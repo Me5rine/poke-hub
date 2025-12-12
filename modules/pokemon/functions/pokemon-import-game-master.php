@@ -1,0 +1,1306 @@
+<?php
+// File: modules/pokemon/tools/pokemon-import-game-master.php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+$active_modules = get_option( 'poke_hub_active_modules', [] );
+if ( ! is_array( $active_modules ) ) {
+    $active_modules = [];
+}
+
+if ( ! in_array( 'pokemon', $active_modules, true ) ) {
+    echo '<div class="notice notice-error"><p>'
+        . esc_html__( 'Game Master tools are only available when the Pokémon module is active.', 'poke-hub' )
+        . '</p></div>';
+    return;
+}
+
+/**
+ * Importe / met à jour UN Pokémon à partir de pokemonSettings.
+ *
+ * + création automatique des formes Méga / Primo comme Pokémon à part entière
+ *   (slug = mega-charizard-x, primal-kyogre, etc.) avec leurs stats dédiées.
+ *
+ * @param string $template_id
+ * @param array  $settings
+ * @param array  $tables
+ * @param array  $stats
+ * @param array  $seen_pokemon_slugs
+ * @param array  $gender_index
+ * @param array  $pokemon_index
+ * @return array
+ */
+function poke_hub_pokemon_import_from_pokemon_settings(
+    $template_id,
+    array $settings,
+    array $tables,
+    array $stats,
+    array &$seen_pokemon_slugs,
+    array $gender_index = [],
+    array &$pokemon_index = []
+) {
+    global $wpdb;
+
+    $pokemon_table = $tables['pokemon'];
+
+    $pokemon_id_proto = $settings['pokemonId'] ?? '';
+    if ( $pokemon_id_proto === '' ) {
+        return $stats;
+    }
+
+    // Dex & génération
+    $dex_number        = poke_hub_pokemon_gm_template_to_dex( $template_id );
+    $generation_number = poke_hub_pokemon_guess_generation_by_dex( $dex_number );
+
+    // Forme brute Niantic
+    $form_proto   = $settings['form'] ?? '';
+    $form_mapping = poke_hub_pokemon_get_form_mapping( $pokemon_id_proto, $form_proto );
+
+    // Form slug :
+    if ( $form_mapping && ! empty( $form_mapping['form_slug'] ) ) {
+        $form_slug = sanitize_title( (string) $form_mapping['form_slug'] );
+    } else {
+        $form_slug = poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto );
+    }
+
+    // Nom humain de base
+    $base_name = poke_hub_pokemon_gm_id_to_label( $pokemon_id_proto );
+
+    // Suffix (label_suffix) prioritaire depuis le mapping
+    $label_suffix = '';
+    if ( $form_mapping && ! empty( $form_mapping['label_suffix'] ) ) {
+        $label_suffix = trim( (string) $form_mapping['label_suffix'] );
+    }
+
+    // Fallback suffix depuis la forme GM si spécial
+    if ( $label_suffix === '' && $form_slug !== '' && $form_proto !== '' && $form_proto !== 'UNSET' && $form_proto !== 'FORM_UNSET' ) {
+        $raw_label = poke_hub_pokemon_gm_id_to_label( $form_proto );
+        if ( $raw_label === $form_proto || $raw_label === '' ) {
+            $raw_label = ucwords( str_replace( [ '-', '_' ], ' ', $form_slug ) );
+        }
+        $label_suffix = $raw_label;
+    }
+
+    // Normalisation du suffix
+    $label_suffix = poke_hub_pokemon_normalize_form_label_suffix( $base_name, $label_suffix );
+
+    // Nom complet
+    if ( $label_suffix !== '' ) {
+        $name_label = $base_name . ' ' . $label_suffix;
+    } else {
+        $name_label = $base_name;
+        if ( substr( $name_label, -7 ) === ' Normal' ) {
+            $name_label = substr( $name_label, 0, -7 );
+        }
+    }
+
+    // Sync de la forme globale dans pokemon_form_variants
+    $variant_id       = 0;
+    $variant_category = '';
+    $variant_group    = '';
+
+    if ( $form_slug !== '' ) {
+        $variant_label = $label_suffix !== '' ? $label_suffix : ucwords( str_replace( '-', ' ', $form_slug ) );
+
+        if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+            $variant_id = poke_hub_pokemon_upsert_form_variant(
+                $form_slug,
+                $variant_label,
+                '', // category
+                '', // group
+                [
+                    'pokemon_id_proto' => $pokemon_id_proto,
+                    'form_proto'       => $form_proto,
+                    'template_id'      => $template_id,
+                ]
+            );
+        }
+
+        $variant_row = poke_hub_pokemon_get_form_variant_by_slug( $form_slug );
+        if ( is_array( $variant_row ) ) {
+            $variant_category = $variant_row['category'] ?? '';
+            $variant_group    = $variant_row['group'] ?? '';
+        }
+    }
+
+    // Slugs
+    $slug_base = poke_hub_pokemon_gm_id_to_slug( $pokemon_id_proto );
+    $slug      = $slug_base;
+    if ( $form_slug !== '' ) {
+        $slug .= '-' . $form_slug;
+    }
+
+    // Pokémon de base = forme vide
+    $is_default = ( $form_slug === '' ) ? 1 : 0;
+
+    // Slug vu dans ce Game Master (stat)
+    $seen_pokemon_slugs[] = $slug;
+
+    // Gender ratio
+    $gender_male   = 0.0;
+    $gender_female = 0.0;
+
+    if ( ! empty( $gender_index[ $pokemon_id_proto ] ) ) {
+        $gender_male   = (float) ( $gender_index[ $pokemon_id_proto ]['male']   ?? 0.0 );
+        $gender_female = (float) ( $gender_index[ $pokemon_id_proto ]['female'] ?? 0.0 );
+    }
+
+    // Stats
+    $stats_proto = $settings['stats'] ?? [];
+    $base_atk    = isset( $stats_proto['baseAttack'] ) ? (int) $stats_proto['baseAttack'] : 0;
+    $base_def    = isset( $stats_proto['baseDefense'] ) ? (int) $stats_proto['baseDefense'] : 0;
+    $base_sta    = isset( $stats_proto['baseStamina'] ) ? (int) $stats_proto['baseStamina'] : 0;
+
+    // CP sets base
+    $cp_sets = [
+        'max_cp'        => [],
+        'min_cp_10'     => [],
+        'min_cp_shadow' => [],
+    ];
+
+    if ( function_exists( 'poke_hub_pokemon_build_cp_sets_for_pokemon' )
+        && $base_atk > 0 && $base_def > 0 && $base_sta > 0
+    ) {
+        $cp_sets = poke_hub_pokemon_build_cp_sets_for_pokemon(
+            $base_atk,
+            $base_def,
+            $base_sta
+        );
+    }
+
+    $type1_proto = $settings['type'] ?? '';
+    $type2_proto = $settings['type2'] ?? '';
+
+    $type1_slug = poke_hub_pokemon_gm_type_proto_to_slug( $type1_proto );
+    $type2_slug = poke_hub_pokemon_gm_type_proto_to_slug( $type2_proto );
+
+    // Données GM supplémentaires
+    $height_m  = isset( $settings['pokedexHeightM'] ) ? (float) $settings['pokedexHeightM'] : 0.0;
+    $weight_kg = isset( $settings['pokedexWeightKg'] ) ? (float) $settings['pokedexWeightKg'] : 0.0;
+
+    $km_buddy_distance = isset( $settings['kmBuddyDistance'] ) ? (float) $settings['kmBuddyDistance'] : 0.0;
+
+    $encounter = ( isset( $settings['encounter'] ) && is_array( $settings['encounter'] ) )
+        ? $settings['encounter']
+        : [];
+
+    $base_capture_rate = isset( $encounter['baseCaptureRate'] ) ? (float) $encounter['baseCaptureRate'] : null;
+    $base_flee_rate    = isset( $encounter['baseFleeRate'] ) ? (float) $encounter['baseFleeRate'] : null;
+
+    $third_attack_raw = ( isset( $settings['thirdAttack'] ) && is_array( $settings['thirdAttack'] ) )
+        ? $settings['thirdAttack']
+        : [];
+
+    $second_attack_cost = [
+        'stardust' => isset( $third_attack_raw['stardustToUnlock'] ) ? (int) $third_attack_raw['stardustToUnlock'] : 0,
+        'candy'    => isset( $third_attack_raw['candyToUnlock'] ) ? (int) $third_attack_raw['candyToUnlock'] : 0,
+    ];
+
+    // Flags GM
+    if ( function_exists( 'poke_hub_pokemon_extract_flags_from_settings' ) ) {
+        $flags = poke_hub_pokemon_extract_flags_from_settings( $settings );
+    } else {
+        $flags = [
+            'is_tradable'               => ! empty( $settings['isTradable'] ) ? 1 : 0,
+            'is_transferable'           => ! empty( $settings['isTransferable'] ) ? 1 : 0,
+            'has_shadow'                => 0,
+            'has_purified'              => 0,
+            'shadow_stardust'           => 0,
+            'shadow_candy'              => 0,
+            'shadow_move'               => '',
+            'purified_move'             => '',
+            'buddy_mega_energy_award'   => 0,
+            'attack_probability'        => 0.0,
+            'dodge_probability'         => 0.0,
+        ];
+    }
+
+    // Noms multi-langues
+    $names = poke_hub_pokemon_get_i18n_names( 'pokemon', $slug, $name_label );
+
+    // Génération
+    $generation_id = 0;
+    if ( ! empty( $tables['generations'] ) && $generation_number > 0 ) {
+        $generation_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$tables['generations']} WHERE generation_number = %d LIMIT 1",
+                $generation_number
+            )
+        );
+    }
+
+    // Ligne existante ?
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+            $slug
+        )
+    );
+
+    $game_key = 'pokemon_go';
+
+    $game_go = [
+        'pokedex' => [
+            'height_m'  => $height_m,
+            'weight_kg' => $weight_kg,
+        ],
+        'buddy'   => [
+            'km_buddy_distance'        => $km_buddy_distance,
+            'buddy_mega_energy_award'  => $flags['buddy_mega_energy_award'] ?? 0,
+        ],
+        'encounter' => [
+            'base_capture_rate'  => $base_capture_rate,
+            'base_flee_rate'     => $base_flee_rate,
+            'attack_probability' => $flags['attack_probability'] ?? 0.0,
+            'dodge_probability'  => $flags['dodge_probability'] ?? 0.0,
+        ],
+        'encounter_raw' => $encounter,
+        'second_move'   => [
+            'cost' => $second_attack_cost,
+            'raw'  => $third_attack_raw,
+        ],
+        'shadow' => [
+            'has_shadow'      => (bool) ( $flags['has_shadow'] ?? 0 ),
+            'has_purified'    => (bool) ( $flags['has_purified'] ?? 0 ),
+            'stardust'        => $flags['shadow_stardust'] ?? 0,
+            'candy'           => $flags['shadow_candy'] ?? 0,
+            'shadow_move'     => $flags['shadow_move'] ?? '',
+            'purified_move'   => $flags['purified_move'] ?? '',
+        ],
+        'trade' => [
+            'is_tradable'     => (bool) ( $flags['is_tradable'] ?? 0 ),
+            'is_transferable' => (bool) ( $flags['is_transferable'] ?? 0 ),
+        ],
+        'cp_sets' => [
+            'max_cp'        => $cp_sets['max_cp'],
+            'min_cp_10'     => $cp_sets['min_cp_10'],
+            'min_cp_shadow' => $cp_sets['min_cp_shadow'],
+        ],
+    ];
+
+    // Meta extra pour la forme de base
+    $extra = [
+        'pokemon_id_proto'   => $pokemon_id_proto,
+        'template_id'        => $template_id,
+        'form_proto'         => $form_proto,
+        'form_slug'          => $form_slug,
+        'type1_proto'        => $type1_proto,
+        'type2_proto'        => $type2_proto,
+
+        'quickAttacks'         => $settings['quickAttacks']         ?? [],
+        'cinematicAttacks'     => $settings['cinematicAttacks']     ?? [],
+        'eliteQuickAttack'     => $settings['eliteQuickAttack']     ?? [],
+        'eliteCinematicAttack' => $settings['eliteCinematicAttack'] ?? [],
+
+        'names'              => $names,
+        'generation_number'  => $generation_number,
+        'game_key'           => $game_key,
+
+        'variant_form_slug'  => $form_slug,
+        'variant_id'         => $variant_id,
+        'variant_category'   => $variant_category,
+        'variant_group'      => $variant_group,
+        'form_label_suffix'  => $label_suffix,
+
+        'gender'             => [
+            'male'   => $gender_male,
+            'female' => $gender_female,
+        ],
+
+        'pokedex'            => [
+            'height_m'  => $height_m,
+            'weight_kg' => $weight_kg,
+        ],
+
+        'buddy'              => [
+            'km_buddy_distance'      => $km_buddy_distance,
+            'buddy_mega_energy_award'=> $flags['buddy_mega_energy_award'] ?? 0,
+        ],
+
+        'encounter'          => [
+            'base_capture_rate'  => $base_capture_rate,
+            'base_flee_rate'     => $base_flee_rate,
+            'attack_probability' => $flags['attack_probability'] ?? 0.0,
+            'dodge_probability'  => $flags['dodge_probability'] ?? 0.0,
+        ],
+        'encounter_raw'      => $encounter,
+
+        'second_move'        => [
+            'cost' => $second_attack_cost,
+            'raw'  => $third_attack_raw,
+        ],
+
+        'shadow'             => [
+            'has_shadow'      => (bool) ( $flags['has_shadow'] ?? 0 ),
+            'has_purified'    => (bool) ( $flags['has_purified'] ?? 0 ),
+            'stardust'        => $flags['shadow_stardust'] ?? 0,
+            'candy'           => $flags['shadow_candy'] ?? 0,
+            'shadow_move'     => $flags['shadow_move'] ?? '',
+            'purified_move'   => $flags['purified_move'] ?? '',
+        ],
+
+        'trade'              => [
+            'is_tradable'     => (bool) ( $flags['is_tradable'] ?? 0 ),
+            'is_transferable' => (bool) ( $flags['is_transferable'] ?? 0 ),
+        ],
+
+        'games'              => [
+            $game_key => $game_go,
+        ],
+    ];
+
+    // === TEMP EVO START : on stocke aussi les tempEvoOverrides dans la forme de base ===
+    if ( ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
+        $extra['temp_evo_overrides'] = $settings['tempEvoOverrides'];
+    }
+    // === TEMP EVO END ===
+
+    $extra_json = wp_json_encode( $extra );
+
+    $data = [
+        'dex_number'      => $dex_number,
+        'name_en'         => $names['en'],
+        'name_fr'         => $names['fr'],
+        'slug'            => $slug,
+        'form_variant_id' => $variant_id,
+        'is_default'      => $is_default,
+
+        'generation_id'   => $generation_id,
+
+        'base_atk'        => $base_atk,
+        'base_def'        => $base_def,
+        'base_sta'        => $base_sta,
+
+        'is_tradable'                       => (int) ( $flags['is_tradable'] ?? 0 ),
+        'is_transferable'                   => (int) ( $flags['is_transferable'] ?? 0 ),
+        'has_shadow'                        => (int) ( $flags['has_shadow'] ?? 0 ),
+        'has_purified'                      => (int) ( $flags['has_purified'] ?? 0 ),
+        'shadow_purification_stardust'      => (int) ( $flags['shadow_stardust'] ?? 0 ),
+        'shadow_purification_candy'         => (int) ( $flags['shadow_candy'] ?? 0 ),
+        'buddy_walked_mega_energy_award'    => (int) ( $flags['buddy_mega_energy_award'] ?? 0 ),
+        'dodge_probability'                 => (float) ( $flags['dodge_probability'] ?? 0.0 ),
+        'attack_probability'                => (float) ( $flags['attack_probability'] ?? 0.0 ),
+
+        'extra'           => $extra_json,
+    ];
+
+    $format = [
+        '%d',      // dex_number
+        '%s',      // name_en
+        '%s',      // name_fr
+        '%s',      // slug
+        '%d',      // form_variant_id
+        '%d',      // is_default
+
+        '%d',      // generation_id
+
+        '%d',      // base_atk
+        '%d',      // base_def
+        '%d',      // base_sta
+
+        '%d',      // is_tradable
+        '%d',      // is_transferable
+        '%d',      // has_shadow
+        '%d',      // has_purified
+        '%d',      // shadow_purification_stardust
+        '%d',      // shadow_purification_candy
+        '%d',      // buddy_walked_mega_energy_award
+        '%f',      // dodge_probability
+        '%f',      // attack_probability
+
+        '%s',      // extra
+    ];
+
+    if ( $row ) {
+        $wpdb->update(
+            $pokemon_table,
+            $data,
+            [ 'id' => (int) $row->id ],
+            $format,
+            [ '%d' ]
+        );
+        $pokemon_id                 = (int) $row->id;
+        $stats['pokemon_updated'][] = $names['en'];
+    } else {
+        $wpdb->insert( $pokemon_table, $data, $format );
+        $pokemon_id                  = (int) $wpdb->insert_id;
+        $stats['pokemon_inserted'][] = $names['en'];
+    }
+
+    // Index proto → (id, forme) pour évolutions
+    $form_key = $form_proto !== '' ? (string) $form_proto : '';
+    if ( $pokemon_id > 0 ) {
+        if ( ! isset( $pokemon_index[ $pokemon_id_proto ] ) ) {
+            $pokemon_index[ $pokemon_id_proto ] = [];
+        }
+        $pokemon_index[ $pokemon_id_proto ][ $form_key ] = [
+            'pokemon_id'      => $pokemon_id,
+            'form_variant_id' => $variant_id,
+        ];
+    }
+
+    // Lier les types
+    $type_ids = [];
+    if ( $type1_slug !== '' ) {
+        $type_ids[] = poke_hub_pokemon_find_or_create_type( $type1_slug, ucfirst( $type1_slug ) );
+    }
+    if ( $type2_slug !== '' && $type2_slug !== $type1_slug ) {
+        $type_ids[] = poke_hub_pokemon_find_or_create_type( $type2_slug, ucfirst( $type2_slug ) );
+    }
+
+    if ( $pokemon_id > 0 && ! empty( $type_ids ) ) {
+        poke_hub_pokemon_sync_pokemon_types_links( $pokemon_id, $type_ids );
+        $stats['pokemon_type_links'] += count( $type_ids );
+    }
+
+    // Liens Pokémon ↔ Attaques
+    $links = [];
+    if ( $pokemon_id > 0 && ! empty( $tables['pokemon_attack_links'] ) && ! empty( $tables['attacks'] ) ) {
+        $quick_moves     = isset( $settings['quickAttacks'] ) && is_array( $settings['quickAttacks'] ) ? $settings['quickAttacks'] : [];
+        $cinematic_moves = isset( $settings['cinematicAttacks'] ) && is_array( $settings['cinematicAttacks'] ) ? $settings['cinematicAttacks'] : [];
+        $elite_quick     = isset( $settings['eliteQuickAttack'] ) && is_array( $settings['eliteQuickAttack'] ) ? $settings['eliteQuickAttack'] : [];
+        $elite_cinematic = isset( $settings['eliteCinematicAttack'] ) && is_array( $settings['eliteCinematicAttack'] ) ? $settings['eliteCinematicAttack'] : [];
+
+        $attack_links_map = [];
+
+        $add_link = static function( $attack_id, $role, $is_legacy = 0, $is_event = 0, $is_elite_tm = 0 ) use ( &$attack_links_map ) {
+            $attack_id = (int) $attack_id;
+            if ( $attack_id <= 0 || $role === '' ) {
+                return;
+            }
+            $key = $attack_id . '|' . $role;
+            if ( ! isset( $attack_links_map[ $key ] ) ) {
+                $attack_links_map[ $key ] = [
+                    'attack_id'   => $attack_id,
+                    'role'        => $role,
+                    'is_legacy'   => 0,
+                    'is_event'    => 0,
+                    'is_elite_tm' => 0,
+                ];
+            }
+            if ( $is_legacy ) {
+                $attack_links_map[ $key ]['is_legacy'] = 1;
+            }
+            if ( $is_event ) {
+                $attack_links_map[ $key ]['is_event'] = 1;
+            }
+            if ( $is_elite_tm ) {
+                $attack_links_map[ $key ]['is_elite_tm'] = 1;
+            }
+        };
+
+        foreach ( $quick_moves as $attack_id ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $attack_id );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'fast', 0, 0, 0 );
+            }
+        }
+
+        foreach ( $elite_quick as $attack_id ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $attack_id );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'fast', 1, 1, 1 );
+            }
+        }
+
+        foreach ( $cinematic_moves as $attack_id ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $attack_id );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'charged', 0, 0, 0 );
+            }
+        }
+
+        foreach ( $elite_cinematic as $attack_id ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $attack_id );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'charged', 1, 1, 1 );
+            }
+        }
+
+        if ( ! empty( $flags['shadow_move'] ) ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $flags['shadow_move'] );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'charged', 0, 0, 0 );
+            }
+        }
+
+        if ( ! empty( $flags['purified_move'] ) ) {
+            $slug_move = poke_hub_pokemon_gm_id_to_slug( $flags['purified_move'] );
+            $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
+            if ( $attack_id > 0 ) {
+                $add_link( $attack_id, 'charged', 0, 0, 0 );
+            }
+        }
+
+        $links = array_values( $attack_links_map );
+        if ( ! empty( $links ) ) {
+            poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, $links, $tables );
+            $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + count( $links );
+        }
+    }
+
+    /**
+     * === TEMP EVO START ===
+     * Création des Pokémon Méga / Primo à partir de tempEvoOverrides.
+     *
+     * - Slugs : mega-charizard-x, primal-kyogre, etc.
+     * - Stats dédiées (overrides), CP sets recalculés.
+     * - Types override (typeOverride1/2).
+     * - Liaison types + attaques.
+     * - Index dans $pokemon_index pour être utilisable par PASS 3 (évolutions).
+     */
+    if ( $pokemon_id > 0 && ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
+        foreach ( $settings['tempEvoOverrides'] as $temp_evo ) {
+            if ( ! is_array( $temp_evo ) ) {
+                continue;
+            }
+
+            $temp_evo_id = (string) ( $temp_evo['tempEvoId'] ?? '' );
+            if ( $temp_evo_id === '' ) {
+                continue;
+            }
+
+            $temp_form_slug  = poke_hub_pokemon_temp_evo_id_to_form_slug( $temp_evo_id );
+            $temp_form_label = poke_hub_pokemon_temp_evo_id_to_label( $temp_evo_id );
+
+            // Construction du slug global : mega-charizard-x, primal-kyogre, etc.
+            $parts  = explode( '-', $temp_form_slug );
+            $prefix = $parts[0] ?? '';
+            $suffix = $parts[1] ?? '';
+
+            if ( $prefix === '' ) {
+                continue;
+            }
+
+            if ( $suffix !== '' ) {
+                $mega_slug = $prefix . '-' . $slug_base . '-' . $suffix;
+            } else {
+                $mega_slug = $prefix . '-' . $slug_base;
+            }
+
+            // Catégorie de variante
+            $mega_variant_category = 'special';
+            if ( poke_hub_pokemon_is_temp_evo_mega( $temp_evo_id ) ) {
+                $mega_variant_category = 'mega';
+            } elseif ( poke_hub_pokemon_is_temp_evo_primal( $temp_evo_id ) ) {
+                $mega_variant_category = 'primal';
+            }
+
+            // Upsert variant (form_slug = mega, mega-x, primal, ...)
+            $mega_variant_id = 0;
+            if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+                $mega_variant_id = poke_hub_pokemon_upsert_form_variant(
+                    $temp_form_slug,
+                    $temp_form_label,
+                    $mega_variant_category,
+                    '',
+                    [
+                        'pokemon_id_proto' => $pokemon_id_proto,
+                        'temp_evo_id'      => $temp_evo_id,
+                        'template_id'      => $template_id,
+                    ]
+                );
+            }
+
+            $mega_variant_row = poke_hub_pokemon_get_form_variant_by_slug( $temp_form_slug );
+            if ( is_array( $mega_variant_row ) ) {
+                $mega_variant_category = $mega_variant_row['category'] ?? $mega_variant_category;
+                $mega_variant_group    = $mega_variant_row['group'] ?? '';
+            } else {
+                $mega_variant_group    = '';
+            }
+
+            // Override des stats
+            $mega_stats = $temp_evo['stats'] ?? [];
+            $mega_atk   = isset( $mega_stats['baseAttack'] )  ? (int) $mega_stats['baseAttack']  : $base_atk;
+            $mega_def   = isset( $mega_stats['baseDefense'] ) ? (int) $mega_stats['baseDefense'] : $base_def;
+            $mega_sta   = isset( $mega_stats['baseStamina'] ) ? (int) $mega_stats['baseStamina'] : $base_sta;
+
+            // Types override
+            $mega_type1_proto = $temp_evo['typeOverride1'] ?? $type1_proto;
+            $mega_type2_proto = $temp_evo['typeOverride2'] ?? $type2_proto;
+
+            $mega_type1_slug = poke_hub_pokemon_gm_type_proto_to_slug( $mega_type1_proto );
+            $mega_type2_slug = poke_hub_pokemon_gm_type_proto_to_slug( $mega_type2_proto );
+
+            // Pokedex overrides
+            $mega_height_m  = isset( $temp_evo['averageHeightM'] ) ? (float) $temp_evo['averageHeightM'] : $height_m;
+            $mega_weight_kg = isset( $temp_evo['averageWeightKg'] ) ? (float) $temp_evo['averageWeightKg'] : $weight_kg;
+
+            // CP sets Méga
+            $mega_cp_sets = [
+                'max_cp'        => [],
+                'min_cp_10'     => [],
+                'min_cp_shadow' => [],
+            ];
+            if ( function_exists( 'poke_hub_pokemon_build_cp_sets_for_pokemon' )
+                && $mega_atk > 0 && $mega_def > 0 && $mega_sta > 0
+            ) {
+                $mega_cp_sets = poke_hub_pokemon_build_cp_sets_for_pokemon(
+                    $mega_atk,
+                    $mega_def,
+                    $mega_sta
+                );
+            }
+
+            // Nom / i18n
+            $mega_label = $temp_form_label . ' ' . $base_name;
+            $mega_names = poke_hub_pokemon_get_i18n_names( 'pokemon', $mega_slug, $mega_label );
+
+            // Game data pour la Méga / Primo
+            $mega_game_go = $game_go;
+            $mega_game_go['pokedex']['height_m']  = $mega_height_m;
+            $mega_game_go['pokedex']['weight_kg'] = $mega_weight_kg;
+            $mega_game_go['cp_sets']              = $mega_cp_sets;
+
+            $mega_extra = [
+                'pokemon_id_proto'   => $pokemon_id_proto,
+                'template_id'        => $template_id,
+                'form_proto'         => $temp_evo_id,
+                'form_slug'          => $temp_form_slug,
+                'type1_proto'        => $mega_type1_proto,
+                'type2_proto'        => $mega_type2_proto,
+
+                'quickAttacks'         => $settings['quickAttacks']         ?? [],
+                'cinematicAttacks'     => $settings['cinematicAttacks']     ?? [],
+                'eliteQuickAttack'     => $settings['eliteQuickAttack']     ?? [],
+                'eliteCinematicAttack' => $settings['eliteCinematicAttack'] ?? [],
+
+                'names'              => $mega_names,
+                'generation_number'  => $generation_number,
+                'game_key'           => $game_key,
+
+                'variant_form_slug'  => $temp_form_slug,
+                'variant_id'         => $mega_variant_id,
+                'variant_category'   => $mega_variant_category,
+                'variant_group'      => $mega_variant_group,
+                'form_label_suffix'  => $temp_form_label,
+
+                'gender'             => [
+                    'male'   => $gender_male,
+                    'female' => $gender_female,
+                ],
+
+                'pokedex'            => [
+                    'height_m'  => $mega_height_m,
+                    'weight_kg' => $mega_weight_kg,
+                ],
+
+                'buddy'              => [
+                    'km_buddy_distance'      => $km_buddy_distance,
+                    'buddy_mega_energy_award'=> $flags['buddy_mega_energy_award'] ?? 0,
+                ],
+
+                'encounter'          => $extra['encounter'],
+                'encounter_raw'      => $encounter,
+
+                'second_move'        => $extra['second_move'],
+                'shadow'             => $extra['shadow'],
+                'trade'              => $extra['trade'],
+
+                'games'              => [
+                    $game_key => $mega_game_go,
+                ],
+
+                'temp_evolution'     => [
+                    'temp_evo_id'            => $temp_evo_id,
+                    'energy_cost'            => (int) ( $temp_evo['temporaryEvolutionEnergyCost'] ?? 0 ),
+                    'energy_cost_subsequent' => (int) ( $temp_evo['temporaryEvolutionEnergyCostSubsequent'] ?? 0 ),
+                ],
+            ];
+
+            $mega_data = [
+                'dex_number'      => $dex_number,
+                'name_en'         => $mega_names['en'],
+                'name_fr'         => $mega_names['fr'],
+                'slug'            => $mega_slug,
+                'form_variant_id' => $mega_variant_id,
+                'is_default'      => 0,
+
+                'generation_id'   => $generation_id,
+
+                'base_atk'        => $mega_atk,
+                'base_def'        => $mega_def,
+                'base_sta'        => $mega_sta,
+
+                'is_tradable'                       => (int) ( $flags['is_tradable'] ?? 0 ),
+                'is_transferable'                   => (int) ( $flags['is_transferable'] ?? 0 ),
+                'has_shadow'                        => (int) ( $flags['has_shadow'] ?? 0 ),
+                'has_purified'                      => (int) ( $flags['has_purified'] ?? 0 ),
+                'shadow_purification_stardust'      => (int) ( $flags['shadow_stardust'] ?? 0 ),
+                'shadow_purification_candy'         => (int) ( $flags['shadow_candy'] ?? 0 ),
+                'buddy_walked_mega_energy_award'    => (int) ( $flags['buddy_mega_energy_award'] ?? 0 ),
+                'dodge_probability'                 => (float) ( $flags['dodge_probability'] ?? 0.0 ),
+                'attack_probability'                => (float) ( $flags['attack_probability'] ?? 0.0 ),
+
+                'extra'           => wp_json_encode( $mega_extra ),
+            ];
+
+            $mega_format = $format;
+
+            // Ligne Méga / Primo existante ?
+            $mega_row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                    $mega_slug
+                )
+            );
+
+            if ( $mega_row ) {
+                $wpdb->update(
+                    $pokemon_table,
+                    $mega_data,
+                    [ 'id' => (int) $mega_row->id ],
+                    $mega_format,
+                    [ '%d' ]
+                );
+                $mega_pokemon_id           = (int) $mega_row->id;
+                $stats['pokemon_updated'][] = $mega_names['en'];
+            } else {
+                $wpdb->insert( $pokemon_table, $mega_data, $mega_format );
+                $mega_pokemon_id            = (int) $wpdb->insert_id;
+                $stats['pokemon_inserted'][] = $mega_names['en'];
+            }
+
+            // Index proto+tempEvoId → (pokemon_id, variant)
+            if ( $mega_pokemon_id > 0 ) {
+                if ( ! isset( $pokemon_index[ $pokemon_id_proto ] ) ) {
+                    $pokemon_index[ $pokemon_id_proto ] = [];
+                }
+                $pokemon_index[ $pokemon_id_proto ][ $temp_evo_id ] = [
+                    'pokemon_id'      => $mega_pokemon_id,
+                    'form_variant_id' => $mega_variant_id,
+                ];
+            }
+
+            // Types Méga / Primo
+            $mega_type_ids = [];
+            if ( $mega_type1_slug !== '' ) {
+                $mega_type_ids[] = poke_hub_pokemon_find_or_create_type( $mega_type1_slug, ucfirst( $mega_type1_slug ) );
+            }
+            if ( $mega_type2_slug !== '' && $mega_type2_slug !== $mega_type1_slug ) {
+                $mega_type_ids[] = poke_hub_pokemon_find_or_create_type( $mega_type2_slug, ucfirst( $mega_type2_slug ) );
+            }
+
+            if ( $mega_pokemon_id > 0 && ! empty( $mega_type_ids ) ) {
+                poke_hub_pokemon_sync_pokemon_types_links( $mega_pokemon_id, $mega_type_ids );
+                $stats['pokemon_type_links'] += count( $mega_type_ids );
+            }
+
+            // Liens attaques → mêmes moves que la forme de base
+            if ( $mega_pokemon_id > 0 && ! empty( $tables['pokemon_attack_links'] ) && ! empty( $tables['attacks'] ) && ! empty( $links ) ) {
+                poke_hub_pokemon_sync_pokemon_attack_links( $mega_pokemon_id, $links, $tables );
+                $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + count( $links );
+            }
+        }
+    }
+    /**
+     * === TEMP EVO END ===
+     */
+
+    return $stats;
+}
+
+/**
+ * Importe / met à jour UN move PvE à partir de moveSettings.
+ *
+ * Remplit :
+ * - attacks (slug, name_en, name_fr, category = fast/charged, extra),
+ * - attack_stats (PvE),
+ * - attack_type_links.
+ *
+ * @param string $template_id
+ * @param array  $settings
+ * @param array  $tables
+ * @param array  $stats
+ * @param array  $seen_attack_slugs Tableau de slugs de moves vus (passé par référence)
+ * @return array
+ */
+function poke_hub_pokemon_import_from_attack_settings( $template_id, array $settings, array $tables, array $stats, array &$seen_attack_slugs ) {
+    global $wpdb;
+
+    $attacks_table = $tables['attacks'];
+    $stats_table   = $tables['attack_stats'];
+
+    $movement_id = $settings['movementId'] ?? '';
+    if ( $movement_id === '' ) {
+        return $stats;
+    }
+
+    $slug          = poke_hub_pokemon_gm_id_to_slug( $movement_id );
+    $default_label = poke_hub_pokemon_gm_id_to_label( $movement_id );
+    $names         = poke_hub_pokemon_get_i18n_names( 'moves', $slug, $default_label );
+
+    // On mémorise le slug comme "vu" (statistique uniquement)
+    $seen_attack_slugs[] = $slug;
+
+    $type_proto = $settings['pokemonType'] ?? '';
+    $type_slug  = poke_hub_pokemon_gm_type_proto_to_slug( $type_proto );
+
+    $power        = isset( $settings['power'] ) ? (int) $settings['power'] : 0;
+    $duration_ms  = isset( $settings['durationMs'] ) ? (int) $settings['durationMs'] : 0;
+    $energy_delta = isset( $settings['energyDelta'] ) ? (int) $settings['energyDelta'] : 0;
+
+    $duration_s = ( $duration_ms > 0 ) ? ( $duration_ms / 1000.0 ) : 0.0;
+    $dps        = ( $duration_s > 0 && $power > 0 ) ? ( $power / $duration_s ) : 0.0;
+    $eps        = ( $duration_s > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $duration_s ) : 0.0;
+
+    // Catégorie globale du move : fast / charged
+    $category = ( substr( $movement_id, -5 ) === '_FAST' ) ? 'fast' : 'charged';
+
+    // Cherche attaque existante
+    $row = $wpdb->get_row(
+        $wpdb->prepare( "SELECT * FROM {$attacks_table} WHERE slug = %s LIMIT 1", $slug )
+    );
+
+    $extra = [
+        'movement_id' => $movement_id,
+        'template_id' => $template_id,
+        'game_key'    => 'pokemon_go',
+        'names'       => $names,
+    ];
+    $extra_json = wp_json_encode( $extra );
+
+    $attack_data   = [
+        'slug'     => $slug,
+        'name_en'  => $names['en'],
+        'name_fr'  => $names['fr'],
+        'category' => $category,
+        'extra'    => $extra_json,
+    ];
+    $attack_format = [ '%s', '%s', '%s', '%s', '%s' ];
+
+    if ( $row ) {
+        $wpdb->update(
+            $attacks_table,
+            $attack_data,
+            [ 'id' => (int) $row->id ],
+            $attack_format,
+            [ '%d' ]
+        );
+        $attack_id                = (int) $row->id;
+        $stats['attacks_updated'][] = $names['en'];
+    } else {
+        $wpdb->insert( $attacks_table, $attack_data, $attack_format );
+        $attack_id                 = (int) $wpdb->insert_id;
+        $stats['attacks_inserted'][] = $names['en'];
+    }
+
+    if ( $attack_id <= 0 || empty( $stats_table ) ) {
+        return $stats;
+    }
+
+    // Stats PvE, context = "pve"
+    $wpdb->delete(
+        $stats_table,
+        [
+            'attack_id' => $attack_id,
+            'game_key'  => 'pokemon_go',
+            'context'   => 'pve',
+        ],
+        [ '%d', '%s', '%s' ]
+    );
+
+    $wpdb->insert(
+        $stats_table,
+        [
+            'attack_id'              => $attack_id,
+            'game_key'               => 'pokemon_go',
+            'context'                => 'pve',
+            'damage'                 => $power,
+            'dps'                    => $dps,
+            'eps'                    => $eps,
+            'duration_ms'            => $duration_ms,
+            'damage_window_start_ms' => 0,
+            'damage_window_end_ms'   => $duration_ms,
+            'energy'                 => $energy_delta,
+            'extra'                  => null,
+        ],
+        [
+            '%d', '%s', '%s',
+            '%d', '%f', '%f',
+            '%d', '%d', '%d',
+            '%d', '%s',
+        ]
+    );
+
+    $stats['pve_stats']++;
+
+    // Liaison type ↔ move
+    if ( $type_slug !== '' ) {
+        $type_id = poke_hub_pokemon_find_or_create_type( $type_slug, ucfirst( $type_slug ) );
+        if ( $type_id > 0 ) {
+            poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            $stats['attack_type_links']++;
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * Importe / met à jour UN move PvP à partir de combatAttack.
+ *
+ * Remplit uniquement attack_stats (context=pvp) et met à jour les noms,
+ * sans toucher à category (déjà décidé côté PvE).
+ *
+ * @param string $template_id
+ * @param array  $combat_move
+ * @param array  $tables
+ * @param array  $stats
+ * @param array  $seen_attack_slugs Tableau de slugs de moves vus (passé par référence)
+ * @return array
+ */
+function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_move, array $tables, array $stats, array &$seen_attack_slugs ) {
+    global $wpdb;
+
+    $attacks_table = $tables['attacks'];
+    $stats_table   = $tables['attack_stats'];
+
+    $unique_id = $combat_move['uniqueId'] ?? '';
+    if ( $unique_id === '' ) {
+        return $stats;
+    }
+
+    $slug          = poke_hub_pokemon_gm_id_to_slug( $unique_id );
+    $default_label = poke_hub_pokemon_gm_id_to_label( $unique_id );
+    $names         = poke_hub_pokemon_get_i18n_names( 'moves', $slug, $default_label );
+
+    // On mémorise le slug comme "vu" (statistique uniquement)
+    $seen_attack_slugs[] = $slug;
+
+    $type_proto = $combat_move['type'] ?? '';
+    $type_slug  = poke_hub_pokemon_gm_type_proto_to_slug( $type_proto );
+
+    $power        = isset( $combat_move['power'] ) ? (int) $combat_move['power'] : 0;
+    $energy_delta = isset( $combat_move['energyDelta'] ) ? (int) $combat_move['energyDelta'] : 0;
+    $turns        = isset( $combat_move['durationTurns'] ) ? (int) $combat_move['durationTurns'] : 0;
+
+    $duration_s = ( $turns > 0 ) ? ( $turns * 0.5 ) : 0.0;
+    $dps        = ( $duration_s > 0 && $power > 0 ) ? ( $power / $duration_s ) : 0.0;
+    $eps        = ( $duration_s > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $duration_s ) : 0.0;
+
+    // Cherche attaque existante
+    $row = $wpdb->get_row(
+        $wpdb->prepare( "SELECT * FROM {$attacks_table} WHERE slug = %s LIMIT 1", $slug )
+    );
+
+    $extra = [
+        'unique_id'   => $unique_id,
+        'template_id' => $template_id,
+        'game_key'    => 'pokemon_go',
+        'names'       => $names,
+    ];
+    $extra_json = wp_json_encode( $extra );
+
+    $attack_data   = [
+        'slug'    => $slug,
+        'name_en' => $names['en'],
+        'name_fr' => $names['fr'],
+        'extra'   => $extra_json,
+    ];
+    $attack_format = [ '%s', '%s', '%s', '%s' ];
+
+    if ( $row ) {
+        $wpdb->update(
+            $attacks_table,
+            $attack_data,
+            [ 'id' => (int) $row->id ],
+            $attack_format,
+            [ '%d' ]
+        );
+        $attack_id                = (int) $row->id;
+        $stats['attacks_updated'][] = $names['en'];
+    } else {
+        $wpdb->insert( $attacks_table, $attack_data, $attack_format );
+        $attack_id                 = (int) $wpdb->insert_id;
+        $stats['attacks_inserted'][] = $names['en'];
+    }
+
+    if ( $attack_id <= 0 || empty( $stats_table ) ) {
+        return $stats;
+    }
+
+    // Stats PvP, context = "pvp"
+    $wpdb->delete(
+        $stats_table,
+        [
+            'attack_id' => $attack_id,
+            'game_key'  => 'pokemon_go',
+            'context'   => 'pvp',
+        ],
+        [ '%d', '%s', '%s' ]
+    );
+
+    $duration_ms = (int) round( $duration_s * 1000 );
+
+    $wpdb->insert(
+        $stats_table,
+        [
+            'attack_id'              => $attack_id,
+            'game_key'               => 'pokemon_go',
+            'context'                => 'pvp',
+            'damage'                 => $power,
+            'dps'                    => $dps,
+            'eps'                    => $eps,
+            'duration_ms'            => $duration_ms,
+            'damage_window_start_ms' => 0,
+            'damage_window_end_ms'   => $duration_ms,
+            'energy'                 => $energy_delta,
+            'extra'                  => null,
+        ],
+        [
+            '%d', '%s', '%s',
+            '%d', '%f', '%f',
+            '%d', '%d', '%d',
+            '%d', '%s',
+        ]
+    );
+
+    $stats['pvp_stats']++;
+
+    // Liaison type ↔ move
+    if ( $type_slug !== '' ) {
+        $type_id = poke_hub_pokemon_find_or_create_type( $type_slug, ucfirst( $type_slug ) );
+        if ( $type_id > 0 ) {
+            poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            $stats['attack_type_links']++;
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * Import global Game Master Pokémon GO → tables Poké HUB.
+ *
+ * IMPORTANT : ne supprime RIEN.
+ * - Ajoute ce qui n'existe pas
+ * - Met à jour ce qui existe déjà
+ *
+ * @param string $source URL ou chemin du JSON Game Master.
+ * @return array|\WP_Error
+ */
+function poke_hub_pokemon_import_game_master( $source ) {
+    if ( ! function_exists( 'pokehub_get_table' ) ) {
+        return new \WP_Error( 'missing_helper', 'pokehub_get_table() is required.' );
+    }
+
+    if ( function_exists( 'set_time_limit' ) ) {
+        @set_time_limit( 300 );
+    }
+
+    // Helper générique, déplacé dans un autre fichier
+    $json = poke_hub_pokemon_load_gamemaster_json( $source );
+    if ( is_wp_error( $json ) ) {
+        return $json;
+    }
+
+    $decoded = json_decode( $json, true );
+    if ( ! is_array( $decoded ) ) {
+        return new \WP_Error( 'invalid_json', 'Game Master JSON is invalid.' );
+    }
+
+    global $wpdb;
+
+    $tables = [
+        'pokemon'              => pokehub_get_table( 'pokemon' ),
+        'pokemon_types'        => pokehub_get_table( 'pokemon_types' ),
+        'pokemon_type_links'   => pokehub_get_table( 'pokemon_type_links' ),
+        'attacks'              => pokehub_get_table( 'attacks' ),
+        'attack_stats'         => pokehub_get_table( 'attack_stats' ),
+        'attack_type_links'    => pokehub_get_table( 'attack_type_links' ),
+        'pokemon_attack_links' => pokehub_get_table( 'pokemon_attack_links' ),
+        'generations'          => pokehub_get_table( 'generations' ),
+        'pokemon_evolutions'   => pokehub_get_table( 'pokemon_evolutions' ),
+    ];
+
+    // Stats détaillées
+    $stats = [
+        'pokemon_inserted'     => [],
+        'pokemon_updated'      => [],
+        'attacks_inserted'       => [],
+        'attacks_updated'        => [],
+        'pve_stats'            => 0,
+        'pvp_stats'            => 0,
+        'pokemon_type_links'   => 0,
+        'attack_type_links'      => 0,
+        'pokemon_attack_links' => 0,
+        // On pourrait ajouter plus tard : 'pokemon_evolutions' => 0,
+    ];
+
+    $seen_pokemon_slugs = [];
+    $seen_attack_slugs    = [];
+
+    // Index des genres (male/female) à partir des blocs SPAWN_*
+    // Helper poke_hub_gm_build_gender_index() déplacé dans un autre fichier.
+    $gender_index = function_exists( 'poke_hub_gm_build_gender_index' )
+        ? poke_hub_gm_build_gender_index( $decoded )
+        : [];
+
+    // Index global proto → id / forme (servira pour les évolutions)
+    $pokemon_index = [];
+
+    // PASS 1 : Attacks (PvE + PvP)
+    foreach ( $decoded as $entry ) {
+        if ( ! is_array( $entry ) ) {
+            continue;
+        }
+
+        $template_id = $entry['templateId'] ?? '';
+        $data        = $entry['data'] ?? [];
+
+        if ( isset( $data['moveSettings'] ) && is_array( $data['moveSettings'] ) && ! empty( $tables['attacks'] ) ) {
+            $stats = poke_hub_pokemon_import_from_attack_settings(
+                $template_id,
+                $data['moveSettings'],
+                $tables,
+                $stats,
+                $seen_attack_slugs
+            );
+            continue;
+        }
+
+        if ( isset( $data['combatAttack'] ) && is_array( $data['combatAttack'] ) && ! empty( $tables['attacks'] ) ) {
+            $stats = poke_hub_pokemon_import_from_combat_move(
+                $template_id,
+                $data['combatAttack'],
+                $tables,
+                $stats,
+                $seen_attack_slugs
+            );
+            continue;
+        }
+    }
+
+    // PASS 2 : Pokémon (stats, types, attaques, flags GM)
+    foreach ( $decoded as $entry ) {
+        if ( ! is_array( $entry ) ) {
+            continue;
+        }
+
+        $template_id = $entry['templateId'] ?? '';
+        $data        = $entry['data'] ?? [];
+
+        if ( isset( $data['pokemonSettings'] ) && is_array( $data['pokemonSettings'] ) && ! empty( $tables['pokemon'] ) ) {
+            $stats = poke_hub_pokemon_import_from_pokemon_settings(
+                $template_id,
+                $data['pokemonSettings'],
+                $tables,
+                $stats,
+                $seen_pokemon_slugs,
+                $gender_index,
+                $pokemon_index
+            );
+            continue;
+        }
+    }
+
+    /**
+     * PASS 3 : Evolutions (pokemon_evolutions)
+     *
+     * On a maintenant :
+     * - $pokemon_index[pokemonId_proto][form_proto] => ['pokemon_id','form_variant_id']
+     * - les helpers :
+     *   * poke_hub_pokemon_normalize_evolution_branches()
+     *   * poke_hub_pokemon_sync_pokemon_evolutions()
+     */
+    if (
+        ! empty( $tables['pokemon_evolutions'] )
+        && function_exists( 'poke_hub_pokemon_normalize_evolution_branches' )
+        && function_exists( 'poke_hub_pokemon_sync_pokemon_evolutions' )
+    ) {
+        foreach ( $decoded as $entry ) {
+            if ( ! is_array( $entry ) ) {
+                continue;
+            }
+
+            $data = $entry['data'] ?? [];
+            if ( empty( $data['pokemonSettings'] ) || ! is_array( $data['pokemonSettings'] ) ) {
+                continue;
+            }
+
+            $pokemon_settings = $data['pokemonSettings'];
+
+            $base_proto = $pokemon_settings['pokemonId'] ?? '';
+            if ( $base_proto === '' ) {
+                continue;
+            }
+
+            $base_form_proto = $pokemon_settings['form'] ?? '';
+            $base_form_key   = $base_form_proto !== '' ? (string) $base_form_proto : '';
+
+            if ( empty( $pokemon_index[ $base_proto ] ) ) {
+                continue;
+            }
+
+            // On essaie d'abord forme exacte, sinon forme par défaut
+            $base_info = $pokemon_index[ $base_proto ][ $base_form_key ] ?? null;
+            if ( ! $base_info && isset( $pokemon_index[ $base_proto ][''] ) ) {
+                $base_info = $pokemon_index[ $base_proto ][''];
+            }
+
+            if ( ! $base_info ) {
+                continue;
+            }
+
+            $base_pokemon_id      = (int) ( $base_info['pokemon_id']      ?? 0 );
+            $base_form_variant_id = (int) ( $base_info['form_variant_id'] ?? 0 );
+
+            if ( $base_pokemon_id <= 0 ) {
+                continue;
+            }
+
+            $branches = poke_hub_pokemon_normalize_evolution_branches( $pokemon_settings );
+            if ( empty( $branches ) ) {
+                continue;
+            }
+
+            // Resolver proto → (pokemon_id, form_variant_id)
+            $resolver = static function( string $target_id_proto, string $target_form_proto ) use ( $pokemon_index ): array {
+                if ( $target_id_proto === '' ) {
+                    return [ 0, 0 ];
+                }
+                if ( empty( $pokemon_index[ $target_id_proto ] ) ) {
+                    return [ 0, 0 ];
+                }
+
+                $form_key = $target_form_proto !== '' ? $target_form_proto : '';
+
+                $info = $pokemon_index[ $target_id_proto ][ $form_key ] ?? null;
+                if ( ! $info && isset( $pokemon_index[ $target_id_proto ][''] ) ) {
+                    $info = $pokemon_index[ $target_id_proto ][''];
+                }
+
+                if ( ! $info ) {
+                    return [ 0, 0 ];
+                }
+
+                return [
+                    (int) ( $info['pokemon_id']      ?? 0 ),
+                    (int) ( $info['form_variant_id'] ?? 0 ),
+                ];
+            };
+
+            poke_hub_pokemon_sync_pokemon_evolutions(
+                $base_pokemon_id,
+                $base_form_variant_id,
+                $branches,
+                [
+                    'mode'     => 'import',
+                    'tables'   => $tables,
+                    'resolver' => $resolver,
+                ]
+            );            
+        }
+    }
+
+    return $stats;
+}

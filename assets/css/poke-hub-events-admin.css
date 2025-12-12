@@ -1,0 +1,46 @@
+.pokehub-event-image-preview {
+    max-width: 150px !important;
+    height: auto !important;
+    border-radius: 6px;
+    display: block;
+}
+
+.pokehub-url-wrap {
+    padding: 20px;
+}
+
+.media-frame select.attachment-filters {
+    max-width: calc(100% - 12px) !important;
+    width: calc(100% - 12px) !important;
+}
+
+.pokehub-gm-summary {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.pokehub-gm-summary .gm-summary-item {
+    margin-bottom: 8px;
+}
+
+.pokehub-gm-summary .gm-summary-item > strong {
+    margin-right: 4px;
+}
+
+.pokehub-gm-summary .gm-summary-detail {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #f6f7f7;
+    border: 1px solid #ccd0d4;
+    max-height: 220px;
+    overflow: auto;
+}
+
+.pokehub-gm-summary .gm-summary-detail ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.pokehub-gm-summary .gm-summary-detail li {
+    margin: 0;
+}
