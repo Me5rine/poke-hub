@@ -28,14 +28,13 @@ jobs:
           script: |
             set -e
 
-            if [ ! -d "${{ matrix.target.path }}" ]; then
-              echo "ERROR: path does not exist: ${{ matrix.target.path }}"
-              exit 1
-            fi
-
             echo "Running git as www-data in ${{ matrix.target.path }}"
 
             sudo -u www-data bash -lc "
+              if [ ! -d '${{ matrix.target.path }}' ]; then
+                echo 'ERROR: path does not exist: ${{ matrix.target.path }}'; \
+                exit 1; \
+              fi; \
               cd '${{ matrix.target.path }}' && \
               if [ ! -d .git ]; then
                 echo 'ERROR: .git directory not found'; \
