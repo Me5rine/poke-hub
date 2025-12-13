@@ -10,7 +10,7 @@ Text Domain: poke-hub
 Domain Path: /languages
 */
 
-// Deploy test: poke-hub auto-deploy OK
+// Deploy test: poke-hub auto-deploy OK or NOT
 
 if (!defined('ABSPATH')) {
     exit;
