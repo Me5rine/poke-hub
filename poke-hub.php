@@ -3,14 +3,12 @@
 Plugin Name: Poké HUB
 Plugin URI: https://example.com
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 1.5.7
+Version: 1.6
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
 Domain Path: /languages
 */
-
-// Deploy test: poke-hub auto-deploy OK or NOT 2333
 
 if (!defined('ABSPATH')) {
     exit;
