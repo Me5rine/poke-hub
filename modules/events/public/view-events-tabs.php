@@ -12,7 +12,7 @@ if (!in_array($current_status, $valid_statuses, true)) {
 }
 
 // Base URL sans paramètre status (mais on garde event_type, category, etc.)
-$base_url = reattack_query_arg(['status', 'pg', 'paged']);
+$base_url = remove_query_arg(['status', 'pg', 'paged']);
 
 ?>
 <div class="pokehub-events-tabs">
