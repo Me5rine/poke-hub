@@ -2,11 +2,90 @@
 
 jQuery(function ($) {
 
+    // Initialiser Select2 pour tous les selects de Pokémon existants
+    function initPokemonSelect2($select) {
+        if (!$select.length || typeof $.fn.select2 === 'undefined') {
+            return;
+        }
+        
+        // Vérifier si Select2 est déjà initialisé sur cet élément
+        if ($select.hasClass('select2-hidden-accessible')) {
+            // Détruire l'instance existante avant de réinitialiser
+            try {
+                $select.select2('destroy');
+            } catch(e) {
+                // Ignorer les erreurs de destruction
+            }
+        }
+        
+        // Initialiser Select2 uniquement si l'élément est visible
+        if ($select.is(':visible')) {
+            $select.select2({
+                placeholder: 'Sélectionner un Pokémon',
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() {
+                        return "Aucun résultat trouvé";
+                    },
+                    searching: function() {
+                        return "Recherche en cours...";
+                    }
+                }
+            });
+        }
+    }
+
+    // Initialiser Select2 pour tous les selects de Pokémon au chargement
+    // Exclure le template (caché) de l'initialisation
+    // Utiliser un délai pour s'assurer que Select2 est chargé
+    setTimeout(function() {
+        $('.pokehub-event-pokemon-row:not(.template) .pokehub-pokemon-select').each(function() {
+            const $select = $(this);
+            // Double vérification : ne pas initialiser si c'est dans un template
+            if (!$select.closest('.pokehub-event-pokemon-row').hasClass('template')) {
+                initPokemonSelect2($select);
+            }
+        });
+    }, 100);
+
     function addPokemonRow() {
         const $wrapper = $('#pokehub-event-pokemon-wrapper');
         const $tmpl = $wrapper.find('.pokehub-event-pokemon-row.template').first();
-        const $row = $tmpl.clone().removeClass('template').show();
+        
+        if (!$tmpl.length) {
+            console.error('Template not found');
+            return;
+        }
+        
+        // Cloner le template et retirer la classe template
+        const $row = $tmpl.clone(true, true); // Cloner avec les données et événements
+        $row.removeClass('template');
+        $row.show();
         $wrapper.append($row);
+        
+        // Initialiser Select2 pour le nouveau select après un court délai
+        // pour s'assurer que l'élément est bien visible dans le DOM
+        setTimeout(function() {
+            const $newSelect = $row.find('.pokehub-pokemon-select');
+            
+            // Vérifier que ce n'est pas le template
+            if ($row.hasClass('template')) {
+                console.warn('Trying to initialize Select2 on template');
+                return;
+            }
+            
+            // Détruire Select2 s'il existe déjà (au cas où)
+            if ($newSelect.hasClass('select2-hidden-accessible')) {
+                try {
+                    $newSelect.select2('destroy');
+                } catch(e) {
+                    // Ignorer les erreurs
+                }
+            }
+            
+            initPokemonSelect2($newSelect);
+        }, 50);
     }
 
     function addBonusRow() {
@@ -81,9 +160,17 @@ jQuery(function ($) {
     });
 
     // Boutons "Ajouter"
-    $('#pokehub-add-pokemon-row').on('click', function () {
+    $('#pokehub-add-pokemon-row').on('click', function (e) {
+        e.preventDefault();
         addPokemonRow();
     });
+    
+    // Si aucun select n'est visible au chargement, ajouter automatiquement une ligne
+    // (pour améliorer l'UX en mode "add")
+    if ($('.pokehub-event-pokemon-row:not(.template)').length === 0) {
+        // Ne pas ajouter automatiquement, laisser l'utilisateur cliquer sur "Ajouter un Pokémon"
+        // Mais s'assurer que le premier ajout fonctionne bien
+    }
 
     $('#pokehub-add-bonus-row').on('click', function () {
         addBonusRow();

@@ -19,6 +19,7 @@ require_once __DIR__ . '/functions/events-helpers.php';
 require_once __DIR__ . '/functions/events-queries.php';
 require_once __DIR__ . '/functions/events-render.php';
 require_once __DIR__ . '/public/shortcode-events.php';
+require_once __DIR__ . '/public/events-front-routing.php';
 
 /**
  * Assets front (optionnel pour l'instant, mais prêt à être utilisé).
@@ -27,6 +28,11 @@ function poke_hub_events_assets() {
     // CSS principal + Select2
     wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', [], POKE_HUB_VERSION);
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+
+    // CSS pour les pages d'événements spéciaux individuels
+    if (get_query_var('pokehub_special_event')) {
+        wp_enqueue_style('pokehub-special-event-single', POKE_HUB_URL . 'assets/css/poke-hub-special-events-single.css', [], POKE_HUB_VERSION);
+    }
 
     // JS Select2
     wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
@@ -42,17 +48,21 @@ function poke_hub_events_assets() {
 add_action('wp_enqueue_scripts', 'poke_hub_events_assets');
 
 add_action('admin_enqueue_scripts', function ($hook) {
-    if ($hook !== 'poke-hub_page_poke-hub-events') {
+    // Vérifier à la fois le hook et le paramètre page pour plus de fiabilité
+    $is_events_page = ($hook === 'poke-hub_page_poke-hub-events') || 
+                      (!empty($_GET['page']) && $_GET['page'] === 'poke-hub-events');
+    
+    if (!$is_events_page) {
         return;
     }
 
     // Nécessaire pour wp.media
     wp_enqueue_media();
 
-    // CSS admin dédié aux Events
+    // CSS admin commun (inclut les styles Events)
     wp_enqueue_style(
-        'pokehub-events-admin-css',
-        POKE_HUB_URL . 'assets/css/poke-hub-events-admin.css',
+        'poke-hub-pokemon-admin',
+        POKE_HUB_URL . 'assets/css/poke-hub-pokemon-admin.css',
         [],
         POKE_HUB_VERSION
     );
@@ -76,11 +86,15 @@ add_action('admin_enqueue_scripts', function ($hook) {
         ]
     );
 
+    // Select2 pour les sélections de Pokémon
+    wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+    wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
+
     // Ton script existant pour la gestion du formulaire (Pokémon, bonus, etc.)
     wp_enqueue_script(
         'pokehub-special-events-admin',
         POKE_HUB_URL . 'assets/js/special-events-admin.js',
-        ['jquery', 'pokehub-media-url'],
+        ['jquery', 'pokehub-media-url', 'select2'],
         POKE_HUB_VERSION,
         true
     );

@@ -325,6 +325,8 @@ Le plugin crée plusieurs tables personnalisées pour stocker les données. Les 
 - `{prefix}_pokehub_pokemon_form_variants` : Variantes de formes
 - `{prefix}_pokehub_pokemon_evolutions` : Évolutions
 - `{prefix}_pokehub_items` : Items/Objets
+- `{prefix}_pokehub_pokemon_backgrounds` : Fonds spéciaux pour Pokémon
+- `{prefix}_pokehub_pokemon_background_pokemon_links` : Liens Backgrounds ↔ Pokémon
 
 ### Tables du module Events
 

@@ -189,9 +189,12 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     $base_capture_rate = isset( $encounter['baseCaptureRate'] ) ? (float) $encounter['baseCaptureRate'] : null;
     $base_flee_rate    = isset( $encounter['baseFleeRate'] ) ? (float) $encounter['baseFleeRate'] : null;
 
-    $third_attack_raw = ( isset( $settings['thirdAttack'] ) && is_array( $settings['thirdAttack'] ) )
-        ? $settings['thirdAttack']
-        : [];
+    // Second charged move cost (Game Master thirdMove ou thirdAttack pour rétrocompatibilité)
+    $third_attack_raw = ( isset( $settings['thirdMove'] ) && is_array( $settings['thirdMove'] ) )
+        ? $settings['thirdMove']
+        : ( ( isset( $settings['thirdAttack'] ) && is_array( $settings['thirdAttack'] ) )
+            ? $settings['thirdAttack']
+            : [] );
 
     $second_attack_cost = [
         'stardust' => isset( $third_attack_raw['stardustToUnlock'] ) ? (int) $third_attack_raw['stardustToUnlock'] : 0,
@@ -289,10 +292,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'type1_proto'        => $type1_proto,
         'type2_proto'        => $type2_proto,
 
-        'quickAttacks'         => $settings['quickAttacks']         ?? [],
-        'cinematicAttacks'     => $settings['cinematicAttacks']     ?? [],
+        'quickMoves'         => $settings['quickMoves']         ?? [],
+        'cinematicMoves'     => $settings['cinematicMoves']     ?? [],
         'eliteQuickAttack'     => $settings['eliteQuickAttack']     ?? [],
-        'eliteCinematicAttack' => $settings['eliteCinematicAttack'] ?? [],
+        'eliteCinematicMove' => $settings['eliteCinematicMove'] ?? [],
 
         'names'              => $names,
         'generation_number'  => $generation_number,
@@ -357,12 +360,39 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     }
     // === TEMP EVO END ===
 
+    // Si c'est une mise à jour, préserver les dates de sortie existantes
+    $existing_release = [];
+    if ( $row ) {
+        $existing_extra = json_decode( $row->extra ?? '{}', true );
+        if ( is_array( $existing_extra ) && isset( $existing_extra['release'] ) && is_array( $existing_extra['release'] ) ) {
+            $existing_release = $existing_extra['release'];
+            // Préserver les dates de sortie dans $extra
+            if ( ! isset( $extra['release'] ) || ! is_array( $extra['release'] ) ) {
+                $extra['release'] = [];
+            }
+            foreach ( $existing_release as $key => $value ) {
+                if ( ! empty( $value ) && ( ! isset( $extra['release'][ $key ] ) || empty( $extra['release'][ $key ] ) ) ) {
+                    $extra['release'][ $key ] = $value;
+                }
+            }
+        }
+    }
+
+    // Mettre à jour automatiquement les flags en fonction des dates de sortie
+    $release = $extra['release'] ?? [];
+    
+    // Si une date de sortie shadow existe, cela signifie que shadow ET purified existent
+    if ( ! empty( $release['shadow'] ) ) {
+        $flags['has_shadow']   = 1;
+        $flags['has_purified'] = 1;
+    }
+
     $extra_json = wp_json_encode( $extra );
 
+    // Préparer les données pour l'insertion/mise à jour
     $data = [
         'dex_number'      => $dex_number,
         'name_en'         => $names['en'],
-        'name_fr'         => $names['fr'],
         'slug'            => $slug,
         'form_variant_id' => $variant_id,
         'is_default'      => $is_default,
@@ -386,32 +416,46 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'extra'           => $extra_json,
     ];
 
-    $format = [
-        '%d',      // dex_number
-        '%s',      // name_en
-        '%s',      // name_fr
-        '%s',      // slug
-        '%d',      // form_variant_id
-        '%d',      // is_default
+    // Ne mettre name_fr que si on a une traduction (pour ne pas écraser avec vide lors de la mise à jour)
+    // Pour les nouveaux enregistrements, on peut mettre vide si pas de traduction
+    if (!empty($names['fr'])) {
+        // Insérer name_fr après name_en dans le bon ordre
+        $data_with_fr = [];
+        foreach ($data as $key => $value) {
+            $data_with_fr[$key] = $value;
+            if ($key === 'name_en') {
+                $data_with_fr['name_fr'] = $names['fr'];
+            }
+        }
+        $data = $data_with_fr;
+    } elseif (!$row) {
+        // Nouvel enregistrement : on peut mettre vide
+        $data_with_fr = [];
+        foreach ($data as $key => $value) {
+            $data_with_fr[$key] = $value;
+            if ($key === 'name_en') {
+                $data_with_fr['name_fr'] = '';
+            }
+        }
+        $data = $data_with_fr;
+    }
+    // Si $row existe et name_fr est vide, on ne met pas name_fr dans $data pour ne pas écraser
 
-        '%d',      // generation_id
-
-        '%d',      // base_atk
-        '%d',      // base_def
-        '%d',      // base_sta
-
-        '%d',      // is_tradable
-        '%d',      // is_transferable
-        '%d',      // has_shadow
-        '%d',      // has_purified
-        '%d',      // shadow_purification_stardust
-        '%d',      // shadow_purification_candy
-        '%d',      // buddy_walked_mega_energy_award
-        '%f',      // dodge_probability
-        '%f',      // attack_probability
-
-        '%s',      // extra
-    ];
+    $format = [];
+    foreach ($data as $key => $value) {
+        if ($key === 'dex_number' || $key === 'form_variant_id' || $key === 'is_default' || 
+            $key === 'generation_id' || $key === 'base_atk' || $key === 'base_def' || 
+            $key === 'base_sta' || $key === 'is_tradable' || $key === 'is_transferable' || 
+            $key === 'has_shadow' || $key === 'has_purified' || 
+            $key === 'shadow_purification_stardust' || $key === 'shadow_purification_candy' || 
+            $key === 'buddy_walked_mega_energy_award') {
+            $format[] = '%d';
+        } elseif ($key === 'dodge_probability' || $key === 'attack_probability') {
+            $format[] = '%f';
+        } else {
+            $format[] = '%s';
+        }
+    }
 
     if ( $row ) {
         $wpdb->update(
@@ -427,6 +471,118 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $wpdb->insert( $pokemon_table, $data, $format );
         $pokemon_id                  = (int) $wpdb->insert_id;
         $stats['pokemon_inserted'][] = $names['en'];
+    }
+
+    // Récupérer automatiquement les traductions Bulbapedia après insertion/mise à jour
+    // si des traductions manquent (surtout pour les autres langues que fr)
+    // MAIS seulement pour les formes de base, pas pour les formes spéciales (Mega-, Copy, etc.)
+    // ET seulement si on n'est PAS en train d'importer le Game Master (pour éviter les ralentissements)
+    // DÉSACTIVÉ pendant l'import : les traductions seront récupérées après via l'onglet Translation
+    if ( false && $pokemon_id > 0 && $dex_number > 0 && !defined('POKE_HUB_GM_IMPORT_IN_PROGRESS') && function_exists('poke_hub_pokemon_auto_fetch_translations')) {
+        // Vérifier si c'est une forme spéciale
+        $is_special_form = false;
+        $special_form_patterns = [
+            '/\bMega\s*-?\s*/i',
+            '/\bCopy\b/i',
+            '/\bFall\s+\d{4}\b/i',
+            '/\bSpring\s+\d{4}\b/i',
+            '/\bSummer\s+\d{4}\b/i',
+            '/\bWinter\s+\d{4}\b/i',
+            '/\bX\b/i',
+            '/\bY\b/i',
+            '/\bAlola\b/i',
+            '/\bGalar\b/i',
+            '/\bHisui\b/i',
+            '/\bPaldea\b/i',
+        ];
+        
+        foreach ($special_form_patterns as $pattern) {
+            if (preg_match($pattern, $names['en'])) {
+                $is_special_form = true;
+                break;
+            }
+        }
+        
+        // Ne pas récupérer depuis Bulbapedia pour les formes spéciales
+        if (!$is_special_form) {
+            // Vérifier si des traductions manquent
+            $needs_fetch = false;
+            $allowed_langs = ['fr', 'de', 'it', 'es', 'ja', 'ko'];
+            foreach ($allowed_langs as $lang) {
+                if (empty($names[$lang]) || $names[$lang] === $names['en']) {
+                    $needs_fetch = true;
+                    break;
+                }
+            }
+
+            if ($needs_fetch) {
+                // Extraire le nom de base (sans les suffixes de forme spéciale) pour Bulbapedia
+                $base_name = $names['en'];
+                foreach ($special_form_patterns as $pattern) {
+                    $base_name = preg_replace($pattern, '', $base_name);
+                }
+                $base_name = trim($base_name);
+                
+                // Récupérer les noms officiels depuis Bulbapedia avec le nom de base
+                $official_names = false;
+                if (!empty($base_name) && function_exists('poke_hub_pokemon_fetch_official_names_from_bulbapedia')) {
+                    $official_names = poke_hub_pokemon_fetch_official_names_from_bulbapedia($dex_number, $base_name);
+                }
+
+                if ($official_names !== false && is_array($official_names)) {
+                    // Mettre à jour extra['names'] avec les nouvelles traductions
+                    $extra_updated = $extra;
+                    $update_extra = false;
+
+                    foreach ($official_names as $lang => $name) {
+                        if ($lang === 'en') {
+                            continue; // Ne pas écraser l'anglais
+                        }
+
+                        // Mettre à jour si la traduction est vide ou identique à l'anglais
+                        if (empty($names[$lang]) || $names[$lang] === $names['en']) {
+                            if (!isset($extra_updated['names']) || !is_array($extra_updated['names'])) {
+                                $extra_updated['names'] = [];
+                            }
+                            $extra_updated['names'][$lang] = $name;
+                            $update_extra = true;
+                        }
+                    }
+
+                    // Mettre à jour name_fr si c'est le français et qu'il était vide
+                    $update_name_fr = false;
+                    if (isset($official_names['fr']) && !empty($official_names['fr']) && (empty($names['fr']) || $names['fr'] === $names['en'])) {
+                        $update_name_fr = true;
+                    }
+
+                    // Mettre à jour la base de données si nécessaire
+                    if ($update_extra || $update_name_fr) {
+                        $update_data = [];
+                        $update_format = [];
+
+                        if ($update_extra) {
+                            $update_data['extra'] = wp_json_encode($extra_updated, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                            $update_format[] = '%s';
+                        }
+
+                        if ($update_name_fr) {
+                            $update_data['name_fr'] = $official_names['fr'];
+                            $update_format[] = '%s';
+                        }
+
+                        if (!empty($update_data)) {
+                            $wpdb->update(
+                                $pokemon_table,
+                                $update_data,
+                                ['id' => $pokemon_id],
+                                $update_format,
+                                ['%d']
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Index proto → (id, forme) pour évolutions
@@ -458,14 +614,15 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     // Liens Pokémon ↔ Attaques
     $links = [];
     if ( $pokemon_id > 0 && ! empty( $tables['pokemon_attack_links'] ) && ! empty( $tables['attacks'] ) ) {
-        $quick_moves     = isset( $settings['quickAttacks'] ) && is_array( $settings['quickAttacks'] ) ? $settings['quickAttacks'] : [];
-        $cinematic_moves = isset( $settings['cinematicAttacks'] ) && is_array( $settings['cinematicAttacks'] ) ? $settings['cinematicAttacks'] : [];
+        // Support des deux formats : ancien (quickAttacks) et nouveau (quickMoves)
+        $quick_moves     = isset( $settings['quickMoves'] ) && is_array( $settings['quickMoves'] ) ? $settings['quickMoves'] : ( isset( $settings['quickAttacks'] ) && is_array( $settings['quickAttacks'] ) ? $settings['quickAttacks'] : [] );
+        $cinematic_moves = isset( $settings['cinematicMoves'] ) && is_array( $settings['cinematicMoves'] ) ? $settings['cinematicMoves'] : ( isset( $settings['cinematicAttacks'] ) && is_array( $settings['cinematicAttacks'] ) ? $settings['cinematicAttacks'] : [] );
         $elite_quick     = isset( $settings['eliteQuickAttack'] ) && is_array( $settings['eliteQuickAttack'] ) ? $settings['eliteQuickAttack'] : [];
-        $elite_cinematic = isset( $settings['eliteCinematicAttack'] ) && is_array( $settings['eliteCinematicAttack'] ) ? $settings['eliteCinematicAttack'] : [];
+        $elite_cinematic = isset( $settings['eliteCinematicMove'] ) && is_array( $settings['eliteCinematicMove'] ) ? $settings['eliteCinematicMove'] : ( isset( $settings['eliteCinematicAttack'] ) && is_array( $settings['eliteCinematicAttack'] ) ? $settings['eliteCinematicAttack'] : [] );
 
         $attack_links_map = [];
 
-        $add_link = static function( $attack_id, $role, $is_legacy = 0, $is_event = 0, $is_elite_tm = 0 ) use ( &$attack_links_map ) {
+        $add_link = static function( $attack_id, $role, $is_legacy = 0, $is_event = 0, $is_elite_tm = 0, $extra_data = null ) use ( &$attack_links_map ) {
             $attack_id = (int) $attack_id;
             if ( $attack_id <= 0 || $role === '' ) {
                 return;
@@ -478,6 +635,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     'is_legacy'   => 0,
                     'is_event'    => 0,
                     'is_elite_tm' => 0,
+                    'extra'       => null,
                 ];
             }
             if ( $is_legacy ) {
@@ -488,6 +646,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
             if ( $is_elite_tm ) {
                 $attack_links_map[ $key ]['is_elite_tm'] = 1;
+            }
+            if ( $extra_data !== null ) {
+                $attack_links_map[ $key ]['extra'] = is_array( $extra_data ) ? wp_json_encode( $extra_data ) : $extra_data;
             }
         };
 
@@ -523,19 +684,23 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
         }
 
+        // Attaques spéciales shadow (FRUSTRATION) - uniquement obtenable via capture shadow
         if ( ! empty( $flags['shadow_move'] ) ) {
             $slug_move = poke_hub_pokemon_gm_id_to_slug( $flags['shadow_move'] );
             $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
             if ( $attack_id > 0 ) {
-                $add_link( $attack_id, 'charged', 0, 0, 0 );
+                // Marquer dans extra comme attaque shadow (ni legacy, ni event)
+                $add_link( $attack_id, 'charged', 0, 0, 0, [ 'is_shadow' => true, 'source' => 'shadow_capture' ] );
             }
         }
 
+        // Attaques spéciales purified (RETURN) - uniquement obtenable via purification
         if ( ! empty( $flags['purified_move'] ) ) {
             $slug_move = poke_hub_pokemon_gm_id_to_slug( $flags['purified_move'] );
             $attack_id = poke_hub_pokemon_get_attack_id_by_slug( $slug_move, $tables );
             if ( $attack_id > 0 ) {
-                $add_link( $attack_id, 'charged', 0, 0, 0 );
+                // Marquer dans extra comme attaque purified (ni legacy, ni event)
+                $add_link( $attack_id, 'charged', 0, 0, 0, [ 'is_purified' => true, 'source' => 'purification' ] );
             }
         }
 
@@ -668,10 +833,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'type1_proto'        => $mega_type1_proto,
                 'type2_proto'        => $mega_type2_proto,
 
-                'quickAttacks'         => $settings['quickAttacks']         ?? [],
-                'cinematicAttacks'     => $settings['cinematicAttacks']     ?? [],
+                'quickMoves'         => $settings['quickMoves']         ?? [],
+                'cinematicMoves'     => $settings['cinematicMoves']     ?? [],
                 'eliteQuickAttack'     => $settings['eliteQuickAttack']     ?? [],
-                'eliteCinematicAttack' => $settings['eliteCinematicAttack'] ?? [],
+                'eliteCinematicMove' => $settings['eliteCinematicMove'] ?? [],
 
                 'names'              => $mega_names,
                 'generation_number'  => $generation_number,
@@ -813,8 +978,11 @@ function poke_hub_pokemon_import_from_pokemon_settings(
  *
  * Remplit :
  * - attacks (slug, name_en, name_fr, category = fast/charged, extra),
- * - attack_stats (PvE),
+ * - attack_stats (stats globales avec context='', stats PvE avec context='pve'),
  * - attack_type_links.
+ *
+ * Les stats globales (duration, damage_window) sont stockées avec context=''.
+ * Les stats PvE (damage, dps, eps, energy) sont stockées avec context='pve'.
  *
  * @param string $template_id
  * @param array  $settings
@@ -844,9 +1012,11 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
     $type_proto = $settings['pokemonType'] ?? '';
     $type_slug  = poke_hub_pokemon_gm_type_proto_to_slug( $type_proto );
 
-    $power        = isset( $settings['power'] ) ? (int) $settings['power'] : 0;
-    $duration_ms  = isset( $settings['durationMs'] ) ? (int) $settings['durationMs'] : 0;
-    $energy_delta = isset( $settings['energyDelta'] ) ? (int) $settings['energyDelta'] : 0;
+    $power                  = isset( $settings['power'] ) ? (int) $settings['power'] : 0;
+    $duration_ms            = isset( $settings['durationMs'] ) ? (int) $settings['durationMs'] : 0;
+    $energy_delta           = isset( $settings['energyDelta'] ) ? (int) $settings['energyDelta'] : 0;
+    $damage_window_start_ms = isset( $settings['damageWindowStartMs'] ) ? (int) $settings['damageWindowStartMs'] : 0;
+    $damage_window_end_ms   = isset( $settings['damageWindowEndMs'] ) ? (int) $settings['damageWindowEndMs'] : 0;
 
     $duration_s = ( $duration_ms > 0 ) ? ( $duration_ms / 1000.0 ) : 0.0;
     $dps        = ( $duration_s > 0 && $power > 0 ) ? ( $power / $duration_s ) : 0.0;
@@ -897,7 +1067,41 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
         return $stats;
     }
 
-    // Stats PvE, context = "pve"
+    // Stats globales (duration, damage_window uniquement) - context = ""
+    $wpdb->delete(
+        $stats_table,
+        [
+            'attack_id' => $attack_id,
+            'game_key'  => 'pokemon_go',
+            'context'   => '',
+        ],
+        [ '%d', '%s', '%s' ]
+    );
+
+    $wpdb->insert(
+        $stats_table,
+        [
+            'attack_id'              => $attack_id,
+            'game_key'               => 'pokemon_go',
+            'context'                => '',
+            'damage'                 => 0,
+            'dps'                    => 0.0,
+            'eps'                    => 0.0,
+            'duration_ms'            => $duration_ms,
+            'damage_window_start_ms' => $damage_window_start_ms,
+            'damage_window_end_ms'   => $damage_window_end_ms,
+            'energy'                 => 0,
+            'extra'                  => null,
+        ],
+        [
+            '%d', '%s', '%s',
+            '%d', '%f', '%f',
+            '%d', '%d', '%d',
+            '%d', '%s',
+        ]
+    );
+
+    // Stats PvE (damage, dps, eps, energy) - context = "pve"
     $wpdb->delete(
         $stats_table,
         [
@@ -917,9 +1121,9 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
             'damage'                 => $power,
             'dps'                    => $dps,
             'eps'                    => $eps,
-            'duration_ms'            => $duration_ms,
+            'duration_ms'            => 0,
             'damage_window_start_ms' => 0,
-            'damage_window_end_ms'   => $duration_ms,
+            'damage_window_end_ms'   => 0,
             'energy'                 => $energy_delta,
             'extra'                  => null,
         ],
@@ -946,10 +1150,14 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
 }
 
 /**
- * Importe / met à jour UN move PvP à partir de combatAttack.
+ * Importe / met à jour UN move PvP à partir de combatMove.
  *
- * Remplit uniquement attack_stats (context=pvp) et met à jour les noms,
+ * Remplit uniquement attack_stats (context='pvp' avec damage, dps, eps, energy) et met à jour les noms,
  * sans toucher à category (déjà décidé côté PvE).
+ *
+ * Les stats globales (duration, damage_window) sont gérées par moveSettings.
+ * Si combatMove contient durationTurns, la durée PvP est stockée dans duration_ms des stats PvP.
+ * Les buffs/debuffs sont stockés dans le champ extra au format JSON.
  *
  * @param string $template_id
  * @param array  $combat_move
@@ -983,14 +1191,77 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
     $energy_delta = isset( $combat_move['energyDelta'] ) ? (int) $combat_move['energyDelta'] : 0;
     $turns        = isset( $combat_move['durationTurns'] ) ? (int) $combat_move['durationTurns'] : 0;
 
-    $duration_s = ( $turns > 0 ) ? ( $turns * 0.5 ) : 0.0;
-    $dps        = ( $duration_s > 0 && $power > 0 ) ? ( $power / $duration_s ) : 0.0;
-    $eps        = ( $duration_s > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $duration_s ) : 0.0;
-
     // Cherche attaque existante
     $row = $wpdb->get_row(
         $wpdb->prepare( "SELECT * FROM {$attacks_table} WHERE slug = %s LIMIT 1", $slug )
     );
+
+    // Calcul de la durée PvP : on vérifie d'abord si durationTurns est présent dans combatMove
+    // Si oui, on utilise cette valeur (qui peut différer de la durée globale)
+    // Sinon, on utilise la durée globale depuis moveSettings
+    $duration_s_pvp = 0.0;
+    $duration_ms_pvp = 0;
+    $global_duration_ms = 0;
+
+    // Récupération de la durée globale si l'attaque existe déjà
+    if ( $row && ! empty( $stats_table ) ) {
+        $existing_global_stats = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT duration_ms FROM {$stats_table} 
+                 WHERE attack_id = %d AND game_key = %s AND context = %s LIMIT 1",
+                (int) $row->id,
+                'pokemon_go',
+                ''
+            )
+        );
+        if ( $existing_global_stats && $existing_global_stats->duration_ms > 0 ) {
+            $global_duration_ms = (int) $existing_global_stats->duration_ms;
+        }
+    }
+
+    // Si durationTurns est présent, on calcule la durée PvP spécifique
+    // Note: Dans le Game Master, durationTurns est stocké avec -1 par rapport à la valeur réelle
+    // Il faut donc ajouter 1 pour obtenir la durée correcte
+    // Source: dataminers ("Turns in the Game Master are one less than what is displayed")
+    $real_turns = 0;
+    $dpt = 0.0; // Damage per turn
+    $ept = 0.0; // Energy per turn
+    
+    if ( $turns > 0 ) {
+        $real_turns = $turns + 1;
+        $duration_s_pvp = $real_turns * 0.5;
+        $duration_ms_pvp = (int) round( $duration_s_pvp * 1000 );
+        
+        // Calcul des statistiques par tour (spécifiques au PvP)
+        $dpt = ( $real_turns > 0 && $power > 0 ) ? ( $power / $real_turns ) : 0.0;
+        $ept = ( $real_turns > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $real_turns ) : 0.0;
+    } else {
+        // Si pas de durationTurns, on utilise la durée globale pour les calculs
+        if ( $global_duration_ms > 0 ) {
+            $duration_s_pvp = $global_duration_ms / 1000.0;
+            // On calcule le nombre de tours à partir de la durée globale
+            $real_turns = (int) round( $duration_s_pvp / 0.5 );
+            if ( $real_turns > 0 ) {
+                $dpt = ( $power > 0 ) ? ( $power / $real_turns ) : 0.0;
+                $ept = ( 0 !== $energy_delta ) ? ( $energy_delta / $real_turns ) : 0.0;
+            }
+        }
+    }
+
+    $dps = ( $duration_s_pvp > 0 && $power > 0 ) ? ( $power / $duration_s_pvp ) : 0.0;
+    $eps = ( $duration_s_pvp > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $duration_s_pvp ) : 0.0;
+
+    // Récupération des buffs/debuffs depuis combatMove
+    $buffs = [];
+    if ( isset( $combat_move['buffs'] ) && is_array( $combat_move['buffs'] ) ) {
+        $buffs = [
+            'buff_activation_chance'            => isset( $combat_move['buffs']['buffActivationChance'] ) ? (float) $combat_move['buffs']['buffActivationChance'] : 0.0,
+            'attacker_attack_stat_stage_change' => isset( $combat_move['buffs']['attackerAttackStatStageChange'] ) ? (int) $combat_move['buffs']['attackerAttackStatStageChange'] : 0,
+            'attacker_defense_stat_stage_change' => isset( $combat_move['buffs']['attackerDefenseStatStageChange'] ) ? (int) $combat_move['buffs']['attackerDefenseStatStageChange'] : 0,
+            'target_attack_stat_stage_change'   => isset( $combat_move['buffs']['targetAttackStatStageChange'] ) ? (int) $combat_move['buffs']['targetAttackStatStageChange'] : 0,
+            'target_defense_stat_stage_change'  => isset( $combat_move['buffs']['targetDefenseStatStageChange'] ) ? (int) $combat_move['buffs']['targetDefenseStatStageChange'] : 0,
+        ];
+    }
 
     $extra = [
         'unique_id'   => $unique_id,
@@ -1028,7 +1299,9 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
         return $stats;
     }
 
-    // Stats PvP, context = "pvp"
+    // Stats PvP (damage, dps, eps, energy) - context = "pvp"
+    // Si durationTurns est présent et différent de la durée globale, on stocke duration_ms dans les stats PvP
+    // Les stats globales (duration, damage_window) sont gérées par moveSettings
     $wpdb->delete(
         $stats_table,
         [
@@ -1039,7 +1312,29 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
         [ '%d', '%s', '%s' ]
     );
 
-    $duration_ms = (int) round( $duration_s * 1000 );
+    // Stocker duration_ms uniquement si elle diffère de la durée globale (si durationTurns était présent)
+    $duration_ms_for_pvp = 0;
+    if ( $turns > 0 && $duration_ms_pvp > 0 ) {
+        // Si durationTurns était présent, on stocke la durée PvP
+        // même si elle est identique à la globale, pour garder la traçabilité
+        $duration_ms_for_pvp = $duration_ms_pvp;
+    }
+
+    // Préparation des données extra pour les buffs/debuffs et statistiques par tour
+    $pvp_extra_data = [];
+    
+    if ( ! empty( $buffs ) ) {
+        $pvp_extra_data['buffs'] = $buffs;
+    }
+    
+    // Ajout des statistiques par tour (spécifiques au PvP)
+    if ( $real_turns > 0 ) {
+        $pvp_extra_data['turns'] = $real_turns;
+        $pvp_extra_data['dpt'] = round( $dpt, 3 );
+        $pvp_extra_data['ept'] = round( $ept, 3 );
+    }
+    
+    $pvp_extra = ! empty( $pvp_extra_data ) ? wp_json_encode( $pvp_extra_data ) : null;
 
     $wpdb->insert(
         $stats_table,
@@ -1050,11 +1345,11 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
             'damage'                 => $power,
             'dps'                    => $dps,
             'eps'                    => $eps,
-            'duration_ms'            => $duration_ms,
+            'duration_ms'            => $duration_ms_for_pvp,
             'damage_window_start_ms' => 0,
-            'damage_window_end_ms'   => $duration_ms,
+            'damage_window_end_ms'   => 0,
             'energy'                 => $energy_delta,
-            'extra'                  => null,
+            'extra'                  => $pvp_extra,
         ],
         [
             '%d', '%s', '%s',
@@ -1091,6 +1386,12 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
 function poke_hub_pokemon_import_game_master( $source ) {
     if ( ! function_exists( 'pokehub_get_table' ) ) {
         return new \WP_Error( 'missing_helper', 'pokehub_get_table() is required.' );
+    }
+
+    // Note: Translations are now handled via Bulbapedia during import
+    // pour éviter les timeouts et les erreurs API (trop d'appels simultanés)
+    if ( ! defined( 'POKE_HUB_GM_IMPORT_IN_PROGRESS' ) ) {
+        define( 'POKE_HUB_GM_IMPORT_IN_PROGRESS', true );
     }
 
     if ( function_exists( 'set_time_limit' ) ) {
@@ -1168,6 +1469,19 @@ function poke_hub_pokemon_import_game_master( $source ) {
             continue;
         }
 
+        // Détection de combatMove (template COMBAT_V0296_MOVE_*)
+        if ( isset( $data['combatMove'] ) && is_array( $data['combatMove'] ) && ! empty( $tables['attacks'] ) ) {
+            $stats = poke_hub_pokemon_import_from_combat_move(
+                $template_id,
+                $data['combatMove'],
+                $tables,
+                $stats,
+                $seen_attack_slugs
+            );
+            continue;
+        }
+
+        // Rétrocompatibilité : combatAttack (ancien format)
         if ( isset( $data['combatAttack'] ) && is_array( $data['combatAttack'] ) && ! empty( $tables['attacks'] ) ) {
             $stats = poke_hub_pokemon_import_from_combat_move(
                 $template_id,
@@ -1299,6 +1613,25 @@ function poke_hub_pokemon_import_game_master( $source ) {
                     'resolver' => $resolver,
                 ]
             );            
+        }
+    }
+
+    /**
+     * PASS 4 : Import des données de types depuis Bulbapedia
+     * 
+     * Importe automatiquement les efficacités offensives et défensives
+     * pour tous les types depuis Bulbapedia.
+     * 
+     * Pour Pokémon GO, on importe les données spécifiques à Pokémon GO
+     * (avec les multiplicateurs ×1.6, ×0.625, ×0.39).
+     */
+    if (function_exists('poke_hub_pokemon_import_all_types_for_pokemon_go')) {
+        $type_import_stats = poke_hub_pokemon_import_all_types_for_pokemon_go();
+        if (isset($type_import_stats['success'])) {
+            $stats['types_imported_for_pokemon_go'] = $type_import_stats['success'];
+        }
+        if (isset($type_import_stats['errors']) && !empty($type_import_stats['errors'])) {
+            $stats['types_import_errors'] = $type_import_stats['errors'];
         }
     }
 

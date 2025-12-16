@@ -34,7 +34,7 @@ function poke_hub_pokemon_items_edit_form($edit_row = null) {
             $name_en = (string) $edit_row->name_en;
         }
 
-        // Compat rétro éventuelle
+        // Compat rétro
         if ($name_fr === '' && $name_en === '' && isset($edit_row->name)) {
             $name_fr = (string) $edit_row->name;
         }
@@ -98,98 +98,84 @@ function poke_hub_pokemon_items_edit_form($edit_row = null) {
                 <input type="hidden" name="id" value="<?php echo (int) $edit_row->id; ?>" />
             <?php endif; ?>
 
-            <table class="form-table" role="presentation">
-                <tr>
-                    <th scope="row">
-                        <label for="name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="name_fr" id="name_fr"
-                               value="<?php echo esc_attr($name_fr); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Example: Encens, Oeuf Chance, Passe de raid…', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+            <!-- Section: Basic Information -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
+                
+                <!-- Name FR / Name EN -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="name_fr" name="name_fr" value="<?php echo esc_attr($name_fr); ?>" />
+                            <p class="description"><?php esc_html_e('Example: Encens, Oeuf Chance, Passe de raid…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="name_en" name="name_en" value="<?php echo esc_attr($name_en); ?>" />
+                            <p class="description"><?php esc_html_e('Example: Incense, Lucky Egg, Raid Pass…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="name_en" id="name_en"
-                               value="<?php echo esc_attr($name_en); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Example: Incense, Lucky Egg, Raid Pass…', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <!-- Slug -->
+                <div class="pokehub-form-group">
+                    <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
+                    <input type="text" id="slug" name="slug" value="<?php echo esc_attr($slug); ?>" />
+                    <p class="description"><?php esc_html_e('Used as a key (e.g. "incense", "lucky-egg"). Leave empty to auto-generate.', 'poke-hub'); ?></p>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="description_fr"><?php esc_html_e('Description (French)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <textarea class="large-text" rows="4" name="description_fr" id="description_fr"><?php echo esc_textarea($description_fr); ?></textarea>
-                        <p class="description">
-                            <?php esc_html_e('Optional: detailed description in French (what the item does in Pokémon GO).', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+            <!-- Section: Descriptions -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Descriptions', 'poke-hub'); ?></h3>
+                
+                <!-- Description FR / Description EN -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="description_fr"><?php esc_html_e('Description (French)', 'poke-hub'); ?></label>
+                            <textarea id="description_fr" name="description_fr" rows="5" style="width: 100%;"><?php echo esc_textarea($description_fr); ?></textarea>
+                            <p class="description"><?php esc_html_e('Optional: what the item does in Pokémon GO.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="description_en"><?php esc_html_e('Description (English)', 'poke-hub'); ?></label>
+                            <textarea id="description_en" name="description_en" rows="5" style="width: 100%;"><?php echo esc_textarea($description_en); ?></textarea>
+                            <p class="description"><?php esc_html_e('Optional: detailed description in English.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="description_en"><?php esc_html_e('Description (English)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <textarea class="large-text" rows="4" name="description_en" id="description_en"><?php echo esc_textarea($description_en); ?></textarea>
-                        <p class="description">
-                            <?php esc_html_e('Optional: detailed description in English.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+            <!-- Section: Item Image -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Item Image', 'poke-hub'); ?></h3>
+                
+                <div class="pokehub-form-group">
+                    <label for="image_url"><?php esc_html_e('Image URL', 'poke-hub'); ?></label>
+                    <input type="url" id="image_url" name="image_url" value="<?php echo esc_attr($image_url); ?>" />
+                    <p class="description"><?php esc_html_e('Full URL to the item icon (e.g. S3 bucket, CDN…).', 'poke-hub'); ?></p>
+                    
+                    <?php if ($image_url) : ?>
+                        <div style="margin-top: 10px;">
+                            <img src="<?php echo esc_url($image_url); ?>" alt="" 
+                                 style="width:64px;height:64px;object-fit:contain;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="slug" id="slug"
-                               value="<?php echo esc_attr($slug); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Used as a key (e.g. "incense", "lucky-egg"). Leave empty to auto-generate from the French or English name.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="image_url"><?php esc_html_e('Item image URL', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="url" class="regular-text" name="image_url" id="image_url"
-                               value="<?php echo esc_attr($image_url); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Full URL to the item icon (e.g. S3 bucket, CDN…).', 'poke-hub'); ?>
-                        </p>
-
-                        <?php if ($image_url) : ?>
-                            <p>
-                                <img src="<?php echo esc_url($image_url); ?>" alt=""
-                                     style="width:48px;height:48px;object-fit:contain;border:1px solid #ccd0d4;padding:2px;background:#fff;" />
-                            </p>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            </table>
-
-            <?php
-            submit_button(
-                $is_edit
-                    ? __('Update item', 'poke-hub')
-                    : __('Add item', 'poke-hub')
-            );
-            ?>
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary"
+                       value="<?php echo $is_edit ? esc_attr__('Update', 'poke-hub') : esc_attr__('Add', 'poke-hub'); ?>" />
+                <a href="<?php echo esc_url($back_url); ?>" class="button">
+                    <?php esc_html_e('Cancel', 'poke-hub'); ?>
+                </a>
+            </p>
         </form>
     </div>
     <?php

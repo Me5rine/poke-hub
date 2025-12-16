@@ -32,13 +32,19 @@ class Poke_Hub_Pokemon_Types_List_Table extends WP_List_Table {
 
     public function get_columns() {
         return [
-            'cb'         => '<input type="checkbox" />',
+            'cb'          => '<input type="checkbox" />',
             // On garde "name" comme identifiant de colonne, mais on affiche name_fr/name_en derrière.
-            'name'       => __('Name', 'poke-hub'),
-            'slug'       => __('Slug', 'poke-hub'),
-            'color'      => __('Color', 'poke-hub'),
-            'icon'       => __('Icon', 'poke-hub'),
-            'sort_order' => __('Order', 'poke-hub'),
+            'name'        => __('Name', 'poke-hub'),
+            'slug'        => __('Slug', 'poke-hub'),
+            'weaknesses'  => __('Weak to (×2)', 'poke-hub'),
+            'resistances' => __('Resists (×½)', 'poke-hub'),
+            'immunities'  => __('Immune to (×0)', 'poke-hub'),
+            'offensive_super_effective' => __('Off. Super (×2)', 'poke-hub'),
+            'offensive_not_very_effective' => __('Off. Not (×½)', 'poke-hub'),
+            'offensive_no_effect' => __('Off. None (×0)', 'poke-hub'),
+            'color'       => __('Color', 'poke-hub'),
+            'icon'        => __('Icon', 'poke-hub'),
+            'sort_order'  => __('Order', 'poke-hub'),
         ];
     }
 
@@ -110,6 +116,24 @@ class Poke_Hub_Pokemon_Types_List_Table extends WP_List_Table {
             case 'slug':
                 return '<code>' . esc_html($item->slug) . '</code>';
 
+            case 'weaknesses':
+                return $this->column_type_relations($item->id, 'weakness');
+
+            case 'resistances':
+                return $this->column_type_relations($item->id, 'resistance');
+
+            case 'immunities':
+                return $this->column_type_relations($item->id, 'immune');
+
+            case 'offensive_super_effective':
+                return $this->column_type_relations($item->id, 'offensive_super_effective');
+
+            case 'offensive_not_very_effective':
+                return $this->column_type_relations($item->id, 'offensive_not_very_effective');
+
+            case 'offensive_no_effect':
+                return $this->column_type_relations($item->id, 'offensive_no_effect');
+
             case 'color':
                 $color = trim((string) $item->color);
                 if ($color === '') {
@@ -139,6 +163,107 @@ class Poke_Hub_Pokemon_Types_List_Table extends WP_List_Table {
         }
 
         return '';
+    }
+
+    /**
+     * Affiche les relations de type (faiblesses, résistances, immunités, efficacités offensives)
+     *
+     * @param int    $type_id
+     * @param string $relation_type 'weakness', 'resistance', 'immune', 'offensive_super_effective', 'offensive_not_very_effective', 'offensive_no_effect'
+     * @return string
+     */
+    private function column_type_relations($type_id, $relation_type) {
+        if (!function_exists('pokehub_get_table')) {
+            return '–';
+        }
+
+        global $wpdb;
+
+        $type_id = (int) $type_id;
+        if ($type_id <= 0) {
+            return '–';
+        }
+
+        // Détermine la table et la colonne selon le type de relation
+        $table_name = '';
+        $join_column = '';
+        
+        switch ($relation_type) {
+            case 'weakness':
+                $table_name = 'pokemon_type_weakness_links';
+                $join_column = 'weakness_type_id';
+                break;
+            case 'resistance':
+                $table_name = 'pokemon_type_resistance_links';
+                $join_column = 'resistance_type_id';
+                break;
+            case 'immune':
+                $table_name = 'pokemon_type_immune_links';
+                $join_column = 'immune_type_id';
+                break;
+            case 'offensive_super_effective':
+                $table_name = 'pokemon_type_offensive_super_effective_links';
+                $join_column = 'target_type_id';
+                break;
+            case 'offensive_not_very_effective':
+                $table_name = 'pokemon_type_offensive_not_very_effective_links';
+                $join_column = 'target_type_id';
+                break;
+            case 'offensive_no_effect':
+                $table_name = 'pokemon_type_offensive_no_effect_links';
+                $join_column = 'target_type_id';
+                break;
+            default:
+                return '–';
+        }
+        
+        $link_table = pokehub_get_table($table_name);
+        $types_table = pokehub_get_table('pokemon_types');
+
+        if (!$link_table || !$types_table) {
+            return '–';
+        }
+
+        // Filtre par game_key : on affiche d'abord pokemon_go, puis core_series
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT t.id, t.name_fr, t.name_en, t.slug, link.game_key
+                 FROM {$link_table} AS link
+                 INNER JOIN {$types_table} AS t ON t.id = link.{$join_column}
+                 WHERE link.type_id = %d
+                 ORDER BY 
+                     CASE link.game_key 
+                         WHEN 'pokemon_go' THEN 1 
+                         WHEN 'core_series' THEN 2 
+                         ELSE 3 
+                     END,
+                     t.name_fr ASC, t.name_en ASC",
+                $type_id
+            )
+        );
+
+        if (empty($rows)) {
+            return '–';
+        }
+
+        $labels = [];
+        foreach ($rows as $row) {
+            $label_fr = isset($row->name_fr) ? (string) $row->name_fr : '';
+            $label_en = isset($row->name_en) ? (string) $row->name_en : '';
+            $label = $label_fr !== '' ? $label_fr : ($label_en !== '' ? $label_en : $row->slug);
+            
+            // Affiche le game_key si différent de core_series
+            $game_key = isset($row->game_key) ? (string) $row->game_key : 'core_series';
+            if ($game_key === 'pokemon_go') {
+                $label = esc_html($label) . ' <span style="color:#999;font-size:0.9em;">(GO)</span>';
+            } else {
+                $label = esc_html($label);
+            }
+            
+            $labels[] = $label;
+        }
+
+        return implode(', ', $labels);
     }
 
     public function get_bulk_actions() {
@@ -192,6 +317,61 @@ class Poke_Hub_Pokemon_Types_List_Table extends WP_List_Table {
                         $ids
                     )
                 );
+            }
+
+            // 🔹 Nettoyage des liaisons type ↔ faiblesses
+            $weakness_table = pokehub_get_table('pokemon_type_weakness_links');
+            if ($weakness_table) {
+                $params = array_merge($ids, $ids);
+                $wpdb->query(
+                    $wpdb->prepare(
+                        "DELETE FROM {$weakness_table} WHERE type_id IN ($in) OR weakness_type_id IN ($in)",
+                        ...$params
+                    )
+                );
+            }
+
+            // 🔹 Nettoyage des liaisons type ↔ résistances
+            $resistance_table = pokehub_get_table('pokemon_type_resistance_links');
+            if ($resistance_table) {
+                $params = array_merge($ids, $ids);
+                $wpdb->query(
+                    $wpdb->prepare(
+                        "DELETE FROM {$resistance_table} WHERE type_id IN ($in) OR resistance_type_id IN ($in)",
+                        ...$params
+                    )
+                );
+            }
+
+            // 🔹 Nettoyage des liaisons type ↔ immunités
+            $immune_table = pokehub_get_table('pokemon_type_immune_links');
+            if ($immune_table) {
+                $params = array_merge($ids, $ids);
+                $wpdb->query(
+                    $wpdb->prepare(
+                        "DELETE FROM {$immune_table} WHERE type_id IN ($in) OR immune_type_id IN ($in)",
+                        ...$params
+                    )
+                );
+            }
+
+            // 🔹 Nettoyage des liaisons type ↔ efficacités offensives
+            $offensive_tables = [
+                'pokemon_type_offensive_super_effective_links',
+                'pokemon_type_offensive_not_very_effective_links',
+                'pokemon_type_offensive_no_effect_links',
+            ];
+            foreach ($offensive_tables as $offensive_table_name) {
+                $offensive_table = pokehub_get_table($offensive_table_name);
+                if ($offensive_table) {
+                    $params = array_merge($ids, $ids);
+                    $wpdb->query(
+                        $wpdb->prepare(
+                            "DELETE FROM {$offensive_table} WHERE type_id IN ($in) OR target_type_id IN ($in)",
+                            ...$params
+                        )
+                    );
+                }
             }
         }
     }
@@ -332,6 +512,41 @@ function poke_hub_pokemon_handle_types_delete() {
         );
     }
 
+    // 🔹 supprimer aussi les liaisons type ↔ faiblesses
+    $weakness_table = pokehub_get_table('pokemon_type_weakness_links');
+    if ($weakness_table) {
+        $wpdb->delete($weakness_table, ['type_id' => $id], ['%d']);
+        $wpdb->delete($weakness_table, ['weakness_type_id' => $id], ['%d']);
+    }
+
+    // 🔹 supprimer aussi les liaisons type ↔ résistances
+    $resistance_table = pokehub_get_table('pokemon_type_resistance_links');
+    if ($resistance_table) {
+        $wpdb->delete($resistance_table, ['type_id' => $id], ['%d']);
+        $wpdb->delete($resistance_table, ['resistance_type_id' => $id], ['%d']);
+    }
+
+    // 🔹 supprimer aussi les liaisons type ↔ immunités
+    $immune_table = pokehub_get_table('pokemon_type_immune_links');
+    if ($immune_table) {
+        $wpdb->delete($immune_table, ['type_id' => $id], ['%d']);
+        $wpdb->delete($immune_table, ['immune_type_id' => $id], ['%d']);
+    }
+
+    // 🔹 supprimer aussi les liaisons type ↔ efficacités offensives
+    $offensive_tables = [
+        'pokemon_type_offensive_super_effective_links' => 'target_type_id',
+        'pokemon_type_offensive_not_very_effective_links' => 'target_type_id',
+        'pokemon_type_offensive_no_effect_links' => 'target_type_id',
+    ];
+    foreach ($offensive_tables as $table_name => $target_column) {
+        $table = pokehub_get_table($table_name);
+        if ($table) {
+            $wpdb->delete($table, ['type_id' => $id], ['%d']);
+            $wpdb->delete($table, [$target_column => $id], ['%d']);
+        }
+    }
+
     $redirect = add_query_arg([
         'page'       => 'poke-hub-pokemon',
         'ph_section' => 'types',
@@ -408,6 +623,66 @@ function poke_hub_pokemon_handle_types_form() {
         $weather_ids = array_values(array_unique($weather_ids));
     }
 
+    // 🔹 NEW : faiblesses sélectionnées
+    $weakness_ids = [];
+    if (!empty($_POST['weakness_ids']) && is_array($_POST['weakness_ids'])) {
+        $weakness_ids = array_map('intval', $_POST['weakness_ids']);
+        $weakness_ids = array_filter($weakness_ids, function ($v) {
+            return $v > 0;
+        });
+        $weakness_ids = array_values(array_unique($weakness_ids));
+    }
+
+    // 🔹 NEW : résistances sélectionnées
+    $resistance_ids = [];
+    if (!empty($_POST['resistance_ids']) && is_array($_POST['resistance_ids'])) {
+        $resistance_ids = array_map('intval', $_POST['resistance_ids']);
+        $resistance_ids = array_filter($resistance_ids, function ($v) {
+            return $v > 0;
+        });
+        $resistance_ids = array_values(array_unique($resistance_ids));
+    }
+
+    // 🔹 NEW : immunités sélectionnées
+    $immune_ids = [];
+    if (!empty($_POST['immune_ids']) && is_array($_POST['immune_ids'])) {
+        $immune_ids = array_map('intval', $_POST['immune_ids']);
+        $immune_ids = array_filter($immune_ids, function ($v) {
+            return $v > 0;
+        });
+        $immune_ids = array_values(array_unique($immune_ids));
+    }
+
+    // 🔹 NEW : efficacités offensives - super efficace
+    $offensive_super_effective_ids = [];
+    if (!empty($_POST['offensive_super_effective_ids']) && is_array($_POST['offensive_super_effective_ids'])) {
+        $offensive_super_effective_ids = array_map('intval', $_POST['offensive_super_effective_ids']);
+        $offensive_super_effective_ids = array_filter($offensive_super_effective_ids, function ($v) {
+            return $v > 0;
+        });
+        $offensive_super_effective_ids = array_values(array_unique($offensive_super_effective_ids));
+    }
+
+    // 🔹 NEW : efficacités offensives - peu efficace
+    $offensive_not_very_effective_ids = [];
+    if (!empty($_POST['offensive_not_very_effective_ids']) && is_array($_POST['offensive_not_very_effective_ids'])) {
+        $offensive_not_very_effective_ids = array_map('intval', $_POST['offensive_not_very_effective_ids']);
+        $offensive_not_very_effective_ids = array_filter($offensive_not_very_effective_ids, function ($v) {
+            return $v > 0;
+        });
+        $offensive_not_very_effective_ids = array_values(array_unique($offensive_not_very_effective_ids));
+    }
+
+    // 🔹 NEW : efficacités offensives - sans effet
+    $offensive_no_effect_ids = [];
+    if (!empty($_POST['offensive_no_effect_ids']) && is_array($_POST['offensive_no_effect_ids'])) {
+        $offensive_no_effect_ids = array_map('intval', $_POST['offensive_no_effect_ids']);
+        $offensive_no_effect_ids = array_filter($offensive_no_effect_ids, function ($v) {
+            return $v > 0;
+        });
+        $offensive_no_effect_ids = array_values(array_unique($offensive_no_effect_ids));
+    }
+
     // Au moins un nom requis (EN ou FR)
     if ($name_en === '' && $name_fr === '') {
         wp_redirect(add_query_arg('ph_msg', 'missing_name', $redirect_base));
@@ -436,9 +711,23 @@ function poke_hub_pokemon_handle_types_form() {
         $wpdb->insert($table, $data, $format);
         $type_id = (int) $wpdb->insert_id;
 
+        // Récupération automatique des traductions depuis Bulbapedia
+        if ($type_id > 0 && !empty($name_en) && function_exists('poke_hub_type_auto_fetch_translations')) {
+            poke_hub_type_auto_fetch_translations($type_id, $name_en);
+        }
+
         // 🔹 sync météo ↔ type
+        // Pour le formulaire, on sauvegarde avec game_key = 'core_series' par défaut
+        // Les données Pokémon GO seront importées automatiquement via l'import Game Master
+        $game_key = 'core_series';
         if ($type_id > 0) {
             poke_hub_pokemon_sync_type_weathers($type_id, $weather_ids);
+            poke_hub_pokemon_sync_type_weaknesses($type_id, $weakness_ids, $game_key);
+            poke_hub_pokemon_sync_type_resistances($type_id, $resistance_ids, $game_key);
+            poke_hub_pokemon_sync_type_immunities($type_id, $immune_ids, $game_key);
+            poke_hub_pokemon_sync_type_offensive_super_effective($type_id, $offensive_super_effective_ids, $game_key);
+            poke_hub_pokemon_sync_type_offensive_not_very_effective($type_id, $offensive_not_very_effective_ids, $game_key);
+            poke_hub_pokemon_sync_type_offensive_no_effect($type_id, $offensive_no_effect_ids, $game_key);
         }
 
         wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
@@ -453,8 +742,22 @@ function poke_hub_pokemon_handle_types_form() {
 
     $wpdb->update($table, $data, ['id' => $id], $format, ['%d']);
 
+    // Récupération automatique des traductions depuis Bulbapedia
+    if (!empty($name_en) && function_exists('poke_hub_type_auto_fetch_translations')) {
+        poke_hub_type_auto_fetch_translations($id, $name_en);
+    }
+
     // 🔹 sync météo ↔ type
+    // Pour le formulaire, on sauvegarde avec game_key = 'core_series' par défaut
+    // Les données Pokémon GO seront importées automatiquement via l'import Game Master
+    $game_key = 'core_series';
     poke_hub_pokemon_sync_type_weathers($id, $weather_ids);
+    poke_hub_pokemon_sync_type_weaknesses($id, $weakness_ids, $game_key);
+    poke_hub_pokemon_sync_type_resistances($id, $resistance_ids, $game_key);
+    poke_hub_pokemon_sync_type_immunities($id, $immune_ids, $game_key);
+    poke_hub_pokemon_sync_type_offensive_super_effective($id, $offensive_super_effective_ids, $game_key);
+    poke_hub_pokemon_sync_type_offensive_not_very_effective($id, $offensive_not_very_effective_ids, $game_key);
+    poke_hub_pokemon_sync_type_offensive_no_effect($id, $offensive_no_effect_ids, $game_key);
 
     $redirect = add_query_arg([
         'ph_msg' => 'updated',
@@ -515,6 +818,390 @@ function poke_hub_pokemon_sync_type_weathers(int $type_id, array $weather_ids) {
                 'weather_id' => $wid,
             ],
             ['%d', '%d']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les faiblesses d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $weakness_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_weaknesses(int $type_id, array $weakness_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_weakness_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $weakness_ids = array_map('intval', $weakness_ids);
+    $weakness_ids = array_filter($weakness_ids, function ($v) {
+        return $v > 0;
+    });
+    $weakness_ids = array_values(array_unique($weakness_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($weakness_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($weakness_ids as $wid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'          => $type_id,
+                'weakness_type_id' => $wid,
+                'game_key'         => $game_key,
+            ],
+            ['%d', '%d', '%s']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les résistances d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $resistance_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_resistances(int $type_id, array $resistance_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_resistance_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $resistance_ids = array_map('intval', $resistance_ids);
+    $resistance_ids = array_filter($resistance_ids, function ($v) {
+        return $v > 0;
+    });
+    $resistance_ids = array_values(array_unique($resistance_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($resistance_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($resistance_ids as $rid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'            => $type_id,
+                'resistance_type_id' => $rid,
+                'game_key'           => $game_key,
+            ],
+            ['%d', '%d', '%s']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les immunités d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $immune_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_immunities(int $type_id, array $immune_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_immune_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $immune_ids = array_map('intval', $immune_ids);
+    $immune_ids = array_filter($immune_ids, function ($v) {
+        return $v > 0;
+    });
+    $immune_ids = array_values(array_unique($immune_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($immune_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($immune_ids as $iid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'     => $type_id,
+                'immune_type_id' => $iid,
+                'game_key'    => $game_key,
+            ],
+            ['%d', '%d', '%s']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les efficacités offensives - Super efficace (×2) d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $target_type_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_offensive_super_effective(int $type_id, array $target_type_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_offensive_super_effective_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $target_type_ids = array_map('intval', $target_type_ids);
+    $target_type_ids = array_filter($target_type_ids, function ($v) {
+        return $v > 0;
+    });
+    $target_type_ids = array_values(array_unique($target_type_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($target_type_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($target_type_ids as $tid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'       => $type_id,
+                'target_type_id' => $tid,
+                'game_key'      => $game_key,
+            ],
+            ['%d', '%d', '%s']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les efficacités offensives - Peu efficace (×½) d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $target_type_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_offensive_not_very_effective(int $type_id, array $target_type_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_offensive_not_very_effective_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $target_type_ids = array_map('intval', $target_type_ids);
+    $target_type_ids = array_filter($target_type_ids, function ($v) {
+        return $v > 0;
+    });
+    $target_type_ids = array_values(array_unique($target_type_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($target_type_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($target_type_ids as $tid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'       => $type_id,
+                'target_type_id' => $tid,
+                'game_key'      => $game_key,
+            ],
+            ['%d', '%d', '%s']
+        );
+    }
+}
+
+/**
+ * 🔹 Synchronise les efficacités offensives - Sans effet (×0) d'un type donné.
+ *
+ * @param int   $type_id
+ * @param int[] $target_type_ids
+ * @param string $game_key 'core_series' ou 'pokemon_go' (défaut: 'core_series')
+ */
+function poke_hub_pokemon_sync_type_offensive_no_effect(int $type_id, array $target_type_ids, string $game_key = 'core_series') {
+    if (!function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+
+    $link_table = pokehub_get_table('pokemon_type_offensive_no_effect_links');
+    if (!$link_table) {
+        return;
+    }
+
+    $type_id = (int) $type_id;
+    if ($type_id <= 0) {
+        return;
+    }
+
+    $game_key = sanitize_key($game_key);
+    if (empty($game_key)) {
+        $game_key = 'core_series';
+    }
+
+    // Nettoyage / dedup
+    $target_type_ids = array_map('intval', $target_type_ids);
+    $target_type_ids = array_filter($target_type_ids, function ($v) {
+        return $v > 0;
+    });
+    $target_type_ids = array_values(array_unique($target_type_ids));
+
+    // Efface toutes les anciennes liaisons pour ce type et ce jeu
+    $wpdb->delete(
+        $link_table,
+        [
+            'type_id' => $type_id,
+            'game_key' => $game_key,
+        ],
+        ['%d', '%s']
+    );
+
+    if (empty($target_type_ids)) {
+        return;
+    }
+
+    // Réinsère les nouvelles liaisons
+    foreach ($target_type_ids as $tid) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'type_id'       => $type_id,
+                'target_type_id' => $tid,
+                'game_key'      => $game_key,
+            ],
+            ['%d', '%d', '%s']
         );
     }
 }

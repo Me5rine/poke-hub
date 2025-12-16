@@ -1425,11 +1425,11 @@ function poke_hub_events_get_remote_attachment_url(int $attachment_id): ?string 
  * Retourne l'URL publique d'un special event.
  *
  * Exemple d'URL finale :
- *   /events/special/mon-event/
+ *   /pokemon-go/events/mon-event/
  */
 function poke_hub_special_event_get_url(string $slug): string {
-    // Adapte le préfixe au besoin : 'events/special/'
-    return home_url('/events/' . rawurlencode($slug) . '/');
+    // Format : /pokemon-go/events/{slug}/
+    return home_url('/pokemon-go/events/' . rawurlencode($slug) . '/');
 }
 
 /**

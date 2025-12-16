@@ -22,8 +22,7 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
 
     $is_edit = ($edit_row && isset($edit_row->id));
 
-    // --- Préparation des valeurs initiales ---
-
+    // Valeurs initiales
     $pokemon_id_proto = '';
     $form_proto       = '';
     $form_slug        = '';
@@ -46,7 +45,6 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
     $existing_variants = [];
 
     if ($variants_table) {
-        // Variant actuellement lié ?
         if ($form_slug !== '') {
             $variant_row = $wpdb->get_row(
                 $wpdb->prepare(
@@ -56,7 +54,6 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
             );
         }
 
-        // Tous les variants existants
         $existing_variants = $wpdb->get_results(
             "SELECT form_slug, label, category, `group`
              FROM {$variants_table}
@@ -94,131 +91,120 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
                 <input type="hidden" name="id" value="<?php echo (int) $edit_row->id; ?>" />
             <?php endif; ?>
 
-            <table class="form-table" role="presentation">
+            <!-- Section: Game Master Identifiers -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Game Master Identifiers', 'poke-hub'); ?></h3>
+                <p class="description" style="margin-top: 0;">
+                    <?php esc_html_e('These values come from the Game Master JSON file.', 'poke-hub'); ?>
+                </p>
+                
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="pokemon_id_proto"><?php esc_html_e('Pokémon ID (proto)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="pokemon_id_proto" name="pokemon_id_proto" value="<?php echo esc_attr($pokemon_id_proto); ?>" required />
+                            <p class="description"><?php esc_html_e('Example: MEWTWO, PIKACHU, BULBASAUR…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="form_proto"><?php esc_html_e('Form (proto)', 'poke-hub'); ?></label>
+                            <input type="text" id="form_proto" name="form_proto" value="<?php echo esc_attr($form_proto); ?>" />
+                            <p class="description"><?php esc_html_e('Example: MEWTWO_A, PIKACHU_FALL_2019…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="pokemon_id_proto"><?php esc_html_e('Pokémon ID (proto)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="pokemon_id_proto" id="pokemon_id_proto"
-                               value="<?php echo esc_attr($pokemon_id_proto); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Example: MEWTWO, PIKACHU, BULBASAUR… (as in Game Master "pokemonId").', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="form_proto"><?php esc_html_e('Form (proto)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="form_proto" id="form_proto"
-                               value="<?php echo esc_attr($form_proto); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Example: MEWTWO_A, PIKACHU_FALL_2019, PIKACHU_COSTUME… (as in "form").', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="form_slug"><?php esc_html_e('Form variant', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <select name="form_slug" id="form_slug">
-                            <option value=""><?php esc_html_e('— Base form / no special variant —', 'poke-hub'); ?></option>
-                            <?php if (!empty($existing_variants)) : ?>
-                                <?php foreach ($existing_variants as $v) : ?>
-                                    <?php
-                                    $option_label = $v->form_slug;
-                                    if (!empty($v->label)) {
-                                        $option_label .= ' — ' . $v->label;
-                                    }
-                                    if (!empty($v->category)) {
-                                        $option_label .= ' [' . $v->category;
-                                        if (!empty($v->group)) {
-                                            $option_label .= ' • ' . $v->group;
-                                        }
-                                        $option_label .= ']';
-                                    } elseif (!empty($v->group)) {
-                                        $option_label .= ' [' . $v->group . ']';
-                                    }
-                                    ?>
-                                    <option value="<?php echo esc_attr($v->form_slug); ?>" <?php selected($form_slug, $v->form_slug); ?>>
-                                        <?php echo esc_html($option_label); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-
-                        <p class="description">
-                            <?php esc_html_e('Choose the global form variant to associate with this proto form. Variants (slug, label, category, group) are managed in the “Form variants” screen.', 'poke-hub'); ?>
-                        </p>
-
-                        <?php if ($variants_table) : ?>
-                            <p class="description">
-                                <a href="<?php echo esc_url( add_query_arg( ['page' => 'poke-hub-pokemon', 'ph_section' => 'form_variants'], admin_url('admin.php') ) ); ?>">
-                                    <?php esc_html_e('Manage global form variants', 'poke-hub'); ?>
-                                </a>
-                            </p>
-                        <?php endif; ?>
-
-                        <?php if ($variant_row) : ?>
-                            <p class="description">
+            <!-- Section: Form Variant Association -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Form Variant Association', 'poke-hub'); ?></h3>
+                
+                <div class="pokehub-form-group">
+                    <label for="form_slug"><?php esc_html_e('Form Variant', 'poke-hub'); ?></label>
+                    <select name="form_slug" id="form_slug">
+                        <option value=""><?php esc_html_e('— Base form / no special variant —', 'poke-hub'); ?></option>
+                        <?php if (!empty($existing_variants)) : ?>
+                            <?php foreach ($existing_variants as $v) : ?>
                                 <?php
-                                printf(
-                                    /* translators: 1: category, 2: group, 3: label */
-                                    esc_html__('Current linked variant: category=%1$s, group=%2$s, label=%3$s', 'poke-hub'),
-                                    esc_html($variant_row->category),
-                                    esc_html($variant_row->group),
-                                    esc_html($variant_row->label)
-                                );
+                                $option_label = $v->form_slug;
+                                if (!empty($v->label)) {
+                                    $option_label .= ' — ' . $v->label;
+                                }
+                                if (!empty($v->category)) {
+                                    $option_label .= ' [' . $v->category;
+                                    if (!empty($v->group)) {
+                                        $option_label .= ' • ' . $v->group;
+                                    }
+                                    $option_label .= ']';
+                                } elseif (!empty($v->group)) {
+                                    $option_label .= ' [' . $v->group . ']';
+                                }
                                 ?>
-                            </p>
-                        <?php elseif ($form_slug !== '') : ?>
-                            <p class="description">
-                                <?php esc_html_e('No global variant was found for this slug. It may be created automatically by the Game Master import, then editable in the “Form variants” screen.', 'poke-hub'); ?>
-                            </p>
+                                <option value="<?php echo esc_attr($v->form_slug); ?>" <?php selected($form_slug, $v->form_slug); ?>>
+                                    <?php echo esc_html($option_label); ?>
+                                </option>
+                            <?php endforeach; ?>
                         <?php endif; ?>
-                    </td>
-                </tr>
+                    </select>
+                    <p class="description">
+                        <?php esc_html_e('Choose the global form variant to associate with this proto form.', 'poke-hub'); ?>
+                        <?php if ($variants_table) : ?>
+                            <a href="<?php echo esc_url( add_query_arg( ['page' => 'poke-hub-pokemon', 'ph_section' => 'forms'], admin_url('admin.php') ) ); ?>" style="margin-left: 10px;">
+                                <?php esc_html_e('Manage form variants', 'poke-hub'); ?> →
+                            </a>
+                        <?php endif; ?>
+                    </p>
 
-                <tr>
-                    <th scope="row">
-                        <label for="label_suffix"><?php esc_html_e('Label suffix (per mapping)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="label_suffix" id="label_suffix"
-                               value="<?php echo esc_attr($label_suffix); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Optional suffix appended to the Pokémon name for this specific mapping (e.g. "Armored", "Fall 2019", "Clone"). This does not change the global form label.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                    <?php if ($variant_row) : ?>
+                        <div style="margin-top: 10px; padding: 10px; background: #f0f0f1; border-left: 3px solid #2271b1; border-radius: 3px;">
+                            <strong><?php esc_html_e('Current linked variant:', 'poke-hub'); ?></strong><br>
+                            <?php
+                            printf(
+                                esc_html__('Category: %1$s | Group: %2$s | Label: %3$s', 'poke-hub'),
+                                '<code>' . esc_html($variant_row->category) . '</code>',
+                                '<code>' . esc_html($variant_row->group) . '</code>',
+                                '<strong>' . esc_html($variant_row->label) . '</strong>'
+                            );
+                            ?>
+                        </div>
+                    <?php elseif ($form_slug !== '') : ?>
+                        <div style="margin-top: 10px; padding: 10px; background: #fcf3cf; border-left: 3px solid #f39c12; border-radius: 3px;">
+                            <?php esc_html_e('⚠️ No global variant found for this slug. It may be created automatically by import.', 'poke-hub'); ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="sort_order"><?php esc_html_e('Sort order', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="number" class="small-text" name="sort_order" id="sort_order"
-                               value="<?php echo esc_attr($sort_order); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Optional ordering between forms for the same Pokémon.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
+            <!-- Section: Display Options -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Display Options', 'poke-hub'); ?></h3>
+                
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="label_suffix"><?php esc_html_e('Label Suffix', 'poke-hub'); ?></label>
+                            <input type="text" id="label_suffix" name="label_suffix" value="<?php echo esc_attr($label_suffix); ?>" />
+                            <p class="description"><?php esc_html_e('Optional suffix appended to the Pokémon name (e.g. "Armored", "Fall 2019").', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="sort_order"><?php esc_html_e('Sort Order', 'poke-hub'); ?></label>
+                            <input type="number" id="sort_order" name="sort_order" value="<?php echo esc_attr($sort_order); ?>" style="max-width: 150px;" />
+                            <p class="description"><?php esc_html_e('Optional ordering between forms.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            <?php
-            submit_button(
-                $is_edit
-                    ? __('Update form mapping', 'poke-hub')
-                    : __('Add form mapping', 'poke-hub')
-            );
-            ?>
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary"
+                       value="<?php echo $is_edit ? esc_attr__('Update', 'poke-hub') : esc_attr__('Add', 'poke-hub'); ?>" />
+                <a href="<?php echo esc_url($back_url); ?>" class="button">
+                    <?php esc_html_e('Cancel', 'poke-hub'); ?>
+                </a>
+            </p>
         </form>
     </div>
     <?php

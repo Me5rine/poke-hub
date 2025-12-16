@@ -79,105 +79,84 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                 <input type="hidden" name="id" value="<?php echo (int) $edit_row->id; ?>" />
             <?php endif; ?>
 
-            <table class="form-table" role="presentation">
+            <!-- Section: Basic Information -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
+                
+                <!-- Form Slug / Label -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="form_slug"><?php esc_html_e('Form Slug', 'poke-hub'); ?> *</label>
+                            <input type="text" id="form_slug" name="form_slug" value="<?php echo esc_attr($form_slug); ?>" required />
+                            <p class="description"><?php esc_html_e('Example: "armored", "fall-2019", "costume".', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="label"><?php esc_html_e('Label', 'poke-hub'); ?> *</label>
+                            <input type="text" id="label" name="label" value="<?php echo esc_attr($label); ?>" required />
+                            <p class="description"><?php esc_html_e('Example: "Armored", "Fall 2019", "Costume".', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="form_slug"><?php esc_html_e('Form slug', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="form_slug" id="form_slug"
-                               value="<?php echo esc_attr($form_slug); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Global key for the form (used in Pokémon slug and mappings). Example: "armored", "fall-2019".', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <!-- Category / Group Key -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
+                            <input type="text" id="category" name="category" value="<?php echo esc_attr($category); ?>" />
+                            <p class="description"><?php esc_html_e('Example: costume, clone, regional, shadow, purified, normal…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="group_key"><?php esc_html_e('Group Key', 'poke-hub'); ?></label>
+                            <input type="text" id="group_key" name="group_key" value="<?php echo esc_attr($group_key); ?>" />
+                            <p class="description"><?php esc_html_e('Optional sub-grouping key.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="label"><?php esc_html_e('Label', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="label" id="label"
-                               value="<?php echo esc_attr($label); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Human readable label for this form (e.g. "Armored", "Fall 2019").', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <!-- Parent Form -->
+                <div class="pokehub-form-group">
+                    <label for="parent_form_slug"><?php esc_html_e('Parent Form', 'poke-hub'); ?></label>
+                    <select name="parent_form_slug" id="parent_form_slug">
+                        <option value=""><?php esc_html_e('— No parent —', 'poke-hub'); ?></option>
+                        <?php
+                        if (!empty($parent_candidates)) :
+                            foreach ($parent_candidates as $parent) :
+                                if ($is_edit && $parent['form_slug'] === $form_slug) {
+                                    continue;
+                                }
 
-                <tr>
-                    <th scope="row">
-                        <label for="category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="category" id="category"
-                               value="<?php echo esc_attr($category); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Functional category, used for grouping/filtering. Example: costume, clone, regional, shadow, purified, normal…', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                                $option_label = sprintf(
+                                    '%s (%s)',
+                                    $parent['label'] !== '' ? $parent['label'] : $parent['form_slug'],
+                                    $parent['category'] !== '' ? $parent['category'] : 'normal'
+                                );
+                                ?>
+                                <option value="<?php echo esc_attr($parent['form_slug']); ?>"
+                                    <?php selected($parent_form_slug, $parent['form_slug']); ?>>
+                                    <?php echo esc_html($option_label); ?>
+                                </option>
+                                <?php
+                            endforeach;
+                        endif;
+                        ?>
+                    </select>
+                    <p class="description"><?php esc_html_e('Optional parent form to build hierarchies.', 'poke-hub'); ?></p>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="group_key"><?php esc_html_e('Group key', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" class="regular-text" name="group_key" id="group_key"
-                               value="<?php echo esc_attr($group_key); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Optional group key inside the category (e.g. "armored", "fall_2019", "copy_2020").', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="parent_form_slug"><?php esc_html_e('Parent form', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <select name="parent_form_slug" id="parent_form_slug">
-                            <option value=""><?php esc_html_e('— No parent —', 'poke-hub'); ?></option>
-                            <?php
-                            if (!empty($parent_candidates)) :
-                                foreach ($parent_candidates as $parent) :
-                                    // On ne propose pas lui-même comme parent
-                                    if ($is_edit && $parent['form_slug'] === $form_slug) {
-                                        continue;
-                                    }
-
-                                    $option_label = sprintf(
-                                        '%s (%s)',
-                                        $parent['label'] !== '' ? $parent['label'] : $parent['form_slug'],
-                                        $parent['category'] !== '' ? $parent['category'] : 'normal'
-                                    );
-                                    ?>
-                                    <option value="<?php echo esc_attr($parent['form_slug']); ?>"
-                                        <?php selected($parent_form_slug, $parent['form_slug']); ?>>
-                                        <?php echo esc_html($option_label); ?>
-                                    </option>
-                                    <?php
-                                endforeach;
-                            endif;
-                            ?>
-                        </select>
-                        <p class="description">
-                            <?php esc_html_e('Optional parent form to build hierarchies. For example: "costume-base" as parent and "fall-2019" as child.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-            </table>
-
-            <?php
-            submit_button(
-                $is_edit
-                    ? __('Update form', 'poke-hub')
-                    : __('Add form', 'poke-hub')
-            );
-            ?>
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary"
+                       value="<?php echo $is_edit ? esc_attr__('Update', 'poke-hub') : esc_attr__('Add', 'poke-hub'); ?>" />
+                <a href="<?php echo esc_url($back_url); ?>" class="button">
+                    <?php esc_html_e('Cancel', 'poke-hub'); ?>
+                </a>
+            </p>
         </form>
     </div>
     <?php

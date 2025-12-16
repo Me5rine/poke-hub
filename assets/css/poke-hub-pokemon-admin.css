@@ -1,0 +1,259 @@
+/* ==============================================
+   PokeHub Admin Styles
+   Shared styles for all admin pages
+   ============================================== */
+
+/* Table max width */
+.widefat.fixed.striped.pokehub-table-max-width {
+    max-width: 520px;
+}
+
+/* Table column widths */
+.pokehub-col-legacy {
+    width: 120px;
+}
+
+.pokehub-col-priority,
+.pokehub-col-remove {
+    width: 60px;
+}
+
+.pokehub-col-remove-small {
+    width: 40px;
+}
+
+/* Select2 full width */
+.pokehub-pokemon-select2,
+.pokehub-item-select2,
+.pokehub-lure-select2,
+.pokehub-weather-select2 {
+    width: 100% !important;
+}
+
+/* Evolution form labels */
+.pokehub-evolution-label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+/* Selects et inputs classiques dans la colonne Conditions - ne doivent pas dépasser */
+.widefat.fixed.striped select.regular-text,
+.widefat.fixed.striped input.regular-text {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* ==============================================
+   Move Form Layout - Compact Design
+   ============================================== */
+
+/* Row & Column Layout */
+.wrap .pokehub-section .pokehub-form-row,
+.wrap form .pokehub-form-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+    align-items: flex-start;
+    box-sizing: border-box;
+}
+
+.wrap .pokehub-section .pokehub-form-col,
+.wrap form .pokehub-form-col {
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.wrap .pokehub-section .pokehub-form-col-50,
+.wrap form .pokehub-form-col-50 {
+    flex: 0 0 calc(50% - 10px) !important;
+    max-width: calc(50% - 10px);
+    box-sizing: border-box;
+}
+
+/* Form Groups */
+.wrap .pokehub-section .pokehub-form-group,
+.wrap form .pokehub-form-group {
+    margin-bottom: 15px;
+}
+
+.wrap .pokehub-section .pokehub-form-group label,
+.wrap form .pokehub-form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.wrap .pokehub-section .pokehub-form-group input[type="text"],
+.wrap form .pokehub-form-group input[type="text"],
+.wrap .pokehub-section .pokehub-form-group input[type="number"],
+.wrap form .pokehub-form-group input[type="number"],
+.wrap .pokehub-section .pokehub-form-group select,
+.wrap form .pokehub-form-group select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.wrap .pokehub-section .pokehub-form-group .description,
+.wrap form .pokehub-form-group .description {
+    margin-top: 5px;
+    color: #646970;
+    font-size: 13px;
+}
+
+/* Section Containers */
+.wrap .pokehub-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+}
+
+.wrap .pokehub-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #dcdcde;
+    padding-bottom: 10px;
+    font-size: 18px;
+}
+
+.wrap .pokehub-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.wrap .pokehub-section h5 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Types Grid */
+.wrap .pokehub-section .pokehub-types-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.wrap .pokehub-section .pokehub-type-checkbox {
+    display: flex !important;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.wrap .pokehub-section .pokehub-type-checkbox input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.wrap .pokehub-section .pokehub-type-checkbox span {
+    display: inline !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Buffs/Debuffs Grid */
+.wrap .pokehub-section .pokehub-buffs-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.wrap .pokehub-section .pokehub-buffs-col {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.wrap .pokehub-section .pokehub-buffs-col h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .wrap .pokehub-section .pokehub-form-row,
+    .wrap form .pokehub-form-row {
+        flex-direction: column !important;
+        gap: 0;
+    }
+    
+    .wrap .pokehub-section .pokehub-form-col-50,
+    .wrap form .pokehub-form-col-50 {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .wrap .pokehub-section .pokehub-buffs-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px;
+    }
+    
+    .wrap .pokehub-section .pokehub-types-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+    }
+}
+
+/* ==============================================
+   Events Admin Styles
+   ============================================== */
+
+.pokehub-event-image-preview {
+    max-width: 150px !important;
+    height: auto !important;
+    border-radius: 6px;
+    display: block;
+}
+
+.pokehub-url-wrap {
+    padding: 20px;
+}
+
+.media-frame select.attachment-filters {
+    max-width: calc(100% - 12px) !important;
+    width: calc(100% - 12px) !important;
+}
+
+.pokehub-gm-summary {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.pokehub-gm-summary .gm-summary-item {
+    margin-bottom: 8px;
+}
+
+.pokehub-gm-summary .gm-summary-item > strong {
+    margin-right: 4px;
+}
+
+.pokehub-gm-summary .gm-summary-detail {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #f6f7f7;
+    border: 1px solid #ccd0d4;
+    max-height: 220px;
+    overflow: auto;
+}
+
+.pokehub-gm-summary .gm-summary-detail ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.pokehub-gm-summary .gm-summary-detail li {
+    margin: 0;
+}
+

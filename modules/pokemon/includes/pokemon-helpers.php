@@ -9,12 +9,20 @@ if (!defined('ABSPATH')) { exit; }
 function pokehub_get_all_pokemon_for_select(): array {
     global $wpdb;
 
-    $table = pokehub_get_table('pokemon');
+    $pokemon_table = pokehub_get_table('pokemon');
+    $form_variants_table = pokehub_get_table('pokemon_form_variants');
 
+    // Utiliser name_fr si disponible, sinon name_en
+    // Récupérer le label de la forme depuis pokemon_form_variants si form_variant_id > 0
     $rows = $wpdb->get_results(
-        "SELECT id, dex_number, name, form
-         FROM {$table}
-         ORDER BY dex_number ASC, name ASC",
+        "SELECT p.id, 
+                p.dex_number, 
+                COALESCE(NULLIF(p.name_fr, ''), p.name_en) AS name,
+                p.form_variant_id,
+                COALESCE(fv.label, fv.form_slug, '') AS form
+         FROM {$pokemon_table} p
+         LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+         ORDER BY p.dex_number ASC, name ASC",
         ARRAY_A
     );
 
@@ -40,13 +48,13 @@ function pokehub_get_pokemon_special_attacks(int $pokemon_id): array {
     $rows = $wpdb->get_results(
         $wpdb->prepare(
             "
-            SELECT a.id, a.name
+            SELECT a.id, COALESCE(NULLIF(a.name_fr, ''), a.name_en) AS name
             FROM {$links_table} l
             INNER JOIN {$attacks_table} a
                 ON a.id = l.attack_id
             WHERE l.pokemon_id = %d
               AND (l.is_event = 1 OR l.role = %s)
-            ORDER BY a.name ASC
+            ORDER BY name ASC
             ",
             $pokemon_id,
             'special'

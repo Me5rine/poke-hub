@@ -201,10 +201,13 @@ function poke_hub_pokemon_get_i18n_names( $category, $slug, $default_en ) {
 
     $allowed_langs = [ 'en', 'fr', 'de', 'it', 'es', 'ja','ko' ];
 
-    // Valeurs par défaut = EN partout
+    // Initialisation : seulement EN avec la valeur par défaut, les autres langues vides
     $names = [];
+    $names['en'] = $default_en;
     foreach ( $allowed_langs as $lang ) {
-        $names[ $lang ] = $default_en;
+        if ( $lang !== 'en' ) {
+            $names[ $lang ] = '';
+        }
     }
 
     $category_map = $cache[ $category ] ?? [];
@@ -220,6 +223,9 @@ function poke_hub_pokemon_get_i18n_names( $category, $slug, $default_en ) {
         // Cas simple : on considère que c'est du FR
         $names['fr'] = $entry;
     }
+
+    // Appliquer le filtre pour les noms officiels Bulbapedia si nécessaire
+    $names = apply_filters('poke_hub_pokemon_i18n_names', $names, $category, $slug, $default_en);
 
     return $names;
 }
@@ -500,9 +506,15 @@ function poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, array $links, 
         $is_legacy   = ! empty( $link['is_legacy'] ) ? 1 : 0;
         $is_event    = ! empty( $link['is_event'] ) ? 1 : 0;
         $is_elite_tm = ! empty( $link['is_elite_tm'] ) ? 1 : 0;
+        $extra       = isset( $link['extra'] ) ? $link['extra'] : null;
 
         if ( $attack_id <= 0 || $role === '' ) {
             continue;
+        }
+
+        // Si extra est un tableau, l'encoder en JSON
+        if ( is_array( $extra ) ) {
+            $extra = wp_json_encode( $extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
         }
 
         $values[]       = $pokemon_id;
@@ -511,7 +523,7 @@ function poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, array $links, 
         $values[]       = $is_legacy;
         $values[]       = $is_event;
         $values[]       = $is_elite_tm;
-        $values[]       = null; // extra
+        $values[]       = $extra;
 
         $placeholders[] = '(%d, %d, %s, %d, %d, %d, %s)';
     }
@@ -661,19 +673,27 @@ function poke_hub_pokemon_extract_flags_from_settings( array $pokemon_settings )
     if ( ! empty( $settings['shadow'] ) && is_array( $settings['shadow'] ) ) {
         $sh = $settings['shadow'];
 
+        // Si le bloc shadow existe, activer automatiquement les flags shadow et purified
+        $has_shadow   = 1;
+        $has_purified = 1;
+
         if ( isset( $sh['purificationStardustNeeded'] ) ) {
             $shadow_stardust = (int) $sh['purificationStardustNeeded'];
         }
         if ( isset( $sh['purificationCandyNeeded'] ) ) {
             $shadow_candy = (int) $sh['purificationCandyNeeded'];
         }
-        if ( ! empty( $sh['shadowChargeAttack'] ) ) {
+        if ( ! empty( $sh['shadowChargeMove'] ) ) {
+            $shadow_move = (string) $sh['shadowChargeMove'];
+        } elseif ( ! empty( $sh['shadowChargeAttack'] ) ) {
+            // Support de l'ancienne clé pour compatibilité
             $shadow_move = (string) $sh['shadowChargeAttack'];
-            $has_shadow  = 1;
         }
-        if ( ! empty( $sh['purifiedChargeAttack'] ) ) {
+        if ( ! empty( $sh['purifiedChargeMove'] ) ) {
+            $purified_move = (string) $sh['purifiedChargeMove'];
+        } elseif ( ! empty( $sh['purifiedChargeAttack'] ) ) {
+            // Support de l'ancienne clé pour compatibilité
             $purified_move = (string) $sh['purifiedChargeAttack'];
-            $has_purified  = 1;
         }
     }
 

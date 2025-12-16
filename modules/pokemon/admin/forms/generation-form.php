@@ -13,12 +13,11 @@ if (!defined('ABSPATH')) {
 function poke_hub_pokemon_generations_edit_form($edit_row = null) {
     global $wpdb;
 
-    // ✅ on veut la liste des RÉGIONS Pokémon (multilingues)
+    // Liste des RÉGIONS Pokémon
     $table_regions = pokehub_get_table('pokemon_regions');
     $regions       = [];
 
     if ($table_regions) {
-        // On fabrique un label UI = COALESCE(name_fr, name_en)
         $regions = $wpdb->get_results(
             "SELECT 
                 id,
@@ -43,7 +42,7 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
     $current_slug       = $is_edit ? (string) $edit_row->slug : '';
     $current_region_id  = $is_edit ? (int) $edit_row->region_id : 0;
 
-    // Noms multilingues : si ancienne colonne label, on fallback dessus
+    // Noms multilingues
     $current_name_fr = '';
     $current_name_en = '';
 
@@ -55,7 +54,7 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
             $current_name_en = (string) $edit_row->name_en;
         }
 
-        // Compat rétro : si les deux sont vides mais qu'on a encore "label"
+        // Compat rétro
         if ($current_name_fr === '' && $current_name_en === '' && isset($edit_row->label)) {
             $current_name_fr = (string) $edit_row->label;
         }
@@ -82,106 +81,71 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                 <input type="hidden" name="id" value="<?php echo (int) $edit_row->id; ?>" />
             <?php endif; ?>
 
-            <table class="form-table" role="presentation">
-                <tr>
-                    <th scope="row">
-                        <label for="gen_number"><?php esc_html_e('Generation number', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="number"
-                               class="small-text"
-                               id="gen_number"
-                               name="generation_number"
-                               value="<?php echo esc_attr($current_gen_number); ?>"
-                               min="1" />
-                        <p class="description">
-                            <?php esc_html_e('Example: 1, 2, 3…', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <!-- Nom FR -->
-                <tr>
-                    <th scope="row">
-                        <label for="gen_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="gen_name_fr"
-                               name="name_fr"
-                               value="<?php echo esc_attr($current_name_fr); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Displayed name in French. At least one name (FR or EN) is required.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <!-- Nom EN -->
-                <tr>
-                    <th scope="row">
-                        <label for="gen_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="gen_name_en"
-                               name="name_en"
-                               value="<?php echo esc_attr($current_name_en); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Displayed name in English.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="gen_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="gen_slug"
-                               name="slug"
-                               value="<?php echo esc_attr($current_slug); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Leave empty to auto-generate from name (FR first, then EN).', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="gen_region"><?php esc_html_e('Region', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <select name="region_id" id="gen_region">
-                            <option value="0">
-                                <?php esc_html_e('None / multiple regions', 'poke-hub'); ?>
-                            </option>
-                            <?php
-                            if (!empty($regions)) :
-                                foreach ($regions as $reg) : ?>
-                                    <option value="<?php echo (int) $reg->id; ?>"
-                                        <?php selected($current_region_id, (int) $reg->id); ?>>
-                                        <?php echo esc_html($reg->label); ?>
+            <!-- Section: Basic Information -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
+                
+                <!-- Generation Number & Region -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="gen_number"><?php esc_html_e('Generation Number', 'poke-hub'); ?> *</label>
+                            <input type="number" id="gen_number" name="generation_number" 
+                                   value="<?php echo esc_attr($current_gen_number); ?>" 
+                                   min="1" style="max-width: 150px;" />
+                            <p class="description"><?php esc_html_e('Example: 1, 2, 3…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="gen_region"><?php esc_html_e('Region', 'poke-hub'); ?></label>
+                            <select name="region_id" id="gen_region">
+                                <option value="0"><?php esc_html_e('-- No region --', 'poke-hub'); ?></option>
+                                <?php foreach ($regions as $r) : ?>
+                                    <option value="<?php echo (int) $r->id; ?>"
+                                        <?php selected($current_region_id, (int) $r->id); ?>>
+                                        <?php echo esc_html($r->label); ?>
                                     </option>
-                                <?php
-                                endforeach;
-                            endif;
-                            ?>
-                        </select>
-                    </td>
-                </tr>
-            </table>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Associated Pokémon region.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
 
-            <?php
-            submit_button(
-                $is_edit
-                    ? __('Update generation', 'poke-hub')
-                    : __('Add generation', 'poke-hub')
-            );
-            ?>
+                <!-- Name FR / Name EN -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="gen_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="gen_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
+                            <p class="description"><?php esc_html_e('Example: Génération 1, Première génération…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="gen_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="gen_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
+                            <p class="description"><?php esc_html_e('Example: Generation 1, First generation…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slug -->
+                <div class="pokehub-form-group">
+                    <label for="gen_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
+                    <input type="text" id="gen_slug" name="slug" value="<?php echo esc_attr($current_slug); ?>" />
+                    <p class="description"><?php esc_html_e('Leave empty to auto-generate from name.', 'poke-hub'); ?></p>
+                </div>
+            </div>
+
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary"
+                       value="<?php echo $is_edit ? esc_attr__('Update', 'poke-hub') : esc_attr__('Add', 'poke-hub'); ?>" />
+                <a href="<?php echo esc_url($back_url); ?>" class="button">
+                    <?php esc_html_e('Cancel', 'poke-hub'); ?>
+                </a>
+            </p>
         </form>
     </div>
     <?php

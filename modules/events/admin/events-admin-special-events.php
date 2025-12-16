@@ -127,6 +127,10 @@ function pokehub_render_special_events_page() {
 
         <form method="get">
             <input type="hidden" name="page" value="poke-hub-events" />
+            <?php 
+            // Afficher le champ de recherche
+            $list_table->search_box(__('Search events', 'poke-hub'), 'pokehub-events');
+            ?>
             <?php wp_nonce_field('bulk-pokehub_events'); ?>
             <?php
             $list_table->display();

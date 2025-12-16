@@ -1,0 +1,96 @@
+/**
+ * Styles pour l'affichage d'un événement spécial unique
+ */
+
+.pokehub-special-event-content {
+    margin: 2em 0;
+}
+
+.pokehub-event-dates {
+    background: #f8f9fa;
+    border-left: 4px solid #0073aa;
+    padding: 1.5em;
+    margin: 2em 0;
+    border-radius: 4px;
+}
+
+.pokehub-event-dates p {
+    margin: 0.5em 0;
+}
+
+.pokehub-event-dates strong {
+    color: #333;
+    font-weight: 600;
+}
+
+/* Badge de type d'événement */
+.pokehub-event-type-badge {
+    display: inline-block;
+    padding: 0.5em 1em;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.875em;
+    margin-bottom: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Pokémon associés */
+.pokehub-event-pokemon-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1em;
+    margin: 2em 0;
+}
+
+.pokehub-event-pokemon-item {
+    text-align: center;
+    padding: 1em;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.pokehub-event-pokemon-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.pokehub-event-pokemon-item img {
+    max-width: 100px;
+    height: auto;
+}
+
+/* Bonus */
+.pokehub-event-bonus-list {
+    margin: 2em 0;
+}
+
+.pokehub-event-bonus-item {
+    padding: 1em;
+    background: #f0f8ff;
+    border-left: 4px solid #4CAF50;
+    margin-bottom: 1em;
+    border-radius: 4px;
+}
+
+.pokehub-event-bonus-item strong {
+    display: block;
+    margin-bottom: 0.5em;
+    color: #2c3e50;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pokehub-event-pokemon-list {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.5em;
+    }
+    
+    .pokehub-event-dates {
+        padding: 1em;
+    }
+}
+

@@ -20,8 +20,11 @@ require_once __DIR__ . '/includes/pokemon-images-helpers.php';
 require_once __DIR__ . '/includes/pokemon-import-game-master-helpers.php';
 require_once __DIR__ . '/includes/pokemon-items-helpers.php';
 require_once __DIR__ . '/includes/pokemon-weathers-helpers.php';
+require_once __DIR__ . '/includes/pokemon-official-names-fetcher.php';
+require_once __DIR__ . '/includes/pokemon-auto-translations.php';
+require_once __DIR__ . '/includes/pokemon-translation-helpers.php';
+require_once __DIR__ . '/includes/pokemon-type-bulbapedia-importer.php';
 require_once __DIR__ . '/functions/pokemon-import-game-master.php';
-require_once __DIR__ . '/functions/pokemon-name-import.php';
 
 /**
  * Assets admin pour la page Pokémon (types, etc.)

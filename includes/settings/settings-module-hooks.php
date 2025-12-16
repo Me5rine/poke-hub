@@ -134,10 +134,18 @@ add_action('admin_init', function () {
             pokehub_get_table('pokemon_attack_links'),
             pokehub_get_table('pokemon_weathers'),
             pokehub_get_table('pokemon_type_weather_links'),
+            pokehub_get_table('pokemon_type_weakness_links'),
+            pokehub_get_table('pokemon_type_resistance_links'),
+            pokehub_get_table('pokemon_type_immune_links'),
+            pokehub_get_table('pokemon_type_offensive_super_effective_links'),
+            pokehub_get_table('pokemon_type_offensive_not_very_effective_links'),
+            pokehub_get_table('pokemon_type_offensive_no_effect_links'),
             pokehub_get_table('pokemon_form_mappings'),
             pokehub_get_table('pokemon_form_variants'),
             pokehub_get_table('pokemon_evolutions'),
             pokehub_get_table('items'),
+            pokehub_get_table('pokemon_backgrounds'),
+            pokehub_get_table('pokemon_background_pokemon_links'),
         ],
 
         'events' => [
@@ -171,5 +179,13 @@ add_action('admin_init', function () {
 
     if (!empty($modules_to_create)) {
         Pokehub_DB::getInstance()->createTables($modules_to_create);
+    }
+    
+    // Migration des colonnes recurring pour special_events (même si la table existe déjà)
+    if (in_array('events', $active_modules, true)) {
+        $events_table = pokehub_get_table('special_events');
+        if ($events_table && ($wpdb->get_var("SHOW TABLES LIKE '{$events_table}'") === $events_table)) {
+            Pokehub_DB::getInstance()->migrateEventsRecurringColumns();
+        }
     }
 });

@@ -979,6 +979,15 @@ function poke_hub_pokemon_prepare_evolutions_from_request(array $raw): array {
             $time_of_day = '';
         }
 
+        // Préparer extra pour stats requirements
+        $extra_data = [];
+        if (isset($entry['stats_requirement_type']) && !empty($entry['stats_requirement_type'])) {
+            $extra_data['stats_requirement_type'] = sanitize_text_field($entry['stats_requirement_type']);
+        }
+        if (isset($entry['stats_requirement_condition']) && !empty($entry['stats_requirement_condition'])) {
+            $extra_data['stats_requirement_condition'] = sanitize_text_field($entry['stats_requirement_condition']);
+        }
+
         $rows[] = [
             'target_pokemon_id'       => $target_id,
             'candy_cost'              => isset($entry['candy_cost'])             ? max(0, (int) $entry['candy_cost']) : 0,
@@ -995,6 +1004,7 @@ function poke_hub_pokemon_prepare_evolutions_from_request(array $raw): array {
             'time_of_day'             => $time_of_day,
             'priority'                => isset($entry['priority'])               ? (int) $entry['priority'] : 0,
             'quest_template_id'       => isset($entry['quest_template_id'])      ? sanitize_text_field($entry['quest_template_id']) : '',
+            'extra'                   => !empty($extra_data) ? $extra_data : null,
         ];
     }
 
@@ -1223,7 +1233,20 @@ function poke_hub_pokemon_sync_pokemon_evolutions(
             // Mode form : on ne gère PAS la création d'items
             $item_slug      = (string) ($row['item_requirement_slug'] ?? '');
             $lure_item_slug = (string) ($row['lure_item_slug'] ?? '');
-            $extra_json     = null;
+            
+            // Extra JSON : récupérer les stats requirements si présents
+            $extra_data = [];
+            if (isset($row['extra']) && is_array($row['extra']) && !empty($row['extra'])) {
+                $extra_data = $row['extra'];
+            }
+            // Si stats requirements sont dans extra, les conserver
+            if (isset($row['stats_requirement_type']) && !empty($row['stats_requirement_type'])) {
+                $extra_data['stats_requirement_type'] = sanitize_text_field($row['stats_requirement_type']);
+            }
+            if (isset($row['stats_requirement_condition']) && !empty($row['stats_requirement_condition'])) {
+                $extra_data['stats_requirement_condition'] = sanitize_text_field($row['stats_requirement_condition']);
+            }
+            $extra_json = !empty($extra_data) ? wp_json_encode($extra_data) : null;
         }
 
         // -------------------------
@@ -1502,6 +1525,13 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'gigantamax' => $release_gigantamax,
     ];
 
+    // Mettre à jour automatiquement les flags en fonction des dates de sortie
+    // Si une date de sortie shadow existe, cela signifie que shadow ET purified existent
+    if ( ! empty( $release_shadow ) ) {
+        $has_shadow   = 1;
+        $has_purified = 1;
+    }
+
     $extra['regional'] = [
         'is_regional'  => $regional_is_regional,
         'description'  => $regional_description,
@@ -1638,6 +1668,11 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
         $pokemon_id = (int) $wpdb->insert_id;
 
+        // Récupération automatique des traductions depuis Bulbapedia
+        if ($pokemon_id > 0 && !empty($name_en) && function_exists('poke_hub_pokemon_auto_fetch_translations')) {
+            poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_number);
+        }
+
         // Sync attaques si helper dispo
         if ($pokemon_id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_attacks')) {
             poke_hub_pokemon_sync_pokemon_attacks(
@@ -1673,6 +1708,11 @@ function poke_hub_pokemon_handle_pokemon_form() {
     }
 
     $wpdb->update($table, $data_common, ['id' => $id], null, ['%d']);
+
+    // Récupération automatique des traductions depuis Bulbapedia (si name_en a changé ou traductions manquantes)
+    if ($id > 0 && !empty($name_en) && function_exists('poke_hub_pokemon_auto_fetch_translations')) {
+        poke_hub_pokemon_auto_fetch_translations($id, $name_en, $dex_number);
+    }
 
     if ($id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_attacks')) {
         poke_hub_pokemon_sync_pokemon_attacks(

@@ -76,6 +76,8 @@ function poke_hub_settings_ui() {
     $sources_enabled     = ($events_enabled || $pokemon_enabled);
     // Onglet Game Master visible seulement si le module Pokémon est actif
     $gamemaster_enabled  = $pokemon_enabled;
+    // Onglet Translation visible si le module Pokémon est actif
+    $translation_enabled = $pokemon_enabled;
 
     // Liste des onglets autorisés
     $allowed_tabs = ['general'];
@@ -84,6 +86,9 @@ function poke_hub_settings_ui() {
     }
     if ($gamemaster_enabled) {
         $allowed_tabs[] = 'gamemaster';
+    }
+    if ($translation_enabled) {
+        $allowed_tabs[] = 'translation';
     }
 
     // Si on demande un onglet non autorisé (ex: désactivation de pokemon
@@ -115,6 +120,12 @@ function poke_hub_settings_ui() {
                 . esc_html__('Game Master', 'poke-hub') . '</a>';
     }
 
+    // Onglet Translation (si module Pokémon actif)
+    if ($translation_enabled) {
+        echo '<a href="?page=poke-hub-settings&tab=translation" class="nav-tab ' . ($active_tab === 'translation' ? 'nav-tab-active' : '') . '">'
+                . esc_html__('Translation', 'poke-hub') . '</a>';
+    }
+
     echo '</nav>';
 
     // Inclusion des onglets
@@ -126,6 +137,8 @@ function poke_hub_settings_ui() {
         include $tabs_dir . 'settings-tab-sources.php';
     } elseif ($active_tab === 'gamemaster') {
         include $tabs_dir . 'settings-tab-gamemaster.php';
+    } elseif ($active_tab === 'translation') {
+        include $tabs_dir . 'settings-tab-translation.php';
     }
 
     echo '</div>';

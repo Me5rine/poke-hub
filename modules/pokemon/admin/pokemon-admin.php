@@ -31,6 +31,8 @@ function poke_hub_pokemon_get_section_label($section) {
             return __('Weathers', 'poke-hub');
         case 'items':
             return __('Items', 'poke-hub');
+        case 'backgrounds':
+            return __('Backgrounds', 'poke-hub');
         case 'overview':
         default:
             return __('Pokémon data', 'poke-hub');
@@ -48,7 +50,8 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/moves.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/forms.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/form-mappings.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/weathers.php';
-require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php'; // 🔹 NOUVEAU
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/backgrounds.php'; // 🔹 NOUVEAU
 
 /**
  * Screen options pour la page Pokémon (onglet "Pokémon" + "Attacks").
@@ -130,8 +133,13 @@ function poke_hub_pokemon_manage_columns($columns) {
         $columns = $table->get_columns();
     }
 
-    if ($current_section === 'items' && class_exists('Poke_Hub_Pokemon_Items_List_Table')) { // 🔹 NOUVEAU
+    if ($current_section === 'items' && class_exists('Poke_Hub_Pokemon_Items_List_Table')) {
         $table   = new Poke_Hub_Pokemon_Items_List_Table();
+        $columns = $table->get_columns();
+    }
+
+    if ($current_section === 'backgrounds' && class_exists('Poke_Hub_Pokemon_Backgrounds_List_Table')) {
+        $table   = new Poke_Hub_Pokemon_Backgrounds_List_Table();
         $columns = $table->get_columns();
     }
 
@@ -216,17 +224,178 @@ function poke_hub_pokemon_admin_ui() {
             case 'types':
                 global $wpdb;
                 $edit_row = null;
+                $all_weathers = [];
+                $all_types = [];
+                $current_weather_ids = [];
+                $current_weakness_ids = [];
+                $current_resistance_ids = [];
+                $current_immune_ids = [];
+                $current_offensive_super_effective_ids = [];
+                $current_offensive_not_very_effective_ids = [];
+                $current_offensive_no_effect_ids = [];
+
+                // Récupérer la table des types dès le début
+                $table_types = pokehub_get_table('pokemon_types');
 
                 if ($action === 'edit' && !empty($_GET['id'])) {
                     $id          = (int) $_GET['id'];
-                    $table_types = pokehub_get_table('pokemon_types');
                     $edit_row    = $wpdb->get_row(
                         $wpdb->prepare("SELECT * FROM {$table_types} WHERE id = %d", $id)
                     );
+
+                    if ($edit_row) {
+                        // Récupérer les météos liées
+                        $table_weather_links = pokehub_get_table('pokemon_type_weather_links');
+                        if ($table_weather_links) {
+                            $weather_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT weather_id FROM {$table_weather_links} WHERE type_id = %d",
+                                    $id
+                                )
+                            );
+                            $current_weather_ids = array_map(function($row) {
+                                return (int) $row->weather_id;
+                            }, $weather_rows);
+                        }
+
+                        // Récupérer les faiblesses (défense ×2) - priorité à pokemon_go, sinon core_series
+                        $table_weakness_links = pokehub_get_table('pokemon_type_weakness_links');
+                        if ($table_weakness_links) {
+                            $weakness_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT weakness_type_id FROM {$table_weakness_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_weakness_ids = array_map(function($row) {
+                                return (int) $row->weakness_type_id;
+                            }, $weakness_rows);
+                        }
+
+                        // Récupérer les résistances (défense ×½) - priorité à pokemon_go
+                        $table_resistance_links = pokehub_get_table('pokemon_type_resistance_links');
+                        if ($table_resistance_links) {
+                            $resistance_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT resistance_type_id FROM {$table_resistance_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_resistance_ids = array_map(function($row) {
+                                return (int) $row->resistance_type_id;
+                            }, $resistance_rows);
+                        }
+
+                        // Récupérer les immunités (défense ×0) - priorité à pokemon_go
+                        $table_immune_links = pokehub_get_table('pokemon_type_immune_links');
+                        if ($table_immune_links) {
+                            $immune_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT immune_type_id FROM {$table_immune_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_immune_ids = array_map(function($row) {
+                                return (int) $row->immune_type_id;
+                            }, $immune_rows);
+                        }
+
+                        // Récupérer les efficacités offensives - Super efficace (×2) - priorité à pokemon_go
+                        $table_offensive_super_effective_links = pokehub_get_table('pokemon_type_offensive_super_effective_links');
+                        if ($table_offensive_super_effective_links) {
+                            $offensive_super_effective_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT target_type_id FROM {$table_offensive_super_effective_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_offensive_super_effective_ids = array_map(function($row) {
+                                return (int) $row->target_type_id;
+                            }, $offensive_super_effective_rows);
+                        }
+
+                        // Récupérer les efficacités offensives - Peu efficace (×½) - priorité à pokemon_go
+                        $table_offensive_not_very_effective_links = pokehub_get_table('pokemon_type_offensive_not_very_effective_links');
+                        if ($table_offensive_not_very_effective_links) {
+                            $offensive_not_very_effective_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT target_type_id FROM {$table_offensive_not_very_effective_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_offensive_not_very_effective_ids = array_map(function($row) {
+                                return (int) $row->target_type_id;
+                            }, $offensive_not_very_effective_rows);
+                        }
+
+                        // Récupérer les efficacités offensives - Sans effet (×0) - priorité à pokemon_go
+                        $table_offensive_no_effect_links = pokehub_get_table('pokemon_type_offensive_no_effect_links');
+                        if ($table_offensive_no_effect_links) {
+                            $offensive_no_effect_rows = $wpdb->get_results(
+                                $wpdb->prepare(
+                                    "SELECT target_type_id FROM {$table_offensive_no_effect_links} 
+                                     WHERE type_id = %d 
+                                     ORDER BY CASE game_key WHEN 'pokemon_go' THEN 1 WHEN 'core_series' THEN 2 ELSE 3 END
+                                     LIMIT 50",
+                                    $id
+                                )
+                            );
+                            $current_offensive_no_effect_ids = array_map(function($row) {
+                                return (int) $row->target_type_id;
+                            }, $offensive_no_effect_rows);
+                        }
+                    }
+                }
+
+                // Récupérer toutes les météos disponibles
+                $table_weathers = pokehub_get_table('pokemon_weathers');
+                if ($table_weathers) {
+                    $all_weathers = $wpdb->get_results("SELECT * FROM {$table_weathers} ORDER BY name_fr ASC, name_en ASC");
+                }
+
+                // Récupérer tous les types disponibles (exclure le type en cours d'édition)
+                if ($table_types) {
+                    $exclude_id = ($edit_row && isset($edit_row->id)) ? (int) $edit_row->id : 0;
+                    if ($exclude_id > 0) {
+                        $all_types = $wpdb->get_results(
+                            $wpdb->prepare(
+                                "SELECT * FROM {$table_types} WHERE id != %d ORDER BY name_fr ASC, name_en ASC",
+                                $exclude_id
+                            )
+                        );
+                    } else {
+                        $all_types = $wpdb->get_results("SELECT * FROM {$table_types} ORDER BY name_fr ASC, name_en ASC");
+                    }
                 }
 
                 if (function_exists('poke_hub_pokemon_types_edit_form')) {
-                    poke_hub_pokemon_types_edit_form($edit_row);
+                    poke_hub_pokemon_types_edit_form(
+                        $edit_row,
+                        $all_weathers,
+                        $current_weather_ids,
+                        $all_types,
+                        $current_weakness_ids,
+                        $current_resistance_ids,
+                        $current_immune_ids,
+                        $current_offensive_super_effective_ids,
+                        $current_offensive_not_very_effective_ids,
+                        $current_offensive_no_effect_ids
+                    );
                 } else {
                     echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_types_edit_form()</h1></div>';
                 }
@@ -354,6 +523,27 @@ function poke_hub_pokemon_admin_ui() {
                     poke_hub_pokemon_items_edit_form($edit_row);
                 } else {
                     echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_items_edit_form()</h1></div>';
+                }
+                break;
+
+            case 'backgrounds':
+                global $wpdb;
+                $edit_row = null;
+
+                if ($action === 'edit' && !empty($_GET['id'])) {
+                    $id    = (int) $_GET['id'];
+                    $table = pokehub_get_table('pokemon_backgrounds');
+                    if ($table) {
+                        $edit_row = $wpdb->get_row(
+                            $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $id)
+                        );
+                    }
+                }
+
+                if (function_exists('poke_hub_pokemon_backgrounds_edit_form')) {
+                    poke_hub_pokemon_backgrounds_edit_form($edit_row);
+                } else {
+                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_backgrounds_edit_form()</h1></div>';
                 }
                 break;
         }
@@ -494,6 +684,20 @@ function poke_hub_pokemon_admin_ui() {
             ];
             break;
 
+        case 'backgrounds':
+            $add_button = [
+                'label' => __('Add background', 'poke-hub'),
+                'url'   => add_query_arg(
+                    [
+                        'page'       => 'poke-hub-pokemon',
+                        'ph_section' => 'backgrounds',
+                        'action'     => 'add',
+                    ],
+                    admin_url('admin.php')
+                ),
+            ];
+            break;
+
         default:
             $add_button = null;
             break;
@@ -511,6 +715,7 @@ function poke_hub_pokemon_admin_ui() {
         'form_mappings' => __('Form mappings', 'poke-hub'),
         'weathers'      => __('Weathers', 'poke-hub'),
         'items'         => __('Items', 'poke-hub'),
+        'backgrounds'   => __('Backgrounds', 'poke-hub'),
     ];
     ?>
     <div class="wrap">
@@ -629,6 +834,14 @@ function poke_hub_pokemon_admin_ui() {
                     }
                     break;
 
+                case 'backgrounds':
+                    if (function_exists('poke_hub_pokemon_admin_backgrounds_screen')) {
+                        poke_hub_pokemon_admin_backgrounds_screen();
+                    } else {
+                        echo '<p>Backgrounds screen not implemented yet.</p>';
+                    }
+                    break;
+
                 default:
                     if (function_exists('poke_hub_pokemon_admin_overview_screen')) {
                         poke_hub_pokemon_admin_overview_screen();
@@ -674,8 +887,16 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
 
     $section = isset($_GET['ph_section']) ? sanitize_key($_GET['ph_section']) : 'overview';
 
-    // On limite toujours à l'onglet "pokemon" pour Select2 (pas nécessaire sur le mapping / forms / weathers / items)
-    if ($section !== 'pokemon') {
+    // Le CSS admin est maintenant chargé pour toutes les sections
+    wp_enqueue_style(
+        'poke-hub-pokemon-admin',
+        POKE_HUB_URL . 'assets/css/poke-hub-pokemon-admin.css',
+        [],
+        POKE_HUB_VERSION
+    );
+
+    // On limite Select2 aux onglets qui en ont besoin (pokemon, backgrounds)
+    if ($section !== 'pokemon' && $section !== 'backgrounds') {
         return;
     }
 
@@ -711,8 +932,130 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
                 });
             }
 
+            function pokehubInitWeatherSelect2(context){
+                var \$ctx = context ? $(context) : $(document);
+                \$ctx.find('select.pokehub-weather-select2').each(function(){
+                    var \$s = $(this);
+                    if (\$s.data('select2')) {
+                        return;
+                    }
+                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select weather (optional)', 'poke-hub')) . "';
+                    \$s.select2({
+                        width: '100%',
+                        placeholder: placeholder,
+                        allowClear: true
+                    });
+                });
+            }
+
+            function pokehubInitItemSelect2(context){
+                var \$ctx = context ? $(context) : $(document);
+                \$ctx.find('select.pokehub-item-select2').each(function(){
+                    var \$s = $(this);
+                    if (\$s.data('select2')) {
+                        return;
+                    }
+                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select item (optional)', 'poke-hub')) . "';
+                    \$s.select2({
+                        width: '100%',
+                        placeholder: placeholder,
+                        allowClear: true
+                    });
+                });
+            }
+
+            function pokehubInitLureSelect2(context){
+                var \$ctx = context ? $(context) : $(document);
+                \$ctx.find('select.pokehub-lure-select2').each(function(){
+                    var \$s = $(this);
+                    if (\$s.data('select2')) {
+                        return;
+                    }
+                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select lure (optional)', 'poke-hub')) . "';
+                    \$s.select2({
+                        width: '100%',
+                        placeholder: placeholder,
+                        allowClear: true
+                    });
+                });
+            }
+
+            function pokehubInitPokemonSelect2(context){
+                var \$ctx = context ? $(context) : $(document);
+                \$ctx.find('select.pokehub-pokemon-select2').each(function(){
+                    var \$s = $(this);
+                    if (\$s.data('select2')) {
+                        return;
+                    }
+                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select target Pokémon', 'poke-hub')) . "';
+                    \$s.select2({
+                        width: '100%',
+                        placeholder: placeholder,
+                        allowClear: true
+                    });
+                });
+            }
+
             window.pokehubInitAttackSelect2 = pokehubInitAttackSelect2;
+            window.pokehubInitWeatherSelect2 = pokehubInitWeatherSelect2;
+            window.pokehubInitItemSelect2 = pokehubInitItemSelect2;
+            window.pokehubInitLureSelect2 = pokehubInitLureSelect2;
+            window.pokehubInitPokemonSelect2 = pokehubInitPokemonSelect2;
             pokehubInitAttackSelect2(document);
+            pokehubInitWeatherSelect2(document);
+            pokehubInitItemSelect2(document);
+            pokehubInitLureSelect2(document);
+            pokehubInitPokemonSelect2(document);
+
+            // Gestion de l'affichage conditionnel des champs d'évolution selon la méthode
+            function pokehubToggleEvolutionFields(selectElement) {
+                var \$row = $(selectElement).closest('tr');
+                var method = $(selectElement).val();
+                
+                // Cacher tous les champs conditionnels
+                \$row.find('.pokehub-evolution-conditional').hide();
+                
+                // Afficher les champs selon la méthode
+                if (method === 'item') {
+                    \$row.find('.pokehub-evo-method-item').show();
+                } else if (method === 'lure') {
+                    \$row.find('.pokehub-evo-method-lure').show();
+                } else if (method === 'quest') {
+                    \$row.find('.pokehub-evo-method-quest').show();
+                } else if (method === 'stats') {
+                    \$row.find('.pokehub-evo-method-stats').show();
+                }
+                // levelup, other, ou vide : rien d'autre ne s'affiche
+                
+                // Time of day : s'affiche si une valeur est sélectionnée
+                var timeOfDaySelect = \$row.find('select[name*=\"[time_of_day]\"]');
+                if (timeOfDaySelect.length && timeOfDaySelect.val()) {
+                    \$row.find('.pokehub-evo-method-time').show();
+                }
+            }
+
+            // Exposer la fonction globalement pour pouvoir l'appeler depuis pokemon-form.php
+            window.pokehubToggleEvolutionFields = pokehubToggleEvolutionFields;
+
+            // Initialiser l'affichage pour toutes les lignes existantes
+            $(document).on('change', '.pokehub-evolution-method', function() {
+                pokehubToggleEvolutionFields(this);
+            });
+            
+            // Gérer l'affichage du time_of_day quand il change
+            $(document).on('change', 'select[name*=\"[time_of_day]\"]', function() {
+                var \$row = $(this).closest('tr');
+                if ($(this).val()) {
+                    \$row.find('.pokehub-evo-method-time').show();
+                } else {
+                    \$row.find('.pokehub-evo-method-time').hide();
+                }
+            });
+
+            // Initialiser au chargement de la page
+            $('.pokehub-evolution-method').each(function() {
+                pokehubToggleEvolutionFields(this);
+            });
         });"
     );
 }

@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://example.com
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 1.6
+Version: 1.6.1
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -37,6 +37,7 @@ define('POKE_HUB_INCLUDES_DIR', POKE_HUB_PATH . 'includes/');
 
 // Charger les fichiers nécessaires
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-encryption.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-modules.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-module-hooks.php';
@@ -240,7 +241,17 @@ function poke_hub_ensure_custom_hooks_file() {
     }
 }
 
-register_activation_hook(__FILE__, 'poke_hub_ensure_custom_hooks_file');
+/**
+ * Fonction d'activation du plugin : flush les rewrite rules
+ */
+function poke_hub_plugin_activation() {
+    poke_hub_ensure_custom_hooks_file();
+    
+    // Flush les rewrite rules pour activer les routes personnalisées
+    flush_rewrite_rules();
+}
+
+register_activation_hook(__FILE__, 'poke_hub_plugin_activation');
 
 /**
  * Chargement des modules activés.

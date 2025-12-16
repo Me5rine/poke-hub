@@ -101,7 +101,10 @@ function pokehub_render_special_event_form(
                                id="event_slug"
                                name="event[slug]"
                                value="<?php echo esc_attr($slug); ?>"
-                               required>
+                               placeholder="<?php esc_attr_e('Leave empty to auto-generate from title', 'poke-hub'); ?>">
+                        <p class="description">
+                            <?php esc_html_e('Leave empty to auto-generate from title (WordPress style)', 'poke-hub'); ?>
+                        </p>
                     </td>
                 </tr>
 
@@ -262,22 +265,28 @@ function pokehub_render_special_event_form(
             <div id="pokehub-event-pokemon-wrapper">
                 <!-- Ligne modèle -->
                 <div class="pokehub-event-pokemon-row template" style="display:none;">
-                    <select class="pokehub-pokemon-select">
+                    <select class="pokehub-pokemon-select" style="width: 100%;">
                         <option value=""><?php esc_html_e('Select a Pokémon', 'poke-hub'); ?></option>
-                        <?php foreach (pokehub_get_all_pokemon_for_select() as $p) : ?>
-                            <option value="<?php echo esc_attr($p['id']); ?>">
-                                <?php
-                                echo esc_html(
-                                    sprintf(
-                                        '#%03d %s%s',
-                                        $p['dex_number'],
-                                        $p['name'],
-                                        $p['form'] ? ' (' . $p['form'] . ')' : ''
-                                    )
-                                );
-                                ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php 
+                        $pokemon_list = pokehub_get_all_pokemon_for_select();
+                        if (empty($pokemon_list)) : ?>
+                            <option value="" disabled><?php esc_html_e('No Pokémon found in database', 'poke-hub'); ?></option>
+                        <?php else : ?>
+                            <?php foreach ($pokemon_list as $p) : ?>
+                                <option value="<?php echo esc_attr($p['id']); ?>">
+                                    <?php
+                                    echo esc_html(
+                                        sprintf(
+                                            '#%03d %s%s',
+                                            $p['dex_number'],
+                                            $p['name'],
+                                            !empty($p['form']) ? ' (' . $p['form'] . ')' : ''
+                                        )
+                                    );
+                                    ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
 
                     <div class="pokehub-pokemon-attacks">
@@ -292,25 +301,31 @@ function pokehub_render_special_event_form(
                 </div>
 
                 <?php if ($is_edit && !empty($pokemon_rows)) : ?>
-                    <?php foreach ($pokemon_rows as $prow) : ?>
+                    <?php 
+                    $pokemon_list_edit = pokehub_get_all_pokemon_for_select();
+                    foreach ($pokemon_rows as $prow) : ?>
                         <div class="pokehub-event-pokemon-row">
-                            <select class="pokehub-pokemon-select">
+                            <select class="pokehub-pokemon-select" style="width: 100%;">
                                 <option value=""><?php esc_html_e('Select a Pokémon', 'poke-hub'); ?></option>
-                                <?php foreach (pokehub_get_all_pokemon_for_select() as $p) : ?>
-                                    <option value="<?php echo esc_attr($p['id']); ?>"
-                                        <?php selected($prow['pokemon_id'], $p['id']); ?>>
-                                        <?php
-                                        echo esc_html(
-                                            sprintf(
-                                                '#%03d %s%s',
-                                                $p['dex_number'],
-                                                $p['name'],
-                                                $p['form'] ? ' (' . $p['form'] . ')' : ''
-                                            )
-                                        );
-                                        ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (empty($pokemon_list_edit)) : ?>
+                                    <option value="" disabled><?php esc_html_e('No Pokémon found in database', 'poke-hub'); ?></option>
+                                <?php else : ?>
+                                    <?php foreach ($pokemon_list_edit as $p) : ?>
+                                        <option value="<?php echo esc_attr($p['id']); ?>"
+                                            <?php selected($prow['pokemon_id'], $p['id']); ?>>
+                                            <?php
+                                            echo esc_html(
+                                                sprintf(
+                                                    '#%03d %s%s',
+                                                    $p['dex_number'],
+                                                    $p['name'],
+                                                    !empty($p['form']) ? ' (' . $p['form'] . ')' : ''
+                                                )
+                                            );
+                                            ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
 
                             <div class="pokehub-pokemon-attacks">

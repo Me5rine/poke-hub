@@ -65,81 +65,56 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
                 <input type="hidden" name="id" value="<?php echo (int) $edit_row->id; ?>" />
             <?php endif; ?>
 
-            <table class="form-table" role="presentation">
-                <!-- Nom FR -->
-                <tr>
-                    <th scope="row">
-                        <label for="region_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="region_name_fr"
-                               name="name_fr"
-                               value="<?php echo esc_attr($current_name_fr); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Displayed name in French. Example: Kanto, Johto, Hoenn…', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+            <!-- Section: Basic Information -->
+            <div class="pokehub-section">
+                <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
+                
+                <!-- Name FR / Name EN -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="region_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="region_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
+                            <p class="description"><?php esc_html_e('Example: Kanto, Johto, Hoenn…', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col-50">
+                        <div class="pokehub-form-group">
+                            <label for="region_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
+                            <input type="text" id="region_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
+                            <p class="description"><?php esc_html_e('At least one name (FR or EN) is required.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
 
-                <!-- Nom EN -->
-                <tr>
-                    <th scope="row">
-                        <label for="region_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="region_name_en"
-                               name="name_en"
-                               value="<?php echo esc_attr($current_name_en); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Displayed name in English. At least one name (FR or EN) will be required.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <!-- Slug & Sort Order -->
+                <div class="pokehub-form-row">
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="region_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
+                            <input type="text" id="region_slug" name="slug" value="<?php echo esc_attr($is_edit ? $edit_row->slug : ''); ?>" />
+                            <p class="description"><?php esc_html_e('Leave empty to auto-generate from name.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="pokehub-form-col">
+                        <div class="pokehub-form-group">
+                            <label for="region_sort_order"><?php esc_html_e('Sort Order', 'poke-hub'); ?></label>
+                            <input type="number" id="region_sort_order" name="sort_order" 
+                                   value="<?php echo esc_attr($is_edit ? (int) $edit_row->sort_order : '0'); ?>" 
+                                   style="max-width: 150px;" />
+                            <p class="description"><?php esc_html_e('Lower = appears first in lists.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <tr>
-                    <th scope="row">
-                        <label for="region_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               class="regular-text"
-                               id="region_slug"
-                               name="slug"
-                               value="<?php echo esc_attr($is_edit ? $edit_row->slug : ''); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Leave empty to auto-generate from French name, or English fallback.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="region_sort_order"><?php esc_html_e('Sort order', 'poke-hub'); ?></label>
-                    </th>
-                    <td>
-                        <input type="number"
-                               class="small-text"
-                               id="region_sort_order"
-                               name="sort_order"
-                               value="<?php echo esc_attr($is_edit ? (int) $edit_row->sort_order : '0'); ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Optional. Lower = appears first in lists.', 'poke-hub'); ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
-
-            <?php
-            submit_button(
-                $is_edit
-                    ? __('Update region', 'poke-hub')
-                    : __('Add region', 'poke-hub')
-            );
-            ?>
+            <p class="submit">
+                <input type="submit" name="submit" id="submit" class="button button-primary"
+                       value="<?php echo $is_edit ? esc_attr__('Update', 'poke-hub') : esc_attr__('Add', 'poke-hub'); ?>" />
+                <a href="<?php echo esc_url($back_url); ?>" class="button">
+                    <?php esc_html_e('Cancel', 'poke-hub'); ?>
+                </a>
+            </p>
         </form>
     </div>
     <?php

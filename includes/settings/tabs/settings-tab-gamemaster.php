@@ -332,7 +332,7 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                 if ( ! $skip_for_mtime || $force_import ) {
                     if ( ! function_exists( 'poke_hub_pokemon_import_game_master' ) ) {
                         if ( defined( 'POKE_HUB_POKEMON_PATH' ) ) {
-                            $import_file = POKE_HUB_POKEMON_PATH . '/tools/pokemon-import-game-master.php';
+                            $import_file = POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master.php';
                             if ( file_exists( $import_file ) ) {
                                 require_once $import_file;
                                 $importer_loaded = true;
@@ -345,7 +345,7 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                     if ( ! $importer_loaded || ! function_exists( 'poke_hub_pokemon_import_game_master' ) ) {
                         $messages[] = [
                             'type' => 'error',
-                            'text' => __( 'Game Master importer not found. Make sure tools/pokemon-import-game-master.php is included.', 'poke-hub' ),
+                            'text' => __( 'Game Master importer not found. Make sure functions/pokemon-import-game-master.php is included.', 'poke-hub' ),
                         ];
                     } else {
                         $result = poke_hub_pokemon_import_game_master( $path );
@@ -599,6 +599,12 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                                     break;
                                 case 'attack_type_links':
                                     $label = __( 'Attack ↔ Type links', 'poke-hub' );
+                                    break;
+                                case 'pokemon_type_weakness_links':
+                                    $label = __( 'Type ↔ Weakness links', 'poke-hub' );
+                                    break;
+                                case 'pokemon_type_resistance_links':
+                                    $label = __( 'Type ↔ Resistance links', 'poke-hub' );
                                     break;
                                 case 'pokemon_attack_links':
                                     $label = __( 'Pokémon ↔ Attack links', 'poke-hub' );

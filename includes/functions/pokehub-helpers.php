@@ -154,11 +154,16 @@ function pokehub_get_table(string $key): string {
         'pokemon_weathers'           => ['scope' => 'local',  'suffix' => 'pokemon_weathers'],
         'weathers'                   => ['scope' => 'local',  'suffix' => 'pokemon_weathers'],
         'pokemon_type_weather_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_weather_links'],
+        'pokemon_type_weakness_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_weakness_links'],
+        'pokemon_type_resistance_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_resistance_links'],
         'pokemon_form_variants'      => ['scope' => 'local',  'suffix' => 'pokemon_form_variants'],
         'evolutions'                 => ['scope' => 'local',  'suffix' => 'pokemon_evolutions'],
         'pokemon_evolutions'         => ['scope' => 'local',  'suffix' => 'pokemon_evolutions'],
         'items'                      => ['scope' => 'local',  'suffix' => 'items'],
         'pokemon_items'                      => ['scope' => 'local',  'suffix' => 'items'],
+        'pokemon_backgrounds'        => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
+        'backgrounds'               => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
+        'pokemon_background_pokemon_links' => ['scope' => 'local',  'suffix' => 'pokemon_background_pokemon_links'],
 
         //=== table de mapping des formes / costumes / clones ===
         'pokemon_form_mappings'      => ['scope' => 'local',  'suffix' => 'pokemon_form_mappings'],

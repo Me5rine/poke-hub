@@ -870,6 +870,11 @@ function poke_hub_pokemon_handle_attacks_form() {
         $attack_id = (int) $wpdb->insert_id;
 
         if ($attack_id > 0) {
+            // Récupération automatique des traductions depuis Bulbapedia
+            if (!empty($name_en) && function_exists('poke_hub_attack_auto_fetch_translations')) {
+                poke_hub_attack_auto_fetch_translations($attack_id, $name_en);
+            }
+
             // Types
             poke_hub_pokemon_sync_attack_types_links($attack_id, $type_ids);
             // Stats
@@ -887,6 +892,11 @@ function poke_hub_pokemon_handle_attacks_form() {
     }
 
     $wpdb->update($table_attacks, $data, ['id' => $id], $format, ['%d']);
+
+    // Récupération automatique des traductions depuis Bulbapedia
+    if (!empty($name_en) && function_exists('poke_hub_attack_auto_fetch_translations')) {
+        poke_hub_attack_auto_fetch_translations($id, $name_en);
+    }
 
     // On (re)enregistre les types
     poke_hub_pokemon_sync_attack_types_links($id, $type_ids);
@@ -934,24 +944,56 @@ function poke_hub_pokemon_save_attack_stats_for_attack($attack_id, $game_key, $t
         ]
     );
 
-    // PvE
-    $pve_damage                 = isset($_POST['pve_damage']) ? (int) $_POST['pve_damage'] : 0;
-    $pve_dps                    = isset($_POST['pve_dps']) ? (float) $_POST['pve_dps'] : 0;
-    $pve_eps                    = isset($_POST['pve_eps']) ? (float) $_POST['pve_eps'] : 0;
-    $pve_duration_ms            = isset($_POST['pve_duration_ms']) ? (int) $_POST['pve_duration_ms'] : 0;
-    $pve_damage_window_start_ms = isset($_POST['pve_damage_window_start_ms']) ? (int) $_POST['pve_damage_window_start_ms'] : 0;
-    $pve_damage_window_end_ms   = isset($_POST['pve_damage_window_end_ms']) ? (int) $_POST['pve_damage_window_end_ms'] : 0;
-    $pve_energy                 = isset($_POST['pve_energy']) ? (int) $_POST['pve_energy'] : 0;
+    // Stats globales (context='') - duration et damage_window uniquement
+    $global_duration_ms            = isset($_POST['global_duration_ms']) ? (int) $_POST['global_duration_ms'] : 0;
+    $global_damage_window_start_ms = isset($_POST['global_damage_window_start_ms']) ? (int) $_POST['global_damage_window_start_ms'] : 0;
+    $global_damage_window_end_ms   = isset($_POST['global_damage_window_end_ms']) ? (int) $_POST['global_damage_window_end_ms'] : 0;
 
-    $has_pve = (
-        $pve_damage ||
-        $pve_dps ||
-        $pve_eps ||
-        $pve_duration_ms ||
-        $pve_damage_window_start_ms ||
-        $pve_damage_window_end_ms ||
-        $pve_energy
+    $has_global = (
+        $global_duration_ms ||
+        $global_damage_window_start_ms ||
+        $global_damage_window_end_ms
     );
+
+    if ($has_global) {
+        $wpdb->insert(
+            $table_stats,
+            [
+                'attack_id'              => $attack_id,
+                'game_key'               => $game_key,
+                'context'                => '',
+                'damage'                 => 0,
+                'dps'                    => 0.0,
+                'eps'                    => 0.0,
+                'duration_ms'            => $global_duration_ms,
+                'damage_window_start_ms' => $global_damage_window_start_ms,
+                'damage_window_end_ms'   => $global_damage_window_end_ms,
+                'energy'                 => 0,
+                'extra'                  => null,
+            ],
+            [
+                '%d', // attack_id
+                '%s', // game_key
+                '%s', // context
+                '%d', // damage
+                '%f', // dps
+                '%f', // eps
+                '%d', // duration_ms
+                '%d', // damage_window_start_ms
+                '%d', // damage_window_end_ms
+                '%d', // energy
+                '%s', // extra
+            ]
+        );
+    }
+
+    // PvE (damage, dps, eps, energy)
+    $pve_damage = isset($_POST['pve_damage']) ? (int) $_POST['pve_damage'] : 0;
+    $pve_dps    = isset($_POST['pve_dps']) ? (float) $_POST['pve_dps'] : 0;
+    $pve_eps    = isset($_POST['pve_eps']) ? (float) $_POST['pve_eps'] : 0;
+    $pve_energy = isset($_POST['pve_energy']) ? (int) $_POST['pve_energy'] : 0;
+
+    $has_pve = ($pve_damage || $pve_dps || $pve_eps || $pve_energy);
 
     if ($has_pve) {
         $wpdb->insert(
@@ -963,9 +1005,9 @@ function poke_hub_pokemon_save_attack_stats_for_attack($attack_id, $game_key, $t
                 'damage'                 => $pve_damage,
                 'dps'                    => $pve_dps,
                 'eps'                    => $pve_eps,
-                'duration_ms'            => $pve_duration_ms,
-                'damage_window_start_ms' => $pve_damage_window_start_ms,
-                'damage_window_end_ms'   => $pve_damage_window_end_ms,
+                'duration_ms'            => 0,
+                'damage_window_start_ms' => 0,
+                'damage_window_end_ms'   => 0,
                 'energy'                 => $pve_energy,
                 'extra'                  => null,
             ],
@@ -985,24 +1027,52 @@ function poke_hub_pokemon_save_attack_stats_for_attack($attack_id, $game_key, $t
         );
     }
 
-    // PvP
-    $pvp_damage                 = isset($_POST['pvp_damage']) ? (int) $_POST['pvp_damage'] : 0;
-    $pvp_dps                    = isset($_POST['pvp_dps']) ? (float) $_POST['pvp_dps'] : 0;
-    $pvp_eps                    = isset($_POST['pvp_eps']) ? (float) $_POST['pvp_eps'] : 0;
-    $pvp_duration_ms            = isset($_POST['pvp_duration_ms']) ? (int) $_POST['pvp_duration_ms'] : 0;
-    $pvp_damage_window_start_ms = isset($_POST['pvp_damage_window_start_ms']) ? (int) $_POST['pvp_damage_window_start_ms'] : 0;
-    $pvp_damage_window_end_ms   = isset($_POST['pvp_damage_window_end_ms']) ? (int) $_POST['pvp_damage_window_end_ms'] : 0;
-    $pvp_energy                 = isset($_POST['pvp_energy']) ? (int) $_POST['pvp_energy'] : 0;
+    // PvP (damage, dps, eps, energy, duration_ms, buffs)
+    $pvp_damage = isset($_POST['pvp_damage']) ? (int) $_POST['pvp_damage'] : 0;
+    $pvp_dps    = isset($_POST['pvp_dps']) ? (float) $_POST['pvp_dps'] : 0;
+    $pvp_eps    = isset($_POST['pvp_eps']) ? (float) $_POST['pvp_eps'] : 0;
+    $pvp_energy = isset($_POST['pvp_energy']) ? (int) $_POST['pvp_energy'] : 0;
+    $pvp_duration_ms = isset($_POST['pvp_duration_ms']) ? (int) $_POST['pvp_duration_ms'] : 0;
 
-    $has_pvp = (
-        $pvp_damage ||
-        $pvp_dps ||
-        $pvp_eps ||
-        $pvp_duration_ms ||
-        $pvp_damage_window_start_ms ||
-        $pvp_damage_window_end_ms ||
-        $pvp_energy
+    // Récupération des statistiques par tour
+    $pvp_turns = isset($_POST['pvp_turns']) ? (int) $_POST['pvp_turns'] : 0;
+    $pvp_dpt = isset($_POST['pvp_dpt']) ? (float) $_POST['pvp_dpt'] : 0.0;
+    $pvp_ept = isset($_POST['pvp_ept']) ? (float) $_POST['pvp_ept'] : 0.0;
+    
+    // Récupération des buffs/debuffs
+    $pvp_buffs = [
+        'buff_activation_chance' => isset($_POST['pvp_buff_activation_chance']) ? (float) $_POST['pvp_buff_activation_chance'] : 0.0,
+        'attacker_attack_stat_stage_change' => isset($_POST['pvp_attacker_attack_stat_stage_change']) ? (int) $_POST['pvp_attacker_attack_stat_stage_change'] : 0,
+        'attacker_defense_stat_stage_change' => isset($_POST['pvp_attacker_defense_stat_stage_change']) ? (int) $_POST['pvp_attacker_defense_stat_stage_change'] : 0,
+        'target_attack_stat_stage_change' => isset($_POST['pvp_target_attack_stat_stage_change']) ? (int) $_POST['pvp_target_attack_stat_stage_change'] : 0,
+        'target_defense_stat_stage_change' => isset($_POST['pvp_target_defense_stat_stage_change']) ? (int) $_POST['pvp_target_defense_stat_stage_change'] : 0,
+    ];
+
+    // Vérifier si des buffs sont définis (au moins un non-zéro)
+    $has_buffs = (
+        $pvp_buffs['buff_activation_chance'] > 0 ||
+        $pvp_buffs['attacker_attack_stat_stage_change'] != 0 ||
+        $pvp_buffs['attacker_defense_stat_stage_change'] != 0 ||
+        $pvp_buffs['target_attack_stat_stage_change'] != 0 ||
+        $pvp_buffs['target_defense_stat_stage_change'] != 0
     );
+
+    // Préparation du champ extra pour les buffs et statistiques par tour
+    $pvp_extra_data = [];
+    
+    if ($has_buffs) {
+        $pvp_extra_data['buffs'] = $pvp_buffs;
+    }
+    
+    if ($pvp_turns > 0) {
+        $pvp_extra_data['turns'] = $pvp_turns;
+        $pvp_extra_data['dpt'] = round($pvp_dpt, 3);
+        $pvp_extra_data['ept'] = round($pvp_ept, 3);
+    }
+    
+    $pvp_extra = !empty($pvp_extra_data) ? wp_json_encode($pvp_extra_data) : null;
+
+    $has_pvp = ($pvp_damage || $pvp_dps || $pvp_eps || $pvp_energy || $pvp_duration_ms || $has_buffs || $pvp_turns);
 
     if ($has_pvp) {
         $wpdb->insert(
@@ -1015,10 +1085,10 @@ function poke_hub_pokemon_save_attack_stats_for_attack($attack_id, $game_key, $t
                 'dps'                    => $pvp_dps,
                 'eps'                    => $pvp_eps,
                 'duration_ms'            => $pvp_duration_ms,
-                'damage_window_start_ms' => $pvp_damage_window_start_ms,
-                'damage_window_end_ms'   => $pvp_damage_window_end_ms,
+                'damage_window_start_ms' => 0,
+                'damage_window_end_ms'   => 0,
                 'energy'                 => $pvp_energy,
-                'extra'                  => null,
+                'extra'                  => $pvp_extra,
             ],
             [
                 '%d',

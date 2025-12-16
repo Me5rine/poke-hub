@@ -253,6 +253,7 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         $status_filter = isset($_GET['event_status']) ? sanitize_key($_GET['event_status']) : '';
         $source_filter = isset($_GET['event_source']) ? sanitize_key($_GET['event_source']) : '';
         $type_filter   = isset($_GET['event_type']) ? sanitize_text_field($_GET['event_type']) : '';
+        $search        = isset($_REQUEST['s']) ? trim(wp_unslash($_REQUEST['s'])) : '';
 
         // ---------- 1) Récupération unifiée des événements ----------
         $status_for_query = in_array($status_filter, ['current', 'upcoming', 'past'], true)
@@ -285,6 +286,20 @@ class PokeHub_Events_List_Table extends WP_List_Table {
                     continue;
                 }
                 $filtered[] = $e;
+            }
+            $all_events = $filtered;
+        }
+        
+        // ---------- 2bis) Filtrage par recherche (titre) ----------
+        if ($search !== '') {
+            $search_lower = strtolower($search);
+            $filtered = [];
+            foreach ($all_events as $e) {
+                $title_lower = isset($e->title) ? strtolower($e->title) : '';
+                // Recherche dans le titre
+                if (strpos($title_lower, $search_lower) !== false) {
+                    $filtered[] = $e;
+                }
             }
             $all_events = $filtered;
         }

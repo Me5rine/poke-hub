@@ -58,6 +58,12 @@ class Pokehub_DB {
      * - pokemon_attack_links
      * - pokemon_weathers
      * - pokemon_type_weather_links
+     * - pokemon_type_weakness_links
+     * - pokemon_type_resistance_links
+     * - pokemon_type_immune_links
+     * - pokemon_type_offensive_super_effective_links
+     * - pokemon_type_offensive_not_very_effective_links
+     * - pokemon_type_offensive_no_effect_links
      * - pokemon_form_mappings
      */
     private function createPokemonTables() {
@@ -76,10 +82,18 @@ class Pokehub_DB {
         $pokemon_attack_links  = pokehub_get_table('pokemon_attack_links');
         $weathers_table        = pokehub_get_table('pokemon_weathers');
         $type_weather_links    = pokehub_get_table('pokemon_type_weather_links');
+        $type_weakness_links   = pokehub_get_table('pokemon_type_weakness_links');
+        $type_resistance_links = pokehub_get_table('pokemon_type_resistance_links');
+        $type_immune_links     = pokehub_get_table('pokemon_type_immune_links');
+        $type_offensive_super_effective_links = pokehub_get_table('pokemon_type_offensive_super_effective_links');
+        $type_offensive_not_very_effective_links = pokehub_get_table('pokemon_type_offensive_not_very_effective_links');
+        $type_offensive_no_effect_links = pokehub_get_table('pokemon_type_offensive_no_effect_links');
         $form_mappings_table   = pokehub_get_table('pokemon_form_mappings');
         $pokemon_form_variants = pokehub_get_table('pokemon_form_variants');
         $evolutions_table      = pokehub_get_table('pokemon_evolutions');
         $items_table           = pokehub_get_table('items');
+        $backgrounds_table     = pokehub_get_table('pokemon_backgrounds');
+        $background_pokemon_links = pokehub_get_table('pokemon_background_pokemon_links');
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
@@ -198,6 +212,11 @@ class Pokehub_DB {
 
             category VARCHAR(20) NOT NULL DEFAULT '',
 
+            duration_ms INT UNSIGNED NOT NULL DEFAULT 0,
+            damage_window_start_ms INT UNSIGNED NOT NULL DEFAULT 0,
+            damage_window_end_ms INT UNSIGNED NOT NULL DEFAULT 0,
+            energy SMALLINT NOT NULL DEFAULT 0,
+
             extra LONGTEXT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug),
@@ -224,6 +243,7 @@ class Pokehub_DB {
             extra LONGTEXT NULL,
 
             PRIMARY KEY (id),
+            UNIQUE KEY attack_game_context (attack_id, game_key, context),
             KEY attack_id (attack_id),
             KEY game_key (game_key),
             KEY context (context)
@@ -290,6 +310,67 @@ class Pokehub_DB {
             weather_id BIGINT UNSIGNED NOT NULL,
             PRIMARY KEY (type_id, weather_id),
             KEY weather_id (weather_id)
+        ) {$charset_collate};";
+
+        // 10bis) Lien Type ↔ Faiblesses (un type est faible contre d'autres types)
+        // game_key: 'core_series' pour les jeux principaux, 'pokemon_go' pour Pokémon GO
+        $sql_type_weakness_links = "CREATE TABLE {$type_weakness_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            weakness_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, weakness_type_id, game_key),
+            KEY weakness_type_id (weakness_type_id),
+            KEY game_key (game_key)
+        ) {$charset_collate};";
+
+        // 10ter) Lien Type ↔ Résistances (un type résiste à d'autres types)
+        $sql_type_resistance_links = "CREATE TABLE {$type_resistance_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            resistance_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, resistance_type_id, game_key),
+            KEY resistance_type_id (resistance_type_id),
+            KEY game_key (game_key)
+        ) {$charset_collate};";
+
+        // 10quater) Lien Type ↔ Immunités défensives (un type est immunisé contre d'autres types en défense)
+        $sql_type_immune_links = "CREATE TABLE {$type_immune_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            immune_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, immune_type_id, game_key),
+            KEY immune_type_id (immune_type_id),
+            KEY game_key (game_key)
+        ) {$charset_collate};";
+
+        // 10quinquies) Lien Type ↔ Efficacités offensives - Super efficace (×2)
+        $sql_type_offensive_super_effective_links = "CREATE TABLE {$type_offensive_super_effective_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            target_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, target_type_id, game_key),
+            KEY target_type_id (target_type_id),
+            KEY game_key (game_key)
+        ) {$charset_collate};";
+
+        // 10sexies) Lien Type ↔ Efficacités offensives - Peu efficace (×½)
+        $sql_type_offensive_not_very_effective_links = "CREATE TABLE {$type_offensive_not_very_effective_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            target_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, target_type_id, game_key),
+            KEY target_type_id (target_type_id),
+            KEY game_key (game_key)
+        ) {$charset_collate};";
+
+        // 10septies) Lien Type ↔ Efficacités offensives - Sans effet (×0)
+        $sql_type_offensive_no_effect_links = "CREATE TABLE {$type_offensive_no_effect_links} (
+            type_id BIGINT UNSIGNED NOT NULL,
+            target_type_id BIGINT UNSIGNED NOT NULL,
+            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
+            PRIMARY KEY (type_id, target_type_id, game_key),
+            KEY target_type_id (target_type_id),
+            KEY game_key (game_key)
         ) {$charset_collate};";
 
         // 11) Mappings de formes (costumes, clones, etc.)
@@ -399,6 +480,34 @@ class Pokehub_DB {
             KEY game_key (game_key)
         ) {$charset_collate};";
 
+        // 15) Backgrounds (fonds spéciaux pour Pokémon)
+        $sql_backgrounds = "CREATE TABLE {$backgrounds_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(191) NOT NULL,
+            title VARCHAR(255) NOT NULL DEFAULT '',
+            image_url TEXT NULL,
+            event_id BIGINT(20) UNSIGNED NULL DEFAULT NULL,
+            event_type VARCHAR(50) NOT NULL DEFAULT '', -- 'local_post', 'remote_post', 'special_local', 'special_remote'
+            extra LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug),
+            KEY event_id (event_id),
+            KEY event_type (event_type)
+        ) {$charset_collate};";
+
+        // 16) Liaison Background ↔ Pokémon (plusieurs Pokémon peuvent avoir le même background)
+        $sql_background_pokemon_links = "CREATE TABLE {$background_pokemon_links} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            background_id BIGINT(20) UNSIGNED NOT NULL,
+            pokemon_id BIGINT(20) UNSIGNED NOT NULL,
+            PRIMARY KEY (id),
+            KEY background_id (background_id),
+            KEY pokemon_id (pokemon_id),
+            UNIQUE KEY background_pokemon (background_id, pokemon_id)
+        ) {$charset_collate};";
+
         dbDelta($sql_pokemon);
         dbDelta($sql_types);
         dbDelta($sql_regions);
@@ -410,10 +519,124 @@ class Pokehub_DB {
         dbDelta($sql_pokemon_attack_links);
         dbDelta($sql_weathers);
         dbDelta($sql_type_weather_links);
+        dbDelta($sql_type_weakness_links);
+        dbDelta($sql_type_resistance_links);
+        dbDelta($sql_type_immune_links);
+        dbDelta($sql_type_offensive_super_effective_links);
+        dbDelta($sql_type_offensive_not_very_effective_links);
+        dbDelta($sql_type_offensive_no_effect_links);
         dbDelta($sql_form_mappings);
         dbDelta($sql_form_variants);
         dbDelta($sql_evolutions);
         dbDelta($sql_items);
+        dbDelta($sql_backgrounds);
+        dbDelta($sql_background_pokemon_links);
+
+        // Migration : ajouter le champ game_key aux tables existantes si nécessaire
+        $this->migrate_type_relations_tables();
+    }
+
+    /**
+     * Migration : ajoute le champ game_key aux tables de relations de types existantes.
+     * Cette fonction est appelée après la création/mise à jour des tables.
+     */
+    private function migrate_type_relations_tables() {
+        global $wpdb;
+
+        $tables_to_migrate = [
+            'pokemon_type_weakness_links' => 'weakness_type_id',
+            'pokemon_type_resistance_links' => 'resistance_type_id',
+            'pokemon_type_immune_links' => 'immune_type_id',
+            'pokemon_type_offensive_super_effective_links' => 'target_type_id',
+            'pokemon_type_offensive_not_very_effective_links' => 'target_type_id',
+            'pokemon_type_offensive_no_effect_links' => 'target_type_id',
+        ];
+
+        foreach ($tables_to_migrate as $table_key => $foreign_key) {
+            $table = pokehub_get_table($table_key);
+            if (!$table) {
+                continue;
+            }
+
+            // Vérifie si la table existe
+            $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") === $table);
+            if (!$table_exists) {
+                continue;
+            }
+
+            // Vérifie si la colonne game_key existe déjà
+            $column_exists = $wpdb->get_results(
+                "SHOW COLUMNS FROM {$table} LIKE 'game_key'"
+            );
+
+            if (empty($column_exists)) {
+                // Ajoute la colonne game_key
+                $wpdb->query(
+                    "ALTER TABLE {$table} 
+                     ADD COLUMN game_key VARCHAR(50) NOT NULL DEFAULT 'core_series' 
+                     AFTER {$foreign_key}"
+                );
+
+                // Mettre à jour les données existantes pour qu'elles aient game_key = 'core_series'
+                $wpdb->query(
+                    "UPDATE {$table} 
+                     SET game_key = 'core_series' 
+                     WHERE game_key = '' OR game_key IS NULL"
+                );
+
+                // Vérifie si un index game_key existe déjà
+                $index_exists = $wpdb->get_results(
+                    "SHOW INDEX FROM {$table} WHERE Key_name = 'game_key'"
+                );
+
+                if (empty($index_exists)) {
+                    // Ajoute l'index sur game_key
+                    $wpdb->query(
+                        "ALTER TABLE {$table} 
+                         ADD INDEX game_key (game_key)"
+                    );
+                }
+
+                // Vérifie la structure de la clé primaire actuelle
+                $primary_key_info = $wpdb->get_results(
+                    "SHOW KEYS FROM {$table} WHERE Key_name = 'PRIMARY'"
+                );
+
+                // Si la clé primaire n'inclut pas game_key, on la modifie
+                $has_game_key_in_pk = false;
+                foreach ($primary_key_info as $key_info) {
+                    if ($key_info->Column_name === 'game_key') {
+                        $has_game_key_in_pk = true;
+                        break;
+                    }
+                }
+
+                if (!$has_game_key_in_pk && !empty($primary_key_info)) {
+                    // Supprime les doublons potentiels avant de modifier la clé primaire
+                    $wpdb->query(
+                        "DELETE t1 FROM {$table} t1
+                         INNER JOIN {$table} t2 
+                         WHERE t1.type_id = t2.type_id 
+                         AND t1.{$foreign_key} = t2.{$foreign_key}
+                         AND t1.game_key = 'core_series'
+                         AND t2.game_key = 'core_series'
+                         AND t1.type_id < t2.type_id"
+                    );
+
+                    // Supprime l'ancienne clé primaire
+                    $wpdb->query(
+                        "ALTER TABLE {$table} 
+                         DROP PRIMARY KEY"
+                    );
+
+                    // Ajoute la nouvelle clé primaire avec game_key
+                    $wpdb->query(
+                        "ALTER TABLE {$table} 
+                         ADD PRIMARY KEY (type_id, {$foreign_key}, game_key)"
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -445,6 +668,11 @@ class Pokehub_DB {
             start_ts INT UNSIGNED NOT NULL,
             end_ts INT UNSIGNED NOT NULL,
             mode VARCHAR(20) NOT NULL DEFAULT 'local',
+
+            recurring TINYINT(1) NOT NULL DEFAULT 0,
+            recurring_freq VARCHAR(20) NOT NULL DEFAULT 'weekly',
+            recurring_interval INT UNSIGNED NOT NULL DEFAULT 1,
+            recurring_window_end_ts INT UNSIGNED NOT NULL DEFAULT 0,
 
             image_id BIGINT UNSIGNED NULL DEFAULT NULL,
             image_url TEXT NULL,
@@ -499,5 +727,74 @@ class Pokehub_DB {
         dbDelta($sql_event_pokemon);
         dbDelta($sql_event_bonus);
         dbDelta($sql_event_pokemon_attacks);
+        
+        // Migration : ajouter les colonnes recurring si elles n'existent pas
+        $this->migrateSpecialEventsRecurringColumns($events_table);
+    }
+    
+    /**
+     * Migration : ajoute les colonnes recurring si elles n'existent pas.
+     * 
+     * @param string $table_name Nom de la table special_events
+     */
+    private function migrateSpecialEventsRecurringColumns($table_name) {
+        global $wpdb;
+        
+        // Vérifier si la table existe
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Vérifier si la colonne recurring existe
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'recurring'",
+                DB_NAME,
+                $table_name
+            )
+        );
+        
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            // Ajouter les colonnes manquantes une par une pour éviter les erreurs
+            $columns_to_add = [
+                'recurring' => "ADD COLUMN recurring TINYINT(1) NOT NULL DEFAULT 0 AFTER mode",
+                'recurring_freq' => "ADD COLUMN recurring_freq VARCHAR(20) NOT NULL DEFAULT 'weekly' AFTER recurring",
+                'recurring_interval' => "ADD COLUMN recurring_interval INT UNSIGNED NOT NULL DEFAULT 1 AFTER recurring_freq",
+                'recurring_window_end_ts' => "ADD COLUMN recurring_window_end_ts INT UNSIGNED NOT NULL DEFAULT 0 AFTER recurring_interval"
+            ];
+            
+            foreach ($columns_to_add as $column_name => $sql_part) {
+                $column_check = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                         WHERE TABLE_SCHEMA = %s 
+                         AND TABLE_NAME = %s 
+                         AND COLUMN_NAME = %s",
+                        DB_NAME,
+                        $table_name,
+                        $column_name
+                    )
+                );
+                
+                if (empty($column_check) || (int) $column_check === 0) {
+                    $wpdb->query("ALTER TABLE {$table_name} {$sql_part}");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Méthode publique pour exécuter la migration des colonnes recurring.
+     * Peut être appelée depuis l'extérieur de la classe.
+     */
+    public function migrateEventsRecurringColumns() {
+        $events_table = pokehub_get_table('special_events');
+        if ($events_table) {
+            $this->migrateSpecialEventsRecurringColumns($events_table);
+        }
     }
 }
