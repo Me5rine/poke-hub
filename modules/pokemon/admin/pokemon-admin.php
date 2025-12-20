@@ -368,19 +368,9 @@ function poke_hub_pokemon_admin_ui() {
                     $all_weathers = $wpdb->get_results("SELECT * FROM {$table_weathers} ORDER BY name_fr ASC, name_en ASC");
                 }
 
-                // Récupérer tous les types disponibles (exclure le type en cours d'édition)
+                // Récupérer tous les types disponibles (inclure TOUS les types, y compris le type en cours d'édition)
                 if ($table_types) {
-                    $exclude_id = ($edit_row && isset($edit_row->id)) ? (int) $edit_row->id : 0;
-                    if ($exclude_id > 0) {
-                        $all_types = $wpdb->get_results(
-                            $wpdb->prepare(
-                                "SELECT * FROM {$table_types} WHERE id != %d ORDER BY name_fr ASC, name_en ASC",
-                                $exclude_id
-                            )
-                        );
-                    } else {
-                        $all_types = $wpdb->get_results("SELECT * FROM {$table_types} ORDER BY name_fr ASC, name_en ASC");
-                    }
+                    $all_types = $wpdb->get_results("SELECT * FROM {$table_types} ORDER BY name_fr ASC, name_en ASC");
                 }
 
                 if (function_exists('poke_hub_pokemon_types_edit_form')) {
@@ -896,6 +886,18 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
     );
 
     // On limite Select2 aux onglets qui en ont besoin (pokemon, backgrounds)
+    // Mais on charge toujours le script d'évolutions pour pokemon
+    if ($section === 'pokemon') {
+        // Script pour gérer l'affichage conditionnel des champs d'évolution
+        wp_enqueue_script(
+            'pokehub-pokemon-evolutions-admin',
+            POKE_HUB_URL . 'assets/js/pokehub-pokemon-evolutions-admin.js',
+            ['jquery'],
+            POKE_HUB_VERSION,
+            true
+        );
+    }
+    
     if ($section !== 'pokemon' && $section !== 'backgrounds') {
         return;
     }
@@ -915,148 +917,26 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
         true
     );
 
-    wp_add_inline_script(
-        'select2',
-        "jQuery(function($){
-            function pokehubInitAttackSelect2(context){
-                var \$ctx = context ? $(context) : $(document);
-                \$ctx.find('select.pokehub-move-select').each(function(){
-                    var \$s = $(this);
-                    if (\$s.data('select2')) {
-                        return;
-                    }
-                    \$s.select2({
-                        width: '100%',
-                        placeholder: '" . esc_js(__('Select move', 'poke-hub')) . "'
-                    });
-                });
-            }
-
-            function pokehubInitWeatherSelect2(context){
-                var \$ctx = context ? $(context) : $(document);
-                \$ctx.find('select.pokehub-weather-select2').each(function(){
-                    var \$s = $(this);
-                    if (\$s.data('select2')) {
-                        return;
-                    }
-                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select weather (optional)', 'poke-hub')) . "';
-                    \$s.select2({
-                        width: '100%',
-                        placeholder: placeholder,
-                        allowClear: true
-                    });
-                });
-            }
-
-            function pokehubInitItemSelect2(context){
-                var \$ctx = context ? $(context) : $(document);
-                \$ctx.find('select.pokehub-item-select2').each(function(){
-                    var \$s = $(this);
-                    if (\$s.data('select2')) {
-                        return;
-                    }
-                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select item (optional)', 'poke-hub')) . "';
-                    \$s.select2({
-                        width: '100%',
-                        placeholder: placeholder,
-                        allowClear: true
-                    });
-                });
-            }
-
-            function pokehubInitLureSelect2(context){
-                var \$ctx = context ? $(context) : $(document);
-                \$ctx.find('select.pokehub-lure-select2').each(function(){
-                    var \$s = $(this);
-                    if (\$s.data('select2')) {
-                        return;
-                    }
-                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select lure (optional)', 'poke-hub')) . "';
-                    \$s.select2({
-                        width: '100%',
-                        placeholder: placeholder,
-                        allowClear: true
-                    });
-                });
-            }
-
-            function pokehubInitPokemonSelect2(context){
-                var \$ctx = context ? $(context) : $(document);
-                \$ctx.find('select.pokehub-pokemon-select2').each(function(){
-                    var \$s = $(this);
-                    if (\$s.data('select2')) {
-                        return;
-                    }
-                    var placeholder = \$s.attr('data-placeholder') || '" . esc_js(__('Select target Pokémon', 'poke-hub')) . "';
-                    \$s.select2({
-                        width: '100%',
-                        placeholder: placeholder,
-                        allowClear: true
-                    });
-                });
-            }
-
-            window.pokehubInitAttackSelect2 = pokehubInitAttackSelect2;
-            window.pokehubInitWeatherSelect2 = pokehubInitWeatherSelect2;
-            window.pokehubInitItemSelect2 = pokehubInitItemSelect2;
-            window.pokehubInitLureSelect2 = pokehubInitLureSelect2;
-            window.pokehubInitPokemonSelect2 = pokehubInitPokemonSelect2;
-            pokehubInitAttackSelect2(document);
-            pokehubInitWeatherSelect2(document);
-            pokehubInitItemSelect2(document);
-            pokehubInitLureSelect2(document);
-            pokehubInitPokemonSelect2(document);
-
-            // Gestion de l'affichage conditionnel des champs d'évolution selon la méthode
-            function pokehubToggleEvolutionFields(selectElement) {
-                var \$row = $(selectElement).closest('tr');
-                var method = $(selectElement).val();
-                
-                // Cacher tous les champs conditionnels
-                \$row.find('.pokehub-evolution-conditional').hide();
-                
-                // Afficher les champs selon la méthode
-                if (method === 'item') {
-                    \$row.find('.pokehub-evo-method-item').show();
-                } else if (method === 'lure') {
-                    \$row.find('.pokehub-evo-method-lure').show();
-                } else if (method === 'quest') {
-                    \$row.find('.pokehub-evo-method-quest').show();
-                } else if (method === 'stats') {
-                    \$row.find('.pokehub-evo-method-stats').show();
-                }
-                // levelup, other, ou vide : rien d'autre ne s'affiche
-                
-                // Time of day : s'affiche si une valeur est sélectionnée
-                var timeOfDaySelect = \$row.find('select[name*=\"[time_of_day]\"]');
-                if (timeOfDaySelect.length && timeOfDaySelect.val()) {
-                    \$row.find('.pokehub-evo-method-time').show();
-                }
-            }
-
-            // Exposer la fonction globalement pour pouvoir l'appeler depuis pokemon-form.php
-            window.pokehubToggleEvolutionFields = pokehubToggleEvolutionFields;
-
-            // Initialiser l'affichage pour toutes les lignes existantes
-            $(document).on('change', '.pokehub-evolution-method', function() {
-                pokehubToggleEvolutionFields(this);
-            });
-            
-            // Gérer l'affichage du time_of_day quand il change
-            $(document).on('change', 'select[name*=\"[time_of_day]\"]', function() {
-                var \$row = $(this).closest('tr');
-                if ($(this).val()) {
-                    \$row.find('.pokehub-evo-method-time').show();
-                } else {
-                    \$row.find('.pokehub-evo-method-time').hide();
-                }
-            });
-
-            // Initialiser au chargement de la page
-            $('.pokehub-evolution-method').each(function() {
-                pokehubToggleEvolutionFields(this);
-            });
-        });"
+    // Script pour l'initialisation Select2 avec recherche multilingue
+    wp_enqueue_script(
+        'pokehub-pokemon-admin-select2',
+        POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+    
+    // Localiser les chaînes de traduction pour Select2
+    wp_localize_script(
+        'pokehub-pokemon-admin-select2',
+        'pokehubSelect2Strings',
+        [
+            'selectMove'         => __('Select move', 'poke-hub'),
+            'selectWeather'      => __('Select weather (optional)', 'poke-hub'),
+            'selectItem'         => __('Select item (optional)', 'poke-hub'),
+            'selectLure'         => __('Select lure (optional)', 'poke-hub'),
+            'selectTargetPokemon' => __('Select target Pokémon', 'poke-hub'),
+        ]
     );
 }
 add_action('admin_enqueue_scripts', 'poke_hub_pokemon_admin_enqueue_assets');

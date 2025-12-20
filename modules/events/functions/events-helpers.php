@@ -11,7 +11,9 @@ function poke_hub_event_get_meta($post_id, $key, $default = null) {
 }
 
 function poke_hub_event_get_status($post_id) {
-    $now   = (int) current_time('timestamp');
+    // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
+    // sont toujours en UTC et doivent être comparés avec time() (UTC)
+    $now   = (int) time();
     $start = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_start', 0);
     $end   = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_end', 0);
 
@@ -45,7 +47,9 @@ function poke_hub_event_get_duration($post_id) {
  * à partir des timestamps.
  */
 function poke_hub_events_compute_status(int $start_ts, int $end_ts): string {
-    $now = (int) current_time('timestamp');
+    // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
+    // sont toujours en UTC et doivent être comparés avec time() (UTC)
+    $now = (int) time();
 
     if ($start_ts <= $now && $end_ts >= $now) {
         return 'current';

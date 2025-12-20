@@ -58,6 +58,20 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     $form_proto   = $settings['form'] ?? '';
     $form_mapping = poke_hub_pokemon_get_form_mapping( $pokemon_id_proto, $form_proto );
 
+    // ---------------------------------------------------------------------
+    // FIX: Beaucoup d’entrées GM dupliquent la forme "de base" via *_NORMAL
+    // (ex: V0032_POKEMON_NIDORAN_NORMAL avec form = NIDORAN_NORMAL).
+    // On veut une seule entrée => on traite *_NORMAL comme "pas de forme".
+    // ---------------------------------------------------------------------
+    if ( $form_proto !== '' ) {
+        $upper_form = strtoupper( (string) $form_proto );
+
+        if ( $upper_form === 'NORMAL' || $upper_form === 'FORM_NORMAL' || preg_match( '/_NORMAL$/', $upper_form ) ) {
+            $form_proto   = '';
+            $form_mapping = null; // éviter qu’un mapping force un suffix
+        }
+    }
+
     // Form slug :
     if ( $form_mapping && ! empty( $form_mapping['form_slug'] ) ) {
         $form_slug = sanitize_title( (string) $form_mapping['form_slug'] );
@@ -1626,13 +1640,38 @@ function poke_hub_pokemon_import_game_master( $source ) {
      * (avec les multiplicateurs ×1.6, ×0.625, ×0.39).
      */
     if (function_exists('poke_hub_pokemon_import_all_types_for_pokemon_go')) {
-        $type_import_stats = poke_hub_pokemon_import_all_types_for_pokemon_go();
-        if (isset($type_import_stats['success'])) {
-            $stats['types_imported_for_pokemon_go'] = $type_import_stats['success'];
+        // Vérifie que le fichier d'import est bien chargé
+        if (!function_exists('poke_hub_pokemon_import_type_from_bulbapedia')) {
+            // Essaie de charger le fichier
+            $importer_file = POKE_HUB_POKEMON_PATH . '/includes/pokemon-type-bulbapedia-importer.php';
+            if (file_exists($importer_file)) {
+                require_once $importer_file;
+            }
         }
-        if (isset($type_import_stats['errors']) && !empty($type_import_stats['errors'])) {
-            $stats['types_import_errors'] = $type_import_stats['errors'];
+        
+        if (function_exists('poke_hub_pokemon_import_all_types_for_pokemon_go')) {
+            $type_import_stats = poke_hub_pokemon_import_all_types_for_pokemon_go();
+            if (isset($type_import_stats['success'])) {
+                $stats['types_imported_for_pokemon_go'] = $type_import_stats['success'];
+            }
+            if (isset($type_import_stats['total'])) {
+                $stats['types_import_total'] = $type_import_stats['total'];
+            }
+            if (isset($type_import_stats['errors']) && !empty($type_import_stats['errors'])) {
+                $stats['types_import_errors'] = $type_import_stats['errors'];
+                // Log les erreurs pour debug
+                error_log(sprintf(
+                    'Poke Hub: Erreurs lors de l\'import des types: %d erreur(s)',
+                    count($type_import_stats['errors'])
+                ));
+            }
+        } else {
+            $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non disponible';
+            error_log('Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non disponible');
         }
+    } else {
+        $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée';
+        error_log('Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée');
     }
 
     return $stats;

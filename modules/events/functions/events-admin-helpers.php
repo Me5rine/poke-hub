@@ -45,6 +45,18 @@ add_filter('pokehub_remote_events_edit_url', function ($url, $item) {
 }, 10, 2);
 
 /**
+ * URL d'édition des special events distants (site JV).
+ *
+ * $item->id = ID du special event distant.
+ */
+add_filter('pokehub_remote_special_events_edit_url', function ($url, $item) {
+    // 🔧 ADAPTE ce domaine à ton site distant
+    $remote_admin_base = 'http://jv-actu.local:8080/wp-admin/';
+
+    return $remote_admin_base . 'admin.php?page=poke-hub-events&action=edit_special&event_id=' . (int) $item->id;
+}, 10, 2);
+
+/**
  * Génère un slug unique parmi :
  * - les special events (table locale special_events)
  * - les posts distants (table remote_posts, via pokehub_get_table())

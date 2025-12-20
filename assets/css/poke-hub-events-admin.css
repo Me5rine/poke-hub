@@ -1,0 +1,26 @@
+/* Styles pour le Select2 du filtre de type d'événement */
+/* Select2 crée un conteneur avec la classe select2-container, on cible celui qui suit le select original */
+select#filter-by-event-type + .select2-container {
+    margin-right: 8px;
+}
+
+select#filter-by-event-type + .select2-container .select2-selection--single {
+    border-color: #8c8f94 !important;
+    height: 30px;
+}
+
+select#filter-by-event-type + .select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 28px;
+    padding-left: 8px;
+    padding-right: 20px;
+}
+
+select#filter-by-event-type + .select2-container .select2-selection--single .select2-selection__arrow {
+    height: 28px;
+}
+
+select#filter-by-event-type + .select2-container.select2-container--focus .select2-selection--single,
+select#filter-by-event-type + .select2-container.select2-container--open .select2-selection--single {
+    border-color: #2271b1;
+}
+

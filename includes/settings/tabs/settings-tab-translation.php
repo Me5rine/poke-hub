@@ -34,7 +34,6 @@ $allowed_types = ['pokemon', 'attacks', 'types'];
 if (!empty($selected_lang) && !in_array($selected_lang, $allowed_langs, true)) {
     $selected_lang = 'fr';
 }
-
 if (!empty($selected_type) && !in_array($selected_type, $allowed_types, true)) {
     $selected_type = 'pokemon';
 }
@@ -69,8 +68,7 @@ if (!empty($_POST['poke_hub_save_translations'])) {
             $lang = sanitize_text_field($data['lang']);
             $translation = isset($data['translation']) ? trim(sanitize_text_field($data['translation'])) : '';
 
-            // Ne sauvegarder que si une traduction a été saisie
-            if (empty($translation)) {
+            if ($translation === '') {
                 $skipped_count++;
                 continue;
             }
@@ -88,21 +86,17 @@ if (!empty($_POST['poke_hub_save_translations'])) {
             } elseif ($type === 'types') {
                 $table = pokehub_get_table('pokemon_types');
             }
-
             if (empty($table)) {
                 continue;
             }
 
-            // Récupérer l'enregistrement existant
             $row = $wpdb->get_row(
                 $wpdb->prepare("SELECT id, name_en, name_fr, extra FROM {$table} WHERE id = %d", $item_id)
             );
-
             if (!$row) {
                 continue;
             }
 
-            // Récupérer les données extra existantes
             $extra = [];
             if (!empty($row->extra)) {
                 $decoded = json_decode($row->extra, true);
@@ -110,26 +104,22 @@ if (!empty($_POST['poke_hub_save_translations'])) {
                     $extra = $decoded;
                 }
             }
-
             if (!isset($extra['names']) || !is_array($extra['names'])) {
                 $extra['names'] = [];
             }
 
-            // Mettre à jour la traduction
             $extra['names'][$lang] = $translation;
 
             $update_data = [
                 'extra' => wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ];
-
-            // Si c'est le français, mettre à jour aussi name_fr
             if ($lang === 'fr') {
                 $update_data['name_fr'] = $translation;
             }
 
-            $format = ['%s']; // extra
+            $format = ['%s'];
             if (isset($update_data['name_fr'])) {
-                $format[] = '%s'; // name_fr
+                $format[] = '%s';
             }
 
             $result = $wpdb->update(
@@ -150,15 +140,9 @@ if (!empty($_POST['poke_hub_save_translations'])) {
         if ($saved_count > 0) {
             $messages[] = [
                 'type' => 'success',
-                'text' => sprintf(
-                    /* translators: %d: number of translations saved */
-                    __('%d translation(s) saved successfully.', 'poke-hub'),
-                    $saved_count
-                ),
+                'text' => sprintf(__(' %d translation(s) saved successfully.', 'poke-hub'), $saved_count),
             ];
-        }
-
-        if ($skipped_count > 0 && $saved_count === 0) {
+        } elseif ($skipped_count > 0) {
             $messages[] = [
                 'type' => 'info',
                 'text' => __('No translations were saved. Please enter translations in the form fields.', 'poke-hub'),
@@ -172,17 +156,19 @@ if (!empty($_POST['poke_hub_fetch_missing_translations'])) {
     check_admin_referer('poke_hub_translation_settings', 'poke_hub_translation_nonce');
 
     $fetch_type = isset($_POST['fetch_type']) ? sanitize_text_field($_POST['fetch_type']) : '';
-    $limit = isset($_POST['fetch_limit']) ? (int) $_POST['fetch_limit'] : 5; // Limite par défaut réduite à 5 pour éviter les timeouts
-    $force = isset($_POST['fetch_force']) && $_POST['fetch_force'] === '1';
-    
-    // Limiter à 20 maximum pour éviter les timeouts
-    if ($limit <= 0 || $limit > 20) {
+
+    $limit_raw = isset($_POST['fetch_limit']) ? trim((string) $_POST['fetch_limit']) : '';
+    $limit = is_numeric($limit_raw) ? (int) $limit_raw : 0;
+
+    if ($limit <= 0) {
         $limit = 5;
     }
 
+    $force = isset($_POST['fetch_force']) && $_POST['fetch_force'] === '1';
+
     if (in_array($fetch_type, $allowed_types, true)) {
         $result = [];
-        
+
         if ($fetch_type === 'pokemon' && function_exists('poke_hub_pokemon_fetch_official_names_existing')) {
             $result = poke_hub_pokemon_fetch_official_names_existing($limit, $force);
         } elseif ($fetch_type === 'attacks' && function_exists('poke_hub_attacks_fetch_existing_official_names')) {
@@ -195,39 +181,43 @@ if (!empty($_POST['poke_hub_fetch_missing_translations'])) {
             $messages[] = [
                 'type' => 'success',
                 'text' => sprintf(
-                    __('Fetched translations: %d updated, %d skipped, %d errors out of %d items.', 'poke-hub'),
+                    __('Fetched translations: %d updated, %d skipped, %d errors out of %d items. (Limit requested: %d)', 'poke-hub'),
                     $result['updated'] ?? 0,
                     $result['skipped'] ?? 0,
                     $result['errors'] ?? 0,
-                    $result['total'] ?? 0
+                    $result['total'] ?? 0,
+                    $limit
                 ),
             ];
         }
     }
 }
 
-// Récupérer les traductions manquantes pour la langue et le type sélectionnés
+if (function_exists('poke_hub_trlog_write')) {
+    poke_hub_trlog_write('settings_tab: bulk fetch request', [
+        'fetch_type' => $fetch_type ?? null,
+        'limit_raw' => $limit_raw ?? null,
+        'limit' => $limit ?? null,
+        'force' => $force ?? null,
+        'user' => get_current_user_id(),
+    ]);
+}
+
+// Récupérer les traductions manquantes
 $missing_items = [];
 if (function_exists('poke_hub_get_all_missing_translations')) {
-    $filters = [
-        'lang' => $selected_lang,
-    ];
+    $filters = ['lang' => $selected_lang];
     $all_missing = poke_hub_get_all_missing_translations($filters);
-    
-    // Filtrer par type et langue
+
     if (isset($all_missing[$selected_type][$selected_lang])) {
         $missing_items = $all_missing[$selected_type][$selected_lang];
     }
 }
 
-// Compter les traductions manquantes par langue et type (pour les stats)
+// Stats
 $stats = [];
 foreach ($allowed_langs as $lang) {
-    $stats[$lang] = [
-        'pokemon' => 0,
-        'attacks' => 0,
-        'types' => 0,
-    ];
+    $stats[$lang] = ['pokemon' => 0, 'attacks' => 0, 'types' => 0];
 }
 
 $all_missing_for_stats = [];
@@ -259,7 +249,6 @@ foreach ($messages as $msg) {
         esc_html($msg['text'])
     );
 }
-
 ?>
 
 <h2><?php esc_html_e('Translation Management', 'poke-hub'); ?></h2>
@@ -267,7 +256,7 @@ foreach ($messages as $msg) {
 
 <div style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-top: 20px;">
     <h3><?php esc_html_e('Missing Translations Statistics', 'poke-hub'); ?></h3>
-    
+
     <table class="widefat" style="margin-top: 15px;">
         <thead>
             <tr>
@@ -279,21 +268,19 @@ foreach ($messages as $msg) {
             </tr>
         </thead>
         <tbody>
-            <?php
-            foreach ($allowed_langs as $lang) {
+            <?php foreach ($allowed_langs as $lang): ?>
+                <?php
                 $total = $stats[$lang]['pokemon'] + $stats[$lang]['attacks'] + $stats[$lang]['types'];
-                $row_class = $total > 0 ? '' : 'style="opacity: 0.5;"';
+                $row_attr = $total > 0 ? '' : 'style="opacity: 0.5;"';
                 ?>
-                <tr <?php echo $row_class; ?>>
+                <tr <?php echo $row_attr; ?>>
                     <td><strong><?php echo esc_html($lang_names[$lang] ?? strtoupper($lang)); ?></strong></td>
                     <td><?php echo (int) $stats[$lang]['pokemon']; ?></td>
                     <td><?php echo (int) $stats[$lang]['attacks']; ?></td>
                     <td><?php echo (int) $stats[$lang]['types']; ?></td>
                     <td><strong><?php echo (int) $total; ?></strong></td>
                 </tr>
-                <?php
-            }
-            ?>
+            <?php endforeach; ?>
         </tbody>
     </table>
 </div>
@@ -304,12 +291,10 @@ foreach ($messages as $msg) {
 
     <form method="post" action="" style="margin-top: 15px;">
         <?php wp_nonce_field('poke_hub_translation_settings', 'poke_hub_translation_nonce'); ?>
-        
+
         <table class="form-table" role="presentation">
             <tr>
-                <th scope="row">
-                    <label for="fetch_type"><?php esc_html_e('Type', 'poke-hub'); ?></label>
-                </th>
+                <th scope="row"><label for="fetch_type"><?php esc_html_e('Type', 'poke-hub'); ?></label></th>
                 <td>
                     <select id="fetch_type" name="fetch_type" required>
                         <option value=""><?php esc_html_e('Select...', 'poke-hub'); ?></option>
@@ -319,39 +304,28 @@ foreach ($messages as $msg) {
                     </select>
                 </td>
             </tr>
+
             <tr>
-                <th scope="row">
-                    <label for="fetch_limit"><?php esc_html_e('Limit', 'poke-hub'); ?></label>
-                </th>
+                <th scope="row"><label for="fetch_limit"><?php esc_html_e('Limit', 'poke-hub'); ?></label></th>
                 <td>
-                    <input type="number"
-                           id="fetch_limit"
-                           name="fetch_limit"
-                           value="5"
-                           min="1"
-                           max="20"
-                           class="small-text" />
+                    <input type="number" id="fetch_limit" name="fetch_limit" value="5" min="1" max="100" class="small-text" />
                     <p class="description">
-                        <?php esc_html_e('Number of items to fetch (1-20 recommended). Bulbapedia has rate limits and can be slow, so start with a small number (5-10).', 'poke-hub'); ?>
+                        <?php esc_html_e('Number of items to fetch (1-100 recommended). Bulbapedia has rate limits and can be slow, so start with a small number (5-10).', 'poke-hub'); ?>
                     </p>
                 </td>
             </tr>
+
             <tr>
-                <th scope="row">
-                    <label for="fetch_force"><?php esc_html_e('Force update', 'poke-hub'); ?></label>
-                </th>
+                <th scope="row"><label for="fetch_force"><?php esc_html_e('Force update', 'poke-hub'); ?></label></th>
                 <td>
                     <label>
-                        <input type="checkbox"
-                               id="fetch_force"
-                               name="fetch_force"
-                               value="1" />
+                        <input type="checkbox" id="fetch_force" name="fetch_force" value="1" />
                         <?php esc_html_e('Update even if translations already exist (will replace existing translations).', 'poke-hub'); ?>
                     </label>
                 </td>
             </tr>
         </table>
-        
+
         <?php submit_button(__('Fetch Missing Translations', 'poke-hub'), 'primary', 'poke_hub_fetch_missing_translations'); ?>
     </form>
 </div>
@@ -363,16 +337,15 @@ foreach ($messages as $msg) {
     <form method="get" action="" style="margin-top: 15px; margin-bottom: 20px; padding: 15px; background: #f0f0f1; border-radius: 4px;">
         <input type="hidden" name="page" value="poke-hub-settings" />
         <input type="hidden" name="tab" value="translation" />
-        
+
         <label for="filter_lang" style="margin-right: 15px;">
             <strong><?php esc_html_e('Language:', 'poke-hub'); ?></strong>
             <select id="filter_lang" name="lang" onchange="this.form.submit();" style="margin-left: 5px;">
-                <?php
-                foreach ($allowed_langs as $lang) {
-                    $selected = $selected_lang === $lang ? 'selected' : '';
-                    echo '<option value="' . esc_attr($lang) . '" ' . $selected . '>' . esc_html($lang_names[$lang] ?? strtoupper($lang)) . '</option>';
-                }
-                ?>
+                <?php foreach ($allowed_langs as $lang): ?>
+                    <option value="<?php echo esc_attr($lang); ?>" <?php selected($selected_lang, $lang); ?>>
+                        <?php echo esc_html($lang_names[$lang] ?? strtoupper($lang)); ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
         </label>
 
@@ -391,7 +364,6 @@ foreach ($messages as $msg) {
             <p>
                 <?php
                 printf(
-                    /* translators: %1$s: Language name, %2$s: Type name */
                     esc_html__('No missing translations found for %1$s %2$s. All items have translations!', 'poke-hub'),
                     esc_html($lang_names[$selected_lang] ?? strtoupper($selected_lang)),
                     esc_html(ucfirst($selected_type))
@@ -402,14 +374,21 @@ foreach ($messages as $msg) {
     <?php else: ?>
         <form method="post" action="" id="translations-form">
             <?php wp_nonce_field('poke_hub_translation_settings', 'poke_hub_translation_nonce'); ?>
-            
+
             <div style="margin-bottom: 15px;">
                 <p>
-                    <strong><?php printf(esc_html__('Found %d missing translation(s) for %s %s', 'poke-hub'), count($missing_items), esc_html($lang_names[$selected_lang] ?? strtoupper($selected_lang)), esc_html(ucfirst($selected_type))); ?></strong>
+                    <strong>
+                        <?php
+                        printf(
+                            esc_html__('Found %d missing translation(s) for %s %s', 'poke-hub'),
+                            count($missing_items),
+                            esc_html($lang_names[$selected_lang] ?? strtoupper($selected_lang)),
+                            esc_html(ucfirst($selected_type))
+                        );
+                        ?>
+                    </strong>
                 </p>
-                <p class="description">
-                    <?php esc_html_e('Enter translations in the fields below. Only fields with content will be saved.', 'poke-hub'); ?>
-                </p>
+                <p class="description"><?php esc_html_e('Enter translations in the fields below. Only fields with content will be saved.', 'poke-hub'); ?></p>
             </div>
 
             <table class="widefat striped" style="margin-top: 10px;">
@@ -425,51 +404,58 @@ foreach ($messages as $msg) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    foreach ($missing_items as $item) {
-                        $item_id = (int) $item['id'];
+                    <?php foreach ($missing_items as $item): ?>
+                        <?php
+                        $item_id = (int) ($item['id'] ?? 0);
                         $current_translation = '';
-                        
-                        // Récupérer la traduction actuelle si elle existe
+
                         if ($selected_lang === 'fr' && !empty($item['name_fr'])) {
-                            $current_translation = $item['name_fr'];
+                            $current_translation = (string) $item['name_fr'];
+                        } elseif (!empty($item['extra'])) {
+                            $decoded = json_decode((string) $item['extra'], true);
+                            if (is_array($decoded) && !empty($decoded['names'][$selected_lang])) {
+                                $current_translation = (string) $decoded['names'][$selected_lang];
+                            }
+                        } elseif (!empty($item['names']) && is_array($item['names']) && !empty($item['names'][$selected_lang])) {
+                            $current_translation = (string) $item['names'][$selected_lang];
                         }
-                        
                         ?>
                         <tr>
-                            <td><?php echo $item_id; ?></td>
+                            <td><?php echo (int) $item_id; ?></td>
+
                             <?php if ($selected_type === 'pokemon'): ?>
                                 <td><?php echo isset($item['dex_number']) ? (int) $item['dex_number'] : '-'; ?></td>
                             <?php endif; ?>
-                            <td><strong><?php echo esc_html($item['name_en']); ?></strong></td>
+
+                            <td><strong><?php echo esc_html($item['name_en'] ?? ''); ?></strong></td>
+
                             <td>
-                                <?php if (!empty($current_translation)): ?>
+                                <?php if ($current_translation !== ''): ?>
                                     <em style="color: #666;"><?php echo esc_html($current_translation); ?></em>
                                 <?php else: ?>
                                     <span style="color: #d63638;"><?php esc_html_e('Missing', 'poke-hub'); ?></span>
                                 <?php endif; ?>
                             </td>
+
                             <td>
-                                <input type="hidden" name="translations[<?php echo $item_id; ?>][type]" value="<?php echo esc_attr($selected_type); ?>" />
-                                <input type="hidden" name="translations[<?php echo $item_id; ?>][lang]" value="<?php echo esc_attr($selected_lang); ?>" />
-                                <input type="text"
-                                       name="translations[<?php echo $item_id; ?>][translation]"
-                                       value="<?php echo esc_attr($current_translation); ?>"
-                                       class="regular-text"
-                                       placeholder="<?php printf(esc_attr__('Enter %s translation...', 'poke-hub'), esc_attr($lang_names[$selected_lang] ?? strtoupper($selected_lang))); ?>" />
+                                <input type="hidden" name="translations[<?php echo (int) $item_id; ?>][type]" value="<?php echo esc_attr($selected_type); ?>" />
+                                <input type="hidden" name="translations[<?php echo (int) $item_id; ?>][lang]" value="<?php echo esc_attr($selected_lang); ?>" />
+                                <input
+                                    type="text"
+                                    name="translations[<?php echo (int) $item_id; ?>][translation]"
+                                    value="<?php echo esc_attr($current_translation); ?>"
+                                    class="regular-text"
+                                    placeholder="<?php printf(esc_attr__('Enter %s translation...', 'poke-hub'), esc_attr($lang_names[$selected_lang] ?? strtoupper($selected_lang))); ?>"
+                                />
                             </td>
                         </tr>
-                        <?php
-                    }
-                    ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
 
             <p style="margin-top: 20px;">
                 <?php submit_button(__('Save Translations', 'poke-hub'), 'primary', 'poke_hub_save_translations', false); ?>
-                <span class="description" style="margin-left: 10px;">
-                    <?php esc_html_e('Only translations with entered values will be saved.', 'poke-hub'); ?>
-                </span>
+                <span class="description" style="margin-left: 10px;"><?php esc_html_e('Only translations with entered values will be saved.', 'poke-hub'); ?></span>
             </p>
         </form>
     <?php endif; ?>

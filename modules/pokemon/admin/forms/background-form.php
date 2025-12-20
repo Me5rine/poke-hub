@@ -214,8 +214,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                                         ?>
                                         <option value="<?php echo $ev_id; ?>" 
                                                 data-source="<?php echo esc_attr($ev_source); ?>"
-                                                <?php selected($event_id, $ev_id); ?>
-                                                style="display:none;">
+                                                <?php selected($event_id, $ev_id); ?>>
                                             <?php echo esc_html($label); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -242,7 +241,10 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                                 $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
                                 $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
                                 ?>
-                                <option value="<?php echo $p_id; ?>" <?php selected(in_array($p_id, $current_pokemon_ids, true)); ?>>
+                                <option value="<?php echo $p_id; ?>" 
+                                        data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                        data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                        <?php selected(in_array($p_id, $current_pokemon_ids, true)); ?>>
                                     <?php echo $label; ?>
                                 </option>
                             <?php endforeach; ?>
@@ -264,13 +266,40 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
 
     <script type="text/javascript">
     jQuery(function($) {
-        // Initialiser Select2 sur le champ Pokémon
-        if ($.fn.select2) {
-            $('#pokemon_ids').select2({
-                placeholder: '<?php echo esc_js(__('Search Pokémon...', 'poke-hub')); ?>',
+            // Initialiser Select2 sur le champ Pokémon (utilise pokehubMultilingualMatcher si disponible)
+            if ($.fn.select2) {
+                // Utiliser la fonction globale ou définir une version locale si elle n'existe pas encore
+                var matcherFn = window.pokehubMultilingualMatcher || function(params, data) {
+                    if (!params.term || params.term.trim() === '') return data;
+                    var term = params.term.toLowerCase().trim();
+                    var text = (data.text || '').toLowerCase();
+                    if (text.indexOf(term) !== -1) return data;
+                    if (data.element) {
+                        var el = data.element;
+                        var nameFr = (el.getAttribute && el.getAttribute('data-name-fr') || '').toLowerCase();
+                        var nameEn = (el.getAttribute && el.getAttribute('data-name-en') || '').toLowerCase();
+                        if (nameFr && nameFr.indexOf(term) !== -1) return data;
+                        if (nameEn && nameEn.indexOf(term) !== -1) return data;
+                    }
+                    return null;
+                };
+                
+                $('#pokemon_ids').select2({
+                    placeholder: '<?php echo esc_js(__('Search Pokémon...', 'poke-hub')); ?>',
+                    allowClear: true,
+                    width: '100%',
+                    matcher: matcherFn
+                });
+
+            // Initialiser Select2 sur le champ Événement
+            $('#event_id').select2({
+                placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>',
                 allowClear: true,
                 width: '100%'
             });
+
+            // Appliquer le filtre initial après l'initialisation de Select2
+            $('#event_type').trigger('change');
         }
         // Gestion de la médiathèque pour l'image
         $(document).on('click', '.pokehub-select-background-image', function(e) {
@@ -370,21 +399,22 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             const $eventSelect = $('#event_id');
             const currentValue = $eventSelect.val();
 
+            // Avec Select2, on utilise disabled au lieu de show/hide
             $eventSelect.find('option').each(function() {
                 const $option = $(this);
                 const optionSource = $option.data('source') || '';
 
-                // Toujours afficher l'option "None"
+                // Toujours activer l'option "None"
                 if ($option.val() === '0') {
-                    $option.show();
+                    $option.prop('disabled', false);
                     return;
                 }
 
-                // Afficher les options qui correspondent au type sélectionné
+                // Activer les options qui correspondent au type sélectionné
                 if (!selectedType || optionSource === selectedType) {
-                    $option.show();
+                    $option.prop('disabled', false);
                 } else {
-                    $option.hide();
+                    $option.prop('disabled', true);
                 }
             });
 
@@ -393,13 +423,15 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             if ($selectedOption.length && $selectedOption.val() !== '0') {
                 const optionSource = $selectedOption.data('source') || '';
                 if (selectedType && optionSource !== selectedType) {
-                    $eventSelect.val('0');
+                    $eventSelect.val('0').trigger('change');
                 }
             }
-        });
 
-        // Déclencher le filtre au chargement
-        $('#event_type').trigger('change');
+            // Réinitialiser Select2 pour que les changements soient visibles
+            if ($.fn.select2 && $eventSelect.data('select2')) {
+                $eventSelect.trigger('change.select2');
+            }
+        });
     });
     </script>
     <?php

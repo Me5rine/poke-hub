@@ -1,6 +1,56 @@
-// assets/js/special-events-admin.js
+// assets/js/pokehub-special-events-admin.js
 
 jQuery(function ($) {
+
+    // Fonction helper pour la recherche multilingue (utiliser la version globale si disponible)
+    var pokehubMultilingualMatcher = window.pokehubMultilingualMatcher || function(params, data) {
+        // Si aucun terme de recherche, afficher toutes les options
+        if (!params.term || params.term.trim() === '') {
+            return data;
+        }
+        
+        var term = params.term.toLowerCase().trim();
+        var text = data.text ? data.text.toLowerCase() : '';
+        
+        // Chercher dans le texte affiché
+        if (text.indexOf(term) !== -1) {
+            return data;
+        }
+        
+        // Chercher dans les attributs data-name-fr et data-name-en de l'élément option original
+        if (data.element) {
+            var optionEl = data.element;
+            var nameFr = '';
+            var nameEn = '';
+            
+            // Essayer getAttribute d'abord
+            if (optionEl.getAttribute) {
+                nameFr = (optionEl.getAttribute('data-name-fr') || '').toLowerCase();
+                nameEn = (optionEl.getAttribute('data-name-en') || '').toLowerCase();
+            }
+            // Fallback sur dataset si disponible
+            else if (optionEl.dataset) {
+                nameFr = (optionEl.dataset.nameFr || '').toLowerCase();
+                nameEn = (optionEl.dataset.nameEn || '').toLowerCase();
+            }
+            // Fallback sur jQuery si l'élément peut être converti
+            else if (typeof $ !== 'undefined') {
+                var $el = $(optionEl);
+                nameFr = ($el.attr('data-name-fr') || '').toLowerCase();
+                nameEn = ($el.attr('data-name-en') || '').toLowerCase();
+            }
+            
+            if (nameFr && nameFr.length > 0 && nameFr.indexOf(term) !== -1) {
+                return data;
+            }
+            if (nameEn && nameEn.length > 0 && nameEn.indexOf(term) !== -1) {
+                return data;
+            }
+        }
+        
+        // Aucune correspondance
+        return null;
+    };
 
     // Initialiser Select2 pour tous les selects de Pokémon existants
     function initPokemonSelect2($select) {
@@ -24,6 +74,7 @@ jQuery(function ($) {
                 placeholder: 'Sélectionner un Pokémon',
                 allowClear: true,
                 width: '100%',
+                matcher: pokehubMultilingualMatcher,
                 language: {
                     noResults: function() {
                         return "Aucun résultat trouvé";

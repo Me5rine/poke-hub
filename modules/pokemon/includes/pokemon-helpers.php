@@ -12,19 +12,33 @@ function pokehub_get_all_pokemon_for_select(): array {
     $pokemon_table = pokehub_get_table('pokemon');
     $form_variants_table = pokehub_get_table('pokemon_form_variants');
 
-    // Utiliser name_fr si disponible, sinon name_en
     // Récupérer le label de la forme depuis pokemon_form_variants si form_variant_id > 0
     $rows = $wpdb->get_results(
         "SELECT p.id, 
                 p.dex_number, 
-                COALESCE(NULLIF(p.name_fr, ''), p.name_en) AS name,
+                p.name_fr,
+                p.name_en,
                 p.form_variant_id,
                 COALESCE(fv.label, fv.form_slug, '') AS form
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
-         ORDER BY p.dex_number ASC, name ASC",
+         ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );
+    
+    // Construire le nom au format "nom-fr (nom-anglais)" si les deux sont disponibles
+    foreach ($rows as &$row) {
+        $name_fr = (string) ($row['name_fr'] ?? '');
+        $name_en = (string) ($row['name_en'] ?? '');
+        if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+            $row['name'] = $name_fr . ' (' . $name_en . ')';
+        } elseif ($name_fr !== '') {
+            $row['name'] = $name_fr;
+        } else {
+            $row['name'] = $name_en;
+        }
+    }
+    unset($row);
 
     return $rows ?: [];
 }

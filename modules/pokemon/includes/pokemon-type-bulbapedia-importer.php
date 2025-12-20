@@ -44,9 +44,21 @@ function poke_hub_pokemon_import_type_from_bulbapedia($type_name_en) {
     $xpath = new DOMXPath($dom);
 
     // Recherche de la section "Battle properties"
+    // Essaie plusieurs variantes du titre
     $battle_properties_heading = $xpath->query("//h2[contains(., 'Battle properties')]")->item(0);
     if (!$battle_properties_heading) {
-        return new WP_Error('section_not_found', 'Battle properties section not found.');
+        // Essaie avec span mw-headline
+        $span = $xpath->query("//h2/span[@id='Battle_properties']")->item(0);
+        if ($span && $span->parentNode) {
+            $battle_properties_heading = $span->parentNode;
+        }
+    }
+    if (!$battle_properties_heading) {
+        // Essaie une recherche plus large (insensible à la casse)
+        $battle_properties_heading = $xpath->query("//h2[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'battle properties')]")->item(0);
+    }
+    if (!$battle_properties_heading) {
+        return new WP_Error('section_not_found', 'Battle properties section not found on Bulbapedia page.');
     }
 
     $result = [
@@ -63,102 +75,76 @@ function poke_hub_pokemon_import_type_from_bulbapedia($type_name_en) {
     ];
 
     // Trouve les tableaux après le titre "Battle properties"
-    $current = $battle_properties_heading->nextSibling;
-    while ($current) {
-        if ($current->nodeName === 'table') {
-            // Vérifie si c'est le tableau des propriétés offensives
-            $th = $xpath->query(".//th[contains(., 'Offensive properties')]", $current)->item(0);
-            if ($th) {
-                // Parse le tableau offensif
-                $rows = $xpath->query(".//tr", $current);
-                foreach ($rows as $row) {
-                    $cells = $xpath->query(".//td", $row);
-                    if ($cells->length >= 3) {
-                        // Colonne 1: Super effective (×2)
-                        $super_effective_cell = $cells->item(0);
-                        if ($super_effective_cell) {
-                            $links = $xpath->query(".//a[@title]", $super_effective_cell);
-                            foreach ($links as $link) {
-                                $title = $link->getAttribute('title');
-                                if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                    $result['offensive']['super_effective'][] = trim($matches[1]);
-                                }
-                            }
-                        }
-
-                        // Colonne 2: Not very effective (×½)
-                        $not_very_effective_cell = $cells->item(1);
-                        if ($not_very_effective_cell) {
-                            $links = $xpath->query(".//a[@title]", $not_very_effective_cell);
-                            foreach ($links as $link) {
-                                $title = $link->getAttribute('title');
-                                if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                    $result['offensive']['not_very_effective'][] = trim($matches[1]);
-                                }
-                            }
-                        }
-
-                        // Colonne 3: No effect (×0)
-                        $no_effect_cell = $cells->item(2);
-                        if ($no_effect_cell) {
-                            $text = trim($no_effect_cell->textContent);
-                            if (strtolower($text) !== 'none') {
-                                $links = $xpath->query(".//a[@title]", $no_effect_cell);
-                                foreach ($links as $link) {
-                                    $title = $link->getAttribute('title');
-                                    if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                        $result['offensive']['no_effect'][] = trim($matches[1]);
-                                    }
-                                }
+    // Recherche directe des tableaux avec les bonnes classes/headers
+    $tables_found = [];
+    
+    // Essaie d'abord de trouver les tableaux avec la classe roundy
+    $tables = $xpath->query("//table[contains(@class, 'roundy')]");
+    foreach ($tables as $table) {
+        $tables_found[] = $table;
+    }
+    
+    // Si pas de résultats avec roundy, cherche tous les tableaux après le h2
+    if (empty($tables_found)) {
+        $current = $battle_properties_heading;
+        $count = 0;
+        while ($current && $count < 20) {
+            $current = $current->nextSibling;
+            $count++;
+            if ($current && $current->nodeType === XML_ELEMENT_NODE && $current->nodeName === 'table') {
+                $tables_found[] = $current;
+            }
+            // Limite la recherche aux 2 premiers tableaux
+            if (count($tables_found) >= 2) {
+                break;
+            }
+        }
+    }
+    
+    // Parcourt les tableaux trouvés
+    foreach ($tables_found as $table) {
+        // Vérifie si c'est le tableau des propriétés offensives
+        $th = $xpath->query(".//th[contains(., 'Offensive properties')]", $table)->item(0);
+        if ($th) {
+            // Parse le tableau offensif
+            $rows = $xpath->query(".//tr", $table);
+            foreach ($rows as $row) {
+                $cells = $xpath->query(".//td", $row);
+                if ($cells->length >= 3) {
+                    // Colonne 1: Super effective (×2)
+                    $super_effective_cell = $cells->item(0);
+                    if ($super_effective_cell) {
+                        $links = $xpath->query(".//a[@title]", $super_effective_cell);
+                        foreach ($links as $link) {
+                            $title = $link->getAttribute('title');
+                            if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
+                                $result['offensive']['super_effective'][] = trim($matches[1]);
                             }
                         }
                     }
-                }
-            }
 
-            // Vérifie si c'est le tableau des propriétés défensives
-            $th_defensive = $xpath->query(".//th[contains(., 'Defensive properties')]", $current)->item(0);
-            if ($th_defensive) {
-                // Parse le tableau défensif
-                $rows = $xpath->query(".//tr", $current);
-                foreach ($rows as $row) {
-                    $cells = $xpath->query(".//td", $row);
-                    if ($cells->length >= 3) {
-                        // Colonne 1: Weak to (×2)
-                        $weak_to_cell = $cells->item(0);
-                        if ($weak_to_cell) {
-                            $links = $xpath->query(".//a[@title]", $weak_to_cell);
+                    // Colonne 2: Not very effective (×½)
+                    $not_very_effective_cell = $cells->item(1);
+                    if ($not_very_effective_cell) {
+                        $links = $xpath->query(".//a[@title]", $not_very_effective_cell);
+                        foreach ($links as $link) {
+                            $title = $link->getAttribute('title');
+                            if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
+                                $result['offensive']['not_very_effective'][] = trim($matches[1]);
+                            }
+                        }
+                    }
+
+                    // Colonne 3: No effect (×0)
+                    $no_effect_cell = $cells->item(2);
+                    if ($no_effect_cell) {
+                        $text = trim($no_effect_cell->textContent);
+                        if (strtolower($text) !== 'none') {
+                            $links = $xpath->query(".//a[@title]", $no_effect_cell);
                             foreach ($links as $link) {
                                 $title = $link->getAttribute('title');
                                 if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                    $result['defensive']['weak_to'][] = trim($matches[1]);
-                                }
-                            }
-                        }
-
-                        // Colonne 2: Resists (×½)
-                        $resists_cell = $cells->item(1);
-                        if ($resists_cell) {
-                            $links = $xpath->query(".//a[@title]", $resists_cell);
-                            foreach ($links as $link) {
-                                $title = $link->getAttribute('title');
-                                if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                    $result['defensive']['resists'][] = trim($matches[1]);
-                                }
-                            }
-                        }
-
-                        // Colonne 3: Immune to (×0)
-                        $immune_to_cell = $cells->item(2);
-                        if ($immune_to_cell) {
-                            $text = trim($immune_to_cell->textContent);
-                            if (strtolower($text) !== 'none') {
-                                $links = $xpath->query(".//a[@title]", $immune_to_cell);
-                                foreach ($links as $link) {
-                                    $title = $link->getAttribute('title');
-                                    if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
-                                        $result['defensive']['immune_to'][] = trim($matches[1]);
-                                    }
+                                    $result['offensive']['no_effect'][] = trim($matches[1]);
                                 }
                             }
                         }
@@ -166,7 +152,56 @@ function poke_hub_pokemon_import_type_from_bulbapedia($type_name_en) {
                 }
             }
         }
-        $current = $current->nextSibling;
+
+        // Vérifie si c'est le tableau des propriétés défensives
+        $th_defensive = $xpath->query(".//th[contains(., 'Defensive properties')]", $table)->item(0);
+        if ($th_defensive) {
+            // Parse le tableau défensif
+            $rows = $xpath->query(".//tr", $table);
+            foreach ($rows as $row) {
+                $cells = $xpath->query(".//td", $row);
+                if ($cells->length >= 3) {
+                    // Colonne 1: Weak to (×2)
+                    $weak_to_cell = $cells->item(0);
+                    if ($weak_to_cell) {
+                        $links = $xpath->query(".//a[@title]", $weak_to_cell);
+                        foreach ($links as $link) {
+                            $title = $link->getAttribute('title');
+                            if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
+                                $result['defensive']['weak_to'][] = trim($matches[1]);
+                            }
+                        }
+                    }
+
+                    // Colonne 2: Resists (×½)
+                    $resists_cell = $cells->item(1);
+                    if ($resists_cell) {
+                        $links = $xpath->query(".//a[@title]", $resists_cell);
+                        foreach ($links as $link) {
+                            $title = $link->getAttribute('title');
+                            if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
+                                $result['defensive']['resists'][] = trim($matches[1]);
+                            }
+                        }
+                    }
+
+                    // Colonne 3: Immune to (×0)
+                    $immune_to_cell = $cells->item(2);
+                    if ($immune_to_cell) {
+                        $text = trim($immune_to_cell->textContent);
+                        if (strtolower($text) !== 'none') {
+                            $links = $xpath->query(".//a[@title]", $immune_to_cell);
+                            foreach ($links as $link) {
+                                $title = $link->getAttribute('title');
+                                if (preg_match('/^(.+?)\s*\(type\)$/', $title, $matches)) {
+                                    $result['defensive']['immune_to'][] = trim($matches[1]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     return $result;
@@ -240,12 +275,17 @@ function poke_hub_pokemon_apply_bulbapedia_type_data($type_id, $bulbapedia_data,
                     $weakness_ids[] = $tid;
                 }
             }
+            // Ajoute le type lui-même s'il n'est pas déjà présent
+            if (!in_array($type_id, $weakness_ids, true)) {
+                // Un type peut être faible contre lui-même dans certains cas (rare mais possible)
+                // On ne l'ajoute pas automatiquement ici, seulement si présent dans Bulbapedia
+            }
             if (!empty($weakness_ids)) {
                 poke_hub_pokemon_sync_type_weaknesses($type_id, $weakness_ids, $game_key);
             }
         }
 
-        // Resists (×½)
+        // Resists (×½) - On respecte uniquement les données Bulbapedia
         if (isset($bulbapedia_data['defensive']['resists'])) {
             $resistance_ids = [];
             foreach ($bulbapedia_data['defensive']['resists'] as $type_name) {
@@ -276,7 +316,19 @@ function poke_hub_pokemon_apply_bulbapedia_type_data($type_id, $bulbapedia_data,
 
     // Applique les données offensives
     if (isset($bulbapedia_data['offensive'])) {
-        // Super effective (×2)
+        // Récupère d'abord les types "no effect" pour les exclure de "not very effective"
+        $no_effect_type_names = isset($bulbapedia_data['offensive']['no_effect']) 
+            ? $bulbapedia_data['offensive']['no_effect'] 
+            : [];
+        $no_effect_ids_map = [];
+        foreach ($no_effect_type_names as $type_name) {
+            $tid = $get_type_id_by_name($type_name);
+            if ($tid > 0) {
+                $no_effect_ids_map[$tid] = true;
+            }
+        }
+
+        // Super effective (×2) - On respecte uniquement les données Bulbapedia
         if (isset($bulbapedia_data['offensive']['super_effective'])) {
             $super_effective_ids = [];
             foreach ($bulbapedia_data['offensive']['super_effective'] as $type_name) {
@@ -291,11 +343,13 @@ function poke_hub_pokemon_apply_bulbapedia_type_data($type_id, $bulbapedia_data,
         }
 
         // Not very effective (×½)
+        // On respecte exactement les données Bulbapedia et on exclut les types "no effect"
         if (isset($bulbapedia_data['offensive']['not_very_effective'])) {
             $not_very_effective_ids = [];
             foreach ($bulbapedia_data['offensive']['not_very_effective'] as $type_name) {
                 $tid = $get_type_id_by_name($type_name);
-                if ($tid > 0) {
+                // Exclut les types qui sont dans "no effect"
+                if ($tid > 0 && !isset($no_effect_ids_map[$tid])) {
                     $not_very_effective_ids[] = $tid;
                 }
             }
@@ -491,18 +545,63 @@ function poke_hub_pokemon_import_all_types_for_pokemon_go() {
                 'type' => $type_name,
                 'error' => $bulbapedia_data->get_error_message(),
             ];
+            // Log l'erreur pour debug
+            error_log(sprintf(
+                'Poke Hub: Erreur import type %s depuis Bulbapedia: %s',
+                $type_name,
+                $bulbapedia_data->get_error_message()
+            ));
+            continue;
+        }
+        
+        // Vérifie que des données ont été récupérées
+        $has_data = false;
+        if (isset($bulbapedia_data['offensive'])) {
+            $has_data = !empty($bulbapedia_data['offensive']['super_effective']) 
+                     || !empty($bulbapedia_data['offensive']['not_very_effective'])
+                     || !empty($bulbapedia_data['offensive']['no_effect']);
+        }
+        if (!$has_data && isset($bulbapedia_data['defensive'])) {
+            $has_data = !empty($bulbapedia_data['defensive']['weak_to'])
+                     || !empty($bulbapedia_data['defensive']['resists'])
+                     || !empty($bulbapedia_data['defensive']['immune_to']);
+        }
+        
+        if (!$has_data) {
+            $stats['errors'][] = [
+                'type' => $type_name,
+                'error' => 'Aucune donnée récupérée depuis Bulbapedia',
+            ];
+            error_log(sprintf(
+                'Poke Hub: Aucune donnée récupérée pour le type %s depuis Bulbapedia',
+                $type_name
+            ));
             continue;
         }
 
         // Convertir les données pour Pokémon GO (copie profonde)
+        // IMPORTANT: Exclure les types "no_effect" de "not_very_effective"
+        $no_effect_names = isset($bulbapedia_data['offensive']['no_effect']) 
+            ? array_map('trim', $bulbapedia_data['offensive']['no_effect']) 
+            : [];
+        
+        $not_very_effective_filtered = [];
+        if (isset($bulbapedia_data['offensive']['not_very_effective'])) {
+            foreach ($bulbapedia_data['offensive']['not_very_effective'] as $type_name) {
+                $type_name_trimmed = trim($type_name);
+                // Exclut les types qui sont dans "no_effect"
+                if (!in_array($type_name_trimmed, $no_effect_names, true)) {
+                    $not_very_effective_filtered[] = $type_name_trimmed;
+                }
+            }
+        }
+        
         $pokemon_go_data = [
             'offensive' => [
                 'super_effective' => isset($bulbapedia_data['offensive']['super_effective']) 
                     ? array_values($bulbapedia_data['offensive']['super_effective']) 
                     : [],
-                'not_very_effective' => isset($bulbapedia_data['offensive']['not_very_effective']) 
-                    ? array_values($bulbapedia_data['offensive']['not_very_effective']) 
-                    : [],
+                'not_very_effective' => $not_very_effective_filtered,
                 'no_effect' => isset($bulbapedia_data['offensive']['no_effect']) 
                     ? array_values($bulbapedia_data['offensive']['no_effect']) 
                     : [],

@@ -67,6 +67,17 @@ add_action('admin_enqueue_scripts', function ($hook) {
         POKE_HUB_VERSION
     );
 
+    // Select2 pour les sélections de Pokémon et le filtre de type d'événement
+    wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+    
+    // CSS spécifique pour les événements admin (après Select2)
+    wp_enqueue_style(
+        'poke-hub-events-admin',
+        POKE_HUB_URL . 'assets/css/poke-hub-events-admin.css',
+        ['select2'],
+        POKE_HUB_VERSION
+    );
+
     // Script commun pour la media frame + onglet URL
     wp_enqueue_script(
         'pokehub-media-url',
@@ -86,14 +97,30 @@ add_action('admin_enqueue_scripts', function ($hook) {
         ]
     );
 
-    // Select2 pour les sélections de Pokémon
-    wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+    // Select2 JS
     wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
+    
+    // Initialiser Select2 pour le filtre de type d'événement
+    wp_add_inline_script('select2', "
+    jQuery(document).ready(function($) {
+        if ($('#filter-by-event-type').length && typeof $.fn.select2 !== 'undefined') {
+            $('#filter-by-event-type').select2({
+                placeholder: '" . esc_js(__('Search event type...', 'poke-hub')) . "',
+                allowClear: true,
+                width: '200px',
+                language: {
+                    noResults: function() { return '" . esc_js(__('No results found', 'poke-hub')) . "'; },
+                    searching: function() { return '" . esc_js(__('Searching...', 'poke-hub')) . "'; }
+                }
+            });
+        }
+    });
+    ");
 
     // Ton script existant pour la gestion du formulaire (Pokémon, bonus, etc.)
     wp_enqueue_script(
         'pokehub-special-events-admin',
-        POKE_HUB_URL . 'assets/js/special-events-admin.js',
+        POKE_HUB_URL . 'assets/js/pokehub-special-events-admin.js',
         ['jquery', 'pokehub-media-url', 'select2'],
         POKE_HUB_VERSION,
         true
@@ -121,5 +148,23 @@ add_action('load-poke-hub_page_poke-hub-events', function () {
         'option'  => 'pokehub_events_per_page',
     ];
     add_screen_option('per_page', $args);
+    
+    // Activer les Screen Options pour masquer/afficher les colonnes
+    // WordPress le fait automatiquement si la classe WP_List_Table est utilisée correctement
+    // On s'assure juste que le screen est bien défini
+    $screen = get_current_screen();
+    if ($screen && class_exists('PokeHub_Events_List_Table')) {
+        // Les colonnes seront automatiquement disponibles dans Screen Options
+        // grâce à get_hidden_columns() dans la classe
+    }
+});
+
+// Hook pour gérer les colonnes dans les Screen Options
+add_filter('manage_poke-hub_page_poke-hub-events_columns', function($columns) {
+    if (class_exists('PokeHub_Events_List_Table')) {
+        $table = new PokeHub_Events_List_Table();
+        return $table->get_columns();
+    }
+    return $columns;
 });
 

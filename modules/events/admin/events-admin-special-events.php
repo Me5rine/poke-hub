@@ -15,6 +15,45 @@ function pokehub_render_special_events_page() {
         wp_die(__('You are not allowed to access this page.', 'poke-hub'));
     }
 
+    // Nettoyer l'URL si c'est une soumission de formulaire avec des paramètres inutiles
+    // (filtrage ou action en masse)
+    if ((isset($_GET['filter_action']) && !empty($_GET['filter_action'])) || 
+        (isset($_GET['bulk_action']) && !empty($_GET['bulk_action']))) {
+        
+        $clean_params = [];
+        $useful_params = ['page', 'event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order', 'added', 'updated', 'deleted'];
+        
+        foreach ($useful_params as $param) {
+            if (isset($_GET[$param]) && $_GET[$param] !== '' && $_GET[$param] !== '-1') {
+                $clean_params[$param] = sanitize_text_field($_GET[$param]);
+            }
+        }
+        
+        // Supprimer les paramètres inutiles (event_ids, bulk_action, filter_action, etc.)
+        $unwanted_params = ['event_ids', 'bulk_action', 'filter_action', 'action', 'action2', '_wpnonce', '_wp_http_referer'];
+        foreach ($unwanted_params as $param) {
+            unset($clean_params[$param]);
+        }
+        
+        // Si on a des paramètres propres différents de ceux actuels, rediriger
+        $current_clean = array_intersect_key($_GET, array_flip($useful_params));
+        $current_clean = array_filter($current_clean, function($v) { return $v !== '' && $v !== '-1'; });
+        
+        // Vérifier s'il y a des paramètres indésirables dans l'URL actuelle
+        $has_unwanted = false;
+        foreach ($unwanted_params as $param) {
+            if (isset($_GET[$param])) {
+                $has_unwanted = true;
+                break;
+            }
+        }
+        
+        if ($has_unwanted || count($clean_params) !== count($current_clean) || !empty(array_diff_assoc($clean_params, $current_clean))) {
+            wp_redirect(add_query_arg($clean_params, admin_url('admin.php')));
+            exit;
+        }
+    }
+
     $action   = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
     $event_id = isset($_GET['event_id']) ? (int) $_GET['event_id'] : 0;
 
@@ -117,25 +156,74 @@ function pokehub_render_special_events_page() {
             <div id="message" class="updated notice notice-success is-dismissible">
                 <p><?php esc_html_e('Special event added.', 'poke-hub'); ?></p>
             </div>
-        <?php elseif (!empty($_GET['updated'])) : ?>
+        <?php endif; ?>
+        <?php if (!empty($_GET['updated'])) : ?>
             <div id="message" class="updated notice notice-success is-dismissible">
                 <p><?php esc_html_e('Special event updated.', 'poke-hub'); ?></p>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['deleted'])) : ?>
+            <div id="message" class="updated notice notice-success is-dismissible">
+                <p><?php 
+                    printf(
+                        esc_html(_n('%d special event deleted.', '%d special events deleted.', (int) $_GET['deleted'], 'poke-hub')),
+                        (int) $_GET['deleted']
+                    );
+                ?></p>
             </div>
         <?php endif; ?>
 
         <hr class="wp-header-end">
 
-        <form method="get">
+        <form method="get" id="pokehub-events-filter-form">
             <input type="hidden" name="page" value="poke-hub-events" />
             <?php 
             // Afficher le champ de recherche
             $list_table->search_box(__('Search events', 'poke-hub'), 'pokehub-events');
             ?>
-            <?php wp_nonce_field('bulk-pokehub_events'); ?>
             <?php
             $list_table->display();
             ?>
         </form>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Nettoyer l'URL après soumission du formulaire de filtrage
+            $('#pokehub-events-filter-form').on('submit', function(e) {
+                var $form = $(this);
+                var params = {};
+                
+                // Récupérer uniquement les paramètres utiles et non vides
+                $form.find('input, select').each(function() {
+                    var $field = $(this);
+                    var name = $field.attr('name');
+                    var value = $field.val();
+                    
+                    // Ignorer les champs sans nom, les valeurs vides, et les paramètres WordPress inutiles
+                    if (!name || !value || value === '' || value === '-1') {
+                        return;
+                    }
+                    
+                    // Ignorer les paramètres WordPress de sécurité et les actions vides
+                    if (name.indexOf('_wp') === 0 || name === 'action' || name === 'action2' || name === 'filter_action') {
+                        return;
+                    }
+                    
+                    params[name] = value;
+                });
+                
+                // Construire la nouvelle URL propre
+                var baseUrl = '<?php echo esc_js(admin_url('admin.php')); ?>';
+                var queryString = $.param(params);
+                var cleanUrl = baseUrl + (queryString ? '?' + queryString : '');
+                
+                // Rediriger vers l'URL propre
+                window.location.href = cleanUrl;
+                e.preventDefault();
+                return false;
+            });
+        });
+        </script>
     </div>
     <?php
 }
@@ -443,11 +531,78 @@ add_action('admin_post_pokehub_save_special_event', function () {
         }
     }
 
-    wp_redirect(
-        add_query_arg(
-            ['page' => 'poke-hub-events', 'updated' => 1],
-            admin_url('admin.php')
-        )
-    );
+    // Déterminer si c'est un ajout ou une mise à jour
+    // Si event_id existe dans POST et est > 0, c'est une mise à jour
+    $is_new = ($event_id <= 0);
+    
+    // Construire les arguments de redirection
+    $redirect_args = [
+        'page' => 'poke-hub-events',
+    ];
+    
+    // Ajouter le paramètre added ou updated
+    if ($is_new) {
+        $redirect_args['added'] = 1;
+    } else {
+        $redirect_args['updated'] = 1;
+    }
+    
+    // Préserver les paramètres de filtrage depuis la requête POST (champs cachés)
+    // ou depuis le referer HTTP
+    $preserve_params = ['event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order'];
+    
+    // Récupérer les paramètres depuis POST (champs cachés du formulaire)
+    foreach ($preserve_params as $param) {
+        if (isset($_POST[$param]) && $_POST[$param] !== '') {
+            if ($param === 's') {
+                $redirect_args[$param] = sanitize_text_field($_POST[$param]);
+            } elseif (in_array($param, ['paged', 'orderby', 'order'])) {
+                $redirect_args[$param] = sanitize_key($_POST[$param]);
+            } else {
+                $redirect_args[$param] = sanitize_text_field($_POST[$param]);
+            }
+        }
+    }
+    
+    // Si pas de paramètres dans POST, essayer de les récupérer depuis le referer
+    // Le referer devrait contenir l'URL de la page de liste avec les filtres
+    $referer = wp_get_referer();
+    if ($referer) {
+        $referer_parsed = parse_url($referer);
+        if (!empty($referer_parsed['query'])) {
+            parse_str($referer_parsed['query'], $referer_params);
+            foreach ($preserve_params as $param) {
+                // Ne pas écraser si déjà défini depuis POST
+                if (isset($redirect_args[$param])) {
+                    continue;
+                }
+                
+                if (isset($referer_params[$param]) && $referer_params[$param] !== '') {
+                    if ($param === 's') {
+                        $redirect_args[$param] = sanitize_text_field($referer_params[$param]);
+                    } elseif (in_array($param, ['paged', 'orderby', 'order'])) {
+                        $redirect_args[$param] = sanitize_key($referer_params[$param]);
+                    } else {
+                        $redirect_args[$param] = sanitize_text_field($referer_params[$param]);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Nettoyer les paramètres vides et inutiles pour éviter les URLs avec des paramètres vides
+    $redirect_args = array_filter($redirect_args, function($value, $key) {
+        // Supprimer les valeurs vides, null, et les paramètres WordPress inutiles
+        if ($value === '' || $value === null || $value === '-1') {
+            return false;
+        }
+        // Ignorer les paramètres WordPress de sécurité
+        if (strpos($key, '_wp') === 0 || $key === 'action' || $key === 'action2' || $key === 'filter_action') {
+            return false;
+        }
+        return true;
+    }, ARRAY_FILTER_USE_BOTH);
+    
+    wp_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
     exit;
 });

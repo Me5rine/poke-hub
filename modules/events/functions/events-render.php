@@ -122,12 +122,34 @@ function poke_hub_events_render_event(object $event): void {
     $image_url = property_exists($event, 'image_url') ? (string) $event->image_url : '';
     $color     = !empty($event->event_type_color) ? $event->event_type_color : '#880051';
 
-    // URL distante vers l'article JV Actu
-    $link = !empty($event->remote_url ?? '') ? $event->remote_url : '';
+    // URL vers l'événement
+    $link = '';
+    
+    // Pour les événements spéciaux locaux, utiliser l'URL locale
+    if (!empty($event->source) && ($event->source === 'special_local' || $event->source === 'special')) {
+        if (!empty($event->slug) && function_exists('poke_hub_special_event_get_url')) {
+            $link = poke_hub_special_event_get_url($event->slug);
+        }
+    }
+    // Pour les événements spéciaux remote, utiliser remote_url s'il existe
+    elseif (!empty($event->source) && $event->source === 'special_remote') {
+        if (!empty($event->remote_url)) {
+            $link = $event->remote_url;
+        } elseif (!empty($event->slug) && function_exists('poke_hub_special_event_get_url')) {
+            // Fallback : utiliser l'URL locale si pas de remote_url
+            $link = poke_hub_special_event_get_url($event->slug);
+        }
+    }
+    // Pour les autres événements (posts), utiliser remote_url
+    elseif (!empty($event->remote_url)) {
+        $link = $event->remote_url;
+    }
 
     $event_type_name = !empty($event->event_type_name) ? $event->event_type_name : '';
 
-    $now         = current_time('timestamp');
+    // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
+    // (start_ts, end_ts) sont toujours en UTC et doivent être comparés avec time() (UTC)
+    $now         = time();
     $time_label  = '';
     $time_status = $event->status ?? 'current';
 

@@ -221,3 +221,6 @@ https://votre-site.com/pokemon-go/events/go-fest-2024
 2. Les chemins S3/CDN sont corrects
 3. Utilisez `$event->computed_image_url` dans votre code
 
+
+
+

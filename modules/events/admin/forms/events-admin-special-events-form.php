@@ -77,6 +77,16 @@ function pokehub_render_special_event_form(
             <?php if ($is_edit) : ?>
                 <input type="hidden" name="event_id" value="<?php echo esc_attr($event->id); ?>">
             <?php endif; ?>
+            
+            <?php
+            // Préserver les paramètres de filtrage depuis l'URL d'origine
+            $preserve_params = ['event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order'];
+            foreach ($preserve_params as $param) {
+                if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                    echo '<input type="hidden" name="' . esc_attr($param) . '" value="' . esc_attr($_GET[$param]) . '">' . "\n";
+                }
+            }
+            ?>
 
             <h2><?php esc_html_e('Main information', 'poke-hub'); ?></h2>
 
@@ -273,7 +283,9 @@ function pokehub_render_special_event_form(
                             <option value="" disabled><?php esc_html_e('No Pokémon found in database', 'poke-hub'); ?></option>
                         <?php else : ?>
                             <?php foreach ($pokemon_list as $p) : ?>
-                                <option value="<?php echo esc_attr($p['id']); ?>">
+                                <option value="<?php echo esc_attr($p['id']); ?>"
+                                        data-name-fr="<?php echo esc_attr($p['name_fr'] ?? ''); ?>"
+                                        data-name-en="<?php echo esc_attr($p['name_en'] ?? ''); ?>">
                                     <?php
                                     echo esc_html(
                                         sprintf(
@@ -312,6 +324,8 @@ function pokehub_render_special_event_form(
                                 <?php else : ?>
                                     <?php foreach ($pokemon_list_edit as $p) : ?>
                                         <option value="<?php echo esc_attr($p['id']); ?>"
+                                                data-name-fr="<?php echo esc_attr($p['name_fr'] ?? ''); ?>"
+                                                data-name-en="<?php echo esc_attr($p['name_en'] ?? ''); ?>"
                                             <?php selected($prow['pokemon_id'], $p['id']); ?>>
                                             <?php
                                             echo esc_html(

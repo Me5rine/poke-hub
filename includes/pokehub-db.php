@@ -60,10 +60,6 @@ class Pokehub_DB {
      * - pokemon_type_weather_links
      * - pokemon_type_weakness_links
      * - pokemon_type_resistance_links
-     * - pokemon_type_immune_links
-     * - pokemon_type_offensive_super_effective_links
-     * - pokemon_type_offensive_not_very_effective_links
-     * - pokemon_type_offensive_no_effect_links
      * - pokemon_form_mappings
      */
     private function createPokemonTables() {
@@ -84,10 +80,6 @@ class Pokehub_DB {
         $type_weather_links    = pokehub_get_table('pokemon_type_weather_links');
         $type_weakness_links   = pokehub_get_table('pokemon_type_weakness_links');
         $type_resistance_links = pokehub_get_table('pokemon_type_resistance_links');
-        $type_immune_links     = pokehub_get_table('pokemon_type_immune_links');
-        $type_offensive_super_effective_links = pokehub_get_table('pokemon_type_offensive_super_effective_links');
-        $type_offensive_not_very_effective_links = pokehub_get_table('pokemon_type_offensive_not_very_effective_links');
-        $type_offensive_no_effect_links = pokehub_get_table('pokemon_type_offensive_no_effect_links');
         $form_mappings_table   = pokehub_get_table('pokemon_form_mappings');
         $pokemon_form_variants = pokehub_get_table('pokemon_form_variants');
         $evolutions_table      = pokehub_get_table('pokemon_evolutions');
@@ -243,7 +235,6 @@ class Pokehub_DB {
             extra LONGTEXT NULL,
 
             PRIMARY KEY (id),
-            UNIQUE KEY attack_game_context (attack_id, game_key, context),
             KEY attack_id (attack_id),
             KEY game_key (game_key),
             KEY context (context)
@@ -313,64 +304,19 @@ class Pokehub_DB {
         ) {$charset_collate};";
 
         // 10bis) Lien Type ↔ Faiblesses (un type est faible contre d'autres types)
-        // game_key: 'core_series' pour les jeux principaux, 'pokemon_go' pour Pokémon GO
         $sql_type_weakness_links = "CREATE TABLE {$type_weakness_links} (
             type_id BIGINT UNSIGNED NOT NULL,
             weakness_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, weakness_type_id, game_key),
-            KEY weakness_type_id (weakness_type_id),
-            KEY game_key (game_key)
+            PRIMARY KEY (type_id, weakness_type_id),
+            KEY weakness_type_id (weakness_type_id)
         ) {$charset_collate};";
 
         // 10ter) Lien Type ↔ Résistances (un type résiste à d'autres types)
         $sql_type_resistance_links = "CREATE TABLE {$type_resistance_links} (
             type_id BIGINT UNSIGNED NOT NULL,
             resistance_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, resistance_type_id, game_key),
-            KEY resistance_type_id (resistance_type_id),
-            KEY game_key (game_key)
-        ) {$charset_collate};";
-
-        // 10quater) Lien Type ↔ Immunités défensives (un type est immunisé contre d'autres types en défense)
-        $sql_type_immune_links = "CREATE TABLE {$type_immune_links} (
-            type_id BIGINT UNSIGNED NOT NULL,
-            immune_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, immune_type_id, game_key),
-            KEY immune_type_id (immune_type_id),
-            KEY game_key (game_key)
-        ) {$charset_collate};";
-
-        // 10quinquies) Lien Type ↔ Efficacités offensives - Super efficace (×2)
-        $sql_type_offensive_super_effective_links = "CREATE TABLE {$type_offensive_super_effective_links} (
-            type_id BIGINT UNSIGNED NOT NULL,
-            target_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, target_type_id, game_key),
-            KEY target_type_id (target_type_id),
-            KEY game_key (game_key)
-        ) {$charset_collate};";
-
-        // 10sexies) Lien Type ↔ Efficacités offensives - Peu efficace (×½)
-        $sql_type_offensive_not_very_effective_links = "CREATE TABLE {$type_offensive_not_very_effective_links} (
-            type_id BIGINT UNSIGNED NOT NULL,
-            target_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, target_type_id, game_key),
-            KEY target_type_id (target_type_id),
-            KEY game_key (game_key)
-        ) {$charset_collate};";
-
-        // 10septies) Lien Type ↔ Efficacités offensives - Sans effet (×0)
-        $sql_type_offensive_no_effect_links = "CREATE TABLE {$type_offensive_no_effect_links} (
-            type_id BIGINT UNSIGNED NOT NULL,
-            target_type_id BIGINT UNSIGNED NOT NULL,
-            game_key VARCHAR(50) NOT NULL DEFAULT 'core_series',
-            PRIMARY KEY (type_id, target_type_id, game_key),
-            KEY target_type_id (target_type_id),
-            KEY game_key (game_key)
+            PRIMARY KEY (type_id, resistance_type_id),
+            KEY resistance_type_id (resistance_type_id)
         ) {$charset_collate};";
 
         // 11) Mappings de formes (costumes, clones, etc.)
@@ -521,122 +467,12 @@ class Pokehub_DB {
         dbDelta($sql_type_weather_links);
         dbDelta($sql_type_weakness_links);
         dbDelta($sql_type_resistance_links);
-        dbDelta($sql_type_immune_links);
-        dbDelta($sql_type_offensive_super_effective_links);
-        dbDelta($sql_type_offensive_not_very_effective_links);
-        dbDelta($sql_type_offensive_no_effect_links);
         dbDelta($sql_form_mappings);
         dbDelta($sql_form_variants);
         dbDelta($sql_evolutions);
         dbDelta($sql_items);
         dbDelta($sql_backgrounds);
         dbDelta($sql_background_pokemon_links);
-
-        // Migration : ajouter le champ game_key aux tables existantes si nécessaire
-        $this->migrate_type_relations_tables();
-    }
-
-    /**
-     * Migration : ajoute le champ game_key aux tables de relations de types existantes.
-     * Cette fonction est appelée après la création/mise à jour des tables.
-     */
-    private function migrate_type_relations_tables() {
-        global $wpdb;
-
-        $tables_to_migrate = [
-            'pokemon_type_weakness_links' => 'weakness_type_id',
-            'pokemon_type_resistance_links' => 'resistance_type_id',
-            'pokemon_type_immune_links' => 'immune_type_id',
-            'pokemon_type_offensive_super_effective_links' => 'target_type_id',
-            'pokemon_type_offensive_not_very_effective_links' => 'target_type_id',
-            'pokemon_type_offensive_no_effect_links' => 'target_type_id',
-        ];
-
-        foreach ($tables_to_migrate as $table_key => $foreign_key) {
-            $table = pokehub_get_table($table_key);
-            if (!$table) {
-                continue;
-            }
-
-            // Vérifie si la table existe
-            $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") === $table);
-            if (!$table_exists) {
-                continue;
-            }
-
-            // Vérifie si la colonne game_key existe déjà
-            $column_exists = $wpdb->get_results(
-                "SHOW COLUMNS FROM {$table} LIKE 'game_key'"
-            );
-
-            if (empty($column_exists)) {
-                // Ajoute la colonne game_key
-                $wpdb->query(
-                    "ALTER TABLE {$table} 
-                     ADD COLUMN game_key VARCHAR(50) NOT NULL DEFAULT 'core_series' 
-                     AFTER {$foreign_key}"
-                );
-
-                // Mettre à jour les données existantes pour qu'elles aient game_key = 'core_series'
-                $wpdb->query(
-                    "UPDATE {$table} 
-                     SET game_key = 'core_series' 
-                     WHERE game_key = '' OR game_key IS NULL"
-                );
-
-                // Vérifie si un index game_key existe déjà
-                $index_exists = $wpdb->get_results(
-                    "SHOW INDEX FROM {$table} WHERE Key_name = 'game_key'"
-                );
-
-                if (empty($index_exists)) {
-                    // Ajoute l'index sur game_key
-                    $wpdb->query(
-                        "ALTER TABLE {$table} 
-                         ADD INDEX game_key (game_key)"
-                    );
-                }
-
-                // Vérifie la structure de la clé primaire actuelle
-                $primary_key_info = $wpdb->get_results(
-                    "SHOW KEYS FROM {$table} WHERE Key_name = 'PRIMARY'"
-                );
-
-                // Si la clé primaire n'inclut pas game_key, on la modifie
-                $has_game_key_in_pk = false;
-                foreach ($primary_key_info as $key_info) {
-                    if ($key_info->Column_name === 'game_key') {
-                        $has_game_key_in_pk = true;
-                        break;
-                    }
-                }
-
-                if (!$has_game_key_in_pk && !empty($primary_key_info)) {
-                    // Supprime les doublons potentiels avant de modifier la clé primaire
-                    $wpdb->query(
-                        "DELETE t1 FROM {$table} t1
-                         INNER JOIN {$table} t2 
-                         WHERE t1.type_id = t2.type_id 
-                         AND t1.{$foreign_key} = t2.{$foreign_key}
-                         AND t1.game_key = 'core_series'
-                         AND t2.game_key = 'core_series'
-                         AND t1.type_id < t2.type_id"
-                    );
-
-                    // Supprime l'ancienne clé primaire
-                    $wpdb->query(
-                        "ALTER TABLE {$table} 
-                         DROP PRIMARY KEY"
-                    );
-
-                    // Ajoute la nouvelle clé primaire avec game_key
-                    $wpdb->query(
-                        "ALTER TABLE {$table} 
-                         ADD PRIMARY KEY (type_id, {$foreign_key}, game_key)"
-                    );
-                }
-            }
-        }
     }
 
     /**

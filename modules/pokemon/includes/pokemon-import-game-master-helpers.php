@@ -325,20 +325,32 @@ function poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto )
 
     $suffix = $form_proto;
 
-    // On retire le préfixe "MEWTWO_" dans "MEWTWO_A" par ex.
+    // 1) Prefix exact : "MEWTWO_" dans "MEWTWO_A"
     if ( $pokemon_id_proto !== '' && strpos( $form_proto, $pokemon_id_proto . '_' ) === 0 ) {
         $suffix = substr( $form_proto, strlen( $pokemon_id_proto ) + 1 );
+    } else {
+        // 2) Fix Nidoran & co : si pokemonId a un suffixe de genre, Niantic peut utiliser la racine
+        // Ex: pokemonId = NIDORAN_MALE, form = NIDORAN_NORMAL  => on retire "NIDORAN_"
+        $root = preg_replace( '/_(MALE|FEMALE)$/', '', $pokemon_id_proto );
+        if ( $root && $root !== $pokemon_id_proto && strpos( $form_proto, $root . '_' ) === 0 ) {
+            $suffix = substr( $form_proto, strlen( $root ) + 1 );
+        }
     }
 
     $suffix = strtolower( $suffix );
     $suffix = str_replace( '__', '_', $suffix );
 
-    if ( in_array( $suffix, [ 'normal', 'standard' ], true ) ) {
+    // "normal"/"standard" = forme de base
+    if ( in_array( $suffix, [ 'normal', 'standard', 'form_normal', 'form_standard' ], true ) ) {
+        return '';
+    }
+
+    // Cas tordu où la forme reste "..._normal" (ex: nidoran_normal si pas matché)
+    if ( preg_match( '/(^|_)normal$/', $suffix ) || preg_match( '/(^|_)standard$/', $suffix ) ) {
         return '';
     }
 
     $suffix = str_replace( '_', '-', $suffix );
-
     return $suffix;
 }
 

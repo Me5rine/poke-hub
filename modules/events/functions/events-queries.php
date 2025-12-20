@@ -16,7 +16,8 @@ function poke_hub_events_compute_status_from_ts(int $start_ts, int $end_ts): str
     }
 
     // Timestamp "absolu" (UTC) → compatible avec nos $start_ts / $end_ts
-    $now = current_time('timestamp');
+    // Utiliser time() car les timestamps Unix sont toujours en UTC
+    $now = time();
 
     if ($start_ts > $now) {
         return 'upcoming';
@@ -1680,8 +1681,15 @@ function poke_hub_special_events_query(array $args = []): array {
         $base = poke_hub_special_event_normalize_row($row);
 
         // Filtre event_type (sur le type "brut")
-        if ($args['event_type'] && $base->event_type !== $args['event_type']) {
-            continue;
+        // Peut être un tableau ou une chaîne
+        if (!empty($args['event_type'])) {
+            $filter_types = is_array($args['event_type']) 
+                ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
+                : [sanitize_title($args['event_type'])];
+            
+            if (!empty($filter_types) && !in_array($base->event_type, $filter_types, true)) {
+                continue;
+            }
         }
 
         $recurring = !empty($row['recurring']) ? '1' : '0';
@@ -1834,8 +1842,15 @@ function poke_hub_special_events_query_remote(array $args = []): array {
         $base->source = 'special_remote';
 
         // Filtre event_type (sur le type "brut")
-        if ($args['event_type'] && $base->event_type !== $args['event_type']) {
-            continue;
+        // Peut être un tableau ou une chaîne
+        if (!empty($args['event_type'])) {
+            $filter_types = is_array($args['event_type']) 
+                ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
+                : [sanitize_title($args['event_type'])];
+            
+            if (!empty($filter_types) && !in_array($base->event_type, $filter_types, true)) {
+                continue;
+            }
         }
 
         $recurring = !empty($row['recurring']) ? '1' : '0';
@@ -2207,9 +2222,28 @@ function poke_hub_special_events_get_local(string $status, array $args = []): ar
         return [];
     }
 
+    // Filtre par event_type si fourni
+    // Peut être un tableau ou une chaîne
+    $filter_event_types = [];
+    if (!empty($args['event_type'])) {
+        if (is_array($args['event_type'])) {
+            // Si c'est un tableau, on sanitize tous les éléments
+            $filter_event_types = array_map('sanitize_title', array_filter($args['event_type'], 'is_string'));
+        } else {
+            $filter_event_types = [sanitize_title($args['event_type'])];
+        }
+    }
+
     $events = [];
 
     foreach ($rows as $row) {
+        $event_type_slug = $row->event_type ?? '';
+        
+        // Filtrer par type d'événement si demandé
+        if (!empty($filter_event_types) && !in_array($event_type_slug, $filter_event_types, true)) {
+            continue;
+        }
+        
         $raw = [
             'id'               => (int) $row->id,
             'title'            => $row->title ?? '',
@@ -2218,7 +2252,7 @@ function poke_hub_special_events_get_local(string $status, array $args = []): ar
             'sort_end_ts'      => isset($row->end_ts)   ? (int) $row->end_ts   : 0,
 
             // On garde juste le slug, les infos viendront du remote
-            'event_type_slug'  => $row->event_type_slug  ?? '',
+            'event_type_slug'  => $event_type_slug,
             'event_type_name'  => '',
             'event_type_color' => '',
 
@@ -2227,6 +2261,9 @@ function poke_hub_special_events_get_local(string $status, array $args = []): ar
                 ? wp_get_attachment_image_url((int) $row->image_id, 'large')
                 : '',
             'url'              => !empty($row->link_url) ? $row->link_url : '',
+            'remote_url'       => !empty($row->slug) && function_exists('poke_hub_special_event_get_url')
+                ? poke_hub_special_event_get_url($row->slug)
+                : '',
             'source'           => 'special_local',
         ];
 
@@ -2302,7 +2339,7 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
 
     $events = [];
 
-    // 1) Posts distants (et special events locaux via poke_hub_events_get_by_status)
+    // 1) Posts distants
     if (function_exists('poke_hub_events_get_by_status')) {
         $remote_posts = poke_hub_events_get_by_status($status, $args);
         if (is_array($remote_posts)) {
@@ -2325,7 +2362,17 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         }
     }
 
-    // 3) Special events distants
+    // 3) Special events locaux
+    if (function_exists('poke_hub_special_events_get_local')) {
+        $special_local = poke_hub_special_events_get_local($status, $args);
+        if (is_array($special_local)) {
+            foreach ($special_local as $ev) {
+                $events[] = $ev;
+            }
+        }
+    }
+
+    // 4) Special events distants
     if (function_exists('poke_hub_special_events_get_remote')) {
         $special_remote = poke_hub_special_events_get_remote($status, $args);
         if (is_array($special_remote)) {

@@ -16,6 +16,7 @@ class PokeHub_Events_List_Table extends WP_List_Table {
             'singular' => 'pokehub_event',
             'plural'   => 'pokehub_events',
             'ajax'     => false,
+            'screen'   => 'poke-hub_page_poke-hub-events',
         ]);
     }
 
@@ -44,6 +45,11 @@ class PokeHub_Events_List_Table extends WP_List_Table {
     }
 
     public function get_hidden_columns() {
+        // Récupérer les colonnes cachées depuis les préférences utilisateur
+        $screen = get_current_screen();
+        if ($screen) {
+            return get_hidden_columns($screen);
+        }
         return [];
     }
 
@@ -60,7 +66,12 @@ class PokeHub_Events_List_Table extends WP_List_Table {
 
     public function column_title($item) {
         $title  = esc_html($item->title);
-        $source = isset($item->source) ? $item->source : 'remote';
+        $source = isset($item->source) ? $item->source : 'remote_post';
+        
+        // Normaliser special_local en special
+        if ($source === 'special_local') {
+            $source = 'special';
+        }
 
         $actions = [];
 
@@ -71,19 +82,33 @@ class PokeHub_Events_List_Table extends WP_List_Table {
                 esc_url($item->remote_url),
                 esc_html__('View', 'poke-hub')
             );
+        } elseif (!empty($item->url)) {
+            $actions['view'] = sprintf(
+                '<a href="%s" target="_blank" rel="noopener">%s</a>',
+                esc_url($item->url),
+                esc_html__('View', 'poke-hub')
+            );
         }
 
-        // Lien modifier / supprimer pour SPECIAL vs REMOTE
-        if ($source === 'special') {
-            // Edit spécial
-            $edit_url = add_query_arg(
-                [
-                    'page'     => 'poke-hub-events',
-                    'action'   => 'edit_special',
-                    'event_id' => (int) $item->id,
-                ],
-                admin_url('admin.php')
-            );
+        // Lien modifier / supprimer selon la source
+        if ($source === 'special' || $source === 'special_local') {
+            // Special local : édition locale
+            // Préserver les paramètres de filtrage dans l'URL d'édition
+            $edit_url_args = [
+                'page'     => 'poke-hub-events',
+                'action'   => 'edit_special',
+                'event_id' => (int) $item->id,
+            ];
+            
+            // Ajouter les paramètres de filtrage depuis la requête actuelle
+            $preserve_params = ['event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order'];
+            foreach ($preserve_params as $param) {
+                if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                    $edit_url_args[$param] = sanitize_text_field($_GET[$param]);
+                }
+            }
+            
+            $edit_url = add_query_arg($edit_url_args, admin_url('admin.php'));
             $actions['edit'] = sprintf(
                 '<a href="%s">%s</a>',
                 esc_url($edit_url),
@@ -110,8 +135,42 @@ class PokeHub_Events_List_Table extends WP_List_Table {
                 esc_html__('Delete', 'poke-hub')
             );
 
+        } elseif ($source === 'special_remote') {
+            // Special remote : URL d'édition distante via filtre
+            // Similaire à pokehub_remote_events_edit_url mais pour les special events
+            $edit_url = apply_filters('pokehub_remote_special_events_edit_url', '', $item);
+            
+            if (!empty($edit_url)) {
+                $actions['edit'] = sprintf(
+                    '<a href="%s" target="_blank" rel="noopener">%s</a>',
+                    esc_url($edit_url),
+                    esc_html__('Edit', 'poke-hub')
+                );
+            } else {
+                // Fallback : construire l'URL par défaut si le filtre n'est pas défini
+                // Format attendu : /wp-admin/admin.php?page=poke-hub-events&action=edit_special&event_id=ID
+                $default_remote_base = apply_filters('pokehub_remote_admin_base_url', 'https://jv-actu.com/wp-admin/');
+                $edit_url = $default_remote_base . 'admin.php?page=poke-hub-events&action=edit_special&event_id=' . (int) $item->id;
+                $actions['edit'] = sprintf(
+                    '<a href="%s" target="_blank" rel="noopener">%s</a>',
+                    esc_url($edit_url),
+                    esc_html__('Edit', 'poke-hub')
+                );
+            }
+
+        } elseif ($source === 'local_post') {
+            // Post local : édition WordPress standard
+            $edit_url = get_edit_post_link((int) $item->id);
+            if ($edit_url) {
+                $actions['edit'] = sprintf(
+                    '<a href="%s">%s</a>',
+                    esc_url($edit_url),
+                    esc_html__('Edit', 'poke-hub')
+                );
+            }
+
         } else {
-            // Remote : URL d’édition distante via filtre
+            // Remote post : URL d'édition distante via filtre
             $edit_url = apply_filters('pokehub_remote_events_edit_url', '', $item);
             if (!empty($edit_url)) {
                 $actions['edit'] = sprintf(
@@ -132,11 +191,27 @@ class PokeHub_Events_List_Table extends WP_List_Table {
     public function column_default($item, $column_name) {
         switch ($column_name) {
             case 'type':
-                return esc_html(
-                    !empty($item->event_type_name)
-                        ? $item->event_type_name
-                        : ($item->event_type_slug ?? '')
-                );
+                $type_name = !empty($item->event_type_name)
+                    ? $item->event_type_name
+                    : ($item->event_type_slug ?? '');
+                $type_slug = $item->event_type_slug ?? '';
+                
+                // Rendre cliquable pour filtrer
+                if ($type_slug) {
+                    $filter_url = add_query_arg(
+                        [
+                            'page' => 'poke-hub-events',
+                            'event_type' => $type_slug,
+                        ],
+                        admin_url('admin.php')
+                    );
+                    return sprintf(
+                        '<a href="%s">%s</a>',
+                        esc_url($filter_url),
+                        esc_html($type_name)
+                    );
+                }
+                return esc_html($type_name);
 
             case 'start':
                 return !empty($item->start_ts)
@@ -155,13 +230,53 @@ class PokeHub_Events_List_Table extends WP_List_Table {
                     : '';
 
             case 'status':
-                return esc_html($item->status ?? '');
+                $status = $item->status ?? '';
+                if ($status) {
+                    // Rendre cliquable pour filtrer
+                    $filter_url = add_query_arg(
+                        [
+                            'page' => 'poke-hub-events',
+                            'event_status' => $status,
+                        ],
+                        admin_url('admin.php')
+                    );
+                    return sprintf(
+                        '<a href="%s">%s</a>',
+                        esc_url($filter_url),
+                        esc_html($status)
+                    );
+                }
+                return '';
 
             case 'source':
-                $source = isset($item->source) ? $item->source : 'remote';
-                return $source === 'special'
-                    ? __('Special', 'poke-hub')
-                    : __('Remote', 'poke-hub');
+                $source = isset($item->source) ? $item->source : 'remote_post';
+                // Normaliser special_local en special pour l'affichage
+                if ($source === 'special_local') {
+                    $source = 'special';
+                }
+                $source_labels = [
+                    'local_post'     => __('Local Event', 'poke-hub'),
+                    'special'       => __('Special Local Event', 'poke-hub'),
+                    'remote_post'    => __('Remote Event', 'poke-hub'),
+                    'special_remote' => __('Remote Special Event', 'poke-hub'),
+                ];
+                $source_label = isset($source_labels[$source]) 
+                    ? $source_labels[$source] 
+                    : __('Unknown', 'poke-hub');
+                
+                // Rendre cliquable pour filtrer
+                $filter_url = add_query_arg(
+                    [
+                        'page' => 'poke-hub-events',
+                        'event_source' => $source,
+                    ],
+                    admin_url('admin.php')
+                );
+                return sprintf(
+                    '<a href="%s">%s</a>',
+                    esc_url($filter_url),
+                    esc_html($source_label)
+                );
         }
 
         return '';
@@ -203,8 +318,10 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         echo '<select name="event_source" id="filter-by-event-source">';
         echo '<option value="">' . esc_html__('All sources', 'poke-hub') . '</option>';
         $source_options = [
-            'remote'  => __('Remote', 'poke-hub'),
-            'special' => __('Special', 'poke-hub'),
+            'local_post'     => __('Local Event', 'poke-hub'),
+            'special'        => __('Special Local Event', 'poke-hub'),
+            'remote_post'    => __('Remote Event', 'poke-hub'),
+            'special_remote' => __('Remote Special Event', 'poke-hub'),
         ];
         foreach ($source_options as $value => $label) {
             printf(
@@ -216,12 +333,12 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         }
         echo '</select>';
 
-        // Filtre type d’événement
+        // Filtre type d'événement avec Select2
         $types = function_exists('poke_hub_events_get_all_event_types')
             ? poke_hub_events_get_all_event_types()
             : [];
 
-        echo '<select name="event_type" id="filter-by-event-type">';
+        echo '<select name="event_type" id="filter-by-event-type" class="pokehub-event-type-select" style="width: 200px;">';
         echo '<option value="">' . esc_html__('All event types', 'poke-hub') . '</option>';
         if ($types) {
             foreach ($types as $type) {
@@ -235,7 +352,9 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         }
         echo '</select>';
 
-        submit_button(__('Filter'), 'secondary', 'filter_action', false);
+        submit_button(__('Filter'), 'secondary', 'filter_action', false, [
+            'id' => 'pokehub-filter-submit'
+        ]);
 
         echo '</div>';
     }
@@ -277,11 +396,15 @@ class PokeHub_Events_List_Table extends WP_List_Table {
             $all_events = [];
         }
 
-        // ---------- 2) Filtrage par source (remote / special) ----------
+        // ---------- 2) Filtrage par source ----------
         if ($source_filter !== '') {
             $filtered = [];
             foreach ($all_events as $e) {
-                $src = isset($e->source) ? $e->source : 'remote';
+                $src = isset($e->source) ? $e->source : 'remote_post';
+                // Normaliser 'special_local' en 'special' pour le filtre
+                if ($src === 'special_local') {
+                    $src = 'special';
+                }
                 if ($src !== $source_filter) {
                     continue;
                 }
@@ -425,8 +548,34 @@ class PokeHub_Events_List_Table extends WP_List_Table {
             $wpdb->delete($event_pokemon_table,       ['event_id' => $id], ['%d']);
             $wpdb->delete($event_bonus_table,         ['event_id' => $id], ['%d']);
 
-            // Puis l’event lui-même
+            // Puis l'event lui-même
             $wpdb->delete($events_table, ['id' => $id], ['%d']);
         }
+        
+        // Redirection avec préservation des filtres
+        $redirect_args = [
+            'page' => 'poke-hub-events',
+            'deleted' => count($ids),
+        ];
+        
+        // Préserver les filtres
+        if (!empty($_GET['event_status'])) {
+            $redirect_args['event_status'] = sanitize_key($_GET['event_status']);
+        }
+        if (!empty($_GET['event_source'])) {
+            $redirect_args['event_source'] = sanitize_key($_GET['event_source']);
+        }
+        if (!empty($_GET['event_type'])) {
+            $redirect_args['event_type'] = sanitize_text_field($_GET['event_type']);
+        }
+        if (!empty($_GET['s'])) {
+            $redirect_args['s'] = sanitize_text_field($_GET['s']);
+        }
+        if (!empty($_GET['paged'])) {
+            $redirect_args['paged'] = (int) $_GET['paged'];
+        }
+        
+        wp_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
+        exit;
     }
 }

@@ -255,12 +255,23 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         foreach ($rows as $row) {
             $name_fr = isset($row->name_fr) ? (string) $row->name_fr : '';
             $name_en = isset($row->name_en) ? (string) $row->name_en : '';
-            $label   = $name_fr !== '' ? $name_fr : ($name_en !== '' ? $name_en : $row->slug);
+            // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+            if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+                $label = $name_fr . ' (' . $name_en . ')';
+            } elseif ($name_fr !== '') {
+                $label = $name_fr;
+            } elseif ($name_en !== '') {
+                $label = $name_en;
+            } else {
+                $label = $row->slug;
+            }
 
             $entry = (object) [
                 'id'       => (int) $row->id,
                 'label'    => $label,
                 'category' => (string) $row->category,
+                'name_fr'  => $name_fr,
+                'name_en'  => $name_en,
             ];
 
             switch ($row->category) {
@@ -873,6 +884,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_fast_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>"
+                                                    data-name-fr="<?php echo esc_attr($move->name_fr ?? ''); ?>"
+                                                    data-name-en="<?php echo esc_attr($move->name_en ?? ''); ?>"
                                                     <?php selected($attack_id, (int) $move->id); ?>>
                                                     <?php echo esc_html($move->label); ?>
                                                 </option>
@@ -905,7 +918,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                         <select class="pokehub-move-select" name="fast_moves[0][attack_id]">
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_fast_moves as $move) : ?>
-                                                <option value="<?php echo (int) $move->id; ?>">
+                                                <option value="<?php echo (int) $move->id; ?>"
+                                                        data-name-fr="<?php echo esc_attr($move->name_fr ?? ''); ?>"
+                                                        data-name-en="<?php echo esc_attr($move->name_en ?? ''); ?>">
                                                     <?php echo esc_html($move->label); ?>
                                                 </option>
                                             <?php endforeach; ?>
@@ -966,6 +981,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_charged_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>"
+                                                    data-name-fr="<?php echo esc_attr($move->name_fr ?? ''); ?>"
+                                                    data-name-en="<?php echo esc_attr($move->name_en ?? ''); ?>"
                                                     <?php selected($attack_id, (int) $move->id); ?>>
                                                     <?php echo esc_html($move->label); ?>
                                                 </option>
@@ -1073,7 +1090,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                     <select class="pokehub-move-select" name="charged_moves[__INDEX__][attack_id]">
                         <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                         <?php foreach ($all_charged_moves as $move) : ?>
-                            <option value="<?php echo (int) $move->id; ?>">
+                            <option value="<?php echo (int) $move->id; ?>"
+                                    data-name-fr="<?php echo esc_attr($move->name_fr ?? ''); ?>"
+                                    data-name-en="<?php echo esc_attr($move->name_en ?? ''); ?>">
                                 <?php echo esc_html($move->label); ?>
                             </option>
                         <?php endforeach; ?>
@@ -1103,7 +1122,14 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             foreach ($all_pokemon_for_evo as $p_row) {
                 $name_fr = $p_row->name_fr ?? '';
                 $name_en = $p_row->name_en ?? '';
-                $label   = $name_fr !== '' ? $name_fr : $name_en;
+                // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+                    $label = $name_fr . ' (' . $name_en . ')';
+                } elseif ($name_fr !== '') {
+                    $label = $name_fr;
+                } else {
+                    $label = $name_en;
+                }
                 $full    = sprintf(
                     '#%03d %s',
                     (int) $p_row->dex_number,
@@ -1135,7 +1161,14 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                     // Fallback si pas dans le map
                                     $name_fr = $p_row->name_fr ?? '';
                                     $name_en = $p_row->name_en ?? '';
-                                    $label   = $name_fr !== '' ? $name_fr : $name_en;
+                                    // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                                    if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+                                        $label = $name_fr . ' (' . $name_en . ')';
+                                    } elseif ($name_fr !== '') {
+                                        $label = $name_fr;
+                                    } else {
+                                        $label = $name_en;
+                                    }
                                     $label_full = sprintf(
                                         '#%03d %s',
                                         (int) $p_row->dex_number,
@@ -1143,7 +1176,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                     );
                                 }
                                 ?>
-                                <option value="<?php echo (int) $p_row->id; ?>">
+                                <option value="<?php echo (int) $p_row->id; ?>"
+                                        data-name-fr="<?php echo esc_attr($p_row->name_fr ?? ''); ?>"
+                                        data-name-en="<?php echo esc_attr($p_row->name_en ?? ''); ?>">
                                     <?php echo esc_html($label_full); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -1206,9 +1241,22 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                 <?php foreach ($all_evolution_items as $item) : ?>
                                     <?php
                                     $i_slug = (string) $item->slug;
-                                    $i_label = !empty($item->name_fr) ? $item->name_fr : (!empty($item->name_en) ? $item->name_en : $i_slug);
+                                    $i_name_fr = (string) ($item->name_fr ?? '');
+                                    $i_name_en = (string) ($item->name_en ?? '');
+                                    // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                                    if ($i_name_fr !== '' && $i_name_en !== '' && $i_name_fr !== $i_name_en) {
+                                        $i_label = $i_name_fr . ' (' . $i_name_en . ')';
+                                    } elseif ($i_name_fr !== '') {
+                                        $i_label = $i_name_fr;
+                                    } elseif ($i_name_en !== '') {
+                                        $i_label = $i_name_en;
+                                    } else {
+                                        $i_label = $i_slug;
+                                    }
                                     ?>
-                                    <option value="<?php echo esc_attr($i_slug); ?>">
+                                    <option value="<?php echo esc_attr($i_slug); ?>"
+                                            data-name-fr="<?php echo esc_attr($item->name_fr ?? ''); ?>"
+                                            data-name-en="<?php echo esc_attr($item->name_en ?? ''); ?>">
                                         <?php echo esc_html($i_label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -1236,9 +1284,22 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                 <?php foreach ($all_lure_items as $lure) : ?>
                                     <?php
                                     $l_slug = (string) $lure->slug;
-                                    $l_label = !empty($lure->name_fr) ? $lure->name_fr : (!empty($lure->name_en) ? $lure->name_en : $l_slug);
+                                    $l_name_fr = (string) ($lure->name_fr ?? '');
+                                    $l_name_en = (string) ($lure->name_en ?? '');
+                                    // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                                    if ($l_name_fr !== '' && $l_name_en !== '' && $l_name_fr !== $l_name_en) {
+                                        $l_label = $l_name_fr . ' (' . $l_name_en . ')';
+                                    } elseif ($l_name_fr !== '') {
+                                        $l_label = $l_name_fr;
+                                    } elseif ($l_name_en !== '') {
+                                        $l_label = $l_name_en;
+                                    } else {
+                                        $l_label = $l_slug;
+                                    }
                                     ?>
-                                    <option value="<?php echo esc_attr($l_slug); ?>">
+                                    <option value="<?php echo esc_attr($l_slug); ?>"
+                                            data-name-fr="<?php echo esc_attr($lure->name_fr ?? ''); ?>"
+                                            data-name-en="<?php echo esc_attr($lure->name_en ?? ''); ?>">
                                         <?php echo esc_html($l_label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -1308,9 +1369,22 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             <?php foreach ($all_weathers as $weather) : ?>
                                 <?php
                                 $w_slug = (string) $weather->slug;
-                                $w_label = !empty($weather->name_fr) ? $weather->name_fr : (!empty($weather->name_en) ? $weather->name_en : $w_slug);
+                                $w_name_fr = (string) ($weather->name_fr ?? '');
+                                $w_name_en = (string) ($weather->name_en ?? '');
+                                // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                                if ($w_name_fr !== '' && $w_name_en !== '' && $w_name_fr !== $w_name_en) {
+                                    $w_label = $w_name_fr . ' (' . $w_name_en . ')';
+                                } elseif ($w_name_fr !== '') {
+                                    $w_label = $w_name_fr;
+                                } elseif ($w_name_en !== '') {
+                                    $w_label = $w_name_en;
+                                } else {
+                                    $w_label = $w_slug;
+                                }
                                 ?>
-                                <option value="<?php echo esc_attr($w_slug); ?>">
+                                <option value="<?php echo esc_attr($w_slug); ?>"
+                                        data-name-fr="<?php echo esc_attr($weather->name_fr ?? ''); ?>"
+                                        data-name-en="<?php echo esc_attr($weather->name_en ?? ''); ?>">
                                     <?php echo esc_html($w_label); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -1509,7 +1583,14 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         foreach ($all_pokemon_for_evo as $p_row) {
                             $name_fr = $p_row->name_fr ?? '';
                             $name_en = $p_row->name_en ?? '';
-                            $label   = $name_fr !== '' ? $name_fr : $name_en;
+                            // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                            if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+                                $label = $name_fr . ' (' . $name_en . ')';
+                            } elseif ($name_fr !== '') {
+                                $label = $name_fr;
+                            } else {
+                                $label = $name_en;
+                            }
                             $full    = sprintf(
                                 '#%03d %s',
                                 (int) $p_row->dex_number,
@@ -1554,6 +1635,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                                 $label_full = $pokemon_label_map[(int) $p_row->id] ?? '';
                                                 ?>
                                                 <option value="<?php echo (int) $p_row->id; ?>"
+                                                        data-name-fr="<?php echo esc_attr($p_row->name_fr ?? ''); ?>"
+                                                        data-name-en="<?php echo esc_attr($p_row->name_en ?? ''); ?>"
                                                     <?php selected($target_id, (int) $p_row->id); ?>>
                                                     <?php echo esc_html($label_full); ?>
                                                 </option>
@@ -1618,10 +1701,24 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                                     <?php foreach ($all_evolution_items as $item) : ?>
                                                         <?php
                                                         $i_slug = (string) $item->slug;
-                                                        $i_label = !empty($item->name_fr) ? $item->name_fr : (!empty($item->name_en) ? $item->name_en : $i_slug);
+                                                        $i_name_fr = (string) ($item->name_fr ?? '');
+                                                        $i_name_en = (string) ($item->name_en ?? '');
+                                                        // Format: "nom-fr (nom-anglais)" si les deux sont disponibles, sinon juste celui disponible
+                                                        if ($i_name_fr !== '' && $i_name_en !== '' && $i_name_fr !== $i_name_en) {
+                                                            $i_label = $i_name_fr . ' (' . $i_name_en . ')';
+                                                        } elseif ($i_name_fr !== '') {
+                                                            $i_label = $i_name_fr;
+                                                        } elseif ($i_name_en !== '') {
+                                                            $i_label = $i_name_en;
+                                                        } else {
+                                                            $i_label = $i_slug;
+                                                        }
                                                         $i_selected = ($row->item_requirement_slug ?? '') === $i_slug;
                                                         ?>
-                                                        <option value="<?php echo esc_attr($i_slug); ?>" <?php selected($i_selected); ?>>
+                                                        <option value="<?php echo esc_attr($i_slug); ?>" 
+                                                                data-name-fr="<?php echo esc_attr($item->name_fr ?? ''); ?>"
+                                                                data-name-en="<?php echo esc_attr($item->name_en ?? ''); ?>"
+                                                                <?php selected($i_selected); ?>>
                                                             <?php echo esc_html($i_label); ?>
                                                         </option>
                                                     <?php endforeach; ?>
@@ -1653,7 +1750,10 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                                         $l_label = !empty($lure->name_fr) ? $lure->name_fr : (!empty($lure->name_en) ? $lure->name_en : $l_slug);
                                                         $l_selected = ($row->lure_item_slug ?? '') === $l_slug;
                                                         ?>
-                                                        <option value="<?php echo esc_attr($l_slug); ?>" <?php selected($l_selected); ?>>
+                                                        <option value="<?php echo esc_attr($l_slug); ?>" 
+                                                                data-name-fr="<?php echo esc_attr($lure->name_fr ?? ''); ?>"
+                                                                data-name-en="<?php echo esc_attr($lure->name_en ?? ''); ?>"
+                                                                <?php selected($l_selected); ?>>
                                                             <?php echo esc_html($l_label); ?>
                                                         </option>
                                                     <?php endforeach; ?>
@@ -1785,7 +1885,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <?php
                                             $label_full = $pokemon_label_map[(int) $p_row->id] ?? '';
                                             ?>
-                                            <option value="<?php echo (int) $p_row->id; ?>">
+                                            <option value="<?php echo (int) $p_row->id; ?>"
+                                                    data-name-fr="<?php echo esc_attr($p_row->name_fr ?? ''); ?>"
+                                                    data-name-en="<?php echo esc_attr($p_row->name_en ?? ''); ?>">
                                                 <?php echo esc_html($label_full); ?>
                                             </option>
                                         <?php endforeach; ?>
@@ -2044,10 +2146,17 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             }
             
             // Initialiser l'affichage conditionnel pour la nouvelle ligne
-            var methodSelect = row.querySelector('.pokehub-evolution-method');
-            if (methodSelect && window.pokehubToggleEvolutionFields) {
-                window.pokehubToggleEvolutionFields(methodSelect);
-            }
+            setTimeout(function() {
+                var methodSelect = row.querySelector('.pokehub-evolution-method');
+                if (methodSelect && window.pokehubToggleEvolutionFields) {
+                    // Appeler directement la fonction
+                    window.pokehubToggleEvolutionFields(methodSelect);
+                    // Et aussi déclencher l'événement change pour s'assurer que les listeners sont appelés
+                    if (typeof jQuery !== 'undefined') {
+                        jQuery(methodSelect).trigger('change');
+                    }
+                }
+            }, 150);
         }
 
         document.addEventListener('click', function (e) {

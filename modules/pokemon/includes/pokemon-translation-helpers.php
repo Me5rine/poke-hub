@@ -6,6 +6,44 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Récupère une valeur de traduction depuis extra JSON.
+ */
+function poke_hub_tr_get_extra_name($extra_json, $lang) {
+    if (empty($extra_json)) {
+        return '';
+    }
+    $decoded = json_decode((string) $extra_json, true);
+    if (!is_array($decoded)) {
+        return '';
+    }
+    if (empty($decoded['names']) || !is_array($decoded['names'])) {
+        return '';
+    }
+    return trim((string) ($decoded['names'][$lang] ?? ''));
+}
+
+/**
+ * Détermine si une traduction existe (non vide), même si identique à l'anglais.
+ * - FR : on regarde d'abord la colonne name_fr, sinon extra.names.fr
+ * - autres langues : extra.names.xx
+ */
+function poke_hub_tr_has_translation($row, $lang) {
+    $lang = (string) $lang;
+
+    if ($lang === 'fr') {
+        $name_fr = trim((string) ($row->name_fr ?? ''));
+        if ($name_fr !== '') {
+            return true;
+        }
+        $extra_fr = poke_hub_tr_get_extra_name($row->extra ?? '', 'fr');
+        return $extra_fr !== '';
+    }
+
+    $extra_val = poke_hub_tr_get_extra_name($row->extra ?? '', $lang);
+    return $extra_val !== '';
+}
+
+/**
  * Détecte les traductions manquantes pour les Pokémon.
  * 
  * @param array $filters Filtres optionnels ['lang' => 'fr', 'force_check' => false]
@@ -66,19 +104,10 @@ function poke_hub_pokemon_get_missing_translations($filters = []) {
 
         // Vérifier chaque langue
         foreach ($languages_to_check as $check_lang) {
-            $has_translation = false;
+            $has_translation = poke_hub_tr_has_translation($pokemon, $check_lang);
 
-            if ($check_lang === 'fr') {
-                // Pour le français, vérifier aussi la colonne name_fr
-                $has_translation = !empty($pokemon->name_fr) && $pokemon->name_fr !== $name_en;
-            }
-
-            // Vérifier dans extra['names']
-            if (!$has_translation && isset($names[$check_lang]) && !empty($names[$check_lang]) && $names[$check_lang] !== $name_en) {
-                $has_translation = true;
-            }
-
-            if (!$has_translation || ($force_check && empty($names[$check_lang]))) {
+            // Missing uniquement si vraiment vide
+            if (!$has_translation) {
                 if (!isset($missing[$check_lang])) {
                     $missing[$check_lang] = [];
                 }
@@ -90,8 +119,17 @@ function poke_hub_pokemon_get_missing_translations($filters = []) {
                     'name_fr' => $pokemon->name_fr,
                     'slug' => $pokemon->slug,
                     'type' => 'pokemon',
+                    'extra' => $pokemon->extra, // utile pour l'affichage du current_translation
                 ];
+                continue;
             }
+
+            /**
+             * Optionnel: si force_check=true, tu peux considérer "à compléter"
+             * quand la clé extra.names[lang] est vide, même si la trad existe ailleurs.
+             * Perso je te conseille de NE PAS le mélanger à "missing".
+             * Donc ici: on ne fait rien.
+             */
         }
     }
 
@@ -159,32 +197,23 @@ function poke_hub_attacks_get_missing_translations($filters = []) {
 
         // Vérifier chaque langue
         foreach ($languages_to_check as $check_lang) {
-            $has_translation = false;
-
-            if ($check_lang === 'fr') {
-                // Pour le français, vérifier aussi la colonne name_fr
-                $has_translation = !empty($attack->name_fr) && $attack->name_fr !== $name_en;
-            }
-
-            // Vérifier dans extra['names']
-            if (!$has_translation && isset($names[$check_lang]) && !empty($names[$check_lang]) && $names[$check_lang] !== $name_en) {
-                $has_translation = true;
-            }
-
-            if (!$has_translation || ($force_check && empty($names[$check_lang]))) {
+            $has_translation = poke_hub_tr_has_translation($attack, $check_lang);
+        
+            if (!$has_translation) {
                 if (!isset($missing[$check_lang])) {
                     $missing[$check_lang] = [];
                 }
-
+        
                 $missing[$check_lang][] = [
                     'id' => (int) $attack->id,
                     'name_en' => $name_en,
                     'name_fr' => $attack->name_fr,
                     'slug' => $attack->slug,
                     'type' => 'attack',
+                    'extra' => $attack->extra,
                 ];
             }
-        }
+        }        
     }
 
     return $missing;
@@ -251,32 +280,23 @@ function poke_hub_types_get_missing_translations($filters = []) {
 
         // Vérifier chaque langue
         foreach ($languages_to_check as $check_lang) {
-            $has_translation = false;
-
-            if ($check_lang === 'fr') {
-                // Pour le français, vérifier aussi la colonne name_fr
-                $has_translation = !empty($type->name_fr) && $type->name_fr !== $name_en;
-            }
-
-            // Vérifier dans extra['names']
-            if (!$has_translation && isset($names[$check_lang]) && !empty($names[$check_lang]) && $names[$check_lang] !== $name_en) {
-                $has_translation = true;
-            }
-
-            if (!$has_translation || ($force_check && empty($names[$check_lang]))) {
+            $has_translation = poke_hub_tr_has_translation($type, $check_lang);
+        
+            if (!$has_translation) {
                 if (!isset($missing[$check_lang])) {
                     $missing[$check_lang] = [];
                 }
-
+        
                 $missing[$check_lang][] = [
                     'id' => (int) $type->id,
                     'name_en' => $name_en,
                     'name_fr' => $type->name_fr,
                     'slug' => $type->slug,
                     'type' => 'type',
+                    'extra' => $type->extra,
                 ];
             }
-        }
+        }        
     }
 
     return $missing;
@@ -295,4 +315,7 @@ function poke_hub_get_all_missing_translations($filters = []) {
         'types' => poke_hub_types_get_missing_translations($filters),
     ];
 }
+
+
+
 
