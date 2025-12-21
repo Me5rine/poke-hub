@@ -24,6 +24,8 @@ function pokehub_render_special_event_form(
         : __('Add Special Event', 'poke-hub');
 
     $title       = $is_edit ? $event->title : '';
+    $title_en    = $is_edit && isset($event->title_en) ? $event->title_en : ($is_edit ? $event->title : '');
+    $title_fr    = $is_edit && isset($event->title_fr) ? $event->title_fr : ($is_edit ? $event->title : '');
     $slug        = $is_edit ? $event->slug : '';
     $event_type  = $is_edit ? $event->event_type_slug : '';
     $description = $is_edit ? $event->description : '';
@@ -98,14 +100,28 @@ function pokehub_render_special_event_form(
 
             <table class="form-table">
                 <tr>
-                    <th><label for="event_title"><?php esc_html_e('Title', 'poke-hub'); ?></label></th>
+                    <th><label for="event_title_en"><?php esc_html_e('Title (EN)', 'poke-hub'); ?></label></th>
                     <td>
                         <input type="text"
                                class="regular-text"
-                               id="event_title"
-                               name="event[title]"
-                               value="<?php echo esc_attr($title); ?>"
+                               id="event_title_en"
+                               name="event[title_en]"
+                               value="<?php echo esc_attr($title_en); ?>"
                                required>
+                        <p class="description"><?php esc_html_e('English title (used for slug generation)', 'poke-hub'); ?></p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th><label for="event_title_fr"><?php esc_html_e('Title (FR)', 'poke-hub'); ?></label></th>
+                    <td>
+                        <input type="text"
+                               class="regular-text"
+                               id="event_title_fr"
+                               name="event[title_fr]"
+                               value="<?php echo esc_attr($title_fr); ?>"
+                               required>
+                        <p class="description"><?php esc_html_e('French title', 'poke-hub'); ?></p>
                     </td>
                 </tr>
 

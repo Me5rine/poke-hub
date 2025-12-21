@@ -63,6 +63,65 @@ function pokehub_render_special_events_page() {
         return;
     }
 
+    // ---------- Vue "Dupliquer un événement spécial" ----------
+    if ($action === 'duplicate_special' && $event_id > 0) {
+        global $wpdb;
+
+        $table = pokehub_get_table('special_events');
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE id = %d",
+                $event_id
+            )
+        );
+
+        if (!$row) {
+            wp_die(__('Special event not found.', 'poke-hub'));
+        }
+
+        // Récupérer infos de type d'événement (nom / couleur)
+        $etype = null;
+        if (!empty($row->event_type) && function_exists('poke_hub_events_get_event_type_by_slug')) {
+            $etype = poke_hub_events_get_event_type_by_slug((string) $row->event_type);
+        }
+
+        $event = (object) [
+            'id'                        => 0, // Nouvel événement
+            'slug'                      => '', // Sera généré
+            'title'                     => (string) $row->title,
+            'title_en'                  => isset($row->title_en) ? (string) $row->title_en : (string) $row->title,
+            'title_fr'                  => isset($row->title_fr) ? (string) $row->title_fr : (string) $row->title,
+            'description'               => (string) $row->description,
+            'event_type_slug'           => (string) $row->event_type,
+            'event_type_name'           => $etype ? (string) $etype->name : (string) $row->event_type,
+            'event_type_color'          => $etype ? (string) $etype->event_type_color : '',
+            'start_ts'                  => (int) $row->start_ts,
+            'end_ts'                    => (int) $row->end_ts,
+
+            'mode'                      => !empty($row->mode) ? (string) $row->mode : 'local',
+            'recurring'                 => !empty($row->recurring) ? (int) $row->recurring : 0,
+            'recurring_freq'            => !empty($row->recurring_freq) ? (string) $row->recurring_freq : 'weekly',
+            'recurring_interval'        => !empty($row->recurring_interval) ? (int) $row->recurring_interval : 1,
+            'recurring_window_end_ts'   => !empty($row->recurring_window_end_ts) ? (int) $row->recurring_window_end_ts : 0,
+
+            'image_id'                  => !empty($row->image_id) ? (int) $row->image_id : 0,
+            'image_url'                 => !empty($row->image_url) ? (string) $row->image_url : '',
+        ];
+
+        // Pré-remplissage Pokémon / bonus depuis l'événement original
+        $pokemon_rows = function_exists('poke_hub_special_event_get_pokemon_rows')
+            ? poke_hub_special_event_get_pokemon_rows($event_id)
+            : [];
+
+        $bonus_rows = function_exists('poke_hub_special_event_get_bonus_rows')
+            ? poke_hub_special_event_get_bonus_rows($event_id)
+            : [];
+
+        pokehub_render_special_event_form('add', $event, $pokemon_rows, $bonus_rows);
+        return;
+    }
+
     // ---------- Vue "Éditer un événement spécial" ----------
     if ($action === 'edit_special' && $event_id > 0) {
         global $wpdb;
@@ -90,6 +149,8 @@ function pokehub_render_special_events_page() {
             'id'                        => (int) $row->id,
             'slug'                      => (string) $row->slug,
             'title'                     => (string) $row->title,
+            'title_en'                  => isset($row->title_en) ? (string) $row->title_en : (string) $row->title,
+            'title_fr'                  => isset($row->title_fr) ? (string) $row->title_fr : (string) $row->title,
             'description'               => (string) $row->description,
             'event_type_slug'           => (string) $row->event_type,
             'event_type_name'           => $etype ? (string) $etype->name : (string) $row->event_type,
@@ -272,27 +333,28 @@ add_action('admin_post_pokehub_save_special_event', function () {
 
     $event = isset($_POST['event']) && is_array($_POST['event']) ? $_POST['event'] : [];
 
-    $title       = isset($event['title']) ? sanitize_text_field($event['title']) : '';
-
+    $title_en = isset($event['title_en']) ? sanitize_text_field($event['title_en']) : '';
+    $title_fr = isset($event['title_fr']) ? sanitize_text_field($event['title_fr']) : '';
     
-    $title       = isset($event['title']) ? sanitize_text_field($event['title']) : '';
+    // Pour la compatibilité, on garde title = title_en
+    $title = $title_en;
 
     // 🔹 Image : ID de média + URL
     $image_id  = !empty($event['image_id']) ? absint($event['image_id']) : 0;
     $image_url = !empty($event['image_url']) ? esc_url_raw($event['image_url']) : '';
     
     // ----- SLUG -----
-    // Si vide → généré depuis le titre comme WordPress
+    // Si vide → généré depuis le titre EN comme WordPress
     $raw_slug = '';
     if (!empty($event['slug'])) {
         $raw_slug = $event['slug'];
-    } elseif (!empty($title)) {
-        $raw_slug = $title;
+    } elseif (!empty($title_en)) {
+        $raw_slug = $title_en;
     }
 
     // Si encore vide, on ne peut rien faire
     if (empty($raw_slug)) {
-        wp_die(__('A title or slug is required to generate the event slug.', 'poke-hub'));
+        wp_die(__('A title (EN) or slug is required to generate the event slug.', 'poke-hub'));
     }
 
     // Génère un slug unique (remote + special)
@@ -370,7 +432,7 @@ add_action('admin_post_pokehub_save_special_event', function () {
         }
     }
 
-    if (!$title || !$slug || !$event_type || !$start_ts || !$end_ts) {
+    if (!$title_en || !$title_fr || !$slug || !$event_type || !$start_ts || !$end_ts) {
         wp_die(__('Missing required fields.', 'poke-hub'));
     }
 
@@ -407,7 +469,9 @@ add_action('admin_post_pokehub_save_special_event', function () {
 
     $data = [
         'slug'                    => $slug,
-        'title'                   => $title,
+        'title'                   => $title, // Compatibilité : garde title = title_en
+        'title_en'                => $title_en,
+        'title_fr'                => $title_fr,
         'description'             => $description,
         'event_type'              => $event_type,
         'start_ts'                => $start_ts,
@@ -422,19 +486,21 @@ add_action('admin_post_pokehub_save_special_event', function () {
     ];
 
     $formats = [
-        '%s',
-        '%s',
-        '%s',
-        '%s',
-        '%d',
-        '%d',
-        '%s',
-        '%d',
-        '%s',
-        '%d',
-        '%d',
-        '%d',
-        '%s',
+        '%s', // slug
+        '%s', // title
+        '%s', // title_en
+        '%s', // title_fr
+        '%s', // description
+        '%s', // event_type
+        '%d', // start_ts
+        '%d', // end_ts
+        '%s', // mode
+        '%d', // recurring
+        '%s', // recurring_freq
+        '%d', // recurring_interval
+        '%d', // recurring_window_end_ts
+        '%d', // image_id
+        '%s', // image_url
     ];
 
     // 🔹 Création vs mise à jour

@@ -114,6 +114,27 @@ class PokeHub_Events_List_Table extends WP_List_Table {
                 esc_url($edit_url),
                 esc_html__('Edit', 'poke-hub')
             );
+            
+            // Lien dupliquer
+            $duplicate_url_args = [
+                'page'     => 'poke-hub-events',
+                'action'   => 'duplicate_special',
+                'event_id' => (int) $item->id,
+            ];
+            
+            // Ajouter les paramètres de filtrage depuis la requête actuelle
+            foreach ($preserve_params as $param) {
+                if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                    $duplicate_url_args[$param] = sanitize_text_field($_GET[$param]);
+                }
+            }
+            
+            $duplicate_url = add_query_arg($duplicate_url_args, admin_url('admin.php'));
+            $actions['duplicate'] = sprintf(
+                '<a href="%s">%s</a>',
+                esc_url($duplicate_url),
+                esc_html__('Duplicate', 'poke-hub')
+            );
 
             // Delete spécial → utilise la même mécanique que les bulk actions
             $delete_url = wp_nonce_url(

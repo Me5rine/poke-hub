@@ -1607,6 +1607,18 @@ function poke_hub_special_event_normalize_row(array $row): object {
         }
     }
 
+    // Déterminer le titre selon la langue
+    $title = (string) $row['title'];
+    if (isset($row['title_en']) && isset($row['title_fr'])) {
+        // Utiliser title_fr si disponible, sinon title_en, sinon title (compatibilité)
+        $locale = get_locale();
+        if (strpos($locale, 'fr') === 0 && !empty($row['title_fr'])) {
+            $title = (string) $row['title_fr'];
+        } elseif (!empty($row['title_en'])) {
+            $title = (string) $row['title_en'];
+        }
+    }
+
     return (object) [
         'id'               => (int) $row['id'],
         'source'           => 'special',
@@ -1616,7 +1628,7 @@ function poke_hub_special_event_normalize_row(array $row): object {
         'event_type_name'  => $event_type_name,
         'event_type_color' => $event_type_color,
 
-        'title'            => (string) $row['title'],
+        'title'            => $title,
         'slug'             => $slug,
 
         'start_ts'         => $start_ts,

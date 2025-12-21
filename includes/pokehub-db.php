@@ -499,6 +499,8 @@ class Pokehub_DB {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             slug VARCHAR(191) NOT NULL,
             title VARCHAR(255) NOT NULL,
+            title_en VARCHAR(255) NULL,
+            title_fr VARCHAR(255) NULL,
             description LONGTEXT NULL,
             event_type VARCHAR(50) NOT NULL,
             start_ts INT UNSIGNED NOT NULL,
