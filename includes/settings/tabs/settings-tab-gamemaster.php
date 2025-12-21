@@ -560,7 +560,6 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
 
     $is_running = in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued' ], true );
 
-    <?php
     $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];
     $pct  = (int) ( $prog['pct'] ?? 0 );
     $phase = (string) ( $prog['phase'] ?? '-' );
