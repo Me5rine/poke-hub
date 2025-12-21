@@ -1,6 +1,6 @@
 # Poké HUB - Documentation
 
-**Version:** 1.6.5  
+**Version:** 1.5.6  
 **Auteur:** Me5rine  
 **Description:** Plugin modulaire WordPress pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...)
 
@@ -32,7 +32,6 @@ Poké HUB est un plugin WordPress modulaire conçu pour gérer toutes les donné
 - **Import Game Master** : Import automatique depuis les fichiers JSON du Game Master
 - **Intégration S3** : Archivage automatique des Game Master sur AWS S3
 - **Sources distantes** : Support pour récupérer des données depuis d'autres sites WordPress
-- **Système de traduction** : Récupération automatique des noms officiels depuis Bulbapedia (6 langues supportées)
 - **Shortcodes** : Affichage facile des événements et bonus sur le front-end
 
 ---
@@ -104,24 +103,6 @@ Accédez à **Poké HUB** > **Settings** > **Sources** pour configurer :
 - **URL de base des assets Pokémon** : URL de base pour charger les images/sprites des Pokémon depuis votre CDN/bucket
 - **URL de fallback** : URL de secours si la source principale est indisponible
 
-### Configuration des traductions
-
-Accédez à **Poké HUB** > **Settings** > **Translation** pour :
-
-- **Gérer les traductions manquantes** : Visualiser et éditer les traductions manquantes pour Pokémon, Attaques et Types
-- **Récupération en masse depuis Bulbapedia** : Récupérer automatiquement les noms officiels depuis Bulbapedia via l'API MediaWiki
-- **Statistiques** : Voir le nombre de traductions manquantes par langue et par type
-
-Le système supporte 6 langues :
-- Français (fr)
-- Allemand (de)
-- Italien (it)
-- Espagnol (es)
-- Japonais (ja)
-- Coréen (ko)
-
-Les traductions sont stockées dans le champ `extra` (JSON) avec la structure `names[lang]` et le français est également stocké dans la colonne `name_fr` pour la rétrocompatibilité.
-
 ---
 
 ## Modules
@@ -171,18 +152,6 @@ Accédez à **Poké HUB** > **Pokémon** pour gérer :
 - Météos
 - Formes
 - Mappings de formes
-
-#### Système de traduction
-
-Le module Pokémon intègre un système de traduction automatique depuis Bulbapedia :
-
-- **Récupération automatique** : Lors de l'ajout ou de l'édition d'un Pokémon, Attaque ou Type, les noms officiels sont automatiquement récupérés depuis Bulbapedia
-- **API MediaWiki** : Utilise l'API officielle de Bulbapedia pour récupérer les noms dans toutes les langues supportées
-- **Gestion des traductions manquantes** : Interface dédiée pour visualiser et compléter les traductions manquantes
-- **Récupération en masse** : Possibilité de récupérer les traductions par lots (recommandé : 5-10 items à la fois pour respecter les limites de taux de Bulbapedia)
-- **Normalisation** : Gestion spéciale des cas particuliers (Nidoran♀/Nidoran♂, formes Mega, etc.)
-
-Les traductions sont automatiquement récupérées depuis la section "In other languages" des pages Bulbapedia via l'API MediaWiki, en évitant de parser des pages HTML complètes pour des performances optimales.
 
 ### Module Events
 
@@ -267,71 +236,6 @@ Le plugin supporte la récupération de données depuis d'autres sites WordPress
 Dans **Settings** > **Sources**, configurez les préfixes de tables pour :
 - Les événements (posts, postmeta, tables spéciales)
 - Les types d'événements (taxonomies)
-
-### Système de traduction Bulbapedia
-
-Le plugin intègre un système complet de gestion des traductions pour Pokémon, Attaques et Types.
-
-#### Fonctionnalités
-
-- **Récupération automatique** : Les noms officiels sont automatiquement récupérés depuis Bulbapedia lors de l'ajout/édition d'items
-- **Interface de gestion** : Onglet dédié dans **Settings** > **Translation** pour visualiser et éditer les traductions manquantes
-- **Récupération en masse** : Possibilité de récupérer les traductions par lots depuis Bulbapedia
-- **Statistiques** : Tableau de bord affichant le nombre de traductions manquantes par langue et par type
-
-#### Langues supportées
-
-- Français (fr) - également stocké dans `name_fr` pour compatibilité
-- Allemand (de)
-- Italien (it)
-- Espagnol (es)
-- Japonais (ja)
-- Coréen (ko)
-
-#### Utilisation
-
-1. **Visualiser les traductions manquantes** :
-   - Allez dans **Poké HUB** > **Settings** > **Translation**
-   - Sélectionnez une langue et un type (Pokémon, Attaques, Types)
-   - Consultez la liste des items sans traduction
-
-2. **Récupérer depuis Bulbapedia** :
-   - Utilisez le formulaire "Bulk Fetch Missing Translations"
-   - Sélectionnez le type et limitez le nombre d'items (recommandé : 5-10)
-   - Cliquez sur "Fetch Missing Translations"
-
-3. **Éditer manuellement** :
-   - Utilisez le formulaire "Edit Missing Translations"
-   - Saisissez les traductions dans les champs appropriés
-   - Seuls les champs remplis seront sauvegardés
-
-#### Stockage des traductions
-
-Les traductions sont stockées dans le champ `extra` (JSON) avec la structure suivante :
-```json
-{
-  "names": {
-    "en": "English Name",
-    "fr": "Nom Français",
-    "de": "Deutscher Name",
-    "it": "Nome Italiano",
-    "es": "Nombre Español",
-    "ja": "日本語名",
-    "ko": "한국어 이름"
-  }
-}
-```
-
-Pour le français, la valeur est également stockée dans la colonne `name_fr` pour la rétrocompatibilité avec le code existant.
-
-#### Constante de débogage
-
-Vous pouvez activer le mode debug des traductions en définissant dans `wp-config.php` :
-```php
-define('POKE_HUB_TRANSLATIONS_DEBUG', true);
-```
-
-Cela activera les logs détaillés dans `error_log` pour diagnostiquer les problèmes de récupération.
 
 ---
 
@@ -421,8 +325,6 @@ Le plugin crée plusieurs tables personnalisées pour stocker les données. Les 
 - `{prefix}_pokehub_pokemon_form_variants` : Variantes de formes
 - `{prefix}_pokehub_pokemon_evolutions` : Évolutions
 - `{prefix}_pokehub_items` : Items/Objets
-- `{prefix}_pokehub_pokemon_backgrounds` : Fonds spéciaux pour Pokémon
-- `{prefix}_pokehub_pokemon_background_pokemon_links` : Liens Backgrounds ↔ Pokémon
 
 ### Tables du module Events
 
@@ -519,7 +421,6 @@ pokehub/
 - `POKE_HUB_INCLUDES_DIR` : Dossier des includes
 - `POKE_HUB_HOOKS_DIR` : Dossier des hooks personnalisés
 - `POKE_HUB_HOOKS_FILE` : Fichier des hooks personnalisés
-- `POKE_HUB_TRANSLATIONS_DEBUG` : Active les logs de débogage pour les traductions (défaut: `false`)
 
 ### Fonctions helper
 
@@ -543,50 +444,6 @@ $registry = poke_hub_get_modules_registry();
 ```php
 $table = pokehub_get_table('pokemon');
 // Retourne: wp_pokehub_pokemon
-```
-
-#### Fonctions de traduction
-
-```php
-// Récupérer les traductions manquantes pour les Pokémon
-$missing = poke_hub_pokemon_get_missing_translations(['lang' => 'fr']);
-
-// Récupérer les traductions manquantes pour les attaques
-$missing = poke_hub_attacks_get_missing_translations(['lang' => 'de']);
-
-// Récupérer les traductions manquantes pour les types
-$missing = poke_hub_types_get_missing_translations(['lang' => 'it']);
-
-// Récupérer toutes les traductions manquantes
-$all_missing = poke_hub_get_all_missing_translations();
-
-// Récupérer les noms officiels depuis Bulbapedia pour un Pokémon
-$names = poke_hub_pokemon_fetch_pokemon_official_names_from_bulbapedia('Pikachu');
-
-// Récupérer les noms officiels pour une attaque
-$names = poke_hub_pokemon_fetch_move_official_names_from_bulbapedia('Thunderbolt');
-
-// Récupérer les noms officiels pour un type
-$names = poke_hub_pokemon_fetch_type_official_names_from_bulbapedia('Electric');
-
-// Récupération en masse depuis Bulbapedia
-$result = poke_hub_pokemon_fetch_official_names_existing($limit = 5, $force = false);
-// Retourne: ['updated' => 5, 'skipped' => 2, 'errors' => 0, 'total' => 7]
-```
-
-#### Vérifier si une traduction existe
-
-```php
-// Récupérer un élément depuis la base de données
-$pokemon = $wpdb->get_row("SELECT * FROM {$table} WHERE id = 123");
-
-// Vérifier si une traduction existe
-if (poke_hub_tr_has_translation($pokemon, 'fr')) {
-    // La traduction française existe
-}
-
-// Récupérer une traduction depuis extra
-$name_fr = poke_hub_tr_get_extra_name($pokemon->extra, 'fr');
 ```
 
 ### Ajouter un nouveau module
@@ -627,8 +484,6 @@ if (!poke_hub_is_module_active('nouveau-module')) {
 - `poke_hub_active_modules` : Modifier la liste des modules actifs
 - `poke_hub_pokemon_data` : Modifier les données d'un Pokémon
 - `poke_hub_event_data` : Modifier les données d'un événement
-- `poke_hub_pokemon_import_i18n` : Fournir des traductions personnalisées lors de l'import Game Master
-- `poke_hub_pokemon_i18n_names` : Modifier les noms multilingues avant leur stockage (format: `['en' => '...', 'fr' => '...', ...]`)
 
 ---
 
@@ -642,17 +497,8 @@ Pour toute question ou problème, contactez l'auteur via :
 
 ## Changelog
 
-### Version 1.6.5
-- **Nouveau système de traduction Bulbapedia** : Récupération automatique des noms officiels depuis Bulbapedia via l'API MediaWiki
-- **Onglet Translation** : Nouvel onglet dans les Settings pour gérer les traductions manquantes
-- **Support multilingue** : Ajout du support pour 6 langues (fr, de, it, es, ja, ko)
-- **Récupération en masse** : Fonctionnalité pour récupérer les traductions par lots depuis Bulbapedia
-- **Statistiques de traduction** : Tableau de bord affichant les traductions manquantes par langue et type
-- **Stockage JSON** : Les traductions sont stockées dans le champ `extra` avec structure `names[lang]`
-- **Gestion spéciale** : Normalisation des cas particuliers (Nidoran♀/Nidoran♂, formes Mega, etc.)
-
 ### Version 1.5.6
-- Version précédente du plugin
+- Version actuelle du plugin
 
 ---
 

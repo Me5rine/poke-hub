@@ -143,3 +143,18 @@ function poke_hub_settings_ui() {
 
     echo '</div>';
 }
+
+add_action( 'wp_ajax_poke_hub_gm_status', function () {
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'forbidden', 403 );
+    }
+
+    $status = get_option( 'poke_hub_gm_import_status', [] );
+    $state  = get_option( 'poke_hub_gm_batch_state', [] );
+
+    wp_send_json_success( [
+        'status' => $status,
+        'progress' => $state['progress'] ?? [],
+    ] );
+});

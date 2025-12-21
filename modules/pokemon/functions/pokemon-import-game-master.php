@@ -150,7 +150,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     $is_default = ( $form_slug === '' ) ? 1 : 0;
 
     // Slug vu dans ce Game Master (stat)
-    $seen_pokemon_slugs[] = $slug;
+    $seen_pokemon_slugs[$slug] = true;
 
     // Gender ratio
     $gender_male   = 0.0;
@@ -480,11 +480,17 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             [ '%d' ]
         );
         $pokemon_id                 = (int) $row->id;
-        $stats['pokemon_updated'][] = $names['en'];
+        $stats['pokemon_updated_count'] = ($stats['pokemon_updated_count'] ?? 0) + 1;
+        if (count($stats['pokemon_updated_sample'] ?? []) < 50) {
+            $stats['pokemon_updated_sample'][] = $names['en'];
+        }
     } else {
         $wpdb->insert( $pokemon_table, $data, $format );
         $pokemon_id                  = (int) $wpdb->insert_id;
-        $stats['pokemon_inserted'][] = $names['en'];
+        $stats['pokemon_inserted_count'] = ($stats['pokemon_inserted_count'] ?? 0) + 1;
+        if (count($stats['pokemon_inserted_sample'] ?? []) < 50) {
+            $stats['pokemon_inserted_sample'][] = $names['en'];
+        }
     }
 
     // Récupérer automatiquement les traductions Bulbapedia après insertion/mise à jour
@@ -629,10 +635,37 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     $links = [];
     if ( $pokemon_id > 0 && ! empty( $tables['pokemon_attack_links'] ) && ! empty( $tables['attacks'] ) ) {
         // Support des deux formats : ancien (quickAttacks) et nouveau (quickMoves)
-        $quick_moves     = isset( $settings['quickMoves'] ) && is_array( $settings['quickMoves'] ) ? $settings['quickMoves'] : ( isset( $settings['quickAttacks'] ) && is_array( $settings['quickAttacks'] ) ? $settings['quickAttacks'] : [] );
-        $cinematic_moves = isset( $settings['cinematicMoves'] ) && is_array( $settings['cinematicMoves'] ) ? $settings['cinematicMoves'] : ( isset( $settings['cinematicAttacks'] ) && is_array( $settings['cinematicAttacks'] ) ? $settings['cinematicAttacks'] : [] );
-        $elite_quick     = isset( $settings['eliteQuickAttack'] ) && is_array( $settings['eliteQuickAttack'] ) ? $settings['eliteQuickAttack'] : [];
-        $elite_cinematic = isset( $settings['eliteCinematicMove'] ) && is_array( $settings['eliteCinematicMove'] ) ? $settings['eliteCinematicMove'] : ( isset( $settings['eliteCinematicAttack'] ) && is_array( $settings['eliteCinematicAttack'] ) ? $settings['eliteCinematicAttack'] : [] );
+        $quick_moves = [];
+        if ( isset($settings['quickMoves']) && is_array($settings['quickMoves']) ) {
+            $quick_moves = $settings['quickMoves'];
+        } elseif ( isset($settings['quickAttacks']) && is_array($settings['quickAttacks']) ) {
+            $quick_moves = $settings['quickAttacks'];
+        }
+        
+        $cinematic_moves = [];
+        if ( isset($settings['cinematicMoves']) && is_array($settings['cinematicMoves']) ) {
+            $cinematic_moves = $settings['cinematicMoves'];
+        } elseif ( isset($settings['cinematicAttacks']) && is_array($settings['cinematicAttacks']) ) {
+            $cinematic_moves = $settings['cinematicAttacks'];
+        }
+        
+        $elite_quick = [];
+        if ( isset($settings['eliteQuickAttack']) && is_array($settings['eliteQuickAttack']) ) {
+            $elite_quick = $settings['eliteQuickAttack'];
+        } elseif ( isset($settings['eliteQuickMove']) && is_array($settings['eliteQuickMove']) ) {
+            $elite_quick = $settings['eliteQuickMove'];
+        } elseif ( isset($settings['eliteQuickMoves']) && is_array($settings['eliteQuickMoves']) ) {
+            $elite_quick = $settings['eliteQuickMoves'];
+        }
+        
+        $elite_cinematic = [];
+        if ( isset($settings['eliteCinematicMove']) && is_array($settings['eliteCinematicMove']) ) {
+            $elite_cinematic = $settings['eliteCinematicMove'];
+        } elseif ( isset($settings['eliteCinematicAttack']) && is_array($settings['eliteCinematicAttack']) ) {
+            $elite_cinematic = $settings['eliteCinematicAttack'];
+        } elseif ( isset($settings['eliteCinematicMoves']) && is_array($settings['eliteCinematicMoves']) ) {
+            $elite_cinematic = $settings['eliteCinematicMoves'];
+        }        
 
         $attack_links_map = [];
 
@@ -849,8 +882,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
                 'quickMoves'         => $settings['quickMoves']         ?? [],
                 'cinematicMoves'     => $settings['cinematicMoves']     ?? [],
-                'eliteQuickAttack'     => $settings['eliteQuickAttack']     ?? [],
-                'eliteCinematicMove' => $settings['eliteCinematicMove'] ?? [],
+                'eliteQuickMoves'      => $elite_quick,
+                'eliteCinematicMoves'  => $elite_cinematic,
 
                 'names'              => $mega_names,
                 'generation_number'  => $generation_number,
@@ -941,11 +974,17 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     [ '%d' ]
                 );
                 $mega_pokemon_id           = (int) $mega_row->id;
-                $stats['pokemon_updated'][] = $mega_names['en'];
+                $stats['pokemon_updated_count'] = ($stats['pokemon_updated_count'] ?? 0) + 1;
+                if (count($stats['pokemon_updated_sample'] ?? []) < 50) {
+                    $stats['pokemon_updated_sample'][] = $mega_names['en'];
+                }
             } else {
                 $wpdb->insert( $pokemon_table, $mega_data, $mega_format );
                 $mega_pokemon_id            = (int) $wpdb->insert_id;
-                $stats['pokemon_inserted'][] = $mega_names['en'];
+                $stats['pokemon_inserted_count'] = ($stats['pokemon_inserted_count'] ?? 0) + 1;
+                if (count($stats['pokemon_inserted_sample'] ?? []) < 50) {
+                    $stats['pokemon_inserted_sample'][] = $mega_names['en'];
+                }
             }
 
             // Index proto+tempEvoId → (pokemon_id, variant)
@@ -1021,7 +1060,7 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
     $names         = poke_hub_pokemon_get_i18n_names( 'moves', $slug, $default_label );
 
     // On mémorise le slug comme "vu" (statistique uniquement)
-    $seen_attack_slugs[] = $slug;
+    $seen_attack_slugs[$slug] = true;
 
     $type_proto = $settings['pokemonType'] ?? '';
     $type_slug  = poke_hub_pokemon_gm_type_proto_to_slug( $type_proto );
@@ -1070,11 +1109,17 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
             [ '%d' ]
         );
         $attack_id                = (int) $row->id;
-        $stats['attacks_updated'][] = $names['en'];
+        $stats['attacks_updated_count'] = ($stats['attacks_updated_count'] ?? 0) + 1;
+        if (count($stats['attacks_updated_sample'] ?? []) < 50) {
+            $stats['attacks_updated_sample'][] = $names['en'];
+        }
     } else {
         $wpdb->insert( $attacks_table, $attack_data, $attack_format );
         $attack_id                 = (int) $wpdb->insert_id;
-        $stats['attacks_inserted'][] = $names['en'];
+        $stats['attacks_inserted_count'] = ($stats['attacks_inserted_count'] ?? 0) + 1;
+        if (count($stats['attacks_inserted_sample'] ?? []) < 50) {
+            $stats['attacks_inserted_sample'][] = $names['en'];
+        }
     }
 
     if ( $attack_id <= 0 || empty( $stats_table ) ) {
@@ -1302,11 +1347,17 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
             [ '%d' ]
         );
         $attack_id                = (int) $row->id;
-        $stats['attacks_updated'][] = $names['en'];
+        $stats['attacks_updated_count'] = ($stats['attacks_updated_count'] ?? 0) + 1;
+        if (count($stats['attacks_updated_sample'] ?? []) < 50) {
+            $stats['attacks_updated_sample'][] = $names['en'];
+        }
     } else {
         $wpdb->insert( $attacks_table, $attack_data, $attack_format );
         $attack_id                 = (int) $wpdb->insert_id;
-        $stats['attacks_inserted'][] = $names['en'];
+        $stats['attacks_inserted_count'] = ($stats['attacks_inserted_count'] ?? 0) + 1;
+        if (count($stats['attacks_inserted_sample'] ?? []) < 50) {
+            $stats['attacks_inserted_sample'][] = $names['en'];
+        }
     }
 
     if ( $attack_id <= 0 || empty( $stats_table ) ) {
@@ -1397,7 +1448,8 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
  * @param string $source URL ou chemin du JSON Game Master.
  * @return array|\WP_Error
  */
-function poke_hub_pokemon_import_game_master( $source ) {
+function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
+    $do_types_import = ! empty( $options['import_types_from_bulbapedia'] );
     if ( ! function_exists( 'pokehub_get_table' ) ) {
         return new \WP_Error( 'missing_helper', 'pokehub_get_table() is required.' );
     }
@@ -1419,6 +1471,7 @@ function poke_hub_pokemon_import_game_master( $source ) {
     }
 
     $decoded = json_decode( $json, true );
+    unset($json); // IMPORTANT: libère la grosse string
     if ( ! is_array( $decoded ) ) {
         return new \WP_Error( 'invalid_json', 'Game Master JSON is invalid.' );
     }
@@ -1438,17 +1491,24 @@ function poke_hub_pokemon_import_game_master( $source ) {
     ];
 
     // Stats détaillées
+    // Stats (évite de stocker des milliers de strings en RAM)
     $stats = [
-        'pokemon_inserted'     => [],
-        'pokemon_updated'      => [],
-        'attacks_inserted'       => [],
-        'attacks_updated'        => [],
-        'pve_stats'            => 0,
-        'pvp_stats'            => 0,
-        'pokemon_type_links'   => 0,
-        'attack_type_links'      => 0,
-        'pokemon_attack_links' => 0,
-        // On pourrait ajouter plus tard : 'pokemon_evolutions' => 0,
+        'pokemon_inserted_count'   => 0,
+        'pokemon_updated_count'    => 0,
+        'attacks_inserted_count'   => 0,
+        'attacks_updated_count'    => 0,
+
+        // échantillons debug (facultatif)
+        'pokemon_inserted_sample'  => [],
+        'pokemon_updated_sample'   => [],
+        'attacks_inserted_sample'  => [],
+        'attacks_updated_sample'   => [],
+
+        'pve_stats'                => 0,
+        'pvp_stats'                => 0,
+        'pokemon_type_links'       => 0,
+        'attack_type_links'        => 0,
+        'pokemon_attack_links'     => 0,
     ];
 
     $seen_pokemon_slugs = [];
@@ -1630,49 +1690,48 @@ function poke_hub_pokemon_import_game_master( $source ) {
         }
     }
 
-    /**
-     * PASS 4 : Import des données de types depuis Bulbapedia
-     * 
-     * Importe automatiquement les efficacités offensives et défensives
-     * pour tous les types depuis Bulbapedia.
-     * 
-     * Pour Pokémon GO, on importe les données spécifiques à Pokémon GO
-     * (avec les multiplicateurs ×1.6, ×0.625, ×0.39).
-     */
-    if (function_exists('poke_hub_pokemon_import_all_types_for_pokemon_go')) {
-        // Vérifie que le fichier d'import est bien chargé
-        if (!function_exists('poke_hub_pokemon_import_type_from_bulbapedia')) {
-            // Essaie de charger le fichier
-            $importer_file = POKE_HUB_POKEMON_PATH . '/includes/pokemon-type-bulbapedia-importer.php';
-            if (file_exists($importer_file)) {
-                require_once $importer_file;
-            }
+    $do_types_import = ! empty( $options['import_types_from_bulbapedia'] );
+
+    if ( $do_types_import ) {
+    
+        /**
+         * PASS 4 : Import des données de types depuis Bulbapedia
+         */
+        $importer_file = POKE_HUB_POKEMON_PATH . '/includes/pokemon-type-bulbapedia-importer.php';
+        if ( file_exists( $importer_file ) ) {
+            require_once $importer_file;
+        } else {
+            $stats['types_import_error'] = 'Fichier importer Bulbapedia introuvable';
+            error_log( 'Poke Hub: Fichier importer Bulbapedia introuvable: ' . $importer_file );
         }
-        
-        if (function_exists('poke_hub_pokemon_import_all_types_for_pokemon_go')) {
+    
+        if ( function_exists( 'poke_hub_pokemon_import_all_types_for_pokemon_go' ) ) {
+    
             $type_import_stats = poke_hub_pokemon_import_all_types_for_pokemon_go();
-            if (isset($type_import_stats['success'])) {
+    
+            if ( isset( $type_import_stats['success'] ) ) {
                 $stats['types_imported_for_pokemon_go'] = $type_import_stats['success'];
             }
-            if (isset($type_import_stats['total'])) {
+            if ( isset( $type_import_stats['total'] ) ) {
                 $stats['types_import_total'] = $type_import_stats['total'];
             }
-            if (isset($type_import_stats['errors']) && !empty($type_import_stats['errors'])) {
+            if ( ! empty( $type_import_stats['errors'] ) && is_array( $type_import_stats['errors'] ) ) {
                 $stats['types_import_errors'] = $type_import_stats['errors'];
-                // Log les erreurs pour debug
-                error_log(sprintf(
+                error_log( sprintf(
                     'Poke Hub: Erreurs lors de l\'import des types: %d erreur(s)',
-                    count($type_import_stats['errors'])
-                ));
+                    count( $type_import_stats['errors'] )
+                ) );
             }
-        } else {
-            $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non disponible';
-            error_log('Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non disponible');
+    
+        } elseif ( empty( $stats['types_import_error'] ) ) {
+            // Si on n'a pas déjà une erreur "fichier introuvable"
+            $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée';
+            error_log( 'Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée' );
         }
+    
     } else {
-        $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée';
-        error_log('Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée');
-    }
+        $stats['types_import_skipped'] = 1;
+    }    
 
     return $stats;
 }

@@ -152,3 +152,5 @@ print_r($wp_rewrite->rules);
 
 
 
+
+

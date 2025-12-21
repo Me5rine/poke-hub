@@ -26,6 +26,12 @@ $last_s3_bucket      = get_option( 'poke_hub_gm_last_s3_bucket', '' );
 $last_s3_key         = get_option( 'poke_hub_gm_last_s3_key', '' );
 $last_s3_uploaded_at = get_option( 'poke_hub_gm_last_uploaded_at', '' );
 
+// Options import GM (checkboxes etc.)
+$gm_import_options = get_option( 'poke_hub_gm_import_options', [] );
+$gm_import_options = is_array( $gm_import_options ) ? $gm_import_options : [];
+
+$gm_import_types_from_bulbapedia = ! empty( $gm_import_options['import_types_from_bulbapedia'] );
+
 /**
  * Upload du latest.json vers S3 à l'aide du SDK AWS installé via Composer dans le plugin.
  *
@@ -287,6 +293,17 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
     $action       = sanitize_text_field( $_POST['poke_hub_gm_submit'] ); // save / save_import
     $force_import = ! empty( $_POST['gm_force_import'] );
 
+    // Options import (checkboxes)
+    $import_options_in = $_POST['poke_hub_gm_import_options'] ?? [];
+    $import_options_in = is_array( $import_options_in ) ? $import_options_in : [];
+
+    $gm_import_options['import_types_from_bulbapedia'] = ! empty( $import_options_in['import_types_from_bulbapedia'] ) ? 1 : 0;
+
+    update_option( 'poke_hub_gm_import_options', $gm_import_options, false );
+
+    // Refléter dans la variable runtime pour le reste de la page
+    $gm_import_types_from_bulbapedia = ! empty( $gm_import_options['import_types_from_bulbapedia'] );
+
     $messages[] = [
         'type' => 'success',
         'text' => __( 'Settings saved.', 'poke-hub' ),
@@ -348,7 +365,25 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                             'text' => __( 'Game Master importer not found. Make sure functions/pokemon-import-game-master.php is included.', 'poke-hub' ),
                         ];
                     } else {
-                        $result = poke_hub_pokemon_import_game_master( $path );
+                        // Charger le batch importer
+                        $batch_file = POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master-batch.php';
+                        if ( file_exists( $batch_file ) ) {
+                            require_once $batch_file;
+                        }
+
+                        if ( function_exists( 'poke_hub_gm_start_batch_import' ) ) {
+                            poke_hub_gm_start_batch_import( $path, $force_import, $gm_import_options );
+
+                            $messages[] = [
+                                'type' => 'success',
+                                'text' => __( 'Import queued and will run in background (batch). You can leave this page.', 'poke-hub' ),
+                            ];
+                        } else {
+                            $messages[] = [
+                                'type' => 'error',
+                                'text' => __( 'Batch importer not available.', 'poke-hub' ),
+                            ];
+                        }
 
                         if ( is_wp_error( $result ) ) {
                             $messages[] = [
@@ -533,6 +568,91 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
 
     <h2><?php esc_html_e( 'Game Master import / sync', 'poke-hub' ); ?></h2>
 
+    <?php
+    $status = get_option( 'poke_hub_gm_import_status', [] );
+    $state  = get_option( 'poke_hub_gm_batch_state', [] );
+    
+    $status = is_array( $status ) ? $status : [];
+    $state  = is_array( $state ) ? $state : [];
+    
+    $is_running = ( ( $status['state'] ?? '' ) === 'running' ) || ( ( $status['state'] ?? '' ) === 'queued' );
+    
+    if ( $is_running ) :
+        $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];
+        $pct  = (int) ( $prog['pct'] ?? 0 );
+        ?>
+        
+        <div class="notice notice-info" style="margin-top:10px;">
+            <p>
+                <strong><?php esc_html_e( 'Status', 'poke-hub' ); ?>:</strong>
+                <span id="gm-status"><?php echo esc_html( $status['state'] ?? '-' ); ?></span>
+            </p>
+    
+            <?php if ( ! empty( $status['message'] ) ) : ?>
+                <p>
+                    <strong><?php esc_html_e( 'Message', 'poke-hub' ); ?>:</strong>
+                    <span id="gm-message"><?php echo esc_html( $status['message'] ?? '-' ); ?></span>
+                </p>
+            <?php endif; ?>
+    
+            <p>
+                <strong><?php esc_html_e( 'Phase', 'poke-hub' ); ?>:</strong>
+                <span id="gm-phase"><?php echo esc_html( $prog['phase'] ?? '-' ); ?></span>
+            </p>
+            <p>
+                <strong><?php esc_html_e( 'Progress', 'poke-hub' ); ?>:</strong>
+                <span id="gm-progress"><?php echo esc_html( $pct ); ?></span> %
+            </p>
+    
+            <div class="progress-bar-wrapper" style="margin-top:10px;">
+                <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100"></progress>
+            </div>
+        </div>
+    
+        <script>
+        (function () {
+            const interval = 5000;
+            let timer = null;
+    
+            function refreshStatus() {
+                fetch(ajaxurl + '?action=poke_hub_gm_status', { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+    
+                    const status = data.data.status || {};
+                    const prog   = data.data.progress || {};
+    
+                    if (status.state && document.getElementById('gm-status')) {
+                        document.getElementById('gm-status').textContent = status.state;
+                    }
+                    if (status.message && document.getElementById('gm-message')) {
+                        document.getElementById('gm-message').textContent = status.message;
+                    }
+                    if (prog.phase && document.getElementById('gm-phase')) {
+                        document.getElementById('gm-phase').textContent = prog.phase;
+                    }
+                    if (typeof prog.pct !== 'undefined' && document.getElementById('gm-progress')) {
+                        document.getElementById('gm-progress').textContent = prog.pct;
+                    }
+                    if (typeof prog.pct !== 'undefined' && document.getElementById('gm-progress-bar')) {
+                        document.getElementById('gm-progress-bar').value = prog.pct;
+                    }
+    
+                    // Stop auto-refresh when finished
+                    if (status.state === 'done' || status.state === 'error') {
+                        clearInterval(timer);
+                    }
+                })
+                .catch(() => {});
+            }
+    
+            timer = setInterval(refreshStatus, interval);
+        })();
+        </script>
+    
+    <?php endif; ?>    
+
     <table class="form-table" role="presentation">
         <tr>
             <th scope="row"><?php esc_html_e( 'Force import', 'poke-hub' ); ?></th>
@@ -541,6 +661,21 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                     <input type="checkbox" name="gm_force_import" value="1" />
                     <?php esc_html_e( 'Import even if the local file has not changed since last run.', 'poke-hub' ); ?>
                 </label>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><?php esc_html_e( 'Types import', 'poke-hub' ); ?></th>
+            <td>
+                <label>
+                    <input type="checkbox"
+                        name="poke_hub_gm_import_options[import_types_from_bulbapedia]"
+                        value="1"
+                        <?php checked( $gm_import_types_from_bulbapedia ); ?> />
+                    <?php esc_html_e( 'Import Pokémon GO type effectiveness from Bulbapedia (PASS 4).', 'poke-hub' ); ?>
+                </label>
+                <p class="description" style="margin:6px 0 0;">
+                    <?php esc_html_e( 'May slow down the import because it fetches external pages.', 'poke-hub' ); ?>
+                </p>
             </td>
         </tr>
     </table>
@@ -692,7 +827,8 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
         <button type="submit"
                 name="poke_hub_gm_submit"
                 value="save_import"
-                class="button button-primary">
+                class="button button-primary"
+                <?php disabled( ( $status['state'] ?? '' ) === 'running' ); ?>>
             <?php esc_html_e( 'Import now', 'poke-hub' ); ?>
         </button>
     </p>

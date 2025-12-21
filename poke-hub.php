@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Poké HUB
-Plugin URI: https://example.com
+Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
 Version: 1.6.5
 Author: Me5rine
