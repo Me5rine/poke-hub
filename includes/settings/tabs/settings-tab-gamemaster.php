@@ -560,78 +560,148 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
 
     $is_running = in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued' ], true );
 
-    if ( $is_running ) :
-        $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];
-        $pct  = (int) ( $prog['pct'] ?? 0 );
-        ?>
-        <div class="notice notice-info" style="margin-top:10px;">
-            <p>
-                <strong><?php esc_html_e( 'Status', 'poke-hub' ); ?>:</strong>
-                <span id="gm-status"><?php echo esc_html( $status['state'] ?? '-' ); ?></span>
-            </p>
-
-            <?php if ( ! empty( $status['message'] ) ) : ?>
-                <p>
-                    <strong><?php esc_html_e( 'Message', 'poke-hub' ); ?>:</strong>
-                    <span id="gm-message"><?php echo esc_html( $status['message'] ?? '-' ); ?></span>
-                </p>
-            <?php endif; ?>
-
-            <p>
-                <strong><?php esc_html_e( 'Phase', 'poke-hub' ); ?>:</strong>
-                <span id="gm-phase"><?php echo esc_html( $prog['phase'] ?? '-' ); ?></span>
-            </p>
-            <p>
-                <strong><?php esc_html_e( 'Progress', 'poke-hub' ); ?>:</strong>
-                <span id="gm-progress"><?php echo esc_html( $pct ); ?></span> %
-            </p>
-
-            <div class="progress-bar-wrapper" style="margin-top:10px; max-width:400px;">
-                <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100"></progress>
-            </div>
+    <?php
+    $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];
+    $pct  = (int) ( $prog['pct'] ?? 0 );
+    $phase = (string) ( $prog['phase'] ?? '-' );
+    $current_state = (string) ( $status['state'] ?? '' );
+    
+    // La box est visible si running/queued, sinon cachée au render (JS gère ensuite).
+    $show_box = in_array( $current_state, [ 'running', 'queued' ], true );
+    ?>
+    <div id="gm-progress-box"
+         class="notice notice-info"
+         style="margin-top:10px; <?php echo $show_box ? '' : 'display:none;'; ?>">
+        <p>
+            <strong><?php esc_html_e( 'Status', 'poke-hub' ); ?>:</strong>
+            <span id="gm-status"><?php echo esc_html( $current_state ?: '-' ); ?></span>
+        </p>
+    
+        <p>
+            <strong><?php esc_html_e( 'Message', 'poke-hub' ); ?>:</strong>
+            <span id="gm-message"><?php echo esc_html( (string) ( $status['message'] ?? '-' ) ); ?></span>
+        </p>
+    
+        <p>
+            <strong><?php esc_html_e( 'Phase', 'poke-hub' ); ?>:</strong>
+            <span id="gm-phase"><?php echo esc_html( $phase ); ?></span>
+        </p>
+    
+        <p>
+            <strong><?php esc_html_e( 'Progress', 'poke-hub' ); ?>:</strong>
+            <span id="gm-progress"><?php echo esc_html( $pct ); ?></span> %
+        </p>
+    
+        <div class="progress-bar-wrapper" style="margin-top:10px; max-width:400px;">
+            <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100"></progress>
         </div>
-
-        <script>
-        (function () {
-            const interval = 5000;
-            let timer = null;
-
-            function refreshStatus() {
-                fetch(ajaxurl + '?action=poke_hub_gm_status', { credentials: 'same-origin' })
+    </div>
+    
+    <div id="gm-done-notice" class="notice notice-success is-dismissible" style="margin-top:10px; display:none;">
+        <p><strong><?php esc_html_e( 'Import done.', 'poke-hub' ); ?></strong></p>
+    </div>
+    
+    <div id="gm-error-notice" class="notice notice-error is-dismissible" style="margin-top:10px; display:none;">
+        <p><strong><?php esc_html_e( 'Import failed.', 'poke-hub' ); ?></strong>
+            <span id="gm-error-text"></span>
+        </p>
+    </div>
+    
+    <script>
+    (function () {
+        const interval = 3000; // un peu plus réactif
+        let timer = null;
+    
+        const box   = document.getElementById('gm-progress-box');
+        const doneN = document.getElementById('gm-done-notice');
+        const errN  = document.getElementById('gm-error-notice');
+        const errT  = document.getElementById('gm-error-text');
+    
+        function setText(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = (val !== undefined && val !== null && val !== '') ? val : '-';
+        }
+    
+        function setPct(pct) {
+            const p = (typeof pct === 'number') ? pct : parseInt(pct || 0, 10);
+            setText('gm-progress', isNaN(p) ? 0 : p);
+            const bar = document.getElementById('gm-progress-bar');
+            if (bar) bar.value = isNaN(p) ? 0 : p;
+        }
+    
+        function show(el) { if (el) el.style.display = ''; }
+        function hide(el) { if (el) el.style.display = 'none'; }
+    
+        function refreshStatus() {
+            fetch(ajaxurl + '?action=poke_hub_gm_status&_ts=' + Date.now(), { credentials: 'same-origin' })
                 .then(r => r.json())
                 .then(data => {
-                    if (!data.success) return;
-
+                    if (!data || !data.success) return;
+    
                     const status = data.data.status || {};
                     const prog   = data.data.progress || {};
-
-                    if (status.state && document.getElementById('gm-status')) {
-                        document.getElementById('gm-status').textContent = status.state;
+    
+                    // Toujours refléter les infos
+                    setText('gm-status', status.state || '-');
+                    setText('gm-message', status.message || '-');
+                    setText('gm-phase', prog.phase || '-');
+    
+                    if (typeof prog.pct !== 'undefined') {
+                        setPct(prog.pct);
                     }
-                    if (status.message && document.getElementById('gm-message')) {
-                        document.getElementById('gm-message').textContent = status.message;
+    
+                    // Affichage selon état
+                    if (status.state === 'queued' || status.state === 'running') {
+                        show(box);
+                        hide(doneN);
+                        hide(errN);
+                        return;
                     }
-                    if (prog.phase && document.getElementById('gm-phase')) {
-                        document.getElementById('gm-phase').textContent = prog.phase;
-                    }
-                    if (typeof prog.pct !== 'undefined' && document.getElementById('gm-progress')) {
-                        document.getElementById('gm-progress').textContent = prog.pct;
-                    }
-                    if (typeof prog.pct !== 'undefined' && document.getElementById('gm-progress-bar')) {
-                        document.getElementById('gm-progress-bar').value = prog.pct;
-                    }
-
-                    if (status.state === 'done' || status.state === 'error') {
+    
+                    if (status.state === 'done') {
+                        // Forcer 100% visuellement
+                        setPct(100);
+                        setText('gm-phase', 'done');
+                        show(box);
+    
+                        // Afficher une notice et recharger pour rafraîchir "Last summary"
+                        show(doneN);
+                        hide(errN);
+    
                         clearInterval(timer);
+    
+                        // Cache-friendly reload (après une courte pause)
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1200);
+    
+                        return;
                     }
+    
+                    if (status.state === 'error') {
+                        setPct(100);
+                        setText('gm-phase', 'error');
+                        show(box);
+    
+                        if (errT) errT.textContent = status.message ? (' ' + status.message) : '';
+                        show(errN);
+                        hide(doneN);
+    
+                        clearInterval(timer);
+                        return;
+                    }
+    
+                    // état inconnu → on cache par défaut
+                    hide(box);
                 })
                 .catch(() => {});
-            }
-
-            timer = setInterval(refreshStatus, interval);
-        })();
-        </script>
-    <?php endif; ?>
+        }
+    
+        // Polling permanent (si un import démarre après le chargement, ça le capte)
+        refreshStatus();
+        timer = setInterval(refreshStatus, interval);
+    })();
+    </script>    
 
     <table class="form-table" role="presentation">
         <tr>

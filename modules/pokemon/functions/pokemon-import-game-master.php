@@ -762,13 +762,27 @@ function poke_hub_pokemon_import_from_pokemon_settings(
      * === TEMP EVO START ===
      * Création des Pokémon Méga / Primo à partir de tempEvoOverrides.
      *
+     * Objectif:
+     * - Ne créer les Méga/Primo QUE depuis la forme de base (évite les doublons quand plusieurs pokemonSettings
+     *   portent tempEvoOverrides: costumes, variantes, etc.)
+     * - Anti-doublon intra-run (si jamais on repasse quand même plusieurs fois)
+     *
      * - Slugs : mega-charizard-x, primal-kyogre, etc.
      * - Stats dédiées (overrides), CP sets recalculés.
      * - Types override (typeOverride1/2).
      * - Liaison types + attaques.
      * - Index dans $pokemon_index pour être utilisable par PASS 3 (évolutions).
      */
-    if ( $pokemon_id > 0 && ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
+    if (
+        $pokemon_id > 0
+        && (int) $is_default === 1
+        && empty( $form_slug )
+        && ! empty( $settings['tempEvoOverrides'] )
+        && is_array( $settings['tempEvoOverrides'] )
+    ) {
+        // Anti-doublon intra-run (clé = mega_slug)
+        static $temp_evo_created = [];
+
         foreach ( $settings['tempEvoOverrides'] as $temp_evo ) {
             if ( ! is_array( $temp_evo ) ) {
                 continue;
@@ -791,11 +805,15 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 continue;
             }
 
-            if ( $suffix !== '' ) {
-                $mega_slug = $prefix . '-' . $slug_base . '-' . $suffix;
-            } else {
-                $mega_slug = $prefix . '-' . $slug_base;
+            $mega_slug = ( $suffix !== '' )
+                ? $prefix . '-' . $slug_base . '-' . $suffix
+                : $prefix . '-' . $slug_base;
+
+            // DEDUPE intra-run
+            if ( isset( $temp_evo_created[ $mega_slug ] ) ) {
+                continue;
             }
+            $temp_evo_created[ $mega_slug ] = true;
 
             // Catégorie de variante
             $mega_variant_category = 'special';
@@ -852,7 +870,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'min_cp_10'     => [],
                 'min_cp_shadow' => [],
             ];
-            if ( function_exists( 'poke_hub_pokemon_build_cp_sets_for_pokemon' )
+            if (
+                function_exists( 'poke_hub_pokemon_build_cp_sets_for_pokemon' )
                 && $mega_atk > 0 && $mega_def > 0 && $mega_sta > 0
             ) {
                 $mega_cp_sets = poke_hub_pokemon_build_cp_sets_for_pokemon(
@@ -880,10 +899,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'type1_proto'        => $mega_type1_proto,
                 'type2_proto'        => $mega_type2_proto,
 
-                'quickMoves'         => $settings['quickMoves']         ?? [],
-                'cinematicMoves'     => $settings['cinematicMoves']     ?? [],
-                'eliteQuickMoves'      => $elite_quick,
-                'eliteCinematicMoves'  => $elite_cinematic,
+                'quickMoves'         => $settings['quickMoves']     ?? [],
+                'cinematicMoves'     => $settings['cinematicMoves'] ?? [],
+                'eliteQuickMoves'    => $elite_quick,
+                'eliteCinematicMoves'=> $elite_cinematic,
 
                 'names'              => $mega_names,
                 'generation_number'  => $generation_number,
@@ -906,8 +925,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 ],
 
                 'buddy'              => [
-                    'km_buddy_distance'      => $km_buddy_distance,
-                    'buddy_mega_energy_award'=> $flags['buddy_mega_energy_award'] ?? 0,
+                    'km_buddy_distance'       => $km_buddy_distance,
+                    'buddy_mega_energy_award' => $flags['buddy_mega_energy_award'] ?? 0,
                 ],
 
                 'encounter'          => $extra['encounter'],
@@ -928,6 +947,14 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 ],
             ];
 
+            // Ligne Méga / Primo existante ?
+            $mega_row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                    $mega_slug
+                )
+            );
+
             $mega_data = [
                 'dex_number'      => $dex_number,
                 'name_en'         => $mega_names['en'],
@@ -942,28 +969,21 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'base_def'        => $mega_def,
                 'base_sta'        => $mega_sta,
 
-                'is_tradable'                       => (int) ( $flags['is_tradable'] ?? 0 ),
-                'is_transferable'                   => (int) ( $flags['is_transferable'] ?? 0 ),
-                'has_shadow'                        => (int) ( $flags['has_shadow'] ?? 0 ),
-                'has_purified'                      => (int) ( $flags['has_purified'] ?? 0 ),
-                'shadow_purification_stardust'      => (int) ( $flags['shadow_stardust'] ?? 0 ),
-                'shadow_purification_candy'         => (int) ( $flags['shadow_candy'] ?? 0 ),
-                'buddy_walked_mega_energy_award'    => (int) ( $flags['buddy_mega_energy_award'] ?? 0 ),
-                'dodge_probability'                 => (float) ( $flags['dodge_probability'] ?? 0.0 ),
-                'attack_probability'                => (float) ( $flags['attack_probability'] ?? 0.0 ),
+                'is_tradable'                    => (int) ( $flags['is_tradable'] ?? 0 ),
+                'is_transferable'                => (int) ( $flags['is_transferable'] ?? 0 ),
+                'has_shadow'                     => (int) ( $flags['has_shadow'] ?? 0 ),
+                'has_purified'                   => (int) ( $flags['has_purified'] ?? 0 ),
+                'shadow_purification_stardust'   => (int) ( $flags['shadow_stardust'] ?? 0 ),
+                'shadow_purification_candy'      => (int) ( $flags['shadow_candy'] ?? 0 ),
+                'buddy_walked_mega_energy_award' => (int) ( $flags['buddy_mega_energy_award'] ?? 0 ),
+                'dodge_probability'              => (float) ( $flags['dodge_probability'] ?? 0.0 ),
+                'attack_probability'             => (float) ( $flags['attack_probability'] ?? 0.0 ),
 
-                'extra'           => wp_json_encode( $mega_extra ),
+                'extra'          => wp_json_encode( $mega_extra ),
             ];
 
+            // On réutilise le format calculé plus haut (avec name_fr présent)
             $mega_format = $format;
-
-            // Ligne Méga / Primo existante ?
-            $mega_row = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
-                    $mega_slug
-                )
-            );
 
             if ( $mega_row ) {
                 $wpdb->update(
@@ -973,16 +993,16 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     $mega_format,
                     [ '%d' ]
                 );
-                $mega_pokemon_id           = (int) $mega_row->id;
-                $stats['pokemon_updated_count'] = ($stats['pokemon_updated_count'] ?? 0) + 1;
-                if (count($stats['pokemon_updated_sample'] ?? []) < 50) {
+                $mega_pokemon_id                = (int) $mega_row->id;
+                $stats['pokemon_updated_count'] = ( $stats['pokemon_updated_count'] ?? 0 ) + 1;
+                if ( count( $stats['pokemon_updated_sample'] ?? [] ) < 50 ) {
                     $stats['pokemon_updated_sample'][] = $mega_names['en'];
                 }
             } else {
                 $wpdb->insert( $pokemon_table, $mega_data, $mega_format );
-                $mega_pokemon_id            = (int) $wpdb->insert_id;
-                $stats['pokemon_inserted_count'] = ($stats['pokemon_inserted_count'] ?? 0) + 1;
-                if (count($stats['pokemon_inserted_sample'] ?? []) < 50) {
+                $mega_pokemon_id                 = (int) $wpdb->insert_id;
+                $stats['pokemon_inserted_count'] = ( $stats['pokemon_inserted_count'] ?? 0 ) + 1;
+                if ( count( $stats['pokemon_inserted_sample'] ?? [] ) < 50 ) {
                     $stats['pokemon_inserted_sample'][] = $mega_names['en'];
                 }
             }
@@ -1013,15 +1033,20 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
 
             // Liens attaques → mêmes moves que la forme de base
-            if ( $mega_pokemon_id > 0 && ! empty( $tables['pokemon_attack_links'] ) && ! empty( $tables['attacks'] ) && ! empty( $links ) ) {
+            if (
+                $mega_pokemon_id > 0
+                && ! empty( $tables['pokemon_attack_links'] )
+                && ! empty( $tables['attacks'] )
+                && ! empty( $links )
+            ) {
                 poke_hub_pokemon_sync_pokemon_attack_links( $mega_pokemon_id, $links, $tables );
                 $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + count( $links );
             }
         }
     }
     /**
-     * === TEMP EVO END ===
-     */
+    * === TEMP EVO END ===
+    */
 
     return $stats;
 }
@@ -1476,6 +1501,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         return new \WP_Error( 'invalid_json', 'Game Master JSON is invalid.' );
     }
 
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'loaded', 15, 'Loaded JSON' );
+    }
+
     global $wpdb;
 
     $tables = [
@@ -1523,6 +1552,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     // Index global proto → id / forme (servira pour les évolutions)
     $pokemon_index = [];
 
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'pass1_moves', 20, 'PASS 1: Moves' );
+    }    
+
     // PASS 1 : Attacks (PvE + PvP)
     foreach ( $decoded as $entry ) {
         if ( ! is_array( $entry ) ) {
@@ -1568,6 +1601,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         }
     }
 
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'pass2_pokemon', 45, 'PASS 2: Pokémon' );
+    }
+
     // PASS 2 : Pokémon (stats, types, attaques, flags GM)
     foreach ( $decoded as $entry ) {
         if ( ! is_array( $entry ) ) {
@@ -1589,6 +1626,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             );
             continue;
         }
+    }
+
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'pass3_evos', 70, 'PASS 3: Evolutions' );
     }
 
     /**
@@ -1690,6 +1731,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         }
     }
 
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'pass4_types', 85, 'PASS 4: Types' );
+    }    
+
     $do_types_import = ! empty( $options['import_types_from_bulbapedia'] );
 
     if ( $do_types_import ) {
@@ -1731,7 +1776,11 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     
     } else {
         $stats['types_import_skipped'] = 1;
-    }    
+    }
+    
+    if ( function_exists( 'poke_hub_gm_progress' ) ) {
+        poke_hub_gm_progress( 'done', 95, 'Finalizing' );
+    }
 
     return $stats;
 }

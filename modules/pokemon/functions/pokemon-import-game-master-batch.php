@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Batch importer orchestrator (simple async runner).
  *
- * But:
+ * Objectifs :
  * - Lancer l'import complet en arrière-plan (Action Scheduler si dispo, sinon WP-Cron)
  * - Exposer un endpoint Ajax "poke_hub_gm_status" pour l'UI settings tab
  * - Stocker status/state dans des options
@@ -70,6 +70,34 @@ if ( ! function_exists( 'poke_hub_gm_release_lock' ) ) {
 }
 
 /**
+ * Progress helper (utilisable par d'autres fichiers pendant l'import).
+ * - Met à jour state.progress
+ * - Optionnellement met à jour status.message
+ */
+if ( ! function_exists( 'poke_hub_gm_progress' ) ) {
+    function poke_hub_gm_progress( string $phase, int $pct, string $message = '' ) : void {
+        $state = poke_hub_gm_state_get();
+        if ( ! is_array( $state ) ) {
+            $state = [];
+        }
+
+        $state['updated_at'] = current_time( 'mysql' );
+        $state['progress']   = [
+            'phase' => $phase,
+            'pct'   => max( 0, min( 100, $pct ) ),
+        ];
+
+        poke_hub_gm_state_set( $state );
+
+        if ( $message !== '' ) {
+            poke_hub_gm_status_set( [
+                'message' => $message,
+            ] );
+        }
+    }
+}
+
+/**
  * Queue helper: Action Scheduler si dispo, sinon WP-Cron
  */
 if ( ! function_exists( 'poke_hub_gm_queue_next' ) ) {
@@ -78,6 +106,7 @@ if ( ! function_exists( 'poke_hub_gm_queue_next' ) ) {
             as_enqueue_async_action( 'poke_hub_run_gm_import_batch', $args, 'poke-hub' );
             return;
         }
+
         // fallback cron: on encapsule les args dans un unique param
         wp_schedule_single_event( time() + 5, 'poke_hub_run_gm_import_batch', [ $args ] );
     }
@@ -85,9 +114,14 @@ if ( ! function_exists( 'poke_hub_gm_queue_next' ) ) {
 
 /**
  * Initialise un import batch (appelé depuis settings-tab-gamemaster.php)
+ *
+ * Note: on reset le state précédent ici (important pour l'UI).
  */
 if ( ! function_exists( 'poke_hub_gm_start_batch_import' ) ) {
     function poke_hub_gm_start_batch_import( string $path, bool $force = false, array $options = [] ) : void {
+
+        // Reset éventuel ancien state pour éviter les "barres bloquées"
+        poke_hub_gm_state_reset();
 
         $state = [
             'path'       => $path,
@@ -112,6 +146,9 @@ if ( ! function_exists( 'poke_hub_gm_start_batch_import' ) ) {
             'message'   => 'Queued',
         ] );
 
+        // Optionnel: set progress via helper
+        poke_hub_gm_progress( 'queued', 0, 'Queued' );
+
         poke_hub_gm_queue_next( [ 'path' => $path ] );
     }
 }
@@ -127,14 +164,22 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
         $args  = is_array( $arg1 ) ? $arg1 : [];
         $state = poke_hub_gm_state_get();
 
-        if ( empty( $state['path'] ) ) {
+        // Résolution du path : state prioritaire, sinon args, puis persistance dans state.
+        $path = '';
+        if ( ! empty( $state['path'] ) ) {
+            $path = (string) $state['path'];
+        } elseif ( ! empty( $args['path'] ) ) {
+            $path = (string) $args['path'];
+            $state['path'] = $path;
+            poke_hub_gm_state_set( $state );
+        }
+
+        if ( $path === '' ) {
             return;
         }
 
-        $path = (string) $state['path'];
-
         if ( ! poke_hub_gm_acquire_lock() ) {
-            // déjà en cours
+            // Déjà en cours
             return;
         }
 
@@ -144,6 +189,9 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
             'path'       => $path,
             'message'    => 'Running',
         ] );
+
+        // UI: on fait avancer un peu
+        poke_hub_gm_progress( 'import', 10, 'Running' );
 
         try {
             if ( $path === '' || ! file_exists( $path ) ) {
@@ -164,7 +212,7 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
                 throw new Exception( 'Importer function poke_hub_pokemon_import_game_master() not found.' );
             }
 
-            // Progress best effort
+            // Progress best-effort (avant import)
             $state['step']       = 'import';
             $state['updated_at'] = current_time( 'mysql' );
             $state['progress']   = [ 'phase' => 'import', 'pct' => 10 ];
@@ -179,7 +227,7 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
                 @set_time_limit( 300 );
             }
 
-            // Import complet
+            // Import complet (le vrai "progrès fin" doit être fait DANS l'importer via poke_hub_gm_progress())
             $result = poke_hub_pokemon_import_game_master( $path, $options );
 
             if ( is_wp_error( $result ) ) {
@@ -195,6 +243,8 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
             $state['progress']   = [ 'phase' => 'finalize', 'pct' => 95 ];
             poke_hub_gm_state_set( $state );
 
+            poke_hub_gm_progress( 'finalize', 95, 'Finalizing' );
+
             update_option( 'poke_hub_gm_last_run', current_time( 'mysql' ), false );
             update_option( 'poke_hub_gm_last_summary', $result, false );
 
@@ -205,8 +255,18 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
                 'message'  => 'Done',
             ] );
 
-            // Nettoyage
-            poke_hub_gm_state_reset();
+            // Important: NE PAS reset immédiatement le state.
+            // Sinon l'UI perd progress/phase et peut rester "bloquée".
+            $state = poke_hub_gm_state_get();
+            if ( ! is_array( $state ) ) {
+                $state = [];
+            }
+            $state['step']       = 'done';
+            $state['updated_at'] = current_time( 'mysql' );
+            $state['progress']   = [ 'phase' => 'done', 'pct' => 100 ];
+            poke_hub_gm_state_set( $state );
+
+            poke_hub_gm_progress( 'done', 100, 'Done' );
 
         } catch ( Throwable $e ) {
             $state = poke_hub_gm_state_get();
@@ -235,6 +295,8 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
                 'message'  => 'Error: ' . $e->getMessage(),
             ] );
 
+            poke_hub_gm_progress( 'error', 100, 'Error: ' . $e->getMessage() );
+
         } finally {
             poke_hub_gm_release_lock();
         }
@@ -252,11 +314,24 @@ if ( ! has_action( 'wp_ajax_poke_hub_gm_status' ) ) {
             wp_send_json_error( [ 'message' => 'forbidden' ], 403 );
         }
 
+        // Sécurise nocache_headers() si jamais
+        if ( ! function_exists( 'nocache_headers' ) ) {
+            require_once ABSPATH . WPINC . '/functions.php';
+        }
+
+        nocache_headers();
+        header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+        header( 'Pragma: no-cache' );
+
         $status = get_option( POKE_HUB_GM_IMPORT_STATUS_OPT, [] );
         $state  = get_option( POKE_HUB_GM_BATCH_STATE_OPT, [] );
 
-        if ( ! is_array( $status ) ) $status = [];
-        if ( ! is_array( $state ) )  $state  = [];
+        if ( ! is_array( $status ) ) {
+            $status = [];
+        }
+        if ( ! is_array( $state ) ) {
+            $state = [];
+        }
 
         $progress = [];
         if ( ! empty( $state['progress'] ) && is_array( $state['progress'] ) ) {
