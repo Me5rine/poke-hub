@@ -365,14 +365,6 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                             'text' => __( 'Game Master importer not found. Make sure functions/pokemon-import-game-master.php is included.', 'poke-hub' ),
                         ];
                     } else {
-                        // Charger le batch importer
-                        $batch_file = defined( 'POKE_HUB_POKEMON_PATH' )
-                            ? ( POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master-batch.php' )
-                            : '';
-
-                        if ( $batch_file && file_exists( $batch_file ) ) {
-                            require_once $batch_file;
-                        }
 
                         if ( function_exists( 'poke_hub_gm_start_batch_import' ) ) {
 
