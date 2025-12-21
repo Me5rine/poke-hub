@@ -113,7 +113,7 @@ if ( ! function_exists( 'poke_hub_gm_upload_to_s3' ) ) {
 
         // 5) Upload du fichier
         try {
-            $result = $s3->putObject(
+            $s3->putObject(
                 [
                     'Bucket'      => $bucket,
                     'Key'         => $key,
@@ -123,7 +123,6 @@ if ( ! function_exists( 'poke_hub_gm_upload_to_s3' ) ) {
                 ]
             );
 
-            // Si besoin, on pourrait exploiter $result['ETag'] ou autre.
             return true;
 
         } catch ( \Exception $e ) {
@@ -347,6 +346,7 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                 }
 
                 if ( ! $skip_for_mtime || $force_import ) {
+
                     if ( ! function_exists( 'poke_hub_pokemon_import_game_master' ) ) {
                         if ( defined( 'POKE_HUB_POKEMON_PATH' ) ) {
                             $import_file = POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master.php';
@@ -366,39 +366,24 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
                         ];
                     } else {
                         // Charger le batch importer
-                        $batch_file = POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master-batch.php';
-                        if ( file_exists( $batch_file ) ) {
+                        $batch_file = defined( 'POKE_HUB_POKEMON_PATH' )
+                            ? ( POKE_HUB_POKEMON_PATH . '/functions/pokemon-import-game-master-batch.php' )
+                            : '';
+
+                        if ( $batch_file && file_exists( $batch_file ) ) {
                             require_once $batch_file;
                         }
 
                         if ( function_exists( 'poke_hub_gm_start_batch_import' ) ) {
+
+                            // Lancer l'import en batch (asynchrone)
                             poke_hub_gm_start_batch_import( $path, $force_import, $gm_import_options );
 
-                            $messages[] = [
-                                'type' => 'success',
-                                'text' => __( 'Import queued and will run in background (batch). You can leave this page.', 'poke-hub' ),
-                            ];
-                        } else {
-                            $messages[] = [
-                                'type' => 'error',
-                                'text' => __( 'Batch importer not available.', 'poke-hub' ),
-                            ];
-                        }
-
-                        if ( is_wp_error( $result ) ) {
-                            $messages[] = [
-                                'type' => 'error',
-                                'text' => sprintf(
-                                    __( 'Game Master import error: %s', 'poke-hub' ),
-                                    esc_html( $result->get_error_message() )
-                                ),
-                            ];
-                        } else {
-                            $last_run     = current_time( 'mysql' );
-                            $last_summary = is_array( $result ) ? $result : [];
-
+                            // NOTE: Batch = pas de $result ici !
+                            // last_run peut être mis à jour immédiatement (utile en UI),
+                            // le summary sera mis à jour à la fin du batch.
+                            $last_run = current_time( 'mysql' );
                             update_option( 'poke_hub_gm_last_run', $last_run );
-                            update_option( 'poke_hub_gm_last_summary', $last_summary );
 
                             if ( $current_mtime ) {
                                 $last_mtime = $current_mtime;
@@ -407,7 +392,13 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
 
                             $messages[] = [
                                 'type' => 'success',
-                                'text' => __( 'Game Master import completed successfully.', 'poke-hub' ),
+                                'text' => __( 'Import queued and will run in background (batch). You can leave this page.', 'poke-hub' ),
+                            ];
+
+                        } else {
+                            $messages[] = [
+                                'type' => 'error',
+                                'text' => __( 'Batch importer not available.', 'poke-hub' ),
                             ];
                         }
                     }
@@ -425,8 +416,8 @@ if ( $gm_local_path && file_exists( $gm_local_path ) ) {
     $filepath   = wp_normalize_path( $gm_local_path );
 
     if ( 0 === strpos( $filepath, $basedir ) ) {
-        $relative      = ltrim( substr( $filepath, strlen( $basedir ) ), '/\\' );
-        $gm_local_url  = trailingslashit( $upload_dir['baseurl'] ) . str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+        $relative     = ltrim( substr( $filepath, strlen( $basedir ) ), '/\\' );
+        $gm_local_url = trailingslashit( $upload_dir['baseurl'] ) . str_replace( DIRECTORY_SEPARATOR, '/', $relative );
     }
 }
 
@@ -562,7 +553,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     </p>
 </form>
 
-<!-- 3) IMPORT : force import + last run / summary + bouton Import now -->
+<!-- 3) IMPORT : force import + options + status/progress + bouton Import now -->
 <form method="post" action="" style="margin-top:30px;">
     <?php wp_nonce_field( 'poke_hub_gm_settings', 'poke_hub_gm_nonce' ); ?>
 
@@ -571,30 +562,29 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     <?php
     $status = get_option( 'poke_hub_gm_import_status', [] );
     $state  = get_option( 'poke_hub_gm_batch_state', [] );
-    
+
     $status = is_array( $status ) ? $status : [];
     $state  = is_array( $state ) ? $state : [];
-    
-    $is_running = ( ( $status['state'] ?? '' ) === 'running' ) || ( ( $status['state'] ?? '' ) === 'queued' );
-    
+
+    $is_running = in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued', 'bootstrap' ], true );
+
     if ( $is_running ) :
         $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];
         $pct  = (int) ( $prog['pct'] ?? 0 );
         ?>
-        
         <div class="notice notice-info" style="margin-top:10px;">
             <p>
                 <strong><?php esc_html_e( 'Status', 'poke-hub' ); ?>:</strong>
                 <span id="gm-status"><?php echo esc_html( $status['state'] ?? '-' ); ?></span>
             </p>
-    
+
             <?php if ( ! empty( $status['message'] ) ) : ?>
                 <p>
                     <strong><?php esc_html_e( 'Message', 'poke-hub' ); ?>:</strong>
                     <span id="gm-message"><?php echo esc_html( $status['message'] ?? '-' ); ?></span>
                 </p>
             <?php endif; ?>
-    
+
             <p>
                 <strong><?php esc_html_e( 'Phase', 'poke-hub' ); ?>:</strong>
                 <span id="gm-phase"><?php echo esc_html( $prog['phase'] ?? '-' ); ?></span>
@@ -603,26 +593,26 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                 <strong><?php esc_html_e( 'Progress', 'poke-hub' ); ?>:</strong>
                 <span id="gm-progress"><?php echo esc_html( $pct ); ?></span> %
             </p>
-    
-            <div class="progress-bar-wrapper" style="margin-top:10px;">
+
+            <div class="progress-bar-wrapper" style="margin-top:10px; max-width:400px;">
                 <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100"></progress>
             </div>
         </div>
-    
+
         <script>
         (function () {
             const interval = 5000;
             let timer = null;
-    
+
             function refreshStatus() {
                 fetch(ajaxurl + '?action=poke_hub_gm_status', { credentials: 'same-origin' })
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;
-    
+
                     const status = data.data.status || {};
                     const prog   = data.data.progress || {};
-    
+
                     if (status.state && document.getElementById('gm-status')) {
                         document.getElementById('gm-status').textContent = status.state;
                     }
@@ -638,20 +628,18 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                     if (typeof prog.pct !== 'undefined' && document.getElementById('gm-progress-bar')) {
                         document.getElementById('gm-progress-bar').value = prog.pct;
                     }
-    
-                    // Stop auto-refresh when finished
+
                     if (status.state === 'done' || status.state === 'error') {
                         clearInterval(timer);
                     }
                 })
                 .catch(() => {});
             }
-    
+
             timer = setInterval(refreshStatus, interval);
         })();
         </script>
-    
-    <?php endif; ?>    
+    <?php endif; ?>
 
     <table class="form-table" role="presentation">
         <tr>
@@ -663,6 +651,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                 </label>
             </td>
         </tr>
+
         <tr>
             <th scope="row"><?php esc_html_e( 'Types import', 'poke-hub' ); ?></th>
             <td>
@@ -704,12 +693,10 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                         <?php foreach ( $last_summary as $key => $value ) : ?>
 
                             <?php
-                            // Par sécurité : si un jour *_deleted réapparaît, on l’ignore
                             if ( substr( $key, -8 ) === '_deleted' ) {
                                 continue;
                             }
 
-                            // Labels plus lisibles
                             switch ( $key ) {
                                 case 'pokemon_inserted':
                                     $label = __( 'Pokémon inserted', 'poke-hub' );
@@ -752,7 +739,6 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                             $is_array = is_array( $value );
                             $count    = $is_array ? count( $value ) : 0;
 
-                            // ID safe pour le bloc de détails
                             $detail_id = 'gm-summary-detail-' . preg_replace( '/[^a-z0-9_\-]/i', '_', $key );
                             ?>
                             <li class="gm-summary-item">
@@ -760,9 +746,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
 
                                 <?php if ( $is_array ) : ?>
                                     <?php
-                                    // Nombre d'éléments (ce que tu voulais pour "nombre de Pokémon")
                                     $count_text = sprintf(
-                                        /* translators: %d = number of items */
                                         esc_html( _n( '%d item', '%d items', $count, 'poke-hub' ) ),
                                         $count
                                     );
@@ -805,9 +789,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                         var targetId = btn.getAttribute('data-target');
                         var content  = document.getElementById(targetId);
 
-                        if (!content) {
-                            return;
-                        }
+                        if (!content) return;
 
                         var isVisible = content.style.display !== 'none';
 
@@ -820,7 +802,6 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
             });
             </script>
         <?php endif; ?>
-
     </table>
 
     <p class="submit">
@@ -828,7 +809,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                 name="poke_hub_gm_submit"
                 value="save_import"
                 class="button button-primary"
-                <?php disabled( ( $status['state'] ?? '' ) === 'running' ); ?>>
+                <?php disabled( $is_running ); ?>>
             <?php esc_html_e( 'Import now', 'poke-hub' ); ?>
         </button>
     </p>
