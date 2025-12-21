@@ -2362,17 +2362,10 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         }
     }
 
-    // 3) Special events locaux
-    if (function_exists('poke_hub_special_events_get_local')) {
-        $special_local = poke_hub_special_events_get_local($status, $args);
-        if (is_array($special_local)) {
-            foreach ($special_local as $ev) {
-                $events[] = $ev;
-            }
-        }
-    }
+    // Note: Les special events locaux sont déjà inclus dans poke_hub_events_get_by_status
+    // (via poke_hub_special_events_query), donc pas besoin de les ajouter à nouveau ici.
 
-    // 4) Special events distants
+    // 3) Special events distants
     if (function_exists('poke_hub_special_events_get_remote')) {
         $special_remote = poke_hub_special_events_get_remote($status, $args);
         if (is_array($special_remote)) {

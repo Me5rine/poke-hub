@@ -591,9 +591,32 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
             <span id="gm-progress"><?php echo esc_html( $pct ); ?></span> %
         </p>
     
-        <div class="progress-bar-wrapper" style="margin-top:10px; max-width:400px;">
-            <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100"></progress>
+        <div class="progress-bar-wrapper" style="margin-top:10px; width:100%;">
+            <progress id="gm-progress-bar" value="<?php echo esc_attr( $pct ); ?>" max="100" style="width:100%; height:30px; border-radius:4px; overflow:hidden;"></progress>
         </div>
+        <style>
+            #gm-progress-bar {
+                width: 100% !important;
+                height: 30px !important;
+                border-radius: 4px;
+                overflow: hidden;
+                background-color: #f0f0f0;
+                border: 1px solid #ddd;
+            }
+            #gm-progress-bar::-webkit-progress-bar {
+                background-color: #f0f0f0;
+                border-radius: 4px;
+            }
+            #gm-progress-bar::-webkit-progress-value {
+                background-color: #2271b1;
+                border-radius: 4px;
+                transition: width 0.3s ease;
+            }
+            #gm-progress-bar::-moz-progress-bar {
+                background-color: #2271b1;
+                border-radius: 4px;
+            }
+        </style>
     </div>
     
     <div id="gm-done-notice" class="notice notice-success is-dismissible" style="margin-top:10px; display:none;">
