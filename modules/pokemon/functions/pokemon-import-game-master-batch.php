@@ -338,6 +338,18 @@ if ( ! has_action( 'wp_ajax_poke_hub_gm_status' ) ) {
             $progress = $state['progress'];
         }
 
+        $status_state = (string) ( $status['state'] ?? '' );
+        $has_state    = ! empty( $state ) && is_array( $state ) && ! empty( $state['path'] );
+
+        // Si l'UI croit que c'est en cours mais qu'on a plus de state (reset / crash / cron jamais parti),
+        // on stoppe l'affichage en repassant à idle.
+        if ( in_array( $status_state, [ 'running', 'queued' ], true ) && ! $has_state ) {
+            $status['state']   = 'idle';
+            $status['message'] = 'Idle';
+
+            update_option( POKE_HUB_GM_IMPORT_STATUS_OPT, $status, false );
+        }
+
         wp_send_json_success( [
             'status'   => $status,
             'progress' => $progress,

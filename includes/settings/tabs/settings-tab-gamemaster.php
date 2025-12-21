@@ -610,6 +610,8 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     (function () {
         const interval = 3000; // un peu plus réactif
         let timer = null;
+        let previousState = '<?php echo esc_js( $current_state ); ?>'; // État initial depuis PHP
+        let hasReloaded = false; // Flag pour éviter les rechargements multiples
     
         const box   = document.getElementById('gm-progress-box');
         const doneN = document.getElementById('gm-done-notice');
@@ -639,9 +641,10 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     
                     const status = data.data.status || {};
                     const prog   = data.data.progress || {};
+                    const currentState = status.state || 'idle';
     
                     // Toujours refléter les infos
-                    setText('gm-status', status.state || '-');
+                    setText('gm-status', currentState);
                     setText('gm-message', status.message || '-');
                     setText('gm-phase', prog.phase || '-');
     
@@ -650,55 +653,60 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                     }
     
                     // Affichage selon état
-                    if (status.state === 'queued' || status.state === 'running') {
+                    if (currentState === 'queued' || currentState === 'running') {
                         show(box);
                         hide(doneN);
                         hide(errN);
+                        previousState = currentState;
                         return;
                     }
     
-                    if (status.state === 'done') {
-                        // Forcer 100% visuellement
-                        setPct(100);
-                        setText('gm-phase', 'done');
-                        show(box);
-    
-                        // Afficher une notice et recharger pour rafraîchir "Last summary"
-                        show(doneN);
-                        hide(errN);
-    
+                    // Si on passe de running/queued à done/error, on recharge une seule fois
+                    if ((currentState === 'done' || currentState === 'error') && 
+                        (previousState === 'running' || previousState === 'queued') && 
+                        !hasReloaded) {
                         clearInterval(timer);
-    
-                        // Cache-friendly reload (après une courte pause)
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1200);
-    
+                        hasReloaded = true;
+                        // Recharger pour afficher le summary à jour
+                        window.location.reload();
                         return;
                     }
     
-                    if (status.state === 'error') {
-                        setPct(100);
-                        setText('gm-phase', 'error');
-                        show(box);
-    
-                        if (errT) errT.textContent = status.message ? (' ' + status.message) : '';
-                        show(errN);
-                        hide(doneN);
-    
+                    // Si l'état est done/error/idle et qu'on n'était pas en cours d'exécution
+                    if (currentState === 'done' || currentState === 'error' || currentState === 'idle') {
                         clearInterval(timer);
-                        return;
+                        hide(box);
+                        
+                        // Afficher les notifications si nécessaire
+                        if (currentState === 'done') {
+                            show(doneN);
+                            hide(errN);
+                        } else if (currentState === 'error') {
+                            hide(doneN);
+                            show(errN);
+                            if (errT && status.message) {
+                                errT.textContent = ': ' + status.message;
+                            }
+                        }
+                    } else {
+                        // état inconnu → on cache par défaut
+                        hide(box);
                     }
-    
-                    // état inconnu → on cache par défaut
-                    hide(box);
+                    
+                    previousState = currentState;
                 })
                 .catch(() => {});
         }
     
         // Polling permanent (si un import démarre après le chargement, ça le capte)
-        refreshStatus();
-        timer = setInterval(refreshStatus, interval);
+        // Mais seulement si un import est en cours, sinon on ne démarre pas le polling
+        if (previousState === 'running' || previousState === 'queued') {
+            refreshStatus();
+            timer = setInterval(refreshStatus, interval);
+        } else {
+            // Vérifier une fois au chargement pour mettre à jour l'affichage
+            refreshStatus();
+        }
     })();
     </script>    
 
