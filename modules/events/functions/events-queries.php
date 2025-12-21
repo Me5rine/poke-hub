@@ -2126,13 +2126,10 @@ function poke_hub_events_get_local_posts_by_status(string $status, array $args =
         }
 
         // Filtre par event_type si demandé
-        if ($filter_event_types && $event_type_slug !== '') {
-            if (!in_array($event_type_slug, $filter_event_types, true)) {
+        if (!empty($filter_event_types)) {
+            if ($event_type_slug === '' || !in_array($event_type_slug, $filter_event_types, true)) {
                 continue;
             }
-        } elseif ($filter_event_types && $event_type_slug === '') {
-            // Si on a un filtre mais aucun slug connu, on skippe aussi
-            continue;
         }
 
         // Image : thumbnail local > image par défaut du type
@@ -2149,41 +2146,39 @@ function poke_hub_events_get_local_posts_by_status(string $status, array $args =
             }
         }
 
-        foreach ($rows as $row) {
-            $raw = [
-                'id'               => (int) $row->ID,
-                'title'            => $row->event_title ?: $row->post_title,
-                'slug'             => $row->post_name,
-                'content'          => $row->post_content,
-                'sort_start_ts'    => (int) $row->sort_start_ts,
-                'sort_end_ts'      => (int) $row->sort_end_ts,
+        $raw = [
+            'id'               => (int) $row->ID,
+            'title'            => $row->event_title ?: $row->post_title,
+            'slug'             => $row->post_name,
+            'content'          => $row->post_content,
+            'sort_start_ts'    => (int) $row->sort_start_ts,
+            'sort_end_ts'      => (int) $row->sort_end_ts,
 
-                // On ne garde QUE le slug comme info "brute" de type
-                'event_type_slug'  => $row->event_type_slug,
-                // name / color seront toujours résolus côté DISTANT
-                'event_type_name'  => '',
-                'event_type_color' => '',
+            // On utilise le slug calculé (métas ou taxonomie)
+            'event_type_slug'  => $event_type_slug,
+            // name / color seront toujours résolus côté DISTANT
+            'event_type_name'  => $event_type_name,
+            'event_type_color' => $event_type_color,
 
-                'image_id'         => get_post_thumbnail_id($row->ID),
-                'image_url'        => get_the_post_thumbnail_url($row->ID, 'large'),
-                'url'              => get_permalink($row->ID),
-                'source'           => 'local_post',
-            ];
+            'image_id'         => $image_id,
+            'image_url'        => $image_url,
+            'url'              => get_permalink($row->ID),
+            'source'           => 'local_post',
+        ];
 
-            $event = poke_hub_events_normalize_event($raw);
+        $event = poke_hub_events_normalize_event($raw);
 
-            // 🔥 enrichissement depuis le site distant
-            if (function_exists('poke_hub_events_enrich_type_from_remote')) {
-                $event = poke_hub_events_enrich_type_from_remote($event);
-            }
-
-            // Filtre par status si $status ≠ 'all'
-            if ($status !== 'all' && $event->status !== $status) {
-                continue;
-            }
-
-            $events[] = $event;
+        // 🔥 enrichissement depuis le site distant
+        if (function_exists('poke_hub_events_enrich_type_from_remote')) {
+            $event = poke_hub_events_enrich_type_from_remote($event);
         }
+
+        // Filtre par status si $status ≠ 'all'
+        if ($status !== 'all' && $event->status !== $status) {
+            continue;
+        }
+
+        $events[] = $event;
 
         // Filtre par status si $status ≠ 'all'
         if ($status !== 'all' && $event->status !== $status) {

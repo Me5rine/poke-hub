@@ -98,3 +98,42 @@ if (!function_exists('poke_hub_special_event_parse_datetime')) {
         }
     }
 }
+
+if (!function_exists('poke_hub_special_event_format_datetime')) {
+    /**
+     * Convertit un timestamp en format datetime-local pour affichage,
+     * selon le mode :
+     *
+     * - local : convertit le timestamp vers le timezone du site (wp_timezone())
+     * - fixed : convertit le timestamp vers UTC
+     *
+     * @param int    $timestamp Timestamp Unix
+     * @param string $mode      'local'|'fixed'
+     * @return string Format "Y-m-d\TH:i" ou '' si erreur
+     */
+    function poke_hub_special_event_format_datetime(int $timestamp, string $mode = 'local'): string {
+        if ($timestamp <= 0) {
+            return '';
+        }
+
+        $mode = ($mode === 'fixed') ? 'fixed' : 'local';
+
+        try {
+            if ($mode === 'local') {
+                // Convertir le timestamp vers le timezone du site
+                $tz = wp_timezone();
+                $dt = new DateTime('@' . $timestamp);
+                $dt->setTimezone($tz);
+            } else {
+                // Convertir le timestamp vers UTC
+                $tz = new DateTimeZone('UTC');
+                $dt = new DateTime('@' . $timestamp);
+                $dt->setTimezone($tz);
+            }
+
+            return $dt->format('Y-m-d\TH:i');
+        } catch (Exception $e) {
+            return '';
+        }
+    }
+}

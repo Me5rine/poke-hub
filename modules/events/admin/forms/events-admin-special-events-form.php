@@ -28,14 +28,20 @@ function pokehub_render_special_event_form(
     $event_type  = $is_edit ? $event->event_type_slug : '';
     $description = $is_edit ? $event->description : '';
 
-    $start_value = $is_edit && !empty($event->start_ts)
-        ? date('Y-m-d\TH:i', $event->start_ts)
-        : '';
-    $end_value = $is_edit && !empty($event->end_ts)
-        ? date('Y-m-d\TH:i', $event->end_ts)
-        : '';
-
     $mode = $is_edit && !empty($event->mode) ? $event->mode : 'local';
+    
+    // Convertir les timestamps pour l'affichage dans datetime-local selon le mode
+    if ($is_edit && !empty($event->start_ts) && function_exists('poke_hub_special_event_format_datetime')) {
+        $start_value = poke_hub_special_event_format_datetime($event->start_ts, $mode);
+    } else {
+        $start_value = '';
+    }
+    
+    if ($is_edit && !empty($event->end_ts) && function_exists('poke_hub_special_event_format_datetime')) {
+        $end_value = poke_hub_special_event_format_datetime($event->end_ts, $mode);
+    } else {
+        $end_value = '';
+    }
 
     $recurring = $is_edit && !empty($event->recurring) ? (int) $event->recurring : 0;
 
@@ -47,8 +53,8 @@ function pokehub_render_special_event_form(
         ? (int) $event->recurring_interval
         : 1;
 
-    $recurring_end_value = ($is_edit && !empty($event->recurring_window_end_ts))
-        ? date('Y-m-d\TH:i', $event->recurring_window_end_ts)
+    $recurring_end_value = ($is_edit && !empty($event->recurring_window_end_ts) && function_exists('poke_hub_special_event_format_datetime'))
+        ? poke_hub_special_event_format_datetime($event->recurring_window_end_ts, $mode)
         : '';
 
     $image_id   = $is_edit && !empty($event->image_id) ? (int) $event->image_id : 0;
