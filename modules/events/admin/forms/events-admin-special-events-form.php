@@ -18,49 +18,50 @@ function pokehub_render_special_event_form(
     array $bonus_rows = []
 ) {
     $is_edit = ($mode === 'edit' && $event && !empty($event->id));
+    $has_event_data = ($event && is_object($event)); // Pour la duplication, on a un event mais pas en mode edit
 
     $page_title = $is_edit
         ? __('Edit Special Event', 'poke-hub')
         : __('Add Special Event', 'poke-hub');
 
-    $title       = $is_edit ? $event->title : '';
-    $title_en    = $is_edit && isset($event->title_en) ? $event->title_en : ($is_edit ? $event->title : '');
-    $title_fr    = $is_edit && isset($event->title_fr) ? $event->title_fr : ($is_edit ? $event->title : '');
-    $slug        = $is_edit ? $event->slug : '';
-    $event_type  = $is_edit ? $event->event_type_slug : '';
-    $description = $is_edit ? $event->description : '';
+    $title       = $has_event_data ? $event->title : '';
+    $title_en    = $has_event_data && isset($event->title_en) ? $event->title_en : ($has_event_data ? $event->title : '');
+    $title_fr    = $has_event_data && isset($event->title_fr) ? $event->title_fr : ($has_event_data ? $event->title : '');
+    $slug        = $is_edit ? ($event->slug ?? '') : '';
+    $event_type  = $has_event_data ? ($event->event_type_slug ?? '') : '';
+    $description = $has_event_data ? ($event->description ?? '') : '';
 
-    $mode = $is_edit && !empty($event->mode) ? $event->mode : 'local';
+    $event_mode = $has_event_data && !empty($event->mode) ? $event->mode : 'local';
     
     // Convertir les timestamps pour l'affichage dans datetime-local selon le mode
-    if ($is_edit && !empty($event->start_ts) && function_exists('poke_hub_special_event_format_datetime')) {
-        $start_value = poke_hub_special_event_format_datetime($event->start_ts, $mode);
+    if ($has_event_data && !empty($event->start_ts) && function_exists('poke_hub_special_event_format_datetime')) {
+        $start_value = poke_hub_special_event_format_datetime($event->start_ts, $event_mode);
     } else {
         $start_value = '';
     }
     
-    if ($is_edit && !empty($event->end_ts) && function_exists('poke_hub_special_event_format_datetime')) {
-        $end_value = poke_hub_special_event_format_datetime($event->end_ts, $mode);
+    if ($has_event_data && !empty($event->end_ts) && function_exists('poke_hub_special_event_format_datetime')) {
+        $end_value = poke_hub_special_event_format_datetime($event->end_ts, $event_mode);
     } else {
         $end_value = '';
     }
 
-    $recurring = $is_edit && !empty($event->recurring) ? (int) $event->recurring : 0;
+    $recurring = $has_event_data && !empty($event->recurring) ? (int) $event->recurring : 0;
 
-    $recurring_freq = $is_edit && !empty($event->recurring_freq)
+    $recurring_freq = $has_event_data && !empty($event->recurring_freq)
         ? $event->recurring_freq
         : 'weekly';
 
-    $recurring_interval = $is_edit && !empty($event->recurring_interval)
+    $recurring_interval = $has_event_data && !empty($event->recurring_interval)
         ? (int) $event->recurring_interval
         : 1;
 
-    $recurring_end_value = ($is_edit && !empty($event->recurring_window_end_ts) && function_exists('poke_hub_special_event_format_datetime'))
-        ? poke_hub_special_event_format_datetime($event->recurring_window_end_ts, $mode)
+    $recurring_end_value = ($has_event_data && !empty($event->recurring_window_end_ts) && function_exists('poke_hub_special_event_format_datetime'))
+        ? poke_hub_special_event_format_datetime($event->recurring_window_end_ts, $event_mode)
         : '';
 
-    $image_id   = $is_edit && !empty($event->image_id) ? (int) $event->image_id : 0;
-    $image_url  = $is_edit && !empty($event->image_url) ? $event->image_url : '';
+    $image_id   = $has_event_data && !empty($event->image_id) ? (int) $event->image_id : 0;
+    $image_url  = $has_event_data && !empty($event->image_url) ? $event->image_url : '';
 
     // URL pour l’aperçu
     $current_image_url = '';
@@ -201,12 +202,12 @@ function pokehub_render_special_event_form(
                     <td>
                         <label>
                             <input type="radio" name="event[mode]" value="local"
-                                <?php checked($mode, 'local'); ?>>
+                                <?php checked($event_mode, 'local'); ?>>
                             <?php esc_html_e('Local time (14:00–17:00 in each timezone)', 'poke-hub'); ?>
                         </label><br>
                         <label>
                             <input type="radio" name="event[mode]" value="fixed"
-                                <?php checked($mode, 'fixed'); ?>>
+                                <?php checked($event_mode, 'fixed'); ?>>
                             <?php esc_html_e('Fixed UTC time', 'poke-hub'); ?>
                         </label>
                     </td>
