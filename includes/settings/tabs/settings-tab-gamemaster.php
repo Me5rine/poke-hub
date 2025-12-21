@@ -566,7 +566,7 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     $status = is_array( $status ) ? $status : [];
     $state  = is_array( $state ) ? $state : [];
 
-    $is_running = in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued', 'bootstrap' ], true );
+    $is_running = in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued' ], true );
 
     if ( $is_running ) :
         $prog = is_array( $state['progress'] ?? null ) ? $state['progress'] : [];

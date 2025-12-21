@@ -1241,7 +1241,7 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
     $names         = poke_hub_pokemon_get_i18n_names( 'moves', $slug, $default_label );
 
     // On mémorise le slug comme "vu" (statistique uniquement)
-    $seen_attack_slugs[] = $slug;
+    $seen_attack_slugs[$slug] = true;
 
     $type_proto = $combat_move['type'] ?? '';
     $type_slug  = poke_hub_pokemon_gm_type_proto_to_slug( $type_proto );
