@@ -215,17 +215,19 @@ class PokeHub_Events_List_Table extends WP_List_Table {
 
             case 'start':
                 return !empty($item->start_ts)
-                    ? esc_html(date_i18n(
+                    ? esc_html(wp_date(
                         get_option('date_format') . ' ' . get_option('time_format'),
-                        $item->start_ts
+                        $item->start_ts,
+                        wp_timezone()
                     ))
                     : '';
 
             case 'end':
                 return !empty($item->end_ts)
-                    ? esc_html(date_i18n(
+                    ? esc_html(wp_date(
                         get_option('date_format') . ' ' . get_option('time_format'),
-                        $item->end_ts
+                        $item->end_ts,
+                        wp_timezone()
                     ))
                     : '';
 

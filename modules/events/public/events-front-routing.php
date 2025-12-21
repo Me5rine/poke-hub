@@ -234,10 +234,10 @@ function pokehub_special_events_inject_content($content) {
         if (!empty($event->start_ts) && !empty($event->end_ts)) {
             echo '<div class="pokehub-event-dates">';
             echo '<p><strong>' . esc_html__('Début :', 'poke-hub') . '</strong> ';
-            echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $event->start_ts));
+            echo esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), $event->start_ts, wp_timezone()));
             echo '</p>';
             echo '<p><strong>' . esc_html__('Fin :', 'poke-hub') . '</strong> ';
-            echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $event->end_ts));
+            echo esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), $event->end_ts, wp_timezone()));
             echo '</p>';
             echo '</div>';
         }

@@ -68,8 +68,8 @@ function pokehub_events_render_date_column(string $column, int $post_id): void {
         // Formatage avec la locale du site
         $date_format = get_option('date_format');
 
-        $start_date = date_i18n($date_format, $start_ts);
-        $end_date   = date_i18n($date_format, $end_ts);
+        $start_date = wp_date($date_format, $start_ts, wp_timezone());
+        $end_date   = wp_date($date_format, $end_ts, wp_timezone());
 
         echo esc_html($start_date . ' → ' . $end_date);
     }
