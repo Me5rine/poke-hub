@@ -1046,6 +1046,7 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
     }
 
     $allowed_ids = null;
+    $event_type_filter_applied = false; // Flag pour savoir si un filtre event_type a été appliqué
 
     if (!empty($filters)) {
         $terms_table = pokehub_get_table('remote_terms');
@@ -1108,8 +1109,17 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
             $ids = $wpdb->get_col($sql);
 
             if (!$ids) {
-                // Aucun post pour ce filtre → on renverra un tableau vide
-                return [];
+                // Aucun post pour ce filtre dans les posts distants
+                if ($tax === 'event_type') {
+                    // Pour event_type, on marque qu'aucun post distant ne correspond
+                    // mais on continue pour chercher dans les special events locaux
+                    $event_type_filter_applied = true;
+                    $allowed_ids = []; // Tableau vide = aucun post distant ne correspond au filtre event_type
+                    continue;
+                } else {
+                    // Pour les autres filtres (catégorie, etc.), on retourne vide
+                    return [];
+                }
             }
 
             $ids = array_map('intval', $ids);
@@ -1120,14 +1130,19 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
                 // Intersections successives pour gérer "catégorie + event_type + autre"
                 $allowed_ids = array_values(array_intersect($allowed_ids, $ids));
 
-                if (!$allowed_ids) {
+                if (!$allowed_ids && $tax !== 'event_type') {
+                    // Pour les autres filtres, si l'intersection est vide, on retourne vide
                     return [];
+                }
+                // Pour event_type, si l'intersection est vide, on continue (allowed_ids reste vide)
+                if ($tax === 'event_type' && !$allowed_ids) {
+                    $event_type_filter_applied = true;
                 }
             }
         }
     }
 
-    // 🔥 Filtre spécifique "event_type_parent" : enfants d’un type parent
+    // 🔥 Filtre spécifique "event_type_parent" : enfants d'un type parent
     if (!empty($args['event_type_parent'])) {
         $parent_slug = sanitize_title($args['event_type_parent']);
 
@@ -1137,15 +1152,22 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
         );
 
         if (!$child_ids) {
-            return [];
-        }
-
-        if ($allowed_ids === null) {
-            $allowed_ids = $child_ids;
+            // Si aucun enfant n'est trouvé pour le parent, on continue quand même
+            // pour chercher dans les special events locaux (ils peuvent avoir le type directement)
+            // On marque simplement qu'aucun post distant ne correspond
+            $allowed_ids = [];
+            $event_type_filter_applied = true;
         } else {
-            $allowed_ids = array_values(array_intersect($allowed_ids, $child_ids));
-            if (!$allowed_ids) {
-                return [];
+            if ($allowed_ids === null) {
+                $allowed_ids = $child_ids;
+            } else {
+                $allowed_ids = array_values(array_intersect($allowed_ids, $child_ids));
+                if (!$allowed_ids && !$event_type_filter_applied) {
+                    // Si l'intersection est vide et qu'on n'a pas de filtre event_type,
+                    // on retourne vide (comportement normal)
+                    return [];
+                }
+                // Si on a un filtre event_type, on continue même si l'intersection est vide
             }
         }
     }
@@ -1155,12 +1177,18 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
     $all_events = poke_hub_events_fetch_all();
     $out        = [];
 
-    foreach ($all_events as $event) {
+    // Si $allowed_ids est un tableau vide (pas null) ET qu'un filtre event_type a été appliqué,
+    // cela signifie qu'aucun post distant ne correspond au filtre
+    // Dans ce cas, on ne retourne AUCUN post distant, seulement les special events locaux
+    $skip_remote_posts = ($event_type_filter_applied && is_array($allowed_ids) && empty($allowed_ids));
 
-        // Filtre taxo : si une liste d'IDs est définie, on ne garde que ceux-là
-        if (is_array($allowed_ids) && !in_array((int) $event->id, $allowed_ids, true)) {
-            continue;
-        }
+    if (!$skip_remote_posts) {
+        foreach ($all_events as $event) {
+
+            // Filtre taxo : si une liste d'IDs est définie, on ne garde que ceux-là
+            if ($allowed_ids !== null && is_array($allowed_ids) && !empty($allowed_ids) && !in_array((int) $event->id, $allowed_ids, true)) {
+                continue;
+            }
 
         // Métas de récurrence pour cet event
         $meta         = poke_hub_events_get_recurring_meta($event->id);
@@ -1213,9 +1241,12 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
 
             $out[] = $clone;
         }
+        }
     }
 
     // ---- 2bis) Ajout des special events (locaux Poké HUB) ----
+
+    error_log('[poke_hub_events_get_by_status] Vérification fonction poke_hub_special_events_query existe: ' . (function_exists('poke_hub_special_events_query') ? 'OUI' : 'NON'));
 
     if (function_exists('poke_hub_special_events_query')) {
 
@@ -1227,14 +1258,18 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
             $event_type_filter = $args['event_type'];
         }
 
+        error_log('[poke_hub_events_get_by_status] Appel poke_hub_special_events_query avec event_type_filter: ' . print_r($event_type_filter, true));
+
         $special_events = poke_hub_special_events_query([
             // null = pas de filtre de statut côté special_events_query
             'status'      => ($status === 'all') ? null : $status,
             'event_type'  => $event_type_filter,
-            // pour l’instant on ne met pas de bornes de date (optionnel)
+            // pour l'instant on ne met pas de bornes de date (optionnel)
             'start_after' => null,
             'end_before'  => null,
         ]);
+
+        error_log('[poke_hub_events_get_by_status] Nombre de special_events retournés: ' . count($special_events));
 
         if (!empty($special_events)) {
             foreach ($special_events as $sevent) {
@@ -1573,7 +1608,8 @@ function poke_hub_special_event_normalize_row(array $row): object {
 
     $status = poke_hub_events_compute_status_from_ts($start_ts, $end_ts);
     $slug   = (string) $row['slug'];
-    $etype  = (string) $row['event_type'];
+    // Normaliser le event_type pour s'assurer qu'il correspond aux filtres
+    $etype  = sanitize_title((string) ($row['event_type'] ?? ''));
 
     // 🔹 Récupération mode + récurrence bruts
     $mode      = !empty($row['mode']) ? $row['mode'] : 'local';
@@ -1681,28 +1717,92 @@ function poke_hub_special_events_query(array $args = []): array {
     }
 
     $table = pokehub_get_table('special_events');
+    
+    // Vérifier que la table existe
+    if (function_exists('pokehub_table_exists') && !pokehub_table_exists($table)) {
+        return [];
+    }
 
-    $rows = $wpdb->get_results("SELECT * FROM {$table}", ARRAY_A);
-    if (!$rows) {
+    // Construire la requête SQL avec filtrage event_type si nécessaire
+    $where_clauses = [];
+    
+    if (!empty($args['event_type'])) {
+        error_log('[poke_hub_special_events_query] Filtre event_type reçu: ' . print_r($args['event_type'], true));
+        
+        $filter_types = is_array($args['event_type']) 
+            ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
+            : [sanitize_title($args['event_type'])];
+        
+        error_log('[poke_hub_special_events_query] Types après sanitize_title: ' . print_r($filter_types, true));
+        
+        if (!empty($filter_types)) {
+            // Construire la clause IN avec échappement sécurisé
+            // Utiliser esc_sql() pour chaque valeur (méthode recommandée pour IN clauses)
+            $escaped_types = array_map('esc_sql', $filter_types);
+            $where_clauses[] = "event_type IN ('" . implode("','", $escaped_types) . "')";
+            
+            error_log('[poke_hub_special_events_query] Types après esc_sql: ' . print_r($escaped_types, true));
+        }
+    }
+    
+    // Construire la requête SQL
+    // Essayer d'abord avec SELECT * (inclut title_en/title_fr si elles existent)
+    $sql = "SELECT * FROM {$table}";
+    if (!empty($where_clauses)) {
+        $sql .= " WHERE " . implode(' AND ', $where_clauses);
+    }
+    
+    error_log('[poke_hub_special_events_query] Requête SQL générée: ' . $sql);
+    error_log('[poke_hub_special_events_query] Table: ' . $table);
+    
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+    
+    error_log('[poke_hub_special_events_query] Nombre de lignes retournées: ' . (is_array($rows) ? count($rows) : 'false'));
+    if ($wpdb->last_error) {
+        error_log('[poke_hub_special_events_query] Erreur SQL: ' . $wpdb->last_error);
+    }
+    
+    // Vérifier si la requête a échoué (erreur SQL) - peut-être que les colonnes title_en/title_fr n'existent pas
+    if ($rows === false && !empty($wpdb->last_error)) {
+        // Erreur SQL - réessayer avec une requête explicite sans les colonnes optionnelles
+        $sql = "SELECT id, slug, title, title_en, title_fr, event_type, description, start_ts, end_ts, mode, recurring, recurring_freq, recurring_interval, recurring_window_end_ts, image_id, image_url FROM {$table}";
+        if (!empty($where_clauses)) {
+            $sql .= " WHERE " . implode(' AND ', $where_clauses);
+        }
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+    }
+    
+    // Si toujours une erreur ou pas de résultats, retourner vide
+    if ($rows === false || !is_array($rows) || empty($rows)) {
         return [];
     }
 
     $events = [];
 
     foreach ($rows as $row) {
-        $base = poke_hub_special_event_normalize_row($row);
-
-        // Filtre event_type (sur le type "brut")
-        // Peut être un tableau ou une chaîne
+        // Normaliser event_type dans la row avant normalisation pour s'assurer de la correspondance
+        $original_event_type = isset($row['event_type']) ? $row['event_type'] : '';
+        if (isset($row['event_type'])) {
+            $row['event_type'] = sanitize_title($row['event_type']);
+        }
+        
+        error_log('[poke_hub_special_events_query] Ligne - ID: ' . ($row['id'] ?? 'N/A') . ', event_type original: ' . $original_event_type . ', event_type normalisé: ' . ($row['event_type'] ?? 'N/A'));
+        
+        // Filtrage supplémentaire après normalisation (au cas où la valeur en base n'était pas normalisée)
         if (!empty($args['event_type'])) {
             $filter_types = is_array($args['event_type']) 
                 ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
                 : [sanitize_title($args['event_type'])];
             
-            if (!empty($filter_types) && !in_array($base->event_type, $filter_types, true)) {
+            error_log('[poke_hub_special_events_query] Comparaison - event_type normalisé: ' . ($row['event_type'] ?? 'N/A') . ' vs filter_types: ' . print_r($filter_types, true));
+            
+            if (!empty($filter_types) && !in_array($row['event_type'], $filter_types, true)) {
+                error_log('[poke_hub_special_events_query] Ligne exclue par filtrage supplémentaire');
                 continue;
             }
         }
+        
+        $base = poke_hub_special_event_normalize_row($row);
 
         $recurring = !empty($row['recurring']) ? '1' : '0';
 
@@ -1801,6 +1901,11 @@ function poke_hub_special_events_query(array $args = []): array {
 
     if ('desc' === $order) {
         $events = array_reverse($events);
+    }
+
+    error_log('[poke_hub_special_events_query] Nombre d\'événements finaux retournés: ' . count($events));
+    if (!empty($events)) {
+        error_log('[poke_hub_special_events_query] Premier événement - ID: ' . ($events[0]->id ?? 'N/A') . ', event_type: ' . ($events[0]->event_type ?? 'N/A'));
     }
 
     return $events;
@@ -2344,11 +2449,15 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         ? $status
         : 'current';
 
+    error_log('[poke_hub_events_get_all_sources_by_status] Appelé avec status: ' . $status . ', args: ' . print_r($args, true));
+
     $events = [];
 
     // 1) Posts distants
     if (function_exists('poke_hub_events_get_by_status')) {
+        error_log('[poke_hub_events_get_all_sources_by_status] Appel poke_hub_events_get_by_status');
         $remote_posts = poke_hub_events_get_by_status($status, $args);
+        error_log('[poke_hub_events_get_all_sources_by_status] Nombre de remote_posts retournés: ' . (is_array($remote_posts) ? count($remote_posts) : 'non-array'));
         if (is_array($remote_posts)) {
             foreach ($remote_posts as $ev) {
                 if (is_object($ev) && empty($ev->source)) {
