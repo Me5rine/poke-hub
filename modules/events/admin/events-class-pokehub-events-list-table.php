@@ -410,15 +410,10 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         if ($type_filter !== '') {
             // get_by_status accepte string|array pour event_type
             $query_args['event_type'] = $type_filter;
-            error_log('[PokeHub_Events_List_Table] Filtre event_type depuis URL: ' . $type_filter);
         }
-
-        error_log('[PokeHub_Events_List_Table] query_args: ' . print_r($query_args, true));
-        error_log('[PokeHub_Events_List_Table] status_for_query: ' . $status_for_query);
 
         if (function_exists('poke_hub_events_get_all_sources_by_status')) {
             $all_events = poke_hub_events_get_all_sources_by_status($status_for_query, $query_args);
-            error_log('[PokeHub_Events_List_Table] Nombre d\'événements retournés: ' . count($all_events));
         } else {
             // Fallback très dégradé (au cas où) :
             $all_events = [];

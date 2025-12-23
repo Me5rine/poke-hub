@@ -88,13 +88,16 @@ function pokehub_special_events_setup_query() {
     // Créer un faux post pour que WordPress/Elementor le reconnaisse
     global $wp_query, $post;
     
+    // Utiliser le titre français si disponible, sinon le titre par défaut
+    $event_title = !empty($event->title_fr) ? $event->title_fr : $event->title;
+    
     $fake_post = new stdClass();
     $fake_post->ID = -999; // ID négatif pour éviter les conflits
     $fake_post->post_author = 1;
     $fake_post->post_date = current_time('mysql');
     $fake_post->post_date_gmt = current_time('mysql', 1);
     $fake_post->post_content = ''; // Le contenu sera généré via un hook
-    $fake_post->post_title = $event->title;
+    $fake_post->post_title = $event_title;
     $fake_post->post_excerpt = '';
     $fake_post->post_status = 'publish';
     $fake_post->comment_status = 'closed';
@@ -264,7 +267,11 @@ function pokehub_special_events_document_title($title) {
     global $pokehub_current_special_event;
     
     if (isset($pokehub_current_special_event)) {
-        $title['title'] = esc_html($pokehub_current_special_event->title);
+        // Utiliser le titre français si disponible, sinon le titre par défaut
+        $event_title = !empty($pokehub_current_special_event->title_fr) 
+            ? $pokehub_current_special_event->title_fr 
+            : $pokehub_current_special_event->title;
+        $title['title'] = esc_html($event_title);
         $title['page'] = '';
     }
     

@@ -26,6 +26,8 @@ require_once __DIR__ . '/includes/pokemon-translation-helpers.php';
 require_once __DIR__ . '/includes/pokemon-type-bulbapedia-importer.php';
 require_once __DIR__ . '/functions/pokemon-import-game-master.php';
 require_once __DIR__ . '/functions/pokemon-import-game-master-batch.php';
+require_once __DIR__ . '/public/pokemon-front-routing.php';
+require_once __DIR__ . '/public/pokemon-entities-front-routing.php';
 
 /**
  * Assets admin pour la page Pokémon (types, etc.)

@@ -1246,8 +1246,6 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
 
     // ---- 2bis) Ajout des special events (locaux Poké HUB) ----
 
-    error_log('[poke_hub_events_get_by_status] Vérification fonction poke_hub_special_events_query existe: ' . (function_exists('poke_hub_special_events_query') ? 'OUI' : 'NON'));
-
     if (function_exists('poke_hub_special_events_query')) {
 
         // Gestion du filtre event_type :
@@ -1258,8 +1256,6 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
             $event_type_filter = $args['event_type'];
         }
 
-        error_log('[poke_hub_events_get_by_status] Appel poke_hub_special_events_query avec event_type_filter: ' . print_r($event_type_filter, true));
-
         $special_events = poke_hub_special_events_query([
             // null = pas de filtre de statut côté special_events_query
             'status'      => ($status === 'all') ? null : $status,
@@ -1268,8 +1264,6 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
             'start_after' => null,
             'end_before'  => null,
         ]);
-
-        error_log('[poke_hub_events_get_by_status] Nombre de special_events retournés: ' . count($special_events));
 
         if (!empty($special_events)) {
             foreach ($special_events as $sevent) {
@@ -1727,21 +1721,15 @@ function poke_hub_special_events_query(array $args = []): array {
     $where_clauses = [];
     
     if (!empty($args['event_type'])) {
-        error_log('[poke_hub_special_events_query] Filtre event_type reçu: ' . print_r($args['event_type'], true));
-        
         $filter_types = is_array($args['event_type']) 
             ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
             : [sanitize_title($args['event_type'])];
-        
-        error_log('[poke_hub_special_events_query] Types après sanitize_title: ' . print_r($filter_types, true));
         
         if (!empty($filter_types)) {
             // Construire la clause IN avec échappement sécurisé
             // Utiliser esc_sql() pour chaque valeur (méthode recommandée pour IN clauses)
             $escaped_types = array_map('esc_sql', $filter_types);
             $where_clauses[] = "event_type IN ('" . implode("','", $escaped_types) . "')";
-            
-            error_log('[poke_hub_special_events_query] Types après esc_sql: ' . print_r($escaped_types, true));
         }
     }
     
@@ -1752,15 +1740,7 @@ function poke_hub_special_events_query(array $args = []): array {
         $sql .= " WHERE " . implode(' AND ', $where_clauses);
     }
     
-    error_log('[poke_hub_special_events_query] Requête SQL générée: ' . $sql);
-    error_log('[poke_hub_special_events_query] Table: ' . $table);
-    
     $rows = $wpdb->get_results($sql, ARRAY_A);
-    
-    error_log('[poke_hub_special_events_query] Nombre de lignes retournées: ' . (is_array($rows) ? count($rows) : 'false'));
-    if ($wpdb->last_error) {
-        error_log('[poke_hub_special_events_query] Erreur SQL: ' . $wpdb->last_error);
-    }
     
     // Vérifier si la requête a échoué (erreur SQL) - peut-être que les colonnes title_en/title_fr n'existent pas
     if ($rows === false && !empty($wpdb->last_error)) {
@@ -1781,12 +1761,9 @@ function poke_hub_special_events_query(array $args = []): array {
 
     foreach ($rows as $row) {
         // Normaliser event_type dans la row avant normalisation pour s'assurer de la correspondance
-        $original_event_type = isset($row['event_type']) ? $row['event_type'] : '';
         if (isset($row['event_type'])) {
             $row['event_type'] = sanitize_title($row['event_type']);
         }
-        
-        error_log('[poke_hub_special_events_query] Ligne - ID: ' . ($row['id'] ?? 'N/A') . ', event_type original: ' . $original_event_type . ', event_type normalisé: ' . ($row['event_type'] ?? 'N/A'));
         
         // Filtrage supplémentaire après normalisation (au cas où la valeur en base n'était pas normalisée)
         if (!empty($args['event_type'])) {
@@ -1794,10 +1771,7 @@ function poke_hub_special_events_query(array $args = []): array {
                 ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
                 : [sanitize_title($args['event_type'])];
             
-            error_log('[poke_hub_special_events_query] Comparaison - event_type normalisé: ' . ($row['event_type'] ?? 'N/A') . ' vs filter_types: ' . print_r($filter_types, true));
-            
             if (!empty($filter_types) && !in_array($row['event_type'], $filter_types, true)) {
-                error_log('[poke_hub_special_events_query] Ligne exclue par filtrage supplémentaire');
                 continue;
             }
         }
@@ -1901,11 +1875,6 @@ function poke_hub_special_events_query(array $args = []): array {
 
     if ('desc' === $order) {
         $events = array_reverse($events);
-    }
-
-    error_log('[poke_hub_special_events_query] Nombre d\'événements finaux retournés: ' . count($events));
-    if (!empty($events)) {
-        error_log('[poke_hub_special_events_query] Premier événement - ID: ' . ($events[0]->id ?? 'N/A') . ', event_type: ' . ($events[0]->event_type ?? 'N/A'));
     }
 
     return $events;
@@ -2449,15 +2418,11 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         ? $status
         : 'current';
 
-    error_log('[poke_hub_events_get_all_sources_by_status] Appelé avec status: ' . $status . ', args: ' . print_r($args, true));
-
     $events = [];
 
     // 1) Posts distants
     if (function_exists('poke_hub_events_get_by_status')) {
-        error_log('[poke_hub_events_get_all_sources_by_status] Appel poke_hub_events_get_by_status');
         $remote_posts = poke_hub_events_get_by_status($status, $args);
-        error_log('[poke_hub_events_get_all_sources_by_status] Nombre de remote_posts retournés: ' . (is_array($remote_posts) ? count($remote_posts) : 'non-array'));
         if (is_array($remote_posts)) {
             foreach ($remote_posts as $ev) {
                 if (is_object($ev) && empty($ev->source)) {

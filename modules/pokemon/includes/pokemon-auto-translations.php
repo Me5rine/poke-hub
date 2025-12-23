@@ -324,3 +324,5 @@ function poke_hub_item_auto_fetch_translations($item_id, $name_en) {
 
 
 
+
+

@@ -73,15 +73,31 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
 
         $title = esc_html($item->title);
 
-        $actions = [
-            'edit'   => sprintf('<a href="%s">%s</a>', esc_url($edit_url), esc_html__('Edit', 'poke-hub')),
-            'delete' => sprintf(
-                '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
-                esc_url($delete_url),
-                esc_attr__('Are you sure you want to delete this background?', 'poke-hub'),
-                esc_html__('Delete', 'poke-hub')
-            ),
-        ];
+        // URL de la page publique du fond
+        $view_url = '';
+        if (!empty($item->slug) && function_exists('pokehub_get_background_url')) {
+            $view_url = pokehub_get_background_url($item->slug);
+        }
+
+        $actions = [];
+        
+        // Lien "View" vers la page publique
+        if ($view_url) {
+            $actions['view'] = sprintf(
+                '<a href="%s" target="_blank">%s</a>',
+                esc_url($view_url),
+                esc_html__('View', 'poke-hub')
+            );
+        }
+        
+        $actions['edit'] = sprintf('<a href="%s">%s</a>', esc_url($edit_url), esc_html__('Edit', 'poke-hub'));
+        
+        $actions['delete'] = sprintf(
+            '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
+            esc_url($delete_url),
+            esc_attr__('Are you sure you want to delete this background?', 'poke-hub'),
+            esc_html__('Delete', 'poke-hub')
+        );
 
         return sprintf(
             '<strong><a href="%1$s">%2$s</a></strong> %3$s',
