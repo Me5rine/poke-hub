@@ -18,8 +18,9 @@ if (!defined('ABSPATH')) {
  */
 function poke_hub_get_modules_registry(): array {
     return [
-        'events'  => 'events/events.php',
-        'bonus'   => 'bonus/bonus.php',
-        'pokemon' => 'pokemon/pokemon.php',
+        'events'        => 'events/events.php',
+        'bonus'         => 'bonus/bonus.php',
+        'pokemon'       => 'pokemon/pokemon.php',
+        'user-profiles' => 'user-profiles/user-profiles.php',
     ];
 }

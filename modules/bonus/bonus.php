@@ -14,7 +14,7 @@ if (!function_exists('poke_hub_is_module_active') || !poke_hub_is_module_active(
  * Constantes de chemin / URL du module Bonus
  */
 define('POKE_HUB_BONUS_PATH', __DIR__);
-define('poke_hub_BONUS_URL', POKE_HUB_URL . 'modules/bonus/');
+define('POKE_HUB_BONUS_URL', POKE_HUB_URL . 'modules/bonus/');
 
 /**
  * Chargement des fonctionnalités du module Bonus

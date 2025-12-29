@@ -10,7 +10,7 @@ if (!poke_hub_is_module_active('events')) {
 }
 
 define('POKE_HUB_EVENTS_PATH', __DIR__);
-define('poke_hub_EVENTS_URL', POKE_HUB_URL . 'modules/events/');
+define('POKE_HUB_EVENTS_URL', POKE_HUB_URL . 'modules/events/');
 
 require_once __DIR__ . '/functions/events-admin-helpers.php';
 require_once __DIR__ . '/admin/forms/events-admin-special-events-form.php';

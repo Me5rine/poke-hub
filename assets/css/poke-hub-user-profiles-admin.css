@@ -1,0 +1,15 @@
+/* assets/css/poke-hub-user-profiles-admin.css */
+
+.poke-hub-user-profiles-admin {
+    /* Styles for user profiles admin interface */
+}
+
+.poke-hub-user-profiles-admin .form-table th {
+    width: 200px;
+}
+
+.poke-hub-user-profiles-admin fieldset label {
+    display: block;
+    margin-bottom: 8px;
+}
+

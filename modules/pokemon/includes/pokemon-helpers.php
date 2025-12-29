@@ -541,3 +541,60 @@ function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category
     return (int) $wpdb->insert_id;
 }
 
+/**
+ * Get Scatterbug/Vivillon patterns from database.
+ * Only returns patterns marked as regional (extra->regional->is_regional = true).
+ * Patterns are stored as form variants for Scatterbug (dex_number 664) and Vivillon (dex_number 666).
+ *
+ * @return array Associative array form_slug => label (French or English name)
+ */
+function poke_hub_pokemon_get_scatterbug_patterns(): array {
+    if (!function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    global $wpdb;
+
+    $pokemon_table = pokehub_get_table('pokemon');
+    $form_variants_table = pokehub_get_table('pokemon_form_variants');
+
+    if (!$pokemon_table || !$form_variants_table) {
+        return [];
+    }
+
+    // Get form variants for Scatterbug (664) and Vivillon (666)
+    // Only those marked as regional (extra->regional->is_regional = true)
+    $patterns = $wpdb->get_results(
+        "SELECT DISTINCT 
+            fv.form_slug,
+            fv.label,
+            COALESCE(p.name_fr, p.name_en, '') AS pokemon_name
+        FROM {$pokemon_table} p
+        INNER JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+        WHERE p.dex_number IN (664, 666)
+        AND p.form_variant_id > 0
+        AND p.extra LIKE '%\"regional\":{\"is_regional\":true%'
+        ORDER BY fv.label ASC, fv.form_slug ASC"
+    );
+
+    $result = [];
+    foreach ($patterns as $pattern) {
+        $form_slug = (string) $pattern->form_slug;
+        if (empty($form_slug)) {
+            continue;
+        }
+
+        // Use variant label, otherwise use pokemon name + form_slug
+        $label = (string) $pattern->label;
+        if (empty($label)) {
+            $label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
+        }
+
+        $result[$form_slug] = $label;
+    }
+
+    // If no patterns found, return empty array
+    // (fallback to hardcoded list will be handled in user-profiles if needed)
+    return $result;
+}
+

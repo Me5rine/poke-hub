@@ -130,6 +130,15 @@ Chaque module suit une structure standardisée :
 - **Functions** : Fonctions utilitaires (`functions/`)
 - **Public** : Fonctionnalités front-end (`public/`)
 - **Includes** : Fichiers d'inclusion supplémentaires (`includes/`)
+- **README.md** : Fichier README minimal dans le module pointant vers `docs/{module}/`
+
+### Documentation
+
+La documentation complète est organisée dans le dossier `docs/` à la racine du plugin :
+- **`docs/README.md`** - Index général de la documentation
+- **`docs/{module}/`** - Documentation spécifique à chaque module
+
+Voir aussi la section [Modules](#modules) pour les liens vers la documentation de chaque module.
 
 ---
 
@@ -427,6 +436,22 @@ Le module Pokédex est en développement. Il permettra d'afficher un Pokédex in
 
 - **État** : En développement
 - **Fonctionnalités** : À venir
+
+---
+
+### Module User Profiles
+
+Le module User Profiles permet aux utilisateurs de gérer leur profil Pokémon GO (équipe, code ami, XP, pays, pseudo, motif Scatterbug, raisons).
+
+> 📖 **Documentation complète** : Voir `docs/user-profiles/` pour la documentation détaillée (CSS, shortcodes, intégration Ultimate Member, personnalisation)
+
+#### Fonctionnalités principales
+
+- **Édition du profil** : Formulaire complet pour gérer toutes les informations Pokémon GO
+- **Intégration Ultimate Member** : Onglet de profil intégré dans Ultimate Member
+- **Shortcode** : `[poke_hub_user_profile]` pour afficher le profil n'importe où
+- **Synchronisation** : Synchronisation automatique avec Ultimate Member pour le pays
+- **Système CSS générique** : Classes CSS réutilisables pour un design unifié
 
 ---
 
@@ -1176,6 +1201,29 @@ Le plugin utilise Composer pour gérer ses dépendances :
 
 ---
 
+## Documentation
+
+La documentation complète est organisée dans le dossier `docs/` à la racine du plugin.
+
+### Structure de la documentation
+
+- **`docs/README.md`** - Index général de la documentation
+- **`docs/events/`** - Documentation du module Events
+  - Routing front-end
+  - Intégration Elementor
+  - Événements distants
+- **`docs/user-profiles/`** - Documentation du module User Profiles
+  - CSS et design system
+  - Shortcodes
+  - Intégration Ultimate Member
+  - Personnalisation
+
+### Documentation des modules
+
+Chaque module peut avoir sa propre documentation dans `docs/{module}/`. Consultez le README.md de chaque module pour plus d'informations.
+
+---
+
 ## Développement
 
 ### Structure du plugin
@@ -1268,12 +1316,31 @@ poke-hub/
 │   │       └── pokemon-entities-front-routing.php
 │   └── pokedex/                     # Module Pokédex (en développement)
 │       └── pokedex.php
+├── docs/                            # Documentation organisée par module
+│   ├── README.md                    # Index de la documentation
+│   ├── events/                      # Documentation du module Events
+│   │   ├── README-ROUTING.md
+│   │   ├── INTEGRATION-ELEMENTOR.md
+│   │   └── EVENEMENTS-DISTANTS.md
+│   └── user-profiles/               # Documentation du module User Profiles
+│       ├── README_USER_PROFILES.md
+│       ├── CSS_RULES.md
+│       ├── CSS_SYSTEM.md
+│       ├── SHORTCODE_USAGE.md
+│       ├── ULTIMATE_MEMBER_SETUP.md
+│       ├── PLUGIN_INTEGRATION.md
+│       ├── CUSTOMIZATION.md
+│       └── README_DATA_CENTRALIZATION.md
 ├── vendor/                          # Dépendances Composer
 │   ├── aws/                         # AWS SDK
 │   └── ...
 ├── poke-hub.php                     # Fichier principal du plugin
+├── README.md                        # Documentation principale du plugin
+├── RAPPORT_AUDIT_CODE.md           # Rapport d'audit du code
 └── uninstall.php                    # Script de désinstallation
 ```
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+read_file
 
 ### Constantes disponibles
 
@@ -1290,11 +1357,11 @@ poke-hub/
 #### Constantes par module
 
 - `POKE_HUB_POKEMON_PATH` : Chemin absolu du module Pokémon
-- `poke_hub_POKEMON_URL` : URL du module Pokémon
+- `POKE_HUB_POKEMON_URL` : URL du module Pokémon
 - `POKE_HUB_EVENTS_PATH` : Chemin absolu du module Events
-- `poke_hub_EVENTS_URL` : URL du module Events
+- `POKE_HUB_EVENTS_URL` : URL du module Events
 - `POKE_HUB_BONUS_PATH` : Chemin absolu du module Bonus
-- `poke_hub_BONUS_URL` : URL du module Bonus
+- `POKE_HUB_BONUS_URL` : URL du module Bonus
 
 ### Ajouter un nouveau module
 

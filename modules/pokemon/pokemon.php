@@ -11,7 +11,7 @@ if (!function_exists('poke_hub_is_module_active') || !poke_hub_is_module_active(
 }
 
 define('POKE_HUB_POKEMON_PATH', __DIR__);
-define('poke_hub_POKEMON_URL', POKE_HUB_URL . 'modules/pokemon/');
+define('POKE_HUB_POKEMON_URL', POKE_HUB_URL . 'modules/pokemon/');
 
 require_once __DIR__ . '/admin/pokemon-admin.php';
 require_once __DIR__ . '/includes/pokemon-helpers.php';

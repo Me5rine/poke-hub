@@ -112,6 +112,18 @@ function poke_hub_admin_menu() {
         );
     }
 
+    // 🔥 Sous-menu User Profiles (si module user-profiles actif)
+    if (in_array('user-profiles', $active_modules, true)) {
+        add_submenu_page(
+            'poke-hub',
+            __('User Profiles', 'poke-hub'),
+            __('User Profiles', 'poke-hub'),
+            'manage_options',
+            'poke-hub-user-profiles',
+            'poke_hub_user_profiles_admin_ui'
+        );
+    }
+
     // Sous-menu Settings → toujours visible
     add_submenu_page(
         'poke-hub',
@@ -134,6 +146,7 @@ function poke_hub_admin_pages() {
         'poke-hub-settings',
         'poke-hub-pokemon',
         'poke-hub-events',
+        'poke-hub-user-profiles',
     ];
 }
 

@@ -22,9 +22,10 @@ if (!is_array($active_modules)) {
  * Liste des modules disponibles dans Poké HUB
  */
 $available_modules = array(
-    'events'  => __('Events', 'poke-hub'),
-    'bonus'   => __('Bonus', 'poke-hub'),
-    'pokemon' => __('Pokémon', 'poke-hub'),
+    'events'        => __('Events', 'poke-hub'),
+    'bonus'         => __('Bonus', 'poke-hub'),
+    'pokemon'       => __('Pokémon', 'poke-hub'),
+    'user-profiles' => __('User Profiles', 'poke-hub'),
 );
 
 // Option : suppression des données à la désinstallation

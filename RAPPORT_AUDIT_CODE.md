@@ -83,7 +83,7 @@ function poke_hub_pokemon_sync_attack_types_links($attack_id, $type_ids) {
 ```php
 // pokemon.php
 define('POKE_HUB_POKEMON_PATH', __DIR__);
-define('poke_hub_POKEMON_URL', POKE_HUB_URL . 'modules/pokemon/');
+define('POKE_HUB_POKEMON_URL', POKE_HUB_URL . 'modules/pokemon/');
 ```
 
 **Après :**
