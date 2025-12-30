@@ -17,7 +17,7 @@ jobs:
           - name: poke-hub
             path: /var/www/poke-hub.fr/htdocs/wp-content/plugins/poke-hub
           - name: me5rine-lab
-            path: /var/www/me5rine-lab.com/htdocs/wp-content/plugins/me5rine-lab
+            path: /var/www/me5rine-lab.com/htdocs/wp-content/plugins/poke-hub
 
     steps:
       - name: Deploy poke-hub
