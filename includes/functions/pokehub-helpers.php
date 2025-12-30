@@ -53,7 +53,7 @@ function poke_hub_events_get_table_prefix(string $context = 'events'): string {
         $prefix = (string) get_option('poke_hub_event_types_remote_prefix', '');
         $prefix = trim($prefix);
 
-        // 2) Si vide → on retombe sur le préfixe des events “généraux”
+        // 2) Si vide → on retombe sur le préfixe des events "généraux"
         if ($prefix === '') {
             $prefix = (string) get_option('poke_hub_events_remote_prefix', '');
             $prefix = trim($prefix);
@@ -91,6 +91,35 @@ function poke_hub_events_get_table_prefix(string $context = 'events'): string {
 }
 
 /**
+ * Récupère le préfixe des tables Pokémon distantes.
+ *
+ * Option :
+ *  - poke_hub_pokemon_remote_prefix (tables Pokémon)
+ *
+ * Si l'option est vide, on retombe sur $wpdb->prefix (préfixe local).
+ *
+ * @return string Préfixe des tables Pokémon
+ */
+function poke_hub_pokemon_get_table_prefix(): string {
+    global $wpdb;
+    
+    // Sécurité : vérifier que $wpdb est disponible
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return '';
+    }
+
+    $prefix = (string) get_option('poke_hub_pokemon_remote_prefix', '');
+    $prefix = trim($prefix);
+
+    // Si vide → fallback dev : préfixe local
+    if ($prefix === '') {
+        return $wpdb->prefix;
+    }
+
+    return $prefix;
+}
+
+/**
  * Helper unique pour retourner le nom réel d'une table,
  * locale (wp_...pokehub_*) ou distante (JV Actu / BDD remote).
  *
@@ -117,6 +146,21 @@ function pokehub_get_table(string $key): string {
     static $cache = [];
 
     global $wpdb;
+    
+    // Sécurité : vérifier que $wpdb est disponible et que WordPress est chargé
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return '';
+    }
+    
+    // Vérifier que le préfixe existe (peut être vide dans certains contextes rares, mais $wpdb doit exister)
+    if (!isset($wpdb->prefix)) {
+        return '';
+    }
+    
+    // Vérifier que les fonctions WordPress de base sont disponibles
+    if (!function_exists('get_option')) {
+        return '';
+    }
 
     $key = trim($key);
     if ($key === '') {
@@ -189,6 +233,27 @@ function pokehub_get_table(string $key): string {
         'remote_special_event_pokemon'         => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_pokemon'],
         'remote_special_event_pokemon_attacks' => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_pokemon_attacks'],
         'remote_special_event_bonus'           => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_bonus'],
+
+        // ==== Tables distantes Pokémon ====
+        'remote_pokemon'                    => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon'],
+        'remote_pokemon_types'              => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_types'],
+        'remote_regions'                    => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_regions'],
+        'remote_generations'                => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_generations'],
+        'remote_attacks'                    => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_attacks'],
+        'remote_attack_stats'               => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_attack_stats'],
+        'remote_attack_type_links'          => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_attack_type_links'],
+        'remote_pokemon_type_links'         => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_type_links'],
+        'remote_pokemon_attack_links'        => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_attack_links'],
+        'remote_pokemon_weathers'           => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_weathers'],
+        'remote_pokemon_type_weather_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_type_weather_links'],
+        'remote_pokemon_type_weakness_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_type_weakness_links'],
+        'remote_pokemon_type_resistance_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_type_resistance_links'],
+        'remote_pokemon_form_variants'      => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_form_variants'],
+        'remote_pokemon_evolutions'          => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_evolutions'],
+        'remote_items'                     => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_items'],
+        'remote_pokemon_backgrounds'       => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_backgrounds'],
+        'remote_pokemon_background_pokemon_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_background_pokemon_links'],
+        'remote_pokemon_form_mappings'      => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_form_mappings'],
     ];
 
     $scope  = 'local';
@@ -199,17 +264,20 @@ function pokehub_get_table(string $key): string {
         $suffix = $tables[$key]['suffix'];
     } else {
         /**
-         * Fallback minimal :
-         *  - si la clé commence par "remote_", on considère que c'est une table distante
-         *    avec suffix = tout ce qui suit "remote_"
+         * Fallback minimal et conservateur :
+         *  - si la clé commence par "remote_", on traite comme table distante events par défaut
+         *  - Seules les clés explicitement mappées ci-dessus utilisent le scope remote_pokemon
          *  - sinon, on considère que c'est un suffix local direct
          *
          * Exemple :
-         *  - "remote_foo"  => scope remote, suffix "foo"
-         *  - "my_custom"   => scope local, suffix "my_custom"
+         *  - "remote_pokemon"  => déjà dans le mapping → scope remote_pokemon
+         *  - "remote_posts"     => scope remote, suffix "posts"
+         *  - "remote_special_event_pokemon" => scope remote (car pas dans le mapping)
+         *  - "my_custom"        => scope local, suffix "my_custom"
          */
         if (strpos($key, 'remote_') === 0) {
-            $scope  = 'remote';
+            // Par défaut, toutes les clés remote_ non mappées sont des tables events
+            $scope = 'remote';
             $suffix = substr($key, strlen('remote_'));
         } else {
             $scope  = 'local';
@@ -222,8 +290,29 @@ function pokehub_get_table(string $key): string {
     }
 
     // Construction du nom de table selon le scope
-    if ($scope === 'remote') {
+    if ($scope === 'remote_pokemon') {
+        // Tables Pokémon distantes : utiliser le préfixe Pokémon
+        // Vérifier d'abord si un préfixe distant est vraiment configuré
+        $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+        $pokemon_remote_prefix = trim($pokemon_remote_prefix);
+        
+        if (!empty($pokemon_remote_prefix) && function_exists('poke_hub_pokemon_get_table_prefix')) {
+            $prefix = (string) poke_hub_pokemon_get_table_prefix();
+            // Si le préfixe est vide (erreur ou $wpdb non disponible), utiliser le préfixe local
+            if (empty($prefix)) {
+                $prefix = $wpdb->prefix;
+            }
+        } else {
+            // Si pas de préfixe distant configuré, utiliser le préfixe local (fallback)
+            $prefix = $wpdb->prefix;
+        }
 
+        $table = $prefix . $suffix;
+        
+        // Debug temporaire pour vérifier la construction de la table
+        error_log('[POKE-HUB] pokehub_get_table - remote_pokemon - key: ' . $key . ', prefix: ' . $prefix . ', suffix: ' . $suffix . ', table finale: ' . $table);
+    } elseif ($scope === 'remote') {
+        // Tables distantes Events : utiliser le préfixe events
         // Détermination du contexte : "events" vs "event_types"
         $context = 'events';
 
@@ -235,7 +324,7 @@ function pokehub_get_table(string $key): string {
             'term_relationships',
         ];
 
-        // On teste sur $suffix (pas la clé) car tu peux avoir d’autres mappings
+        // On teste sur $suffix (pas la clé) car tu peux avoir d'autres mappings
         if (in_array($suffix, $event_type_suffixes, true)) {
             $context = 'event_types';
         }

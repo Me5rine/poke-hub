@@ -214,17 +214,29 @@ function poke_hub_get_reasons() {
  * @return array Patterns list with their labels (form_slug => label)
  */
 function poke_hub_get_scatterbug_patterns() {
-    // Try to retrieve from Pokemon module if available
-    if (poke_hub_is_module_active('pokemon') && function_exists('poke_hub_pokemon_get_scatterbug_patterns')) {
+    // Try to retrieve from Pokemon helpers if available
+    // Les helpers Pokémon sont chargés même si le module n'est pas actif
+    // car les sources Pokémon doivent être disponibles à l'activation du plugin
+    if (function_exists('poke_hub_pokemon_get_scatterbug_patterns')) {
         $patterns = poke_hub_pokemon_get_scatterbug_patterns();
+        
+        // Debug temporaire
+        error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - patterns count: ' . (is_array($patterns) ? count($patterns) : 'not array'));
+        error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - remote_prefix: ' . get_option('poke_hub_pokemon_remote_prefix', 'vide'));
         
         // If patterns found, return them
         if (!empty($patterns)) {
+            error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - retourne patterns depuis DB');
             return $patterns;
+        } else {
+            error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - patterns vide, utilise fallback');
         }
+    } else {
+        error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - fonction poke_hub_pokemon_get_scatterbug_patterns inexistante');
     }
 
     // Fallback: default list if Pokemon module is not active or no patterns found
+    error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - retourne liste par défaut');
     return [
         'archipelago' => __('Archipelago', 'poke-hub'),
         'continental' => __('Continental', 'poke-hub'),

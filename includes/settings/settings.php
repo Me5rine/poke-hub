@@ -72,8 +72,8 @@ function poke_hub_settings_ui() {
     $events_enabled  = in_array('events', $active_modules, true);
     $pokemon_enabled = in_array('pokemon', $active_modules, true);
 
-    // Onglet Sources visible si au moins un des modules sources est actif
-    $sources_enabled     = ($events_enabled || $pokemon_enabled);
+    // Onglet Sources toujours visible (sources image et préfixe Pokémon disponibles à l'activation)
+    $sources_enabled     = true;
     // Onglet Game Master visible seulement si le module Pokémon est actif
     $gamemaster_enabled  = $pokemon_enabled;
     // Onglet Translation visible si le module Pokémon est actif

@@ -9,6 +9,8 @@ if (!current_user_can('manage_options')) {
     return;
 }
 
+global $wpdb;
+
 // 🔎 Vérifie quels modules sont actifs
 $active_modules = get_option('poke_hub_active_modules', []);
 if (!is_array($active_modules)) {
@@ -20,23 +22,18 @@ $pokemon_enabled = in_array('pokemon', $active_modules, true);
 
 $messages = [];
 
-// Si pour une raison quelconque on arrive ici sans module concerné actif
-if (!$events_enabled && !$pokemon_enabled) {
-    echo '<div class="notice notice-info"><p>'
-        . esc_html__('No source-based modules are currently active. Enable the Events and/or Pokémon modules to configure their sources.', 'poke-hub')
-        . '</p></div>';
-    return;
-}
-
 // === Options actuelles ===
 
-// Events source (JV Actu)
+// Events source (JV Actu) - seulement si module events actif
 $events_prefix      = get_option('poke_hub_events_remote_prefix', '');
 $event_types_prefix = get_option('poke_hub_event_types_remote_prefix', '');
 
-// Pokémon images base URL
+// Pokémon images base URL - toujours disponible
 $pokemon_assets_base_url     = get_option('poke_hub_pokemon_assets_base_url', '');
 $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base_url', '');
+
+// Pokémon tables prefix - toujours disponible
+$pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
 
 // === Traitement du formulaire dédié à cet onglet ===
 if (!empty($_POST['poke_hub_sources_submit'])) {
@@ -65,17 +62,22 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
         }
     }
 
-    // Pokémon
-    if ($pokemon_enabled) {
-        if (isset($_POST['poke_hub_pokemon_assets_base_url'])) {
-            $pokemon_assets_base_url = esc_url_raw(wp_unslash($_POST['poke_hub_pokemon_assets_base_url']));
-            update_option('poke_hub_pokemon_assets_base_url', $pokemon_assets_base_url);
-        }
+    // Pokémon - toujours disponible (sources image et préfixe)
+    if (isset($_POST['poke_hub_pokemon_assets_base_url'])) {
+        $pokemon_assets_base_url = esc_url_raw(wp_unslash($_POST['poke_hub_pokemon_assets_base_url']));
+        update_option('poke_hub_pokemon_assets_base_url', $pokemon_assets_base_url);
+    }
 
-        if (isset($_POST['poke_hub_pokemon_assets_fallback_base_url'])) {
-            $pokemon_assets_fallback_url = esc_url_raw(wp_unslash($_POST['poke_hub_pokemon_assets_fallback_base_url']));
-            update_option('poke_hub_pokemon_assets_fallback_base_url', $pokemon_assets_fallback_url);
-        }
+    if (isset($_POST['poke_hub_pokemon_assets_fallback_base_url'])) {
+        $pokemon_assets_fallback_url = esc_url_raw(wp_unslash($_POST['poke_hub_pokemon_assets_fallback_base_url']));
+        update_option('poke_hub_pokemon_assets_fallback_base_url', $pokemon_assets_fallback_url);
+    }
+
+    // Préfixe source des tables Pokémon
+    if (isset($_POST['poke_hub_pokemon_remote_prefix'])) {
+        $pokemon_remote_prefix = sanitize_text_field(wp_unslash($_POST['poke_hub_pokemon_remote_prefix']));
+        update_option('poke_hub_pokemon_remote_prefix', $pokemon_remote_prefix);
+        $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
     }
 
     $messages[] = [
@@ -142,40 +144,52 @@ foreach ($messages as $msg) {
         </table>
     <?php endif; ?>
 
-    <?php if ($pokemon_enabled): ?>
-        <h2><?php _e('Pokémon Images Source', 'poke-hub'); ?></h2>
-        <p><?php _e('Set the base URL used to load Pokémon assets (sprites, artwork, etc.) from your bucket/CDN.', 'poke-hub'); ?></p>
+    <h2><?php _e('Pokémon Sources', 'poke-hub'); ?></h2>
+    <p><?php _e('Configure the sources for Pokémon data and images. These settings are available even when the Pokémon module is not active.', 'poke-hub'); ?></p>
 
-        <table class="form-table">
-            <tr valign="top">
-                <th scope="row"><?php _e('Pokémon assets base URL', 'poke-hub'); ?></th>
-                <td>
-                    <input type="url"
-                        name="poke_hub_pokemon_assets_base_url"
-                        value="<?php echo esc_attr($pokemon_assets_base_url); ?>"
-                        class="regular-text"
-                        placeholder="https://cdn.example.com/pokemon">
-                    <p class="description">
-                        <?php _e('Example: https://cdn.example.com/pokemon. The helpers will append the slug-based filename (e.g. "pikachu.png", "noibat-headband-male-shiny.png").', 'poke-hub'); ?>
-                    </p>
-                </td>
-            </tr>
+    <table class="form-table">
+        <tr valign="top">
+            <th scope="row"><?php _e('Pokémon table prefix (remote)', 'poke-hub'); ?></th>
+            <td>
+                <input type="text"
+                       name="poke_hub_pokemon_remote_prefix"
+                       value="<?php echo esc_attr($pokemon_remote_prefix); ?>"
+                       class="regular-text"
+                       placeholder="<?php echo esc_attr($wpdb->prefix); ?>">
+                <p class="description">
+                    <?php _e('Used for Pokémon tables when the plugin is in remote mode to fetch Pokémon data from another site. Leave empty to use local prefix.', 'poke-hub'); ?>
+                </p>
+            </td>
+        </tr>
 
-            <tr valign="top">
-                <th scope="row"><?php _e('Fallback assets base URL', 'poke-hub'); ?></th>
-                <td>
-                    <input type="url"
-                        name="poke_hub_pokemon_assets_fallback_base_url"
-                        value="<?php echo esc_attr($pokemon_assets_fallback_url); ?>"
-                        class="regular-text"
-                        placeholder="https://backup.example.com/pokemon">
-                    <p class="description">
-                        <?php _e('Optional. If set, this URL will be used as a fallback source with the same slug-based filenames when the primary source is unavailable.', 'poke-hub'); ?>
-                    </p>
-                </td>
-            </tr>
-        </table>
-    <?php endif; ?>
+        <tr valign="top">
+            <th scope="row"><?php _e('Pokémon assets base URL', 'poke-hub'); ?></th>
+            <td>
+                <input type="url"
+                    name="poke_hub_pokemon_assets_base_url"
+                    value="<?php echo esc_attr($pokemon_assets_base_url); ?>"
+                    class="regular-text"
+                    placeholder="https://cdn.example.com/pokemon">
+                <p class="description">
+                    <?php _e('Example: https://cdn.example.com/pokemon. The helpers will append the slug-based filename (e.g. "pikachu.png", "noibat-headband-male-shiny.png").', 'poke-hub'); ?>
+                </p>
+            </td>
+        </tr>
+
+        <tr valign="top">
+            <th scope="row"><?php _e('Fallback assets base URL', 'poke-hub'); ?></th>
+            <td>
+                <input type="url"
+                    name="poke_hub_pokemon_assets_fallback_base_url"
+                    value="<?php echo esc_attr($pokemon_assets_fallback_url); ?>"
+                    class="regular-text"
+                    placeholder="https://backup.example.com/pokemon">
+                <p class="description">
+                    <?php _e('Optional. If set, this URL will be used as a fallback source with the same slug-based filenames when the primary source is unavailable.', 'poke-hub'); ?>
+                </p>
+            </td>
+        </tr>
+    </table>
 
     <?php submit_button(); ?>
 </form>
