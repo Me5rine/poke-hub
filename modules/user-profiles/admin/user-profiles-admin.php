@@ -17,23 +17,48 @@ function poke_hub_user_profiles_admin_ui() {
     $user_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
 
     // Handle form submission
+    $admin_error_message = '';
     if (isset($_POST['poke_hub_save_profile']) && wp_verify_nonce($_POST['poke_hub_profile_nonce'], 'poke_hub_save_profile')) {
         $user_id_to_save = isset($_POST['user_id']) ? (int) $_POST['user_id'] : 0;
         
         if ($user_id_to_save > 0) {
-            $profile = [
-                'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
-                'friend_code'         => isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '',
-                'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
-                'xp'                  => isset($_POST['xp']) ? absint($_POST['xp']) : 0,
-                'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
-                'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
-                'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
-                'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
-            ];
+            // Clean and validate friend code (must be exactly 12 digits)
+            $friend_code_raw = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
+            $friend_code = '';
+            
+            if (!empty($friend_code_raw)) {
+                if (function_exists('poke_hub_clean_friend_code')) {
+                    $friend_code = poke_hub_clean_friend_code($friend_code_raw);
+                } else {
+                    $cleaned = preg_replace('/[^0-9]/', '', $friend_code_raw);
+                    // Must be exactly 12 digits
+                    $friend_code = (strlen($cleaned) === 12) ? $cleaned : '';
+                }
+                
+                // Validate: if friend code was provided but is invalid, show error
+                if (empty($friend_code) && !empty($friend_code_raw)) {
+                    $admin_error_message = __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012).', 'poke-hub');
+                }
+            }
+            
+            // Only save if no validation errors
+            if (empty($admin_error_message)) {
+                $profile = [
+                    'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
+                    'friend_code'         => $friend_code,
+                    'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
+                    'xp'                  => isset($_POST['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($_POST['xp']) : absint(preg_replace('/[^0-9]/', '', $_POST['xp']))) : 0,
+                    'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
+                    'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
+                    'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
+                    'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
+                ];
 
-            poke_hub_save_user_profile($user_id_to_save, $profile);
-            echo '<div class="notice notice-success is-dismissible"><p>' . __('Profile saved successfully.', 'poke-hub') . '</p></div>';
+                poke_hub_save_user_profile($user_id_to_save, $profile);
+                echo '<div class="notice notice-success is-dismissible"><p>' . __('Profile saved successfully.', 'poke-hub') . '</p></div>';
+            } else {
+                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($admin_error_message) . '</p></div>';
+            }
         }
     }
 
@@ -74,7 +99,7 @@ function poke_hub_render_user_profile_form($user_id) {
             <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
         </p>
 
-        <form method="post" action="">
+        <form method="post" action="" id="poke-hub-profile-admin-form">
             <?php wp_nonce_field('poke_hub_save_profile', 'poke_hub_profile_nonce'); ?>
             <input type="hidden" name="user_id" value="<?php echo esc_attr($user_id); ?>">
 
@@ -100,8 +125,14 @@ function poke_hub_render_user_profile_form($user_id) {
                         <label for="friend_code"><?php _e('Friend Code', 'poke-hub'); ?></label>
                     </th>
                     <td>
-                        <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($profile['friend_code']); ?>" class="regular-text" placeholder="1234 5678 9012">
-                        <p class="description"><?php _e('Your Pokémon GO friend code', 'poke-hub'); ?></p>
+                        <?php 
+                        // Format friend code for display in input (with spaces)
+                        $formatted_friend_code = !empty($profile['friend_code']) && function_exists('poke_hub_format_friend_code')
+                            ? poke_hub_format_friend_code($profile['friend_code'])
+                            : $profile['friend_code'];
+                        ?>
+                        <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="regular-text" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
+                        <p class="description"><?php _e('Your Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
                     </td>
                 </tr>
 
@@ -123,7 +154,13 @@ function poke_hub_render_user_profile_form($user_id) {
                         <label for="xp"><?php _e('XP', 'poke-hub'); ?></label>
                     </th>
                     <td>
-                        <input type="number" name="xp" id="xp" value="<?php echo esc_attr($profile['xp']); ?>" class="regular-text" min="0" step="1">
+                        <?php 
+                        // Format XP for display in input (with spaces)
+                        $formatted_xp = !empty($profile['xp']) && function_exists('poke_hub_format_xp')
+                            ? poke_hub_format_xp($profile['xp'])
+                            : $profile['xp'];
+                        ?>
+                        <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="regular-text" pattern="[0-9\s]*" placeholder="0">
                         <p class="description"><?php _e('Your total XP in Pokémon GO', 'poke-hub'); ?></p>
                     </td>
                 </tr>
@@ -279,8 +316,26 @@ function poke_hub_render_user_profiles_list() {
                                 <small><?php echo esc_html($user->user_email); ?></small>
                             </td>
                             <td><?php echo esc_html($team_label); ?></td>
-                            <td><?php echo esc_html($profile['friend_code'] ?: $empty_dash); ?></td>
-                            <td><?php echo esc_html($profile['xp'] ? number_format($profile['xp'], 0, ',', ' ') : $empty_dash); ?></td>
+                            <td><?php 
+                                if (!empty($profile['friend_code'])) {
+                                    $formatted_code = function_exists('poke_hub_format_friend_code') 
+                                        ? poke_hub_format_friend_code($profile['friend_code']) 
+                                        : $profile['friend_code'];
+                                    echo esc_html($formatted_code);
+                                } else {
+                                    echo esc_html($empty_dash);
+                                }
+                            ?></td>
+                            <td><?php 
+                                if (!empty($profile['xp']) || $profile['xp'] === '0' || $profile['xp'] === 0) {
+                                    $formatted_xp = function_exists('poke_hub_format_xp') 
+                                        ? poke_hub_format_xp($profile['xp']) 
+                                        : number_format($profile['xp'], 0, ',', ' ');
+                                    echo esc_html($formatted_xp);
+                                } else {
+                                    echo esc_html($empty_dash);
+                                }
+                            ?></td>
                             <td><?php echo esc_html($profile['country'] ?: $empty_dash); ?></td>
                             <td><?php echo esc_html($profile['pokemon_go_username'] ?: $empty_dash); ?></td>
                             <td><?php echo esc_html($profile['scatterbug_pattern'] ?: $empty_dash); ?></td>

@@ -16,21 +16,44 @@ if (!defined('ABSPATH')) {
 function poke_hub_render_user_profile($user_id, $can_edit) {
     // Handle form submission
     $success_message = '';
+    $error_message = '';
     if ($can_edit && isset($_POST['poke_hub_save_profile_front']) && wp_verify_nonce($_POST['poke_hub_profile_nonce'], 'poke_hub_save_profile_front')) {
-        $profile = [
-            'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
-            'friend_code'         => isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '',
-            'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
-            'xp'                  => isset($_POST['xp']) ? absint($_POST['xp']) : 0,
-            'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
-            'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
-            'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
-            'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
-        ];
+        // Clean and validate friend code (must be exactly 12 digits)
+        $friend_code_raw = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
+        $friend_code = '';
+        
+        if (!empty($friend_code_raw)) {
+            if (function_exists('poke_hub_clean_friend_code')) {
+                $friend_code = poke_hub_clean_friend_code($friend_code_raw);
+            } else {
+                $cleaned = preg_replace('/[^0-9]/', '', $friend_code_raw);
+                // Must be exactly 12 digits
+                $friend_code = (strlen($cleaned) === 12) ? $cleaned : '';
+            }
+            
+            // Validate: if friend code was provided but is invalid, show error
+            if (empty($friend_code) && !empty($friend_code_raw)) {
+                $error_message = __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012).', 'poke-hub');
+            }
+        }
+    
+        // Only save if no validation errors
+        if (empty($error_message)) {
+            $profile = [
+                'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
+                'friend_code'         => $friend_code,
+                'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
+                'xp'                  => isset($_POST['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($_POST['xp']) : absint(preg_replace('/[^0-9]/', '', $_POST['xp']))) : 0,
+                'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
+                'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
+                'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
+                'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
+            ];
 
-        if (function_exists('poke_hub_save_user_profile')) {
-            poke_hub_save_user_profile($user_id, $profile);
-            $success_message = true;
+            if (function_exists('poke_hub_save_user_profile')) {
+                poke_hub_save_user_profile($user_id, $profile);
+                $success_message = true;
+            }
         }
     }
     
@@ -68,14 +91,20 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     ob_start();
     ?>
     <?php if (!empty($success_message)) : ?>
-        <div class="me5rine-lab-form-message me5rine-lab-form-message-success">
+        <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-success">
             <p><?php esc_html_e('Profile saved successfully.', 'poke-hub'); ?></p>
+        </div>
+    <?php endif; ?>
+    
+    <?php if (!empty($error_message)) : ?>
+        <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-error">
+            <p><?php echo esc_html($error_message); ?></p>
         </div>
     <?php endif; ?>
     
     <div class="me5rine-lab-form-container">
         <?php if ($can_edit) : ?>
-            <form method="post" action="" class="me5rine-lab-form-section">
+            <form method="post" action="" class="me5rine-lab-form-section" id="poke-hub-profile-form">
                 <?php wp_nonce_field('poke_hub_save_profile_front', 'poke_hub_profile_nonce'); ?>
                 
                 <!-- Row 1: Username and Country (2 columns) -->
@@ -112,7 +141,13 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="friend_code"><?php esc_html_e('Friend Code', 'poke-hub'); ?></label>
-                            <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($profile['friend_code']); ?>" class="me5rine-lab-form-input" placeholder="1234 5678 9012">
+                            <?php 
+                            // Format friend code for display in input (with spaces)
+                            $formatted_friend_code = !empty($profile['friend_code']) && function_exists('poke_hub_format_friend_code')
+                                ? poke_hub_format_friend_code($profile['friend_code'])
+                                : $profile['friend_code'];
+                            ?>
+                            <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="me5rine-lab-form-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
                             <label class="me5rine-lab-form-checkbox-item" for="friend_code_public">
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" class="me5rine-lab-form-checkbox" <?php checked($profile['friend_code_public'], true); ?>>
                                 <span class="me5rine-lab-form-checkbox-icon">
@@ -129,7 +164,13 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="xp"><?php esc_html_e('XP', 'poke-hub'); ?></label>
-                            <input type="number" name="xp" id="xp" value="<?php echo esc_attr($profile['xp']); ?>" class="me5rine-lab-form-input" min="0" step="1" placeholder="0">
+                            <?php 
+                            // Format XP for display in input (with spaces)
+                            $formatted_xp = !empty($profile['xp']) && function_exists('poke_hub_format_xp')
+                                ? poke_hub_format_xp($profile['xp'])
+                                : $profile['xp'];
+                            ?>
+                            <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="me5rine-lab-form-input" pattern="[0-9\s]*" placeholder="0">
                         </div>
                     </div>
                     <div class="me5rine-lab-form-col">
@@ -197,7 +238,16 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Friend Code', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo (!empty($profile['friend_code']) && !empty($profile['friend_code_public'])) ? esc_html($profile['friend_code']) : '—'; ?></span>
+                        <span class="me5rine-lab-form-view-value"><?php 
+                            if (!empty($profile['friend_code']) && !empty($profile['friend_code_public'])) {
+                                $formatted_code = function_exists('poke_hub_format_friend_code') 
+                                    ? poke_hub_format_friend_code($profile['friend_code']) 
+                                    : $profile['friend_code'];
+                                echo esc_html($formatted_code);
+                            } else {
+                                echo '—';
+                            }
+                        ?></span>
                     </div>
                 </div>
 
@@ -205,7 +255,16 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                 <div class="me5rine-lab-form-view-row">
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('XP', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo esc_html($profile['xp'] ? number_format($profile['xp'], 0, ',', ' ') : '—'); ?></span>
+                        <span class="me5rine-lab-form-view-value"><?php 
+                            if (!empty($profile['xp']) || $profile['xp'] === '0' || $profile['xp'] === 0) {
+                                $formatted_xp = function_exists('poke_hub_format_xp') 
+                                    ? poke_hub_format_xp($profile['xp']) 
+                                    : number_format($profile['xp'], 0, ',', ' ');
+                                echo esc_html($formatted_xp);
+                            } else {
+                                echo '—';
+                            }
+                        ?></span>
                     </div>
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Scatterbug Pattern', 'poke-hub'); ?></span>

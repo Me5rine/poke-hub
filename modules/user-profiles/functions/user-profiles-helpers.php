@@ -94,8 +94,19 @@ function poke_hub_save_user_profile($user_id, $profile) {
     // Sanitize data
     $team = isset($profile['team']) ? sanitize_text_field($profile['team']) : '';
     $friend_code = isset($profile['friend_code']) ? sanitize_text_field($profile['friend_code']) : '';
+    // Clean and validate friend code (must be exactly 12 digits)
+    if (!empty($friend_code)) {
+        if (function_exists('poke_hub_clean_friend_code')) {
+            $friend_code = poke_hub_clean_friend_code($friend_code);
+        } else {
+            $cleaned = preg_replace('/[^0-9]/', '', $friend_code);
+            // Must be exactly 12 digits
+            $friend_code = (strlen($cleaned) === 12) ? $cleaned : '';
+        }
+    }
     $friend_code_public = isset($profile['friend_code_public']) ? (bool) $profile['friend_code_public'] : true; // Default to public
-    $xp = isset($profile['xp']) ? absint($profile['xp']) : 0;
+    // Clean XP (remove spaces) before saving
+    $xp = isset($profile['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($profile['xp']) : absint(preg_replace('/[^0-9]/', '', (string) $profile['xp']))) : 0;
     $country = isset($profile['country']) ? sanitize_text_field($profile['country']) : '';
     $pokemon_go_username = isset($profile['pokemon_go_username']) ? sanitize_text_field($profile['pokemon_go_username']) : '';
     $scatterbug_pattern = isset($profile['scatterbug_pattern']) ? sanitize_text_field($profile['scatterbug_pattern']) : '';
@@ -332,5 +343,84 @@ function poke_hub_um_sync_country_on_profile_update($user_id, $args) {
 if (function_exists('um_user_pre_updating_profile')) {
     add_action('um_user_pre_updating_profile', 'poke_hub_um_sync_country_on_profile_update', 10, 2);
     add_action('um_after_user_account_updated', 'poke_hub_um_sync_country_on_profile_update', 10, 2);
+}
+
+/**
+ * Format XP number with spaces (French format: groups of 3)
+ * 
+ * @param int|string $xp XP value
+ * @return string Formatted XP (e.g., "738 000 000" or "10 000")
+ */
+function poke_hub_format_xp($xp) {
+    // Handle empty/null values (but not 0)
+    if ($xp === '' || $xp === null || $xp === false) {
+        return '';
+    }
+    
+    $xp_int = (int) $xp;
+    return number_format($xp_int, 0, ',', ' ');
+}
+
+/**
+ * Clean XP value (remove spaces)
+ * 
+ * @param string|int $xp XP value (with or without spaces)
+ * @return int Cleaned XP (integer)
+ */
+function poke_hub_clean_xp($xp) {
+    // Handle empty/null values
+    if ($xp === '' || $xp === null || $xp === false) {
+        return 0;
+    }
+    
+    // Remove all spaces and non-digit characters, convert to int
+    $cleaned = preg_replace('/[^0-9]/', '', (string) $xp);
+    return (int) $cleaned;
+}
+
+/**
+ * Clean Pokémon GO friend code (remove spaces and non-digit characters)
+ * Must be exactly 12 digits
+ * 
+ * @param string $friend_code Friend code (with or without spaces)
+ * @return string Cleaned friend code (digits only) or empty string if invalid
+ */
+function poke_hub_clean_friend_code($friend_code) {
+    if (empty($friend_code)) {
+        return '';
+    }
+    
+    // Remove all spaces and non-digit characters
+    $cleaned = preg_replace('/[^0-9]/', '', $friend_code);
+    
+    // Must be exactly 12 digits
+    if (strlen($cleaned) !== 12) {
+        return '';
+    }
+    
+    return $cleaned;
+}
+
+/**
+ * Format Pokémon GO friend code with spaces every 4 digits
+ * Note: This function only formats, it doesn't validate the length
+ * 
+ * @param string $friend_code Friend code (with or without spaces)
+ * @return string Formatted friend code (e.g., "1234 5678 9012")
+ */
+function poke_hub_format_friend_code($friend_code) {
+    if (empty($friend_code)) {
+        return '';
+    }
+    
+    // Clean the code first (just remove non-digits, don't validate length for formatting)
+    $cleaned = preg_replace('/[^0-9]/', '', $friend_code);
+    
+    if (empty($cleaned)) {
+        return '';
+    }
+    
+    // Add space every 4 digits
+    return trim(chunk_split($cleaned, 4, ' '));
 }
 
