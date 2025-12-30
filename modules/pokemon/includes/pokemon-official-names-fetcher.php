@@ -56,6 +56,120 @@ function poke_hub_bulbapedia_api_url() {
 }
 
 /**
+ * Effectue une requête HTTP avec retry automatique et meilleure gestion des erreurs.
+ *
+ * @param string $url URL à appeler
+ * @param array  $args Arguments pour wp_remote_get/wp_remote_post
+ * @param int    $max_retries Nombre maximum de tentatives (défaut: 2)
+ * @return array|WP_Error Réponse ou erreur
+ */
+function poke_hub_http_request_with_retry($url, $args = [], $max_retries = 2) {
+    $method = isset($args['method']) ? strtoupper($args['method']) : 'GET';
+    $is_post = ($method === 'POST');
+    
+    // Timeouts par défaut améliorés (créer une copie pour ne pas modifier l'original)
+    $default_args = [
+        'timeout' => 30, // Augmenté de 15 à 30 secondes
+        'connect_timeout' => 10,
+        'user-agent' => 'Poke-Hub WordPress Plugin',
+    ];
+    
+    // Fusionner avec les valeurs fournies (les valeurs fournies ont priorité)
+    $request_args = array_merge($default_args, $args);
+    
+    $last_error = null;
+    
+    for ($attempt = 0; $attempt <= $max_retries; $attempt++) {
+        if ($attempt > 0) {
+            // Backoff exponentiel : 1s, 2s, 4s
+            $delay = pow(2, $attempt - 1);
+            poke_hub_tr_log('http_retry', [
+                'url' => $url,
+                'attempt' => $attempt + 1,
+                'max_retries' => $max_retries + 1,
+                'delay' => $delay
+            ]);
+            sleep($delay);
+        }
+        
+        // Pour GET, ne pas inclure 'body' et 'method' dans les arguments
+        if ($is_post) {
+            $response = wp_remote_post($url, $request_args);
+        } else {
+            $get_args = $request_args;
+            unset($get_args['body'], $get_args['method']); // GET ne doit pas avoir ces arguments
+            $response = wp_remote_get($url, $get_args);
+        }
+        
+        // Succès immédiat
+        if (!is_wp_error($response)) {
+            $code = (int) wp_remote_retrieve_response_code($response);
+            if ($code >= 200 && $code < 400) {
+                return $response;
+            }
+            
+            // Codes d'erreur serveur : on retry
+            if ($code >= 500 && $code < 600 && $attempt < $max_retries) {
+                $last_error = new WP_Error(
+                    'http_error',
+                    sprintf('HTTP %d error (attempt %d/%d)', $code, $attempt + 1, $max_retries + 1)
+                );
+                continue;
+            }
+            
+            // Autres codes d'erreur : on ne retry pas
+            return new WP_Error(
+                'http_error',
+                sprintf('HTTP error: %d', $code),
+                ['status_code' => $code, 'response' => $response]
+            );
+        }
+        
+        // Erreur WP_Error : vérifier si c'est retryable
+        $last_error = $response;
+        $error_code = $response->get_error_code();
+        $error_message = $response->get_error_message();
+        
+        // Log de l'erreur
+        if (function_exists('error_log')) {
+            error_log(sprintf(
+                '[PokeHub] HTTP request failed: %s - %s (URL: %s, attempt %d/%d)',
+                $error_code,
+                $error_message,
+                $url,
+                $attempt + 1,
+                $max_retries + 1
+            ));
+        }
+        
+        // Erreurs retryables : timeout, connexion, DNS
+        $retryable_errors = [
+            'http_request_failed',
+            'http_failure',
+            'transport_error',
+            'connect_timeout',
+            'timeout',
+            'name_resolution_failed'
+        ];
+        
+        if (in_array($error_code, $retryable_errors, true) && $attempt < $max_retries) {
+            // Vérifier aussi le message pour timeout
+            if (stripos($error_message, 'timeout') !== false || 
+                stripos($error_message, 'connection') !== false ||
+                stripos($error_message, 'network') !== false) {
+                continue; // On retry
+            }
+        }
+        
+        // Erreur non retryable ou toutes les tentatives épuisées
+        break;
+    }
+    
+    // Toutes les tentatives échouées
+    return $last_error ?: new WP_Error('http_error', 'Unknown HTTP error');
+}
+
+/**
  * Résout les redirects MediaWiki proprement (sans parser du HTML).
  */
 function poke_hub_bulbapedia_resolve_title($title) {
@@ -70,13 +184,27 @@ function poke_hub_bulbapedia_resolve_title($title) {
         'format'    => 'json',
     ], $api);
 
-    $resp = wp_remote_get($url, [
-        'timeout'    => 15,
-        'user-agent' => 'Poke-Hub WordPress Plugin',
+    $resp = poke_hub_http_request_with_retry($url, [
+        'timeout' => 30,
     ]);
 
-    if (is_wp_error($resp)) return false;
-    if ((int) wp_remote_retrieve_response_code($resp) !== 200) return false;
+    if (is_wp_error($resp)) {
+        poke_hub_tr_log('bulbapedia_resolve_title_error', [
+            'title' => $title,
+            'error' => $resp->get_error_message(),
+            'code' => $resp->get_error_code()
+        ]);
+        return false;
+    }
+    
+    $code = (int) wp_remote_retrieve_response_code($resp);
+    if ($code !== 200) {
+        poke_hub_tr_log('bulbapedia_resolve_title_bad_status', [
+            'title' => $title,
+            'status_code' => $code
+        ]);
+        return false;
+    }
 
     $data = json_decode(wp_remote_retrieve_body($resp), true);
     if (!is_array($data) || empty($data['query']['pages']) || !is_array($data['query']['pages'])) {
@@ -111,13 +239,27 @@ function poke_hub_bulbapedia_api_get_sections($page_title) {
         'format' => 'json',
     ], $api);
 
-    $resp = wp_remote_get($url, [
-        'timeout'    => 15,
-        'user-agent' => 'Poke-Hub WordPress Plugin',
+    $resp = poke_hub_http_request_with_retry($url, [
+        'timeout' => 30,
     ]);
 
-    if (is_wp_error($resp)) return false;
-    if ((int) wp_remote_retrieve_response_code($resp) !== 200) return false;
+    if (is_wp_error($resp)) {
+        poke_hub_tr_log('bulbapedia_get_sections_error', [
+            'page_title' => $page_title,
+            'error' => $resp->get_error_message(),
+            'code' => $resp->get_error_code()
+        ]);
+        return false;
+    }
+    
+    $code = (int) wp_remote_retrieve_response_code($resp);
+    if ($code !== 200) {
+        poke_hub_tr_log('bulbapedia_get_sections_bad_status', [
+            'page_title' => $page_title,
+            'status_code' => $code
+        ]);
+        return false;
+    }
 
     $data = json_decode(wp_remote_retrieve_body($resp), true);
     if (!is_array($data) || empty($data['parse']['sections']) || !is_array($data['parse']['sections'])) {
@@ -163,10 +305,10 @@ function poke_hub_bulbapedia_api_parse_page_html($page_title) {
         if ($idx !== null) {
             poke_hub_tr_log('api_parse: section', ['page' => $page_title, 'section' => $idx]);
 
-            $resp = wp_remote_post($api, [
-                'timeout'         => 25,
+            $resp = poke_hub_http_request_with_retry($api, [
+                'method' => 'POST',
+                'timeout' => 40,
                 'connect_timeout' => 10,
-                'user-agent'      => 'Poke-Hub WordPress Plugin',
                 'body' => [
                     'action'  => 'parse',
                     'page'    => $page_title,
@@ -176,14 +318,30 @@ function poke_hub_bulbapedia_api_parse_page_html($page_title) {
                 ],
             ]);
 
-            if (!is_wp_error($resp) && (int) wp_remote_retrieve_response_code($resp) === 200) {
-                $data = json_decode(wp_remote_retrieve_body($resp), true);
-                if (is_array($data) && !empty($data['parse']['text']['*'])) {
-                    return [
-                        'title' => $data['parse']['title'] ?? $page_title,
-                        'html'  => (string) $data['parse']['text']['*'],
-                    ];
+            if (!is_wp_error($resp)) {
+                $code = (int) wp_remote_retrieve_response_code($resp);
+                if ($code === 200) {
+                    $data = json_decode(wp_remote_retrieve_body($resp), true);
+                    if (is_array($data) && !empty($data['parse']['text']['*'])) {
+                        return [
+                            'title' => $data['parse']['title'] ?? $page_title,
+                            'html'  => (string) $data['parse']['text']['*'],
+                        ];
+                    }
+                } else {
+                    poke_hub_tr_log('api_parse_section_bad_status', [
+                        'page' => $page_title,
+                        'section' => $idx,
+                        'status_code' => $code
+                    ]);
                 }
+            } else {
+                poke_hub_tr_log('api_parse_section_error', [
+                    'page' => $page_title,
+                    'section' => $idx,
+                    'error' => $resp->get_error_message(),
+                    'code' => $resp->get_error_code()
+                ]);
             }
         }
     }
@@ -191,10 +349,10 @@ function poke_hub_bulbapedia_api_parse_page_html($page_title) {
     // 2) Fallback: full parse (rare)
     poke_hub_tr_log('api_parse: full', ['page' => $page_title]);
 
-    $resp = wp_remote_post($api, [
-        'timeout'         => 25,
+    $resp = poke_hub_http_request_with_retry($api, [
+        'method' => 'POST',
+        'timeout' => 40,
         'connect_timeout' => 10,
-        'user-agent'      => 'Poke-Hub WordPress Plugin',
         'body' => [
             'action' => 'parse',
             'page'   => $page_title,
@@ -203,8 +361,23 @@ function poke_hub_bulbapedia_api_parse_page_html($page_title) {
         ],
     ]);
 
-    if (is_wp_error($resp)) return false;
-    if ((int) wp_remote_retrieve_response_code($resp) !== 200) return false;
+    if (is_wp_error($resp)) {
+        poke_hub_tr_log('api_parse_full_error', [
+            'page' => $page_title,
+            'error' => $resp->get_error_message(),
+            'code' => $resp->get_error_code()
+        ]);
+        return false;
+    }
+    
+    $code = (int) wp_remote_retrieve_response_code($resp);
+    if ($code !== 200) {
+        poke_hub_tr_log('api_parse_full_bad_status', [
+            'page' => $page_title,
+            'status_code' => $code
+        ]);
+        return false;
+    }
 
     $data = json_decode(wp_remote_retrieve_body($resp), true);
     if (!is_array($data) || empty($data['parse']['text']['*'])) return false;
@@ -223,10 +396,10 @@ function poke_hub_bulbapedia_api_parse_page_html_full($page_title) {
     if ($page_title === '') return false;
 
     $api = poke_hub_bulbapedia_api_url();
-    $resp = wp_remote_post($api, [
-        'timeout'         => 25,
+    $resp = poke_hub_http_request_with_retry($api, [
+        'method' => 'POST',
+        'timeout' => 40,
         'connect_timeout' => 10,
-        'user-agent'      => 'Poke-Hub WordPress Plugin',
         'body' => [
             'action' => 'parse',
             'page'   => $page_title,
@@ -235,8 +408,23 @@ function poke_hub_bulbapedia_api_parse_page_html_full($page_title) {
         ],
     ]);
 
-    if (is_wp_error($resp)) return false;
-    if ((int) wp_remote_retrieve_response_code($resp) !== 200) return false;
+    if (is_wp_error($resp)) {
+        poke_hub_tr_log('api_parse_full_forced_error', [
+            'page' => $page_title,
+            'error' => $resp->get_error_message(),
+            'code' => $resp->get_error_code()
+        ]);
+        return false;
+    }
+    
+    $code = (int) wp_remote_retrieve_response_code($resp);
+    if ($code !== 200) {
+        poke_hub_tr_log('api_parse_full_forced_bad_status', [
+            'page' => $page_title,
+            'status_code' => $code
+        ]);
+        return false;
+    }
 
     $data = json_decode(wp_remote_retrieve_body($resp), true);
     if (!is_array($data) || empty($data['parse']['text']['*'])) return false;

@@ -20,19 +20,48 @@ function poke_hub_pokemon_import_type_from_bulbapedia($type_name_en) {
     $type_slug = ucfirst(strtolower(trim($type_name_en)));
     $url = 'https://bulbapedia.bulbagarden.net/wiki/' . urlencode($type_slug) . '_(type)';
 
-    // Récupération de la page HTML
-    $response = wp_remote_get($url, [
-        'timeout' => 30,
-        'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    ]);
+    // Récupération de la page HTML avec retry
+    if (function_exists('poke_hub_http_request_with_retry')) {
+        $response = poke_hub_http_request_with_retry($url, [
+            'timeout' => 35,
+            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ]);
+    } else {
+        $response = wp_remote_get($url, [
+            'timeout' => 35,
+            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ]);
+    }
 
     if (is_wp_error($response)) {
+        // Log de l'erreur pour debugging
+        if (function_exists('error_log')) {
+            error_log(sprintf(
+                '[PokeHub] Type Bulbapedia fetch error: %s - %s (URL: %s)',
+                $response->get_error_code(),
+                $response->get_error_message(),
+                $url
+            ));
+        }
         return $response;
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    if ($code !== 200) {
+        $error = new WP_Error('http_error', 'Bad response code: ' . $code, ['status_code' => $code]);
+        if (function_exists('error_log')) {
+            error_log(sprintf('[PokeHub] Type Bulbapedia HTTP error: %d (URL: %s)', $code, $url));
+        }
+        return $error;
     }
 
     $body = wp_remote_retrieve_body($response);
     if (empty($body)) {
-        return new WP_Error('empty_response', 'Empty response from Bulbapedia.');
+        $error = new WP_Error('empty_response', 'Empty response from Bulbapedia.', ['url' => $url]);
+        if (function_exists('error_log')) {
+            error_log(sprintf('[PokeHub] Type Bulbapedia empty body (URL: %s)', $url));
+        }
+        return $error;
     }
 
     // Parse le HTML avec DOMDocument

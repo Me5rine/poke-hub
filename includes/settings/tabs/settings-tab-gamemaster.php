@@ -631,10 +631,12 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     
     <script>
     (function () {
-        const interval = 3000; // un peu plus réactif
+        const interval = 5000; // Augmenté à 5 secondes pour réduire la charge serveur
         let timer = null;
         let previousState = '<?php echo esc_js( $current_state ); ?>'; // État initial depuis PHP
         let hasReloaded = false; // Flag pour éviter les rechargements multiples
+        let consecutiveErrors = 0; // Compteur d'erreurs consécutives
+        const maxConsecutiveErrors = 5; // Arrêter le polling après 5 erreurs
     
         const box   = document.getElementById('gm-progress-box');
         const doneN = document.getElementById('gm-done-notice');
@@ -657,10 +659,34 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
         function hide(el) { if (el) el.style.display = 'none'; }
     
         function refreshStatus() {
-            fetch(ajaxurl + '?action=poke_hub_gm_status&_ts=' + Date.now(), { credentials: 'same-origin' })
-                .then(r => r.json())
+            // Créer un AbortController pour gérer le timeout manuellement
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // Timeout de 8 secondes
+            
+            fetch(ajaxurl + '?action=poke_hub_gm_status&_ts=' + Date.now(), { 
+                credentials: 'same-origin',
+                signal: controller.signal
+            })
+                .finally(() => clearTimeout(timeoutId))
+                .then(r => {
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status);
+                    }
+                    return r.json();
+                })
                 .then(data => {
-                    if (!data || !data.success) return;
+                    // Réinitialiser le compteur d'erreurs en cas de succès
+                    consecutiveErrors = 0;
+                    
+                    if (!data || !data.success) {
+                        consecutiveErrors++;
+                        if (consecutiveErrors >= maxConsecutiveErrors) {
+                            console.error('[PokeHub] Trop d\'erreurs consécutives, arrêt du polling');
+                            clearInterval(timer);
+                            hide(box);
+                        }
+                        return;
+                    }
     
                     const status = data.data.status || {};
                     const prog   = data.data.progress || {};
@@ -718,7 +744,25 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                     
                     previousState = currentState;
                 })
-                .catch(() => {});
+                .catch(error => {
+                    consecutiveErrors++;
+                    console.error('[PokeHub] Erreur lors du polling du statut:', error);
+                    
+                    // Arrêter le polling si trop d'erreurs
+                    if (consecutiveErrors >= maxConsecutiveErrors) {
+                        console.error('[PokeHub] Trop d\'erreurs consécutives, arrêt du polling');
+                        clearInterval(timer);
+                        hide(box);
+                        
+                        // Afficher un message d'erreur à l'utilisateur
+                        if (errN) {
+                            show(errN);
+                            if (errT) {
+                                errT.textContent = ': Erreur de connexion. Veuillez recharger la page.';
+                            }
+                        }
+                    }
+                });
         }
     
         // Polling permanent (si un import démarre après le chargement, ça le capte)

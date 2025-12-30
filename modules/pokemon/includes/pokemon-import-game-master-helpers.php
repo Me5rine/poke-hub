@@ -19,25 +19,57 @@ function poke_hub_pokemon_load_gamemaster_json( $source ) {
 
     // URL ?
     if ( filter_var( $source, FILTER_VALIDATE_URL ) ) {
-        $response = wp_remote_get(
-            $source,
-            [
-                'timeout' => 60,
-            ]
-        );
+        // Utiliser la fonction avec retry si disponible, sinon fallback
+        if ( function_exists( 'poke_hub_http_request_with_retry' ) ) {
+            $response = poke_hub_http_request_with_retry(
+                $source,
+                [
+                    'timeout' => 90, // Timeout augmenté pour les gros fichiers Game Master
+                ],
+                2 // 2 retries = 3 tentatives au total
+            );
+        } else {
+            $response = wp_remote_get(
+                $source,
+                [
+                    'timeout' => 90,
+                ]
+            );
+        }
 
         if ( is_wp_error( $response ) ) {
+            // Log de l'erreur pour debugging
+            if ( function_exists( 'error_log' ) ) {
+                error_log( sprintf(
+                    '[PokeHub] Game Master fetch error: %s - %s (URL: %s)',
+                    $response->get_error_code(),
+                    $response->get_error_message(),
+                    $source
+                ) );
+            }
             return $response;
         }
 
         $code = wp_remote_retrieve_response_code( $response );
         if ( 200 !== $code ) {
-            return new \WP_Error( 'http_error', 'Bad response code: ' . $code );
+            $error = new \WP_Error( 'http_error', 'Bad response code: ' . $code, [ 'status_code' => $code ] );
+            if ( function_exists( 'error_log' ) ) {
+                error_log( sprintf(
+                    '[PokeHub] Game Master HTTP error: %d (URL: %s)',
+                    $code,
+                    $source
+                ) );
+            }
+            return $error;
         }
 
         $body = wp_remote_retrieve_body( $response );
         if ( ! is_string( $body ) || $body === '' ) {
-            return new \WP_Error( 'empty_body', 'Empty Game Master body.' );
+            $error = new \WP_Error( 'empty_body', 'Empty Game Master body.', [ 'url' => $source ] );
+            if ( function_exists( 'error_log' ) ) {
+                error_log( sprintf( '[PokeHub] Game Master empty body (URL: %s)', $source ) );
+            }
+            return $error;
         }
 
         return $body;
