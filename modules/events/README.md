@@ -19,3 +19,4 @@ Toute la documentation se trouve dans `docs/events/` :
 - `functions/` - Fonctions helper et queries
 - `public/` - Routing front-end et shortcodes
 
+
