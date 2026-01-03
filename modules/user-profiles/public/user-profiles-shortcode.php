@@ -92,7 +92,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     ?>
     <?php if (!empty($success_message)) : ?>
         <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-success">
-            <p><?php esc_html_e('Profile saved successfully.', 'poke-hub'); ?></p>
+            <p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p>
         </div>
     <?php endif; ?>
     
@@ -103,12 +103,13 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     <?php endif; ?>
     
     <div class="me5rine-lab-form-container">
+        <h3 class="me5rine-lab-title-medium"><?php esc_html_e('Pokémon GO Profile', 'poke-hub'); ?></h3>
         <?php if ($can_edit) : ?>
-            <form method="post" action="" class="me5rine-lab-form-section" id="poke-hub-profile-form">
+            <form method="post" action="" id="poke-hub-profile-form">
                 <?php wp_nonce_field('poke_hub_save_profile_front', 'poke_hub_profile_nonce'); ?>
                 
-                <!-- Row 1: Username and Country (2 columns) -->
-                <div class="me5rine-lab-form-row">
+                <!-- Row 1: Username and Country -->
+                <div class="me5rine-lab-form-row me5rine-lab-form-col-gap">
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="pokemon_go_username"><?php esc_html_e('Pokémon GO Username', 'poke-hub'); ?></label>
@@ -123,13 +124,13 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                 </div>
 
-                <!-- Row 2: Team and Friend Code + Visibility (2 columns) -->
-                <div class="me5rine-lab-form-row">
+                <!-- Row 2: Team and Friend Code -->
+                <div class="me5rine-lab-form-row me5rine-lab-form-col-gap">
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="team"><?php esc_html_e('Team', 'poke-hub'); ?></label>
-                            <select name="team" id="team" class="me5rine-lab-form-select">
-                                <option value=""><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
+                            <select name="team" id="team" class="me5rine-lab-form-select<?php echo empty($profile['team']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
+                                <option value=""<?php echo empty($profile['team']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($teams as $value => $label) : ?>
                                     <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'], $value); ?>>
                                         <?php echo esc_html($label); ?>
@@ -159,8 +160,8 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                 </div>
 
-                <!-- Row 3: XP and Scatterbug Pattern (2 columns) -->
-                <div class="me5rine-lab-form-row">
+                <!-- Row 3: XP and Scatterbug Pattern -->
+                <div class="me5rine-lab-form-row me5rine-lab-form-col-gap">
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="xp"><?php esc_html_e('XP', 'poke-hub'); ?></label>
@@ -176,8 +177,8 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="scatterbug_pattern"><?php esc_html_e('Scatterbug Pattern', 'poke-hub'); ?></label>
-                            <select name="scatterbug_pattern" id="scatterbug_pattern" class="me5rine-lab-form-select">
-                                <option value=""><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
+                            <select name="scatterbug_pattern" id="scatterbug_pattern" class="me5rine-lab-form-select<?php echo empty($profile['scatterbug_pattern']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
+                                <option value=""<?php echo empty($profile['scatterbug_pattern']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($scatterbug_patterns as $value => $label) : ?>
                                     <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'], $value); ?>>
                                         <?php echo esc_html($label); ?>
@@ -188,7 +189,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                 </div>
 
-                <!-- Row 4: Reasons (full width) -->
+                <!-- Row: Reasons (full width) -->
                 <div class="me5rine-lab-form-row-full">
                     <div class="me5rine-lab-form-field">
                         <label class="me5rine-lab-form-label"><?php esc_html_e('Reasons', 'poke-hub'); ?></label>
@@ -216,6 +217,36 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <button type="submit" class="me5rine-lab-form-button"><?php esc_html_e('Save Profile', 'poke-hub'); ?></button>
                 </div>
             </form>
+            <script>
+            (function() {
+                function updateSelectStyle(select) {
+                    if (select.value === '') {
+                        select.style.color = '#999';
+                        select.classList.add('me5rine-lab-form-select-placeholder');
+                    } else {
+                        select.style.color = '';
+                        select.classList.remove('me5rine-lab-form-select-placeholder');
+                    }
+                }
+                
+                var teamSelect = document.getElementById('team');
+                var scatterbugSelect = document.getElementById('scatterbug_pattern');
+                
+                if (teamSelect) {
+                    updateSelectStyle(teamSelect);
+                    teamSelect.addEventListener('change', function() {
+                        updateSelectStyle(this);
+                    });
+                }
+                
+                if (scatterbugSelect) {
+                    updateSelectStyle(scatterbugSelect);
+                    scatterbugSelect.addEventListener('change', function() {
+                        updateSelectStyle(this);
+                    });
+                }
+            })();
+            </script>
         <?php else : ?>
             <div class="me5rine-lab-form-view">
                 <!-- Row 1: Username and Country -->
@@ -272,7 +303,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                 </div>
 
-                <!-- Row 4: Reasons (full width) -->
+                <!-- Row: Reasons (full width) -->
                 <?php if (!empty($profile['reasons'])) : ?>
                     <div class="me5rine-lab-form-view-row-full">
                         <div class="me5rine-lab-form-view-item me5rine-lab-form-col-full">

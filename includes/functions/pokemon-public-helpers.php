@@ -147,3 +147,4 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
 
 
 
+

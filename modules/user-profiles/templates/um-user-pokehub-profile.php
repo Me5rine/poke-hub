@@ -37,7 +37,7 @@ if ($can_edit && isset($_POST['poke_hub_save_profile_front']) && wp_verify_nonce
 
     if (function_exists('poke_hub_save_user_profile')) {
         poke_hub_save_user_profile($user_id, $profile);
-        echo '<div class="um-notice um-notice-success"><p>' . esc_html__('Profile saved successfully.', 'poke-hub') . '</p></div>';
+        echo '<div class="um-notice um-notice-success"><p>' . esc_html__('Pokémon GO profile updated successfully', 'poke-hub') . '</p></div>';
     }
 }
 

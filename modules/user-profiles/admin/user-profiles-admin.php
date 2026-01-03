@@ -55,7 +55,7 @@ function poke_hub_user_profiles_admin_ui() {
                 ];
 
                 poke_hub_save_user_profile($user_id_to_save, $profile);
-                echo '<div class="notice notice-success is-dismissible"><p>' . __('Profile saved successfully.', 'poke-hub') . '</p></div>';
+                echo '<div class="notice notice-success is-dismissible"><p>' . __('Pokémon GO profile updated successfully', 'poke-hub') . '</p></div>';
             } else {
                 echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($admin_error_message) . '</p></div>';
             }
