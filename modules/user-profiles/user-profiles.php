@@ -71,10 +71,16 @@ function poke_hub_user_profiles_admin_assets($hook) {
     jQuery(document).ready(function($) {
         if (typeof $.fn.select2 !== 'undefined') {
             // Initialize Select2 on country, team, and scatterbug_pattern selects
-            // Use dropdownParent to keep dropdown in the same DOM context
-            $('#country, #team, #scatterbug_pattern').each(function() {
+            // IMPORTANT: Only target <select> elements, not table headers
+            // Only in forms (not in table headers or filters)
+            $('select#country, select#team, select#scatterbug_pattern').each(function() {
                 var \$select = $(this);
-                if (!\$select.data('select2')) {
+                // Skip if it's in a table header (thead) or in filter nav
+                if (\$select.closest('thead, .tablenav').length > 0) {
+                    return;
+                }
+                // Only initialize on actual select elements in forms
+                if (!\$select.data('select2') && \$select.is('select')) {
                     // Find the closest form field wrapper for dropdownParent (admin uses form-table)
                     var \$parent = \$select.closest('.form-table, td');
                     if (!\$parent.length) {
@@ -93,6 +99,39 @@ function poke_hub_user_profiles_admin_assets($hook) {
     ");
 }
 add_action('admin_enqueue_scripts', 'poke_hub_user_profiles_admin_assets');
+
+/**
+ * Screen options pour la page User Profiles
+ */
+add_action('load-poke-hub_page_poke-hub-user-profiles', function() {
+    // Option "per page"
+    $args = [
+        'label'   => __('User profiles per page', 'poke-hub'),
+        'default' => 20,
+        'option'  => 'pokehub_user_profiles_per_page',
+    ];
+    add_screen_option('per_page', $args);
+    
+    // Les colonnes seront automatiquement disponibles dans Screen Options
+    // grâce à get_hidden_columns() dans la classe PokeHub_User_Profiles_List_Table
+});
+
+// Sauvegarde de l'option "per page"
+add_filter('set-screen-option', function($status, $option, $value) {
+    if ('pokehub_user_profiles_per_page' === $option) {
+        return (int) $value;
+    }
+    return $status;
+}, 10, 3);
+
+// Hook pour gérer les colonnes dans les Screen Options
+add_filter('manage_poke-hub_page_poke-hub-user-profiles_columns', function($columns) {
+    if (class_exists('PokeHub_User_Profiles_List_Table')) {
+        $table = new PokeHub_User_Profiles_List_Table();
+        return $table->get_columns();
+    }
+    return $columns;
+});
 
 /**
  * Hook into subscription_accounts updates to sync user_profiles.

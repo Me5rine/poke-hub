@@ -687,7 +687,7 @@ function poke_hub_get_um_profile_tab_url($user_id) {
     
     // Add tab parameter
     $separator = (strpos($profile_url, '?') !== false) ? '&' : '?';
-    return $profile_url . $separator . 'profiletab=pokehub-profile';
+    return $profile_url . $separator . 'tab=game-pokemon-go';
 }
 
 /**

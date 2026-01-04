@@ -5,6 +5,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Inclure la classe WP_List_Table
+require_once dirname(__FILE__) . '/class-user-profiles-list-table.php';
+
 /**
  * User profiles admin page for Pokémon GO
  */
@@ -15,6 +18,43 @@ function poke_hub_user_profiles_admin_ui() {
 
     $action = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
     $user_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
+    $profile_id = isset($_GET['profile_id']) ? (int) $_GET['profile_id'] : 0;
+
+    // Handle individual profile deletion
+    if ($action === 'delete' && $profile_id > 0) {
+        // Verify nonce
+        if (isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'delete_profile_' . $profile_id)) {
+            global $wpdb;
+            $table_name = pokehub_get_table('user_profiles');
+            
+            if (!empty($table_name)) {
+                $wpdb->delete(
+                    $table_name,
+                    ['id' => $profile_id],
+                    ['%d']
+                );
+                
+                // Redirect with success message
+                $redirect_args = [
+                    'page' => 'poke-hub-user-profiles',
+                    'deleted' => 1,
+                ];
+                
+                // Preserve filters
+                $preserve_params = ['filter_team', 'filter_scatterbug_pattern', 's', 'orderby', 'order'];
+                foreach ($preserve_params as $param) {
+                    if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                        $redirect_args[$param] = sanitize_text_field($_GET[$param]);
+                    }
+                }
+                
+                wp_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
+                exit;
+            }
+        } else {
+            wp_die(__('Security check failed.', 'poke-hub'));
+        }
+    }
 
     // Handle form submission
     $admin_error_message = '';
@@ -237,126 +277,66 @@ function poke_hub_render_user_profile_form($user_id) {
 }
 
 /**
- * Render users list with their profiles
+ * Render users list with their profiles using WP_List_Table
  */
 function poke_hub_render_user_profiles_list() {
-    // Pagination
-    $per_page = 20;
-    $paged = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
-    $offset = ($paged - 1) * $per_page;
-
-    // Search
-    $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
+    $list_table = new PokeHub_User_Profiles_List_Table();
+    $list_table->prepare_items();
     
-    $args = [
-        'number' => $per_page,
-        'offset' => $offset,
-        'search' => $search ? '*' . $search . '*' : '',
-        'search_columns' => ['user_login', 'user_nicename', 'user_email', 'display_name'],
-    ];
-
-    $user_query = new WP_User_Query($args);
-    $users = $user_query->get_results();
-    $total_users = $user_query->get_total();
-
-    $teams = poke_hub_get_teams();
+    // Préserver les paramètres de filtrage dans l'URL
+    $base_url = admin_url('admin.php?page=poke-hub-user-profiles');
+    $preserve_params = ['filter_team', 'filter_scatterbug_pattern', 's', 'orderby', 'order'];
+    foreach ($preserve_params as $param) {
+        if (isset($_GET[$param]) && $_GET[$param] !== '') {
+            $base_url = add_query_arg($param, sanitize_text_field($_GET[$param]), $base_url);
+        }
+    }
     ?>
     <div class="wrap">
-        <h1><?php _e('User Profiles', 'poke-hub'); ?></h1>
+        <h1 class="wp-heading-inline"><?php _e('User Profiles', 'poke-hub'); ?></h1>
+        <hr class="wp-header-end">
 
-        <div class="tablenav top">
-            <div class="alignleft actions">
-                <form method="get" action="">
-                    <input type="hidden" name="page" value="poke-hub-user-profiles">
-                    <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search users...', 'poke-hub'); ?>">
-                    <?php submit_button(__('Search', 'poke-hub'), 'secondary', false, false); ?>
-                </form>
+        <?php if (isset($_GET['deleted'])) : ?>
+            <div class="notice notice-success is-dismissible">
+                <p>
+                    <?php
+                    $deleted_count = (int) $_GET['deleted'];
+                    printf(
+                        _n(
+                            '%d profile deleted successfully.',
+                            '%d profiles deleted successfully.',
+                            $deleted_count,
+                            'poke-hub'
+                        ),
+                        $deleted_count
+                    );
+                    ?>
+                </p>
             </div>
-            <div class="tablenav-pages">
-                <?php
-                $pagination_args = [
-                    'base'      => add_query_arg('paged', '%#%'),
-                    'format'    => '',
-                    'prev_text' => '&laquo;',
-                    'next_text' => '&raquo;',
-                    'total'     => ceil($total_users / $per_page),
-                    'current'   => $paged,
-                ];
-                echo paginate_links($pagination_args);
-                ?>
-            </div>
-        </div>
+        <?php endif; ?>
 
-        <table class="wp-list-table widefat fixed striped">
-            <thead>
-                <tr>
-                    <th scope="col"><?php _e('User', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Team', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Friend Code', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('XP', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Country', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Pokémon GO Username', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Scatterbug Pattern', 'poke-hub'); ?></th>
-                    <th scope="col"><?php _e('Actions', 'poke-hub'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($users)) : ?>
-                    <tr>
-                        <td colspan="8"><?php _e('No users found.', 'poke-hub'); ?></td>
-                    </tr>
-                <?php else : ?>
-                    <?php foreach ($users as $user) : ?>
-                        <?php
-                        $profile = poke_hub_get_user_profile($user->ID);
-                        $team_label = !empty($profile['team']) ? ($teams[$profile['team']] ?? $profile['team']) : '—';
-                        $empty_dash = '—';
-                        ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo esc_html($user->display_name); ?></strong><br>
-                                <small><?php echo esc_html($user->user_email); ?></small>
-                            </td>
-                            <td><?php echo esc_html($team_label); ?></td>
-                            <td><?php 
-                                if (!empty($profile['friend_code'])) {
-                                    $formatted_code = function_exists('poke_hub_format_friend_code') 
-                                        ? poke_hub_format_friend_code($profile['friend_code']) 
-                                        : $profile['friend_code'];
-                                    echo esc_html($formatted_code);
-                                } else {
-                                    echo esc_html($empty_dash);
-                                }
-                            ?></td>
-                            <td><?php 
-                                if (!empty($profile['xp']) || $profile['xp'] === '0' || $profile['xp'] === 0) {
-                                    $formatted_xp = function_exists('poke_hub_format_xp') 
-                                        ? poke_hub_format_xp($profile['xp']) 
-                                        : number_format($profile['xp'], 0, ',', ' ');
-                                    echo esc_html($formatted_xp);
-                                } else {
-                                    echo esc_html($empty_dash);
-                                }
-                            ?></td>
-                            <td><?php echo esc_html($profile['country'] ?: $empty_dash); ?></td>
-                            <td><?php echo esc_html($profile['pokemon_go_username'] ?: $empty_dash); ?></td>
-                            <td><?php echo esc_html($profile['scatterbug_pattern'] ?: $empty_dash); ?></td>
-                            <td>
-                                <a href="<?php echo esc_url(add_query_arg(['action' => 'edit', 'user_id' => $user->ID])); ?>" class="button button-small">
-                                    <?php _e('Edit', 'poke-hub'); ?>
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-
-        <div class="tablenav bottom">
-            <div class="tablenav-pages">
-                <?php echo paginate_links($pagination_args); ?>
-            </div>
-        </div>
+        <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>">
+            <input type="hidden" name="page" value="poke-hub-user-profiles">
+            
+            <?php
+            // Préserver les filtres dans le formulaire de recherche
+            if (isset($_GET['filter_team'])) {
+                echo '<input type="hidden" name="filter_team" value="' . esc_attr($_GET['filter_team']) . '">';
+            }
+            if (isset($_GET['filter_scatterbug_pattern'])) {
+                echo '<input type="hidden" name="filter_scatterbug_pattern" value="' . esc_attr($_GET['filter_scatterbug_pattern']) . '">';
+            }
+            if (isset($_GET['orderby'])) {
+                echo '<input type="hidden" name="orderby" value="' . esc_attr($_GET['orderby']) . '">';
+            }
+            if (isset($_GET['order'])) {
+                echo '<input type="hidden" name="order" value="' . esc_attr($_GET['order']) . '">';
+            }
+            
+            $list_table->search_box(__('Search profiles', 'poke-hub'), 'user_profile');
+            $list_table->display();
+            ?>
+        </form>
     </div>
     <?php
 }
