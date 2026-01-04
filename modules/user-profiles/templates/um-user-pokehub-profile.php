@@ -36,8 +36,15 @@ if ($can_edit && isset($_POST['poke_hub_save_profile_front']) && wp_verify_nonce
     ];
 
     if (function_exists('poke_hub_save_user_profile')) {
-        poke_hub_save_user_profile($user_id, $profile);
-        echo '<div class="um-notice um-notice-success"><p>' . esc_html__('Pokémon GO profile updated successfully', 'poke-hub') . '</p></div>';
+        $save_result = poke_hub_save_user_profile($user_id, $profile);
+        if ($save_result) {
+            // Force Ultimate Member to refetch user data
+            // Note: poke_hub_save_user_profile() already purges UM cache internally
+            if (function_exists('poke_hub_purge_um_user_cache')) {
+                poke_hub_purge_um_user_cache($user_id);
+            }
+            $profile_saved = true;
+        }
     }
 }
 
@@ -50,17 +57,15 @@ $profile = poke_hub_get_user_profile($user_id);
 $teams = function_exists('poke_hub_get_teams') ? poke_hub_get_teams() : [];
 $reasons = function_exists('poke_hub_get_reasons') ? poke_hub_get_reasons() : [];
 $scatterbug_patterns = function_exists('poke_hub_get_scatterbug_patterns') ? poke_hub_get_scatterbug_patterns() : [];
+$countries = function_exists('poke_hub_get_countries') ? poke_hub_get_countries() : [];
 
-// Get country from Ultimate Member
-if (function_exists('poke_hub_get_user_country')) {
-    $current_country = poke_hub_get_user_country($user_id);
-    if (empty($profile['country']) && !empty($current_country)) {
-        $profile['country'] = $current_country;
-    }
-}
 ?>
 
 <div class="um-profile-note pokehub-profile-tab">
+    <?php if (isset($profile_saved) && $profile_saved) : ?>
+        <div class="um-notice um-notice-success"><p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p></div>
+    <?php endif; ?>
+    
     <?php if ($can_edit) : ?>
         <form method="post" action="" class="pokehub-profile-form">
             <?php wp_nonce_field('poke_hub_save_profile_front', 'poke_hub_profile_nonce'); ?>
@@ -106,9 +111,16 @@ if (function_exists('poke_hub_get_user_country')) {
                     <label for="country"><?php esc_html_e('Country', 'poke-hub'); ?></label>
                 </div>
                 <div class="um-field-area">
-                    <input type="text" name="country" id="country" value="<?php echo esc_attr($profile['country']); ?>" class="um-form-field">
+                    <select name="country" id="country" class="um-form-field">
+                        <option value=""><?php esc_html_e('-- Select a country --', 'poke-hub'); ?></option>
+                        <?php foreach ($countries as $code => $label) : ?>
+                            <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <div class="um-field-description">
-                        <?php esc_html_e('Country code (e.g., FR, US, GB). This will be synchronized with Ultimate Member.', 'poke-hub'); ?>
+                        <?php esc_html_e('Your country. This will be synchronized with Ultimate Member.', 'poke-hub'); ?>
                     </div>
                 </div>
             </div>
@@ -210,4 +222,38 @@ if (function_exists('poke_hub_get_user_country')) {
         </div>
     <?php endif; ?>
 </div>
+
+<?php if ($can_edit) : ?>
+<script>
+jQuery(function($) {
+    // Initialize Select2 if available (loaded via wp_enqueue_scripts)
+    if (typeof $.fn.select2 !== 'undefined') {
+        // Use class selector to avoid ID conflicts, and set dropdownParent correctly
+        $('.um-form-field').filter('select').each(function() {
+            var $select = $(this);
+            // Only initialize on country, team, and scatterbug_pattern selects
+            if (!$select.attr('id') || !['country', 'team', 'scatterbug_pattern'].includes($select.attr('id'))) {
+                return;
+            }
+            if (!$select.data('select2')) {
+                // Find the closest form field wrapper for dropdownParent
+                var $parent = $select.closest('.um-field-area');
+                if (!$parent.length) {
+                    $parent = $select.closest('.um-field');
+                }
+                if (!$parent.length) {
+                    $parent = $select.parent();
+                }
+                $select.select2({
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: $select.find('option[value=""]').text() || 'Select...',
+                    dropdownParent: $parent.length ? $parent : $('body')
+                });
+            }
+        });
+    }
+});
+</script>
+<?php endif; ?>
 

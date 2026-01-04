@@ -15,6 +15,7 @@ add_filter('pre_update_option_poke_hub_active_modules', function ($new_value, $o
     include_once ABSPATH . 'wp-admin/includes/plugin.php';
 
     // Dépendance : "events" → Me5rine LAB
+    // Dépendance : "user-profiles" → Me5rine LAB (pour subscription_accounts et préfixe global)
     $is_me5rine_lab_active = is_plugin_active('me5rine-lab/me5rine-lab.php');
 
     if (!is_array($new_value)) {
@@ -30,6 +31,16 @@ add_filter('pre_update_option_poke_hub_active_modules', function ($new_value, $o
 
         set_transient('poke_hub_admin_notice', [
             'message' => __('Events module could not be activated because Me5rine LAB is not installed or active.', 'poke-hub'),
+            'type'    => 'error',
+        ], 30);
+    }
+
+    // Bloquer "user-profiles" si Me5rine LAB n'est pas actif
+    if (in_array('user-profiles', $new_value, true) && !$is_me5rine_lab_active) {
+        $new_value = array_diff($new_value, ['user-profiles']);
+
+        set_transient('poke_hub_admin_notice', [
+            'message' => __('User Profiles module could not be activated because Me5rine LAB is not installed or active.', 'poke-hub'),
             'type'    => 'error',
         ], 30);
     }
@@ -153,6 +164,10 @@ add_action('admin_init', function () {
             pokehub_get_table('special_event_pokemon'),
             pokehub_get_table('special_event_bonus'),
             pokehub_get_table('special_event_pokemon_attacks'),
+        ],
+
+        'user-profiles' => [
+            pokehub_get_table('user_profiles'),
         ],
     ];
 

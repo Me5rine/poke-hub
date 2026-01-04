@@ -51,8 +51,15 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
             ];
 
             if (function_exists('poke_hub_save_user_profile')) {
-                poke_hub_save_user_profile($user_id, $profile);
-                $success_message = true;
+                $save_result = poke_hub_save_user_profile($user_id, $profile);
+                if ($save_result) {
+                    // Force Ultimate Member to refetch user data if available
+                    // Note: poke_hub_save_user_profile() already purges UM cache internally
+                    if (function_exists('poke_hub_purge_um_user_cache')) {
+                        poke_hub_purge_um_user_cache($user_id);
+                    }
+                    $success_message = true;
+                }
             }
         }
     }
@@ -66,14 +73,8 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     $teams = function_exists('poke_hub_get_teams') ? poke_hub_get_teams() : [];
     $reasons = function_exists('poke_hub_get_reasons') ? poke_hub_get_reasons() : [];
     $scatterbug_patterns = function_exists('poke_hub_get_scatterbug_patterns') ? poke_hub_get_scatterbug_patterns() : [];
+    $countries = function_exists('poke_hub_get_countries') ? poke_hub_get_countries() : [];
     
-    // Get country from Ultimate Member
-    if (function_exists('poke_hub_get_user_country')) {
-        $current_country = poke_hub_get_user_country($user_id);
-        if (empty($profile['country']) && !empty($current_country)) {
-            $profile['country'] = $current_country;
-        }
-    }
     
     // Ensure arrays
     if (empty($teams)) $teams = [];
@@ -119,7 +120,14 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="country"><?php esc_html_e('Country', 'poke-hub'); ?></label>
-                            <input type="text" name="country" id="country" value="<?php echo esc_attr($profile['country']); ?>" class="me5rine-lab-form-input" placeholder="<?php esc_attr_e('FR, US, GB...', 'poke-hub'); ?>">
+                            <select name="country" id="country" class="me5rine-lab-form-select<?php echo empty($profile['country']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
+                                <option value=""<?php echo empty($profile['country']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a country --', 'poke-hub'); ?></option>
+                                <?php foreach ($countries as $code => $label) : ?>
+                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                        <?php echo esc_html($label); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -219,30 +227,29 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
             </form>
             <script>
             (function() {
-                function updateSelectStyle(select) {
-                    if (select.value === '') {
-                        select.style.color = '#999';
-                        select.classList.add('me5rine-lab-form-select-placeholder');
-                    } else {
-                        select.style.color = '';
-                        select.classList.remove('me5rine-lab-form-select-placeholder');
-                    }
-                }
-                
-                var teamSelect = document.getElementById('team');
-                var scatterbugSelect = document.getElementById('scatterbug_pattern');
-                
-                if (teamSelect) {
-                    updateSelectStyle(teamSelect);
-                    teamSelect.addEventListener('change', function() {
-                        updateSelectStyle(this);
-                    });
-                }
-                
-                if (scatterbugSelect) {
-                    updateSelectStyle(scatterbugSelect);
-                    scatterbugSelect.addEventListener('change', function() {
-                        updateSelectStyle(this);
+                // Initialize Select2 if available (loaded via wp_enqueue_scripts)
+                if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+                    jQuery(function($) {
+                        // Use class selector to avoid ID conflicts, and set dropdownParent correctly
+                        $('.me5rine-lab-form-select').each(function() {
+                            var $select = $(this);
+                            if (!$select.data('select2')) {
+                                // Find the closest form field wrapper for dropdownParent
+                                var $parent = $select.closest('.me5rine-lab-form-field');
+                                if (!$parent.length) {
+                                    $parent = $select.closest('.me5rine-lab-form-col');
+                                }
+                                if (!$parent.length) {
+                                    $parent = $select.parent();
+                                }
+                                $select.select2({
+                                    width: '100%',
+                                    allowClear: true,
+                                    placeholder: $select.find('option[value=""]').text() || 'Select...',
+                                    dropdownParent: $parent.length ? $parent : $('body')
+                                });
+                            }
+                        });
                     });
                 }
             })();

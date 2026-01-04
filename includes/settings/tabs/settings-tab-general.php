@@ -59,6 +59,12 @@ $can_manage_cleanup = true;
                         $message  = ' <em>(' . __('Requires Me5rine LAB (events source)', 'poke-hub') . ')</em>';
                     }
 
+                    // Dépendance : User Profiles → Me5rine LAB
+                    if ($module_key === 'user-profiles' && !$is_me5rine_lab_active) {
+                        $disabled = 'disabled';
+                        $message  = ' <em>(' . __('Requires Me5rine LAB (subscription_accounts table)', 'poke-hub') . ')</em>';
+                    }
+
                     $checked = in_array($module_key, $active_modules, true) ? 'checked="checked"' : '';
 
                     echo '<label>';

@@ -85,13 +85,8 @@ function poke_hub_render_user_profile_form($user_id) {
     $teams = poke_hub_get_teams();
     $reasons = poke_hub_get_reasons();
     $scatterbug_patterns = poke_hub_get_scatterbug_patterns();
-    $countries = get_option('poke_hub_countries_list', []); // Can be filled later
+    $countries = function_exists('poke_hub_get_countries') ? poke_hub_get_countries() : [];
 
-    // Get country from Ultimate Member or WordPress
-    $current_country = poke_hub_get_user_country($user_id);
-    if (empty($profile['country']) && !empty($current_country)) {
-        $profile['country'] = $current_country;
-    }
     ?>
     <div class="wrap">
         <h1><?php echo esc_html(sprintf(__('Edit Profile: %s', 'poke-hub'), $user->display_name)); ?></h1>
@@ -170,9 +165,16 @@ function poke_hub_render_user_profile_form($user_id) {
                         <label for="country"><?php _e('Country', 'poke-hub'); ?></label>
                     </th>
                     <td>
-                        <input type="text" name="country" id="country" value="<?php echo esc_attr($profile['country']); ?>" class="regular-text">
+                        <select name="country" id="country">
+                            <option value=""><?php _e('-- Select a country --', 'poke-hub'); ?></option>
+                            <?php foreach ($countries as $code => $label) : ?>
+                                <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                    <?php echo esc_html($label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                         <p class="description">
-                            <?php _e('Country code (e.g., FR, US, GB). This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
+                            <?php _e('Your country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
                         </p>
                     </td>
                 </tr>

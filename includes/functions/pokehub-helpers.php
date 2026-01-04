@@ -120,6 +120,44 @@ function poke_hub_pokemon_get_table_prefix(): string {
 }
 
 /**
+ * Récupère le préfixe des tables globales partagées entre tous les sites.
+ *
+ * Utilise la constante ME5RINE_LAB_GLOBAL_PREFIX définie dans wp-config.php,
+ * ou ME5RINE_LAB_CUSTOM_PREFIX si elle est définie.
+ *
+ * Si aucune constante n'est définie, on retombe sur $wpdb->prefix (préfixe local).
+ *
+ * @return string Préfixe des tables globales
+ */
+function poke_hub_global_get_table_prefix(): string {
+    global $wpdb;
+    
+    // Sécurité : vérifier que $wpdb est disponible
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return '';
+    }
+
+    // Utiliser ME5RINE_LAB_CUSTOM_PREFIX si défini, sinon ME5RINE_LAB_GLOBAL_PREFIX
+    if (defined('ME5RINE_LAB_CUSTOM_PREFIX')) {
+        $prefix = ME5RINE_LAB_CUSTOM_PREFIX;
+    } elseif (defined('ME5RINE_LAB_GLOBAL_PREFIX')) {
+        $prefix = ME5RINE_LAB_GLOBAL_PREFIX;
+    } else {
+        // Fallback : préfixe local
+        $prefix = $wpdb->prefix;
+    }
+
+    $prefix = trim((string) $prefix);
+
+    // Si vide → fallback dev : préfixe local
+    if ($prefix === '') {
+        return $wpdb->prefix;
+    }
+
+    return $prefix;
+}
+
+/**
  * Helper unique pour retourner le nom réel d'une table,
  * locale (wp_...pokehub_*) ou distante (JV Actu / BDD remote).
  *
@@ -254,6 +292,9 @@ function pokehub_get_table(string $key): string {
         'remote_pokemon_backgrounds'       => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_backgrounds'],
         'remote_pokemon_background_pokemon_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_background_pokemon_links'],
         'remote_pokemon_form_mappings'      => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_form_mappings'],
+
+        // ==== Tables globales partagées (ME5RINE_LAB_GLOBAL_PREFIX) ====
+        'user_profiles'                    => ['scope' => 'global', 'suffix' => 'pokehub_user_profiles'],
     ];
 
     $scope  = 'local';
@@ -290,7 +331,21 @@ function pokehub_get_table(string $key): string {
     }
 
     // Construction du nom de table selon le scope
-    if ($scope === 'remote_pokemon') {
+    if ($scope === 'global') {
+        // Tables globales partagées : utiliser le préfixe global ME5RINE_LAB_GLOBAL_PREFIX
+        if (function_exists('poke_hub_global_get_table_prefix')) {
+            $prefix = (string) poke_hub_global_get_table_prefix();
+            // Si le préfixe est vide (erreur ou $wpdb non disponible), utiliser le préfixe local
+            if (empty($prefix)) {
+                $prefix = $wpdb->prefix;
+            }
+        } else {
+            // Si la fonction n'existe pas, utiliser le préfixe local (fallback)
+            $prefix = $wpdb->prefix;
+        }
+
+        $table = $prefix . $suffix;
+    } elseif ($scope === 'remote_pokemon') {
         // Tables Pokémon distantes : utiliser le préfixe Pokémon
         // Vérifier d'abord si un préfixe distant est vraiment configuré
         $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');

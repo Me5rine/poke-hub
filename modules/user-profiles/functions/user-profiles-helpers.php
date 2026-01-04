@@ -6,74 +6,211 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Get Pokémon GO user profile.
+ * Get subscription_accounts table name (uses global prefix).
  *
- * @param int $user_id User ID
- * @return array User profile
+ * @return string Table name or empty string if prefix not available
  */
-function poke_hub_get_user_profile($user_id) {
+function poke_hub_get_subscription_accounts_table() {
+    if (function_exists('poke_hub_global_get_table_prefix')) {
+        $prefix = poke_hub_global_get_table_prefix();
+        if (!empty($prefix)) {
+            return $prefix . 'subscription_accounts';
+        }
+    }
+    return '';
+}
+
+/**
+ * Get Discord ID from WordPress user ID using subscription_accounts table.
+ *
+ * @param int $user_id WordPress user ID
+ * @return string|null Discord ID or null if not found
+ */
+function poke_hub_get_discord_id_from_user_id($user_id) {
+    global $wpdb;
+    
     $user_id = (int) $user_id;
     if ($user_id <= 0) {
+        return null;
+    }
+    
+    $table_name = poke_hub_get_subscription_accounts_table();
+    if (empty($table_name)) {
+        return null;
+    }
+    
+    $result = $wpdb->get_var($wpdb->prepare(
+        "SELECT external_user_id FROM {$table_name} WHERE user_id = %d AND provider_slug = 'discord' AND is_active = 1 LIMIT 1",
+        $user_id
+    ));
+    
+    return $result ? (string) $result : null;
+}
+
+/**
+ * Get WordPress user ID from Discord ID using subscription_accounts table.
+ *
+ * @param string $discord_id Discord ID
+ * @return int|null WordPress user ID or null if not found
+ */
+function poke_hub_get_user_id_from_discord_id($discord_id) {
+    global $wpdb;
+    
+    $discord_id = sanitize_text_field((string) $discord_id);
+    if (empty($discord_id)) {
+        return null;
+    }
+    
+    $table_name = poke_hub_get_subscription_accounts_table();
+    if (empty($table_name)) {
+        return null;
+    }
+    
+    $result = $wpdb->get_var($wpdb->prepare(
+        "SELECT user_id FROM {$table_name} WHERE external_user_id = %s AND provider_slug = 'discord' AND is_active = 1 LIMIT 1",
+        $discord_id
+    ));
+    
+    return $result ? (int) $result : null;
+}
+
+/**
+ * Get Pokémon GO user profile.
+ *
+ * @param int|null $user_id WordPress User ID (optional)
+ * @param string|null $discord_id Optional Discord ID
+ * @return array User profile
+ */
+function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
+    global $wpdb;
+
+    // Normalize inputs
+    $wp_user_id = null;
+    $discord_id_value = null;
+
+    // user_id parameter: always treated as WordPress user ID (int)
+    if ($user_id !== null) {
+        $wp_user_id = (int) $user_id;
+        if ($wp_user_id <= 0) {
+            $wp_user_id = null;
+        }
+    }
+
+    // discord_id parameter: Discord ID (string)
+    if ($discord_id !== null) {
+        $discord_id_value = sanitize_text_field((string) $discord_id);
+        if ($discord_id_value === '') {
+            $discord_id_value = null;
+        }
+    }
+
+    // If only user_id provided, try to get discord_id from subscription_accounts
+    if ($wp_user_id !== null && $discord_id_value === null) {
+        $discord_id_value = poke_hub_get_discord_id_from_user_id($wp_user_id);
+    }
+
+    // If only discord_id provided, try to get user_id from subscription_accounts
+    if ($discord_id_value !== null && $wp_user_id === null) {
+        $wp_user_id = poke_hub_get_user_id_from_discord_id($discord_id_value);
+    }
+
+    // If no identifier provided, return empty
+    if ($wp_user_id === null && $discord_id_value === null) {
         return [];
     }
 
-    // Get friend_code_public meta (defaults to true if not set)
-    $friend_code_public_meta = get_user_meta($user_id, 'poke_hub_friend_code_public', true);
-    $friend_code_public = ($friend_code_public_meta !== false) ? (bool) $friend_code_public_meta : true;
-
-    $profile = [
-        'team'                => get_user_meta($user_id, 'poke_hub_team', true) ?: '',
-        'friend_code'         => get_user_meta($user_id, 'poke_hub_friend_code', true) ?: '',
-        'friend_code_public'  => $friend_code_public,
-        'xp'                  => get_user_meta($user_id, 'poke_hub_xp', true) ?: 0,
-        'country'             => get_user_meta($user_id, 'poke_hub_country', true) ?: '',
-        'pokemon_go_username' => get_user_meta($user_id, 'poke_hub_pokemon_go_username', true) ?: '',
-        'scatterbug_pattern'  => get_user_meta($user_id, 'poke_hub_scatterbug_pattern', true) ?: '',
-        'reasons'             => [], // Will be filled by robust normalization below
-    ];
-
-    // Reasons: robust normalization -> always array of strings: ['raids','pvp',...]
-    $raw = get_user_meta($user_id, 'poke_hub_reasons', true);
-
-    // If already an array (WordPress may have auto-unserialized), use it directly
-    if (is_array($raw)) {
-        // If associative array ['raids'=>1,'pvp'=>true] => keep only active keys
-        $is_assoc = array_keys($raw) !== range(0, count($raw) - 1);
-        if ($is_assoc) {
-            $raw = array_keys(array_filter($raw));
-        }
-    } elseif (is_string($raw)) {
-        // Handle string format (serialized PHP, JSON, or CSV)
-        $s = trim($raw);
-        
-        // First try maybe_unserialize (handles PHP serialized format)
-        $unserialized = maybe_unserialize($s);
-        if (is_array($unserialized)) {
-            $raw = $unserialized;
-        } elseif ($s !== '' && ($s[0] === '[' || $s[0] === '{')) {
-            // Try JSON if it looks like JSON
-            $decoded = json_decode($s, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $raw = $decoded;
-            } else {
-                // If still string => treat as CSV
-                $raw = array_map('trim', explode(',', $s));
-            }
-        } elseif ($s !== '') {
-            // If still string => treat as CSV
-            $raw = array_map('trim', explode(',', $s));
-        } else {
-            $raw = [];
-        }
-    } else {
-        // false, null, or other => empty array
-        $raw = [];
+    // Get table name
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        return [];
     }
 
-    // Final: clean strings array (remove empty values, normalize to strings)
-    $profile['reasons'] = array_values(array_filter(array_map('strval', $raw), function($v) {
+    // Build query to search by user_id or discord_id
+    if ($wp_user_id !== null && $discord_id_value !== null) {
+        // Search by both (OR condition)
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE user_id = %d OR discord_id = %s LIMIT 1",
+            $wp_user_id,
+            $discord_id_value
+        );
+    } elseif ($wp_user_id !== null) {
+        // Search by user_id only
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE user_id = %d LIMIT 1",
+            $wp_user_id
+        );
+    } elseif ($discord_id_value !== null) {
+        // Search by discord_id only
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE discord_id = %s LIMIT 1",
+            $discord_id_value
+        );
+    } else {
+        return [];
+    }
+
+    $row = $wpdb->get_row($query, ARRAY_A);
+
+    // Get country from Ultimate Member (single source of truth)
+    // Always check Ultimate Member first, regardless of whether row exists
+    $country = '';
+    if ($wp_user_id !== null && $wp_user_id > 0) {
+        // Always get country from Ultimate Member usermeta (single source of truth)
+        $um_country = get_user_meta($wp_user_id, 'country', true);
+        if (!empty($um_country)) {
+            $country = $um_country;
+        }
+    }
+
+    // If no row exists, return empty profile with country from Ultimate Member
+    if (!$row) {
+        return [
+            'team'                => '',
+            'friend_code'         => '',
+            'friend_code_public'  => false,
+            'xp'                  => 0,
+            'country'             => $country,
+            'pokemon_go_username' => '',
+            'scatterbug_pattern'  => '',
+            'reasons'             => [],
+            'user_id'             => $wp_user_id,
+            'discord_id'          => $discord_id_value,
+        ];
+    }
+
+    // Normalize reasons from database (stored as JSON)
+    $reasons = [];
+    if (!empty($row['reasons'])) {
+        $raw = $row['reasons'];
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $reasons = $decoded;
+            }
+        } elseif (is_array($raw)) {
+            $reasons = $raw;
+        }
+    }
+
+    // Clean reasons array
+    $reasons = array_values(array_filter(array_map('strval', $reasons), function($v) {
         return $v !== '';
     }));
+
+    // Country is always from Ultimate Member, never from table (table column will be removed)
+
+    $profile = [
+        'team'                => $row['team'] ?: '',
+        'friend_code'         => $row['friend_code'] ?: '',
+        'friend_code_public'  => !empty($row['friend_code_public']),
+        'xp'                  => (int) $row['xp'],
+        'country'             => $country,
+        'pokemon_go_username' => $row['pokemon_go_username'] ?: '',
+        'scatterbug_pattern'  => $row['scatterbug_pattern'] ?: '',
+        'reasons'             => $reasons,
+        'user_id'             => !empty($row['user_id']) ? (int) $row['user_id'] : null,
+        'discord_id'          => !empty($row['discord_id']) ? $row['discord_id'] : null,
+    ];
 
     return $profile;
 }
@@ -81,13 +218,50 @@ function poke_hub_get_user_profile($user_id) {
 /**
  * Save Pokémon GO user profile.
  *
- * @param int   $user_id User ID
- * @param array $profile Profile data
+ * @param int|null   $user_id WordPress User ID (optional)
+ * @param array      $profile Profile data (may include 'discord_id' key)
+ * @param string|null $discord_id Optional Discord ID (can also be in $profile['discord_id'])
  * @return bool Success or failure
  */
-function poke_hub_save_user_profile($user_id, $profile) {
-    $user_id = (int) $user_id;
-    if ($user_id <= 0) {
+function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id = null) {
+    global $wpdb;
+
+    // Normalize user_id
+    $wp_user_id = null;
+    if ($user_id !== null) {
+        $wp_user_id = (int) $user_id;
+        if ($wp_user_id <= 0) {
+            $wp_user_id = null;
+        }
+    }
+
+    // Get discord_id from profile or parameter
+    $discord_id_value = null;
+    if (isset($profile['discord_id'])) {
+        $discord_id_value = sanitize_text_field((string) $profile['discord_id']);
+        if ($discord_id_value === '') {
+            $discord_id_value = null;
+        }
+    }
+    if ($discord_id_value === null && $discord_id !== null) {
+        $discord_id_value = sanitize_text_field((string) $discord_id);
+        if ($discord_id_value === '') {
+            $discord_id_value = null;
+        }
+    }
+
+    // If only user_id provided, try to get discord_id from subscription_accounts
+    if ($wp_user_id !== null && $discord_id_value === null) {
+        $discord_id_value = poke_hub_get_discord_id_from_user_id($wp_user_id);
+    }
+
+    // If only discord_id provided, try to get user_id from subscription_accounts
+    if ($discord_id_value !== null && $wp_user_id === null) {
+        $wp_user_id = poke_hub_get_user_id_from_discord_id($discord_id_value);
+    }
+
+    // At least one identifier must be provided
+    if ($wp_user_id === null && $discord_id_value === null) {
         return false;
     }
 
@@ -107,7 +281,27 @@ function poke_hub_save_user_profile($user_id, $profile) {
     $friend_code_public = isset($profile['friend_code_public']) ? (bool) $profile['friend_code_public'] : true; // Default to public
     // Clean XP (remove spaces) before saving
     $xp = isset($profile['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($profile['xp']) : absint(preg_replace('/[^0-9]/', '', (string) $profile['xp']))) : 0;
+    
+    // Get country: prioritize form value, then Ultimate Member, then empty
     $country = isset($profile['country']) ? sanitize_text_field($profile['country']) : '';
+    
+    // If country is empty from form, try to get it from Ultimate Member
+    if (empty($country) && $wp_user_id !== null && $wp_user_id > 0) {
+        $um_country = get_user_meta($wp_user_id, 'country', true);
+        if (!empty($um_country)) {
+            $country = $um_country;
+        }
+    }
+    
+    // Validate that the country label exists in Ultimate Member's countries list
+    if (!empty($country)) {
+        $countries = poke_hub_get_countries(); // Returns array: CODE => LABEL
+        if (is_array($countries) && !in_array($country, $countries, true)) {
+            // Invalid country label, reset to empty
+            $country = '';
+        }
+    }
+    
     $pokemon_go_username = isset($profile['pokemon_go_username']) ? sanitize_text_field($profile['pokemon_go_username']) : '';
     $scatterbug_pattern = isset($profile['scatterbug_pattern']) ? sanitize_text_field($profile['scatterbug_pattern']) : '';
     $reasons = isset($profile['reasons']) && is_array($profile['reasons']) ? array_map('sanitize_text_field', $profile['reasons']) : [];
@@ -118,49 +312,253 @@ function poke_hub_save_user_profile($user_id, $profile) {
         $team = '';
     }
 
-    // Update user meta
-    update_user_meta($user_id, 'poke_hub_team', $team);
-    update_user_meta($user_id, 'poke_hub_friend_code', $friend_code);
-    update_user_meta($user_id, 'poke_hub_friend_code_public', $friend_code_public ? 1 : 0);
-    update_user_meta($user_id, 'poke_hub_xp', $xp);
-    update_user_meta($user_id, 'poke_hub_pokemon_go_username', $pokemon_go_username);
-    update_user_meta($user_id, 'poke_hub_scatterbug_pattern', $scatterbug_pattern);
-    update_user_meta($user_id, 'poke_hub_reasons', $reasons);
-
-    // Sync country: Use Ultimate Member's country_code as the single source of truth
-    // This ensures no duplication and sync across all plugins/modules
-    if (!empty($country)) {
-        // Update Ultimate Member's country_code (primary source)
-        update_user_meta($user_id, 'country_code', $country);
-        
-        // Also update other possible locations for compatibility
-        update_user_meta($user_id, 'country', $country);
-        update_user_meta($user_id, 'billing_country', $country);
-        
-        // Clear Ultimate Member cache if available
-        if (function_exists('um_fetch_user')) {
-            um_fetch_user($user_id);
-        }
-    } elseif (empty($country)) {
-        // If country is empty, try to get it from Ultimate Member first
-        $um_country = get_user_meta($user_id, 'country_code', true);
-        if (!empty($um_country)) {
-            $country = $um_country;
-        }
+    // Get table name
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        return false;
     }
-    
-    // Store country in poke_hub_country as a backup/cache
-    update_user_meta($user_id, 'poke_hub_country', $country);
+
+    // Store reasons as JSON
+    $reasons_json = !empty($reasons) ? json_encode($reasons) : null;
+
+    // Check if row exists (by user_id or discord_id)
+    $existing_row = null;
+    if ($wp_user_id !== null) {
+        $existing_row = $wpdb->get_row(
+            $wpdb->prepare("SELECT id, user_id, discord_id FROM {$table_name} WHERE user_id = %d LIMIT 1", $wp_user_id),
+            ARRAY_A
+        );
+    }
+    if (!$existing_row && $discord_id_value !== null) {
+        $existing_row = $wpdb->get_row(
+            $wpdb->prepare("SELECT id, user_id, discord_id FROM {$table_name} WHERE discord_id = %s LIMIT 1", $discord_id_value),
+            ARRAY_A
+        );
+    }
+
+    // Prepare data for insert/update
+    // Note: country is NOT stored in table, only in Ultimate Member usermeta
+    $data = [
+        'team'                => $team,
+        'friend_code'         => $friend_code,
+        'friend_code_public'  => $friend_code_public ? 1 : 0,
+        'xp'                  => $xp,
+        'pokemon_go_username' => $pokemon_go_username,
+        'scatterbug_pattern'  => $scatterbug_pattern,
+        'reasons'             => $reasons_json,
+    ];
+
+    // Only set user_id and discord_id if they are not null
+    if ($wp_user_id !== null) {
+        $data['user_id'] = $wp_user_id;
+    }
+    if ($discord_id_value !== null) {
+        $data['discord_id'] = $discord_id_value;
+    }
+
+    if ($existing_row) {
+        // Update existing row
+        // Merge user_id and discord_id if we have both
+        if ($wp_user_id !== null && empty($existing_row['user_id'])) {
+            $data['user_id'] = $wp_user_id;
+        }
+        if ($discord_id_value !== null && empty($existing_row['discord_id'])) {
+            $data['discord_id'] = $discord_id_value;
+        }
+
+        // Build format array dynamically based on $data keys
+        $format = [];
+        foreach ($data as $key => $value) {
+            if ($key === 'user_id' || $key === 'xp' || $key === 'friend_code_public') {
+                $format[] = '%d';
+            } elseif ($key === 'reasons') {
+                $format[] = '%s'; // JSON string
+            } else {
+                $format[] = '%s';
+            }
+        }
+
+        $result = $wpdb->update(
+            $table_name,
+            $data,
+            ['id' => $existing_row['id']],
+            $format,
+            ['%d']
+        );
+    } else {
+        // Insert new row
+        // Build format array dynamically based on $data keys
+        $format = [];
+        foreach ($data as $key => $value) {
+            if ($key === 'user_id' || $key === 'xp' || $key === 'friend_code_public') {
+                $format[] = '%d';
+            } elseif ($key === 'reasons') {
+                $format[] = '%s'; // JSON string
+            } else {
+                $format[] = '%s';
+            }
+        }
+
+        $result = $wpdb->insert(
+            $table_name,
+            $data,
+            $format
+        );
+    }
+
+    if ($result === false) {
+        return false;
+    }
+
+    // Sync country with Ultimate Member (country is the single source of truth)
+    // Country is ONLY stored in Ultimate Member usermeta, NOT in our table
+    if ($wp_user_id !== null && $wp_user_id > 0) {
+        if (!empty($country)) {
+            // Update Ultimate Member's country (primary and only source)
+            update_user_meta($wp_user_id, 'country', $country);
+            
+            // IMPORTANT: purge all caches to see change immediately in UM tab
+            // This deletes UM cache (wp_options), WordPress cache, and refreshes UM context
+            if (function_exists('poke_hub_purge_um_user_cache')) {
+                poke_hub_purge_um_user_cache($wp_user_id);
+            }
+        }
+        // Note: We don't store country in our table anymore, Ultimate Member is the only source
+    }
 
     /**
      * Action after profile save
      *
-     * @param int   $user_id User ID
-     * @param array $profile Saved profile
+     * @param int|null   $user_id User ID (may be null if only discord_id)
+     * @param array      $profile Saved profile
+     * @param string|null $discord_id Discord ID (may be null if only user_id)
      */
-    do_action('poke_hub_user_profile_saved', $user_id, $profile);
+    do_action('poke_hub_user_profile_saved', $wp_user_id, $profile, $discord_id_value);
 
     return true;
+}
+
+/**
+ * Synchronize user_id and discord_id in user_profiles from subscription_accounts.
+ * This function should be called when subscription_accounts is updated.
+ *
+ * @param int $user_id WordPress user ID
+ * @return bool Success or failure
+ */
+function poke_hub_sync_user_profile_ids_from_subscription($user_id) {
+    global $wpdb;
+    
+    $user_id = (int) $user_id;
+    if ($user_id <= 0) {
+        return false;
+    }
+    
+    // Get table name
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        return false;
+    }
+    
+    // Check if table exists
+    if (!pokehub_table_exists($table_name)) {
+        return false;
+    }
+    
+    // Get Discord ID from subscription_accounts
+    $discord_id = poke_hub_get_discord_id_from_user_id($user_id);
+    
+    // Check if profile exists
+    $existing_row = $wpdb->get_row(
+        $wpdb->prepare("SELECT id, user_id, discord_id FROM {$table_name} WHERE user_id = %d LIMIT 1", $user_id),
+        ARRAY_A
+    );
+    
+    if ($existing_row) {
+        // Update existing profile with discord_id if we have it
+        $update_data = [];
+        $format = [];
+        
+        if ($discord_id !== null && empty($existing_row['discord_id'])) {
+            $update_data['discord_id'] = $discord_id;
+            $format[] = '%s';
+        }
+        
+        if (!empty($update_data)) {
+            $wpdb->update(
+                $table_name,
+                $update_data,
+                ['id' => $existing_row['id']],
+                $format,
+                ['%d']
+            );
+        }
+    } else {
+        // Profile doesn't exist, but we could create it with just IDs if needed
+        // For now, we don't auto-create profiles, they must be created explicitly
+    }
+    
+    return true;
+}
+
+/**
+ * Synchronize user_id and discord_id when a profile is saved.
+ * This ensures user_profiles stays in sync with subscription_accounts.
+ * Called internally when profile is saved.
+ *
+ * @param int|null $user_id WordPress user ID
+ * @param string|null $discord_id Discord ID
+ * @return void
+ */
+function poke_hub_sync_user_profile_ids_on_save($user_id, $discord_id) {
+    global $wpdb;
+    
+    // Get table name and check if it exists
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name) || !function_exists('pokehub_table_exists') || !pokehub_table_exists($table_name)) {
+        return;
+    }
+    
+    // If we have user_id but not discord_id, try to get it from subscription_accounts
+    if ($user_id !== null && $user_id > 0 && $discord_id === null) {
+        $discord_id_from_sub = poke_hub_get_discord_id_from_user_id($user_id);
+        if ($discord_id_from_sub !== null) {
+            // Update the profile with discord_id
+            $existing_row = $wpdb->get_row(
+                $wpdb->prepare("SELECT id FROM {$table_name} WHERE user_id = %d LIMIT 1", $user_id),
+                ARRAY_A
+            );
+            if ($existing_row) {
+                $wpdb->update(
+                    $table_name,
+                    ['discord_id' => $discord_id_from_sub],
+                    ['id' => $existing_row['id']],
+                    ['%s'],
+                    ['%d']
+                );
+            }
+        }
+    }
+    
+    // If we have discord_id but not user_id, try to get it from subscription_accounts
+    if ($discord_id !== null && $user_id === null) {
+        $user_id_from_sub = poke_hub_get_user_id_from_discord_id($discord_id);
+        if ($user_id_from_sub !== null && $user_id_from_sub > 0) {
+            // Update the profile with user_id
+            $existing_row = $wpdb->get_row(
+                $wpdb->prepare("SELECT id FROM {$table_name} WHERE discord_id = %s LIMIT 1", $discord_id),
+                ARRAY_A
+            );
+            if ($existing_row) {
+                $wpdb->update(
+                    $table_name,
+                    ['user_id' => $user_id_from_sub],
+                    ['id' => $existing_row['id']],
+                    ['%d'],
+                    ['%d']
+                );
+            }
+        }
+    }
 }
 
 /**
@@ -260,45 +658,6 @@ function poke_hub_get_scatterbug_patterns() {
 }
 
 /**
- * Get user country from Ultimate Member or WordPress.
- * Uses Ultimate Member's country_code as the single source of truth.
- *
- * @param int $user_id User ID
- * @return string Country code
- */
-function poke_hub_get_user_country($user_id) {
-    $user_id = (int) $user_id;
-    if ($user_id <= 0) {
-        return '';
-    }
-
-    // Use Ultimate Member's country_code as the single source of truth
-    $country = get_user_meta($user_id, 'country_code', true);
-    if (!empty($country)) {
-        return $country;
-    }
-
-    // Fallback to other locations if country_code is empty
-    $country = get_user_meta($user_id, 'country', true);
-    if (!empty($country)) {
-        return $country;
-    }
-
-    $country = get_user_meta($user_id, 'billing_country', true);
-    if (!empty($country)) {
-        return $country;
-    }
-
-    // Last fallback: poke_hub_country cache
-    $country = get_user_meta($user_id, 'poke_hub_country', true);
-    if (!empty($country)) {
-        return $country;
-    }
-
-    return '';
-}
-
-/**
  * Get team label.
  *
  * @param string $team Team slug
@@ -329,32 +688,6 @@ function poke_hub_get_um_profile_tab_url($user_id) {
     // Add tab parameter
     $separator = (strpos($profile_url, '?') !== false) ? '&' : '?';
     return $profile_url . $separator . 'profiletab=pokehub-profile';
-}
-
-/**
- * Sync country when Ultimate Member profile is updated
- * 
- * @param int $user_id User ID
- * @param array $args Profile update arguments
- */
-function poke_hub_um_sync_country_on_profile_update($user_id, $args) {
-    // Check if country_code is being updated
-    if (isset($args['country_code']) && !empty($args['country_code'])) {
-        $country = sanitize_text_field($args['country_code']);
-        
-        // Update our cache
-        update_user_meta($user_id, 'poke_hub_country', $country);
-        
-        // Update other locations for compatibility
-        update_user_meta($user_id, 'country', $country);
-        update_user_meta($user_id, 'billing_country', $country);
-    }
-}
-
-// Hook into Ultimate Member profile updates if Ultimate Member is active
-if (function_exists('um_user_pre_updating_profile')) {
-    add_action('um_user_pre_updating_profile', 'poke_hub_um_sync_country_on_profile_update', 10, 2);
-    add_action('um_after_user_account_updated', 'poke_hub_um_sync_country_on_profile_update', 10, 2);
 }
 
 /**
@@ -436,3 +769,110 @@ function poke_hub_format_friend_code($friend_code) {
     return trim(chunk_split($cleaned, 4, ' '));
 }
 
+/**
+ * Get countries list from Ultimate Member.
+ * Uses Ultimate Member's built-in countries helper.
+ * 
+ * @return array Countries list (code => label) or empty array if Ultimate Member is not available
+ */
+function poke_hub_get_countries() {
+    // Check if Ultimate Member is available
+    if (!function_exists('UM') || !is_object(UM())) {
+        return [];
+    }
+    
+    // Get countries from Ultimate Member
+    $countries = UM()->builtin()->get('countries');
+    
+    // Ensure we have an array
+    if (!is_array($countries)) {
+        return [];
+    }
+    
+    return $countries;
+}
+
+/**
+ * Get country label from country code.
+ * 
+ * @param string $country_code Country code (e.g., 'FR', 'US', 'GB')
+ * @return string Country label or the code itself if not found
+ */
+function poke_hub_get_country_label($country_code) {
+    if (empty($country_code)) {
+        return '';
+    }
+    
+    $countries = poke_hub_get_countries();
+    
+    if (isset($countries[$country_code])) {
+        return $countries[$country_code];
+    }
+    
+    // Return the code itself if not found
+    return $country_code;
+}
+
+/**
+ * Purge Ultimate Member user cache and WordPress cache.
+ * This ensures that UM and WordPress display updated user meta immediately.
+ * 
+ * @param int $user_id WordPress user ID
+ */
+function poke_hub_purge_um_user_cache($user_id) {
+    $user_id = (int) $user_id;
+    if ($user_id <= 0) {
+        return;
+    }
+
+    // 1) Ultimate Member cache (stored in wp_options)
+    // UM stores cached user data in options table, delete it to force refresh
+    delete_option('um_cache_userdata_' . $user_id);
+
+    // 2) WordPress/Redis object cache
+    clean_user_cache($user_id);
+    wp_cache_delete($user_id, 'user_meta');
+    wp_cache_delete($user_id, 'users');
+
+    // 3) Ultimate Member in-memory user context (same request)
+    if (function_exists('um_fetch_user')) {
+        um_fetch_user($user_id);
+    }
+}
+
+/**
+ * Force refresh of WP user meta cache (useful with Redis Object Cache).
+ * 
+ * @deprecated Use poke_hub_purge_um_user_cache() instead
+ * @param int $user_id WordPress user ID
+ */
+function poke_hub_refresh_user_meta_cache($user_id) {
+    $user_id = (int) $user_id;
+    if ($user_id <= 0) {
+        return;
+    }
+
+    // WordPress core cache cleanup for a user
+    clean_user_cache($user_id);
+
+    // Extra deletions (often helps with persistent object cache)
+    wp_cache_delete($user_id, 'user_meta');
+    wp_cache_delete($user_id, 'users');
+}
+
+/**
+ * Force Ultimate Member to reload the "current/profile" user context.
+ * 
+ * @deprecated Use poke_hub_purge_um_user_cache() instead
+ * @param int $user_id WordPress user ID
+ */
+function poke_hub_um_refresh_user_context($user_id) {
+    $user_id = (int) $user_id;
+    if ($user_id <= 0) {
+        return;
+    }
+
+    if (function_exists('um_fetch_user')) {
+        um_fetch_user($user_id);
+    }
+}
