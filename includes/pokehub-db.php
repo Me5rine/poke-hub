@@ -43,6 +43,10 @@ class Pokehub_DB {
         if (in_array('events', $active_modules, true)) {
             $this->createEventsTables();
         }
+
+        if (in_array('user-profiles', $active_modules, true)) {
+            $this->createUserProfilesTables();
+        }
     }
 
     /**
@@ -633,6 +637,79 @@ class Pokehub_DB {
         $events_table = pokehub_get_table('special_events');
         if ($events_table) {
             $this->migrateSpecialEventsRecurringColumns($events_table);
+        }
+    }
+
+    /**
+     * Création de la table user_profiles pour stocker les profils Pokémon GO.
+     * Table partagée entre tous les sites utilisant ME5RINE_LAB_GLOBAL_PREFIX.
+     */
+    private function createUserProfilesTables() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $user_profiles_table = pokehub_get_table('user_profiles');
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        // Table principale des profils utilisateur Pokémon GO
+        // Note: On ne peut pas utiliser UNIQUE sur des colonnes NULL en MySQL standard
+        // L'unicité est gérée au niveau application
+        $sql_user_profiles = "CREATE TABLE {$user_profiles_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NULL DEFAULT NULL,
+            discord_id VARCHAR(191) NULL DEFAULT NULL,
+            team VARCHAR(50) NOT NULL DEFAULT '',
+            friend_code VARCHAR(12) NOT NULL DEFAULT '',
+            friend_code_public TINYINT(1) NOT NULL DEFAULT 1,
+            xp BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            pokemon_go_username VARCHAR(191) NOT NULL DEFAULT '',
+            scatterbug_pattern VARCHAR(50) NOT NULL DEFAULT '',
+            reasons LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id (user_id),
+            KEY discord_id (discord_id)
+        ) {$charset_collate};";
+
+        dbDelta($sql_user_profiles);
+        
+        // Migration: remove country column if it exists (country is now only in Ultimate Member usermeta)
+        $this->migrateUserProfilesRemoveCountryColumn($user_profiles_table);
+    }
+    
+    /**
+     * Migration: remove country column from user_profiles table.
+     * Country is now only stored in Ultimate Member usermeta.
+     * 
+     * @param string $table_name Name of the user_profiles table
+     */
+    private function migrateUserProfilesRemoveCountryColumn($table_name) {
+        global $wpdb;
+        
+        // Check if table exists
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Check if country column exists
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'country'",
+                DB_NAME,
+                $table_name
+            )
+        );
+        
+        if (!empty($column_exists) && (int) $column_exists > 0) {
+            // Remove country column
+            $wpdb->query("ALTER TABLE {$table_name} DROP COLUMN country");
         }
     }
 }
