@@ -53,7 +53,7 @@ Copiez **TOUT le contenu** du fichier `docs/FRONT_CSS.md` (sauf les titres markd
 
 ### Étape 2 : Vérifier l'ordre de chargement
 
-Assurez-vous que votre `style.css` est chargé **après** les styles du plugin (le plugin charge déjà `global-colors.css`).
+Assurez-vous que votre `style.css` est chargé **après** les styles du plugin. **Note** : Les variables CSS de `global-colors.css` doivent être définies dans votre thème.
 
 ## 🎨 Personnalisation des Variables CSS
 

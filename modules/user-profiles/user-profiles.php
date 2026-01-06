@@ -34,12 +34,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
         return;
     }
 
-    wp_enqueue_style(
-        'pokehub-user-profiles-admin-style',
-        POKE_HUB_URL . 'assets/css/poke-hub-user-profiles-admin.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    // Le CSS admin unifié est chargé via admin-unified.css (dans le plugin principal)
 
     // Select2 CSS
     wp_enqueue_style(
@@ -81,8 +76,8 @@ function poke_hub_user_profiles_admin_assets($hook) {
                 }
                 // Only initialize on actual select elements in forms
                 if (!\$select.data('select2') && \$select.is('select')) {
-                    // Find the closest form field wrapper for dropdownParent (admin uses form-table)
-                    var \$parent = \$select.closest('.form-table, td');
+                    // Find the closest form field wrapper for dropdownParent (admin uses admin-lab-form-section)
+                    var \$parent = \$select.closest('.admin-lab-form-section, .form-table, td');
                     if (!\$parent.length) {
                         \$parent = \$select.parent();
                     }
@@ -202,13 +197,17 @@ function poke_hub_user_profiles_frontend_assets() {
         if (typeof $.fn.select2 !== 'undefined') {
             // Initialize Select2 on country, team, and scatterbug_pattern selects
             // Use dropdownParent to keep dropdown in the same DOM context
-            $('#country, #team, #scatterbug_pattern').each(function() {
+            // Use class selector to avoid ID conflicts
+            $('.me5rine-lab-form-select').each(function() {
                 var \$select = $(this);
                 if (!\$select.data('select2')) {
-                    // Find the closest form field wrapper for dropdownParent (UM uses um-field-area)
-                    var \$parent = \$select.closest('.um-field-area');
+                    // Find the closest form field wrapper for dropdownParent (uses me5rine-lab-form-field)
+                    var \$parent = \$select.closest('.me5rine-lab-form-field');
                     if (!\$parent.length) {
-                        \$parent = \$select.closest('.um-field');
+                        \$parent = \$select.closest('.me5rine-lab-form-col');
+                    }
+                    if (!\$parent.length) {
+                        \$parent = \$select.closest('.me5rine-lab-form-section');
                     }
                     if (!\$parent.length) {
                         \$parent = \$select.parent();

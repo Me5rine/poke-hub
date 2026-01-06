@@ -7,21 +7,22 @@
     flex-direction: row;
 }
 
-.pokehub-event-type-filter-form .select2-search--inline {
-    width: calc(100% - 30px);
-}
-
-.pokehub-event-type-filter-form .select2-search__field {
-    width: 100% !important;
-}
-
-.pokehub-event-type-filter-label {
+/* Ajustements pour les classes unifiées */
+.pokehub-event-type-filter-form label {
     display: none;
+}
+
+.pokehub-event-type-filter-form .select2.select2-container.select2-container--default {
+    width: 100% !important;
 }
 
 .pokehub-events-tabs {
     padding: 10px 0;
     display: block;
+}
+
+.pokehub-events-tabs .tab.me5rine-lab-form-button {
+    margin-top: 0 !important;
 }
 
 .pokehub-events-button {
@@ -339,87 +340,6 @@
     .event-more-button {
         margin-top: 6px;
     }
-}
-
-/* Pagination */
-.pokehub-events-pagination {
-	height: 30px;
-	margin: 6px 0 4px;
-	padding-top: 5px;
-	display: flex;
-	align-items: center;
-	gap: 1rem;
-	font-size: 13px;
-	color: var(--e-global-color-267e1d5);
-	flex-wrap: wrap;
-	float: right;
-}
-
-.pokehub-events-pagination .pagination-links {
-	display: flex;
-	gap: 0.25rem;
-	align-items: center;
-}
-
-.pokehub-events-pagination .button,
-.pokehub-events-pagination .tablenav-pages-navspan {
-	cursor: pointer;
-	border-width: 1px;
-	border-style: solid;
-	-webkit-appearance: none;
-	text-decoration: none;
-	border-radius: 3px;
-	white-space: nowrap;
-	box-sizing: border-box;
-	display: inline-block;
-	vertical-align: baseline;
-	min-width: 30px;
-	min-height: 30px;
-	margin: 0;
-	padding: 0 4px;
-	font-size: 16px;
-	line-height: 1.625;
-	text-align: center;
-	color: var(--e-global-color-267e1d5);
-	border-color: var(--e-global-color-ff316d3);
-	background: var(--e-global-color-ff316d3);
-}
-
-.pokehub-events-pagination .button:hover {
-	background: var(--e-global-color-secondary);
-	border-color: var(--e-global-color-secondary);
-	text-decoration: none;
-	color: var(--e-global-color-267e1d5);
-}
-
-.pokehub-events-pagination .button:focus {
-	background: var(--e-global-color-secondary);
-	border-color: var(--e-global-color-secondary);
-	color: var(--e-global-color-267e1d5);
-	box-shadow: 0 0 0 1px var(--e-global-color-secondary);
-	outline: 2px solid transparent;
-	outline-offset: 0;
-}
-
-.pokehub-events-pagination .button.disabled,
-.pokehub-events-pagination .tablenav-pages-navspan.disabled {
-	color: var(--e-global-color-267e1d5) !important;
-	border-color: var(--e-global-color-ff316d3) !important;
-	background: var(--e-global-color-ff316d3) !important;
-	box-shadow: none !important;
-	opacity: 0.5;
-    pointer-events: none;
-    cursor: default;
-	transform: none !important;
-}
-
-.pokehub-events-pagination .displaying-num,
-.pokehub-events-pagination .paging-input,
-.pokehub-events-pagination .total-pages {
-	color: var(--admin-lab-color-text);
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-	font-size: 13px;
-	line-height: 1.4em;
 }
 
 /* Conteneur global des deux dates (si encore utilisé ailleurs) */

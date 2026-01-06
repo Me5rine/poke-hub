@@ -66,20 +66,20 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Name FR / Name EN -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="region_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="region_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
                             <p class="description"><?php esc_html_e('Example: Kanto, Johto, Hoenn…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="region_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
                             <input type="text" id="region_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
                             <p class="description"><?php esc_html_e('At least one name (FR or EN) is required.', 'poke-hub'); ?></p>
@@ -88,16 +88,16 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Slug & Sort Order -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="region_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                             <input type="text" id="region_slug" name="slug" value="<?php echo esc_attr($is_edit ? $edit_row->slug : ''); ?>" />
                             <p class="description"><?php esc_html_e('Leave empty to auto-generate from name.', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="region_sort_order"><?php esc_html_e('Sort Order', 'poke-hub'); ?></label>
                             <input type="number" id="region_sort_order" name="sort_order" 
                                    value="<?php echo esc_attr($is_edit ? (int) $edit_row->sort_order : '0'); ?>" 

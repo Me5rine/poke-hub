@@ -80,20 +80,20 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Form Slug / Label -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="form_slug"><?php esc_html_e('Form Slug', 'poke-hub'); ?> *</label>
                             <input type="text" id="form_slug" name="form_slug" value="<?php echo esc_attr($form_slug); ?>" required />
                             <p class="description"><?php esc_html_e('Example: "armored", "fall-2019", "costume".', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="label"><?php esc_html_e('Label', 'poke-hub'); ?> *</label>
                             <input type="text" id="label" name="label" value="<?php echo esc_attr($label); ?>" required />
                             <p class="description"><?php esc_html_e('Example: "Armored", "Fall 2019", "Costume".', 'poke-hub'); ?></p>
@@ -102,16 +102,16 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Category / Group Key -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
                             <input type="text" id="category" name="category" value="<?php echo esc_attr($category); ?>" />
                             <p class="description"><?php esc_html_e('Example: costume, clone, regional, shadow, purified, normal…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="group_key"><?php esc_html_e('Group Key', 'poke-hub'); ?></label>
                             <input type="text" id="group_key" name="group_key" value="<?php echo esc_attr($group_key); ?>" />
                             <p class="description"><?php esc_html_e('Optional sub-grouping key.', 'poke-hub'); ?></p>
@@ -120,7 +120,7 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Parent Form -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="parent_form_slug"><?php esc_html_e('Parent Form', 'poke-hub'); ?></label>
                     <select name="parent_form_slug" id="parent_form_slug">
                         <option value=""><?php esc_html_e('— No parent —', 'poke-hub'); ?></option>

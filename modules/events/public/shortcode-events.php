@@ -253,12 +253,12 @@ function poke_hub_shortcode_events($atts) {
             );
         }
 
-        echo '<label class="pokehub-event-type-filter-label" for="pokehub-event-type-select">';
+        echo '<label class="me5rine-lab-form-label me5rine-lab-filter-label" for="pokehub-event-type-select">';
         echo esc_html__('Event type:', 'poke-hub') . ' ';
         echo '</label>';
 
         // 🔽 Select multiple
-        echo '<select id="pokehub-event-type-select" name="event_type[]" multiple="multiple">';
+        echo '<select id="pokehub-event-type-select" name="event_type[]" multiple="multiple" class="me5rine-lab-form-select me5rine-lab-filter-select">';
 
         // Option "Tous les types" – sélectionnée si aucun type choisi
         $all_selected = empty($selected_event_types) ? 'selected="selected"' : '';
@@ -334,53 +334,14 @@ function poke_hub_shortcode_events($atts) {
         echo '<p>' . esc_html__('No events renderer found.', 'poke-hub') . '</p>';
     }
 
-    // 🔽 Pagination style "tablenav-pages"
-    if ($total_pages > 1) : ?>
-        <div class="tablenav-pages pokehub-events-pagination">
-            <span class="displaying-num">
-                <?php
-                printf(
-                    _n('%s item', '%s items', $total_items, 'poke-hub'),
-                    number_format_i18n($total_items)
-                );
-                ?>
-            </span>
-            <span class="pagination-links">
-                <?php if ($paged > 1): ?>
-                    <a class="first-page button" href="<?php echo esc_url(add_query_arg($page_var, 1)); ?>">
-                        <span aria-hidden="true">«</span>
-                    </a>
-                    <a class="prev-page button" href="<?php echo esc_url(add_query_arg($page_var, $paged - 1)); ?>">
-                        <span aria-hidden="true">‹</span>
-                    </a>
-                <?php else: ?>
-                    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">«</span>
-                    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">‹</span>
-                <?php endif; ?>
-
-                <span class="screen-reader-text"><?php esc_html_e('Current page', 'poke-hub'); ?></span>
-                <span class="paging-input">
-                    <span class="tablenav-paging-text">
-                        <?php echo esc_html($paged); ?> <?php esc_html_e('of', 'poke-hub'); ?>
-                        <span class="total-pages"><?php echo esc_html($total_pages); ?></span>
-                    </span>
-                </span>
-
-                <?php if ($paged < $total_pages): ?>
-                    <a class="next-page button" href="<?php echo esc_url(add_query_arg($page_var, $paged + 1)); ?>">
-                        <span aria-hidden="true">›</span>
-                    </a>
-                    <a class="last-page button" href="<?php echo esc_url(add_query_arg($page_var, $total_pages)); ?>">
-                        <span aria-hidden="true">»</span>
-                    </a>
-                <?php else: ?>
-                    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">›</span>
-                    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">»</span>
-                <?php endif; ?>
-            </span>
-        </div>
-    <?php
-    endif;
+    // 🔽 Pagination selon la documentation PLUGIN_INTEGRATION.md
+    echo poke_hub_render_pagination([
+        'total_items' => $total_items,
+        'paged'        => $paged,
+        'total_pages'  => $total_pages,
+        'page_var'     => $page_var,
+        'text_domain'  => 'poke-hub',
+    ]);
 
     echo '</div>'; // 🔚 fin wrapper global
 

@@ -367,11 +367,11 @@ Les filtres utilisent les mêmes styles de base que les formulaires (`me5rine-la
 }
 
 /* Les labels de filtres utilisent me5rine-lab-form-label comme base */
-/* Surcharge spécifique pour les filtres si nécessaire */
+/* Aucune surcharge spécifique nécessaire - utiliser directement me5rine-lab-form-label */
 .me5rine-lab-filter-label {
     /* Hérite de me5rine-lab-form-label (défini dans CSS_RULES.md) */
     /* Les styles de base sont déjà dans me5rine-lab-form-label */
-    /* Surcharges spécifiques aux filtres si nécessaire */
+    /* Aucune surcharge nécessaire - tous les labels de filtres utilisent les mêmes styles */
 }
 
 /* Les inputs/selects de filtres utilisent me5rine-lab-form-input/me5rine-lab-form-select comme base */
@@ -665,6 +665,36 @@ Pour les tuiles d'actions sociales dans les formulaires de campagne :
     margin-bottom: 0;
 }
 
+/* Header de section dans une carte (titre + actions) */
+.me5rine-lab-card-header,
+.me5rine-lab-tile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--me5rine-lab-spacing-md);
+}
+
+/* Actions dans un header de carte */
+.me5rine-lab-card-actions,
+.me5rine-lab-tile-actions {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-sm);
+}
+
+.me5rine-lab-card-actions a,
+.me5rine-lab-tile-actions a {
+    margin-left: 0;
+}
+
+/* Titre de section dans une carte */
+.me5rine-lab-card-section-title,
+.me5rine-lab-tile-section-title {
+    font-size: 1.2rem;
+    margin: var(--me5rine-lab-spacing-lg) 0 var(--me5rine-lab-spacing-md);
+    font-weight: 600;
+    color: var(--me5rine-lab-text);
+}
+
 /* Container de wrapper */
 .me5rine-lab-wrapper {
     background: transparent;
@@ -672,6 +702,179 @@ Pour les tuiles d'actions sociales dans les formulaires de campagne :
     padding: 0;
     box-shadow: none;
     margin-bottom: 0;
+}
+
+/* Notices dans les dashboards */
+.me5rine-lab-dashboard .notice {
+    margin: 1em 0;
+    padding: 1em;
+    border-left: 4px solid var(--me5rine-lab-border);
+    background-color: var(--me5rine-lab-bg-secondary);
+    border-radius: var(--me5rine-lab-radius-sm);
+}
+
+/* Liens dans les dashboards */
+.me5rine-lab-dashboard a {
+    color: var(--me5rine-lab-secondary);
+    text-decoration: none;
+    transition: color var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-dashboard a:hover {
+    text-decoration: underline;
+    color: var(--me5rine-lab-button-primary-hover);
+}
+
+/* ============================================
+   PROFILS (Ultimate Member)
+   ============================================ */
+
+/* Padding pour le contenu des onglets Ultimate Member */
+.um-profile-body .um-tab-content,
+.um-profile-body .um-tab-content > div {
+    padding: var(--me5rine-lab-spacing-lg);
+}
+
+/* Container de profil (wrapper générique) */
+.me5rine-lab-profile-container,
+.me5rine-lab-profile-wrapper {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    margin-bottom: 0;
+}
+
+/* ============================================
+   CARTES AVEC IMAGE (Cards avec thumbnail)
+   ============================================ */
+
+/* Carte avec image à gauche et contenu à droite */
+.me5rine-lab-card-with-image {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-md);
+    margin-bottom: var(--me5rine-lab-spacing-md);
+    transition: transform var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-card-with-image:last-child {
+    margin-bottom: 0;
+}
+
+.me5rine-lab-card-with-image:hover {
+    transform: translateX(4px);
+}
+
+/* Image/thumbnail de la carte */
+.me5rine-lab-card-image {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: var(--me5rine-lab-radius-md);
+    flex-shrink: 0;
+    border: 2px solid var(--me5rine-lab-border);
+}
+
+/* Contenu de la carte */
+.me5rine-lab-card-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-sm);
+}
+
+/* Header de la carte */
+.me5rine-lab-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-xs);
+}
+
+/* Nom/titre dans la carte */
+.me5rine-lab-card-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--me5rine-lab-text);
+}
+
+.me5rine-lab-card-name a {
+    color: var(--me5rine-lab-text);
+    text-decoration: none;
+    transition: color var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-card-name a:hover {
+    color: var(--me5rine-lab-secondary);
+}
+
+/* Meta informations dans la carte */
+.me5rine-lab-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--me5rine-lab-spacing-md);
+    font-size: 13px;
+    color: var(--me5rine-lab-text-light);
+}
+
+.me5rine-lab-card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.me5rine-lab-card-meta .me5rine-lab-meta-label {
+    font-weight: 500;
+}
+
+/* Description/contenu secondaire de la carte */
+.me5rine-lab-card-description {
+    margin: 0;
+    font-size: 14px;
+    color: var(--me5rine-lab-text-light);
+    line-height: 1.6;
+}
+
+.me5rine-lab-card-description strong {
+    color: var(--me5rine-lab-text);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+}
+
+/* Bouton dans la carte */
+.me5rine-lab-card-button {
+    align-self: flex-start;
+}
+
+/* ============================================
+   MESSAGES D'ÉTAT
+   ============================================ */
+
+/* Message d'état générique (vide, erreur, info) */
+.me5rine-lab-state-message {
+    color: var(--me5rine-lab-text-light);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    padding: var(--me5rine-lab-spacing-md);
+    background: var(--me5rine-lab-bg-secondary);
+    border-radius: var(--me5rine-lab-radius-md);
+    border-left: 4px solid var(--me5rine-lab-border);
+}
+
+/* ============================================
+   LABELS DE FILTRES RESPONSIVE
+   ============================================ */
+
+/* Labels de filtres avec affichage conditionnel mobile/desktop */
+.me5rine-lab-filter-label-mobile {
+    display: none;
+}
+
+.me5rine-lab-filter-label-desktop {
+    display: inline-flex;
 }
 
 /* Bloc de formulaire (section avec fond et bordure) */
@@ -1027,15 +1230,276 @@ Toutes les tuiles (stat-tile, card, etc.) utilisent ce système unifié :
 }
 ```
 
-## Responsive Global
+## Dashboards et Profils Génériques
+
+Tous les dashboards et pages de profil utilisent ces classes génériques unifiées :
 
 ```css
+/* ============================================
+   DASHBOARDS
+   ============================================ */
+
+/* Container principal de dashboard */
+.me5rine-lab-dashboard {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--me5rine-lab-text-light);
+    font-size: 14px;
+    padding: var(--me5rine-lab-spacing-md);
+}
+
+/* Header de dashboard (titre + actions) */
+.me5rine-lab-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--me5rine-lab-spacing-lg);
+}
+
+/* Notices dans les dashboards */
+.me5rine-lab-dashboard .notice {
+    margin: 1em 0;
+    padding: 1em;
+    border-left: 4px solid var(--me5rine-lab-border);
+    background-color: var(--me5rine-lab-bg-secondary);
+    border-radius: var(--me5rine-lab-radius-sm);
+}
+
+/* Liens dans les dashboards */
+.me5rine-lab-dashboard a {
+    color: var(--me5rine-lab-secondary);
+    text-decoration: none;
+    transition: color var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-dashboard a:hover {
+    text-decoration: underline;
+    color: var(--me5rine-lab-button-primary-hover);
+}
+
+/* ============================================
+   PROFILS (Ultimate Member)
+   ============================================ */
+
+/* Padding pour le contenu des onglets Ultimate Member */
+.um-profile-body .um-tab-content,
+.um-profile-body .um-tab-content > div {
+    padding: var(--me5rine-lab-spacing-lg);
+}
+
+/* Container de profil (wrapper générique) */
+.me5rine-lab-profile-container,
+.me5rine-lab-profile-wrapper {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    margin-bottom: 0;
+}
+
+/* ============================================
+   CARTES AVEC IMAGE (Cards avec thumbnail)
+   ============================================ */
+
+/* Carte avec image à gauche et contenu à droite */
+.me5rine-lab-card-with-image {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-md);
+    margin-bottom: var(--me5rine-lab-spacing-md);
+    transition: transform var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-card-with-image:last-child {
+    margin-bottom: 0;
+}
+
+.me5rine-lab-card-with-image:hover {
+    transform: translateX(4px);
+}
+
+/* Image/thumbnail de la carte */
+.me5rine-lab-card-image {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: var(--me5rine-lab-radius-md);
+    flex-shrink: 0;
+    border: 2px solid var(--me5rine-lab-border);
+}
+
+/* Contenu de la carte */
+.me5rine-lab-card-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-sm);
+}
+
+/* Header de la carte */
+.me5rine-lab-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-xs);
+}
+
+/* Nom/titre dans la carte */
+.me5rine-lab-card-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--me5rine-lab-text);
+}
+
+.me5rine-lab-card-name a {
+    color: var(--me5rine-lab-text);
+    text-decoration: none;
+    transition: color var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-card-name a:hover {
+    color: var(--me5rine-lab-secondary);
+}
+
+/* Meta informations dans la carte */
+.me5rine-lab-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--me5rine-lab-spacing-md);
+    font-size: 13px;
+    color: var(--me5rine-lab-text-light);
+}
+
+.me5rine-lab-card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.me5rine-lab-card-meta .me5rine-lab-meta-label {
+    font-weight: 500;
+}
+
+/* Description/contenu secondaire de la carte */
+.me5rine-lab-card-description {
+    margin: 0;
+    font-size: 14px;
+    color: var(--me5rine-lab-text-light);
+    line-height: 1.6;
+}
+
+.me5rine-lab-card-description strong {
+    color: var(--me5rine-lab-text);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+}
+
+/* Bouton dans la carte */
+.me5rine-lab-card-button {
+    align-self: flex-start;
+}
+
+/* ============================================
+   MESSAGES D'ÉTAT
+   ============================================ */
+
+/* Message d'état générique (vide, erreur, info) */
+.me5rine-lab-state-message {
+    color: var(--me5rine-lab-text-light);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    padding: var(--me5rine-lab-spacing-md);
+    background: var(--me5rine-lab-bg-secondary);
+    border-radius: var(--me5rine-lab-radius-md);
+    border-left: 4px solid var(--me5rine-lab-border);
+}
+
+/* ============================================
+   LABELS DE FILTRES RESPONSIVE
+   ============================================ */
+
+/* Labels de filtres avec affichage conditionnel mobile/desktop */
+.me5rine-lab-filter-label-mobile {
+    display: none;
+}
+
+.me5rine-lab-filter-label-desktop {
+    display: inline-flex;
+}
+
+@media screen and (max-width: 782px) {
+    .me5rine-lab-filter-label-desktop {
+        display: none;
+    }
+    .me5rine-lab-filter-label-mobile {
+        display: inline-flex;
+    }
+}
+
+/* ============================================
+   RESPONSIVE GLOBAL
+   ============================================ */
+
 /* Responsive global */
 @media (max-width: 782px) {
     .me5rine-lab-filters {
         flex-direction: column;
         gap: var(--me5rine-lab-spacing-md);
     }
+
+    /* Dashboard header responsive */
+    .me5rine-lab-dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--me5rine-lab-spacing-md);
+    }
+
+    /* Profile padding mobile */
+    .um-profile-body .um-tab-content,
+    .um-profile-body .um-tab-content > div {
+        padding: var(--me5rine-lab-spacing-md);
+    }
+
+    /* Cartes avec image responsive */
+    .me5rine-lab-card-with-image {
+        flex-direction: column;
+        gap: var(--me5rine-lab-spacing-md);
+    }
+
+    .me5rine-lab-card-image {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+    }
+
+    .me5rine-lab-card-content {
+        gap: var(--me5rine-lab-spacing-sm);
+    }
+
+    .me5rine-lab-card-meta {
+        flex-direction: column;
+        gap: var(--me5rine-lab-spacing-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    /* Titres responsive */
+    .me5rine-lab-title {
+        font-size: 18px;
+    }
+
+    .me5rine-lab-card-name {
+        font-size: 16px;
+    }
+
+    /* Boutons pleine largeur sur mobile */
+    .me5rine-lab-card-button,
+    .me5rine-lab-form-button {
+        width: 100%;
+        padding: 12px 20px;
+    }
+}
 
     .me5rine-lab-filter-select,
     .me5rine-lab-filter-input {
@@ -1067,6 +1531,59 @@ Toutes les tuiles (stat-tile, card, etc.) utilisent ce système unifié :
         align-items: flex-start;
         gap: var(--me5rine-lab-spacing-md);
     }
+
+    /* Profile padding mobile */
+    .um-profile-body .um-tab-content,
+    .um-profile-body .um-tab-content > div {
+        padding: var(--me5rine-lab-spacing-md);
+    }
+
+    /* Labels de filtres responsive */
+    .me5rine-lab-filter-label-desktop {
+        display: none;
+    }
+    .me5rine-lab-filter-label-mobile {
+        display: inline-flex;
+    }
+
+    /* Cartes avec image responsive */
+    .me5rine-lab-card-with-image {
+        flex-direction: column;
+        gap: var(--me5rine-lab-spacing-md);
+    }
+
+    .me5rine-lab-card-image {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+    }
+
+    .me5rine-lab-card-content {
+        gap: var(--me5rine-lab-spacing-sm);
+    }
+
+    .me5rine-lab-card-meta {
+        flex-direction: column;
+        gap: var(--me5rine-lab-spacing-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    /* Titres responsive */
+    .me5rine-lab-title {
+        font-size: 18px;
+    }
+
+    .me5rine-lab-card-name {
+        font-size: 16px;
+    }
+
+    /* Boutons pleine largeur sur mobile */
+    .me5rine-lab-card-button,
+    .me5rine-lab-form-button {
+        width: 100%;
+        padding: 12px 20px;
+    }
 }
 ```
 
@@ -1074,11 +1591,90 @@ Toutes les tuiles (stat-tile, card, etc.) utilisent ce système unifié :
 
 Tous les éléments front utilisent maintenant ces classes génériques. Pour modifier le style global, changez simplement les variables CSS en haut du fichier.
 
-### Exemple d'utilisation
+### Structure HTML Standardisée
+
+#### Dashboard
+
+```html
+<div class="me5rine-lab-dashboard">
+    <div class="me5rine-lab-dashboard-header">
+        <h1 class="me5rine-lab-title-large">Dashboard Title</h1>
+        <a href="#" class="me5rine-lab-form-button">Action</a>
+    </div>
+    
+    <div class="notice">Message d'information</div>
+    
+    <!-- Contenu du dashboard -->
+</div>
+```
+
+#### Profil (Ultimate Member)
+
+```html
+<div class="me5rine-lab-profile-container me5rine-lab-form-block">
+    <div class="me5rine-lab-form-section">
+        <h2 class="me5rine-lab-title">Section Title</h2>
+        <p class="me5rine-lab-subtitle">Description</p>
+        
+        <!-- Contenu -->
+    </div>
+</div>
+```
+
+#### Carte avec Image
+
+```html
+<div class="me5rine-lab-card-with-image me5rine-lab-card me5rine-lab-card-bordered-left">
+    <img class="me5rine-lab-card-image" src="image.jpg" alt="Title">
+    <div class="me5rine-lab-card-content">
+        <div class="me5rine-lab-card-header">
+            <h4 class="me5rine-lab-card-name">
+                <a href="#">Card Title</a>
+            </h4>
+            <div class="me5rine-lab-card-meta">
+                <span class="me5rine-lab-meta-label">Meta 1</span>
+                <span class="me5rine-lab-meta-label">Meta 2</span>
+            </div>
+        </div>
+        <p class="me5rine-lab-card-description">
+            <strong>Label:</strong> Description text
+        </p>
+        <a href="#" class="me5rine-lab-form-button me5rine-lab-card-button">Action</a>
+    </div>
+</div>
+```
+
+#### Message d'État
+
+```html
+<p class="me5rine-lab-state-message">
+    Message d'information, erreur ou état vide
+</p>
+```
+
+#### Filtres avec Labels Responsive
+
+```html
+<div class="me5rine-lab-filters">
+    <form method="get">
+        <div class="me5rine-lab-filter-group">
+            <label class="me5rine-lab-form-label me5rine-lab-filter-label">
+                <span class="me5rine-lab-filter-label-mobile">Show:</span>
+                <span class="me5rine-lab-filter-label-desktop">Filter by status:</span>
+            </label>
+            <select name="filter" class="me5rine-lab-form-select me5rine-lab-filter-select">
+                <option value="">All</option>
+            </select>
+        </div>
+    </form>
+</div>
+```
+
+### Exemples d'utilisation
 
 ```html
 <!-- Bouton -->
-<button class="me5rine-lab-button me5rine-lab-button-primary">Action</button>
+<button class="me5rine-lab-form-button">Action</button>
 
 <!-- Carte -->
 <div class="me5rine-lab-card me5rine-lab-card-bordered">
@@ -1092,6 +1688,27 @@ Tous les éléments front utilisent maintenant ces classes génériques. Pour mo
     <div class="me5rine-lab-pagination-links">
         <a href="#" class="me5rine-lab-pagination-button">1</a>
         <a href="#" class="me5rine-lab-pagination-button active">2</a>
+    </div>
+</div>
+
+<!-- Podium (Top 3) -->
+<div class="me5rine-lab-podium-wrapper">
+    <div class="me5rine-lab-podium">
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-2 animate">
+            <div class="me5rine-lab-podium-rank">2</div>
+            <a href="#">Second Place</a>
+            <div class="me5rine-lab-podium-info">100 participants</div>
+        </div>
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-1 animate">
+            <div class="me5rine-lab-podium-rank">1</div>
+            <a href="#">First Place</a>
+            <div class="me5rine-lab-podium-info">200 participants</div>
+        </div>
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-3 animate">
+            <div class="me5rine-lab-podium-rank">3</div>
+            <a href="#">Third Place</a>
+            <div class="me5rine-lab-podium-info">50 participants</div>
+        </div>
     </div>
 </div>
 ```
@@ -1113,4 +1730,171 @@ Ces fichiers contiennent des styles spécifiques à des fonctionnalités uniques
 - `autor-socials-style.css` - Styles spécifiques aux auteurs/réseaux sociaux
 
 Ces fichiers restent dans le plugin et ne sont pas migrés dans le thème.
+
+## Composants Réutilisables
+
+Ces composants sont spécifiques mais peuvent être réutilisés dans différents contextes (dashboards, profils, etc.).
+
+### Podium (Top 3)
+
+Composant visuel pour afficher un classement top 3 avec animation.
+
+```css
+/* ============================================
+   PODIUM (Top 3)
+   ============================================ */
+
+/* Container du podium */
+.me5rine-lab-podium-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: var(--me5rine-lab-spacing-lg) 0;
+}
+
+/* Alignement des podiums */
+.me5rine-lab-podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: var(--me5rine-lab-spacing-md);
+    width: 100%;
+}
+
+/* Étape du podium */
+.me5rine-lab-podium-step {
+    background: var(--me5rine-lab-bg-secondary, #f5f5f5);
+    border-radius: var(--me5rine-lab-radius-md) var(--me5rine-lab-radius-md) 0 0;
+    padding: var(--me5rine-lab-spacing-md);
+    text-align: center;
+    width: 140px;
+    position: relative;
+}
+
+/* Rang du podium */
+.me5rine-lab-podium-rank {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: var(--me5rine-lab-spacing-xs);
+    color: var(--me5rine-lab-text);
+}
+
+/* Lien dans le podium */
+.me5rine-lab-podium-step a {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--me5rine-lab-spacing-xs);
+    text-decoration: none;
+    color: var(--me5rine-lab-text);
+    transition: color var(--me5rine-lab-transition);
+}
+
+.me5rine-lab-podium-step a:hover {
+    color: var(--me5rine-lab-secondary);
+}
+
+/* Informations secondaires dans le podium */
+.me5rine-lab-podium-info {
+    font-size: 0.85rem;
+    color: var(--me5rine-lab-text-light);
+}
+
+/* Hauteurs spécifiques pour les niveaux du podium */
+.me5rine-lab-podium-1 {
+    height: 160px;
+    background-color: #ffd700; /* gold */
+}
+
+.me5rine-lab-podium-2 {
+    height: 120px;
+    background-color: #c0c0c0; /* silver */
+}
+
+.me5rine-lab-podium-3 {
+    height: 100px;
+    background-color: #cd7f32; /* bronze */
+}
+
+/* Animation de montée des podiums */
+@keyframes me5rine-lab-podium-rise {
+    0% {
+        transform: translateY(50px) scale(0.9);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Classe pour activer l'animation */
+.me5rine-lab-podium-step.animate {
+    animation: me5rine-lab-podium-rise 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+/* Délais d'apparition pour l'effet "staggered" */
+.me5rine-lab-podium-step.me5rine-lab-podium-2.animate {
+    animation-delay: 0.2s;
+}
+
+.me5rine-lab-podium-step.me5rine-lab-podium-1.animate {
+    animation-delay: 0.4s;
+}
+
+.me5rine-lab-podium-step.me5rine-lab-podium-3.animate {
+    animation-delay: 0.6s;
+}
+
+/* Responsive pour les podiums */
+@media (max-width: 768px) {
+    .me5rine-lab-podium {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--me5rine-lab-spacing-sm);
+    }
+
+    .me5rine-lab-podium-step {
+        width: 100%;
+        max-width: 200px;
+    }
+
+    .me5rine-lab-podium-1,
+    .me5rine-lab-podium-2,
+    .me5rine-lab-podium-3 {
+        height: auto;
+        min-height: 100px;
+    }
+}
+```
+
+#### Structure HTML du Podium
+
+```html
+<div class="me5rine-lab-podium-wrapper">
+    <div class="me5rine-lab-podium">
+        <!-- 2ème place (gauche) -->
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-2 animate">
+            <div class="me5rine-lab-podium-rank">2</div>
+            <a href="#">Item Name</a>
+            <div class="me5rine-lab-podium-info">Info text</div>
+        </div>
+        
+        <!-- 1ère place (centre) -->
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-1 animate">
+            <div class="me5rine-lab-podium-rank">1</div>
+            <a href="#">Item Name</a>
+            <div class="me5rine-lab-podium-info">Info text</div>
+        </div>
+        
+        <!-- 3ème place (droite) -->
+        <div class="me5rine-lab-podium-step me5rine-lab-podium-3 animate">
+            <div class="me5rine-lab-podium-rank">3</div>
+            <a href="#">Item Name</a>
+            <div class="me5rine-lab-podium-info">Info text</div>
+        </div>
+    </div>
+</div>
+```
+
+**Note** : L'ordre d'affichage dans le HTML doit être 2, 1, 3 pour que l'affichage visuel soit correct (1 au centre, 2 à gauche, 3 à droite).
 

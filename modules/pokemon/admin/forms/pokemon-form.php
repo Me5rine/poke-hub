@@ -409,18 +409,18 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         <?php endif; ?>
 
         <!-- Section: General Information -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('General information', 'poke-hub'); ?></h2>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="dex_number"><?php esc_html_e('National Dex #', 'poke-hub'); ?> *</label>
                         <input type="number" min="1" style="max-width: 150px;" name="dex_number" id="dex_number" value="<?php echo esc_attr($dex_number); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="generation_id"><?php esc_html_e('Generation', 'poke-hub'); ?></label>
                         <select name="generation_id" id="generation_id">
                             <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
@@ -437,8 +437,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         </select>
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" name="is_default" value="1" <?php checked($is_default, 1); ?> />
                             <span><?php esc_html_e('Default form', 'poke-hub'); ?></span>
@@ -448,16 +448,16 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="name"><?php esc_html_e('Name', 'poke-hub'); ?> *</label>
                         <input type="text" name="name" id="name" value="<?php echo esc_attr($name); ?>" />
                         <p class="description"><?php esc_html_e('Main display name (usually FR or EN). Localized names are handled below.', 'poke-hub'); ?></p>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                         <input type="text" name="slug" id="slug" value="<?php echo esc_attr($slug); ?>" />
                         <p class="description"><?php esc_html_e('Used in URLs, must be unique.', 'poke-hub'); ?></p>
@@ -465,9 +465,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="form_variant_id"><?php esc_html_e('Form / variant', 'poke-hub'); ?></label>
                         <select name="form_variant_id" id="form_variant_id">
                             <option value="0"><?php esc_html_e('Default form (no variant)', 'poke-hub'); ?></option>
@@ -495,8 +495,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
                         <input type="text" name="category" id="category" value="<?php echo esc_attr($category); ?>" />
                         <p class="description"><?php esc_html_e('Example: Mouse Pokémon', 'poke-hub'); ?></p>
@@ -504,24 +504,24 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-group">
+            <div class="admin-lab-form-group">
                 <label for="about"><?php esc_html_e('About / flavor text', 'poke-hub'); ?></label>
                 <textarea name="about" id="about" rows="4" style="width: 100%;"><?php echo esc_textarea($about); ?></textarea>
             </div>
         </div>
 
         <!-- Section: Localization -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Localization', 'poke-hub'); ?></h2>
             
-            <div class="pokehub-form-row">
+            <div class="admin-lab-form-row">
                 <?php
                 $locales = ['fr', 'en', 'de', 'it', 'es', 'ja', 'ko'];
                 foreach ($locales as $loc) :
                     $val = $names[$loc] ?? '';
                 ?>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="name_<?php echo esc_attr($loc); ?>"><?php echo esc_html(strtoupper($loc)); ?></label>
                             <input type="text" name="name_<?php echo esc_attr($loc); ?>" id="name_<?php echo esc_attr($loc); ?>" value="<?php echo esc_attr($val); ?>" />
                         </div>
@@ -531,18 +531,18 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         </div>
 
         <!-- Section: Gender Ratio -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Gender ratio', 'poke-hub'); ?></h2>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="gender_male"><?php esc_html_e('Male %', 'poke-hub'); ?></label>
                         <input type="number" step="0.1" min="0" max="100" name="gender_male" id="gender_male" value="<?php echo esc_attr($gender_male); ?>" /> %
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="gender_female"><?php esc_html_e('Female %', 'poke-hub'); ?></label>
                         <input type="number" step="0.1" min="0" max="100" name="gender_female" id="gender_female" value="<?php echo esc_attr($gender_female); ?>" /> %
                     </div>
@@ -557,25 +557,25 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         ?>
         
         <!-- Section: Pokémon GO - Stats & CP -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Pokémon GO', 'poke-hub'); ?></h2>
             <h3><?php esc_html_e('Base stats & CP', 'poke-hub'); ?></h3>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="base_atk"><?php esc_html_e('ATK', 'poke-hub'); ?></label>
                         <input type="number" style="max-width: 150px;" name="base_atk" id="base_atk" value="<?php echo esc_attr($base_atk); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="base_def"><?php esc_html_e('DEF', 'poke-hub'); ?></label>
                         <input type="number" style="max-width: 150px;" name="base_def" id="base_def" value="<?php echo esc_attr($base_def); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="base_sta"><?php esc_html_e('STA', 'poke-hub'); ?></label>
                         <input type="number" style="max-width: 150px;" name="base_sta" id="base_sta" value="<?php echo esc_attr($base_sta); ?>" />
                     </div>
@@ -583,7 +583,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </div>
             <p class="description"><?php esc_html_e('CP values are automatically computed from these base stats when possible.', 'poke-hub'); ?></p>
             
-            <div class="pokehub-form-group">
+            <div class="admin-lab-form-group">
                 <label><?php esc_html_e('CP by level (auto)', 'poke-hub'); ?></label>
                 <?php
                 $levels = [15, 20, 25, 30, 35, 40, 50, 51];
@@ -622,34 +622,34 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         </div>
 
         <!-- Section: Pokémon GO Details -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h3><?php esc_html_e('Details', 'poke-hub'); ?></h3>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="go_height_m"><?php esc_html_e('Height (m)', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" name="go_height_m" id="go_height_m" value="<?php echo esc_attr($go_height_m); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="go_weight_kg"><?php esc_html_e('Weight (kg)', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" name="go_weight_kg" id="go_weight_kg" value="<?php echo esc_attr($go_weight_kg); ?>" />
                     </div>
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="go_catch_rate"><?php esc_html_e('Catch rate', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" name="go_catch_rate" id="go_catch_rate" value="<?php echo esc_attr($go_catch_rate); ?>" />
                         <p class="description"><?php esc_html_e('Value between 0 and 1 (Game Master baseCaptureRate).', 'poke-hub'); ?></p>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="go_flee_rate"><?php esc_html_e('Flee rate', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" name="go_flee_rate" id="go_flee_rate" value="<?php echo esc_attr($go_flee_rate); ?>" />
                         <p class="description"><?php esc_html_e('Value between 0 and 1 (Game Master baseFleeRate).', 'poke-hub'); ?></p>
@@ -657,15 +657,15 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="go_buddy_distance_km"><?php esc_html_e('Buddy distance (km)', 'poke-hub'); ?></label>
                         <input type="number" step="0.1" name="go_buddy_distance_km" id="go_buddy_distance_km" value="<?php echo esc_attr($go_buddy_distance_km); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="buddy_mega_energy_award"><?php esc_html_e('Buddy walked mega energy', 'poke-hub'); ?></label>
                         <input type="number" style="max-width: 150px;" name="buddy_mega_energy_award" id="buddy_mega_energy_award" value="<?php echo esc_attr($buddy_mega_energy_award); ?>" />
                         <p class="description"><?php esc_html_e('Mega energy awarded when walking this Pokémon as buddy.', 'poke-hub'); ?></p>
@@ -673,9 +673,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label><?php esc_html_e('Second charged move cost', 'poke-hub'); ?></label>
                         <div style="display: flex; gap: 10px;">
                             <label style="flex: 1;"><?php esc_html_e('Stardust', 'poke-hub'); ?>
@@ -687,8 +687,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         </div>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label><?php esc_html_e('Trade & transfer', 'poke-hub'); ?></label>
                         <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <input type="checkbox" name="is_tradable" value="1" <?php checked($is_tradable, 1); ?> />
@@ -703,7 +703,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-group">
+            <div class="admin-lab-form-group">
                 <label><?php esc_html_e('Shadow & purification', 'poke-hub'); ?></label>
                 <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                     <input type="checkbox" name="has_shadow" value="1" <?php checked($has_shadow, 1); ?> />
@@ -726,16 +726,16 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <p class="description"><?php esc_html_e('Return / Frustration moves are linked automatically by the Game Master importer and stored in the shadow metadata.', 'poke-hub'); ?></p>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="attack_probability"><?php esc_html_e('Attack probability', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" min="0" max="1" name="attack_probability" id="attack_probability" value="<?php echo esc_attr($attack_probability); ?>" />
                         <p class="description"><?php esc_html_e('Value between 0 and 1.', 'poke-hub'); ?></p>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="dodge_probability"><?php esc_html_e('Dodge probability', 'poke-hub'); ?></label>
                         <input type="number" step="0.01" min="0" max="1" name="dodge_probability" id="dodge_probability" value="<?php echo esc_attr($dodge_probability); ?>" />
                         <p class="description"><?php esc_html_e('Value between 0 and 1.', 'poke-hub'); ?></p>
@@ -745,45 +745,45 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         </div>
 
         <!-- Section: Release Dates -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Release dates', 'poke-hub'); ?></h2>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_normal"><?php esc_html_e('Normal', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_normal" id="release_normal" value="<?php echo esc_attr($release['normal'] ?? ''); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_shiny"><?php esc_html_e('Shiny', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_shiny" id="release_shiny" value="<?php echo esc_attr($release['shiny'] ?? ''); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_shadow"><?php esc_html_e('Shadow', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_shadow" id="release_shadow" value="<?php echo esc_attr($release['shadow'] ?? ''); ?>" />
                     </div>
                 </div>
             </div>
 
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_mega"><?php esc_html_e('Mega', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_mega" id="release_mega" value="<?php echo esc_attr($release['mega'] ?? ''); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_dynamax"><?php esc_html_e('Dynamax', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_dynamax" id="release_dynamax" value="<?php echo esc_attr($release['dynamax'] ?? ''); ?>" />
                     </div>
                 </div>
-                <div class="pokehub-form-col">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
                         <label for="release_gigantamax"><?php esc_html_e('Gigantamax', 'poke-hub'); ?></label>
                         <input type="text" placeholder="YYYY-MM-DD" name="release_gigantamax" id="release_gigantamax" value="<?php echo esc_attr($release['gigantamax'] ?? ''); ?>" />
                     </div>
@@ -792,20 +792,20 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         </div>
 
         <!-- Section: Regional Availability -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Regional availability', 'poke-hub'); ?></h2>
             
-            <div class="pokehub-form-row">
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" name="regional_is_regional" value="1" <?php checked(!empty($regional['is_regional'])); ?> />
                             <span><?php esc_html_e('Is regional?', 'poke-hub'); ?></span>
                         </label>
                     </div>
                 </div>
-                <div class="pokehub-form-col-50">
-                    <div class="pokehub-form-group">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
                         <label for="regional_map_image_id"><?php esc_html_e('Region map image ID', 'poke-hub'); ?></label>
                         <input type="number" style="max-width: 150px;" name="regional_map_image_id" id="regional_map_image_id" value="<?php echo esc_attr($regional['map_image_id'] ?? 0); ?>" />
                         <p class="description"><?php esc_html_e('WordPress media attachment ID of the regional map.', 'poke-hub'); ?></p>
@@ -813,7 +813,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <div class="pokehub-form-group">
+            <div class="admin-lab-form-group">
                 <label for="regional_description"><?php esc_html_e('Regional description', 'poke-hub'); ?></label>
                 <textarea name="regional_description" id="regional_description" rows="3" style="width: 100%;"><?php echo esc_textarea($regional['description'] ?? ''); ?></textarea>
                 <p class="description"><?php esc_html_e('Example: Available only in North America, etc.', 'poke-hub'); ?></p>
@@ -827,7 +827,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         ?>
         
         <!-- Section: Attacks -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Pokémon GO – Attacks', 'poke-hub'); ?></h2>
             <p class="description">
                 <?php esc_html_e('Manage fast and charged moves for this Pokémon. Legacy is stored per Pokémon, not globally on the move.', 'poke-hub'); ?>
@@ -880,7 +880,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             ?>
                                 <tr>
                                     <td>
-                                        <select class="pokehub-move-select" name="fast_moves[<?php echo (int) $fast_index; ?>][attack_id]">
+                                        <select class="admin-lab-field-select" name="fast_moves[<?php echo (int) $fast_index; ?>][attack_id]">
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_fast_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>"
@@ -915,7 +915,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             ?>
                                 <tr>
                                     <td>
-                                        <select class="pokehub-move-select" name="fast_moves[0][attack_id]">
+                                        <select class="admin-lab-field-select" name="fast_moves[0][attack_id]">
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_fast_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>"
@@ -977,7 +977,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             ?>
                                 <tr>
                                     <td>
-                                        <select class="pokehub-move-select" name="charged_moves[<?php echo (int) $charged_index; ?>][attack_id]">
+                                        <select class="admin-lab-field-select" name="charged_moves[<?php echo (int) $charged_index; ?>][attack_id]">
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_charged_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>"
@@ -1012,7 +1012,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             ?>
                                 <tr>
                                     <td>
-                                        <select class="pokehub-move-select" name="charged_moves[0][attack_id]">
+                                        <select class="admin-lab-field-select" name="charged_moves[0][attack_id]">
                                             <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                                             <?php foreach ($all_charged_moves as $move) : ?>
                                                 <option value="<?php echo (int) $move->id; ?>">
@@ -1047,7 +1047,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <?php endif; ?>
             </div>
         </div>
-        </div> <!-- Fin section pokehub-section Attacks -->
+        </div> <!-- Fin section admin-lab-form-section Attacks -->
 
         <?php
         // Templates pour JS (lignes vides)
@@ -1056,7 +1056,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             ?>
             <tr>
                 <td>
-                    <select class="pokehub-move-select" name="fast_moves[__INDEX__][attack_id]">
+                    <select class="admin-lab-field-select" name="fast_moves[__INDEX__][attack_id]">
                         <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                         <?php foreach ($all_fast_moves as $move) : ?>
                             <option value="<?php echo (int) $move->id; ?>">
@@ -1087,7 +1087,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             ?>
             <tr>
                 <td>
-                    <select class="pokehub-move-select" name="charged_moves[__INDEX__][attack_id]">
+                    <select class="admin-lab-field-select" name="charged_moves[__INDEX__][attack_id]">
                         <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
                         <?php foreach ($all_charged_moves as $move) : ?>
                             <option value="<?php echo (int) $move->id; ?>"
@@ -1149,7 +1149,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             ?>
             <tr>
                 <td>
-                    <select class="pokehub-pokemon-select2 regular-text"
+                    <select class="admin-lab-field-select regular-text"
                             name="evolutions[__INDEX__][target_pokemon_id]"
                             data-placeholder="<?php esc_attr_e('Select target Pokémon', 'poke-hub'); ?>">
                         <option value="0"><?php esc_html_e('— Select target —', 'poke-hub'); ?></option>
@@ -1233,7 +1233,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <label class="pokehub-evolution-label">
                             <?php esc_html_e('Item requirement', 'poke-hub'); ?>
                         </label>
-                        <select class="pokehub-item-select2 regular-text"
+                        <select class="admin-lab-field-select regular-text"
                                 name="evolutions[__INDEX__][item_requirement_slug]"
                                 data-placeholder="<?php esc_attr_e('Select item', 'poke-hub'); ?>">
                             <option value=""><?php esc_html_e('No item required', 'poke-hub'); ?></option>
@@ -1276,7 +1276,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <label class="pokehub-evolution-label">
                             <?php esc_html_e('Lure item', 'poke-hub'); ?>
                         </label>
-                        <select class="pokehub-lure-select2 regular-text"
+                        <select class="admin-lab-field-select regular-text"
                                 name="evolutions[__INDEX__][lure_item_slug]"
                                 data-placeholder="<?php esc_attr_e('Select lure', 'poke-hub'); ?>">
                             <option value=""><?php esc_html_e('No lure required', 'poke-hub'); ?></option>
@@ -1361,7 +1361,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                     <label class="pokehub-evolution-label">
                         <?php esc_html_e('Weather requirement', 'poke-hub'); ?>
                     </label>
-                    <select class="pokehub-weather-select2 regular-text"
+                    <select class="admin-lab-field-select regular-text"
                             name="evolutions[__INDEX__][weather_requirement_slug]"
                             data-placeholder="<?php esc_attr_e('Select weather (optional)', 'poke-hub'); ?>">
                         <option value=""><?php esc_html_e('No weather requirement', 'poke-hub'); ?></option>
@@ -1425,7 +1425,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         ?>
         
         <!-- Section: Evolutions -->
-        <div class="pokehub-section">
+        <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Pokémon GO – Evolutions', 'poke-hub'); ?></h2>
 
             <?php if (!$is_edit) : ?>
@@ -1626,7 +1626,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                 ?>
                                 <tr>
                                     <td>
-                                        <select class="pokehub-pokemon-select2 regular-text"
+                                        <select class="admin-lab-field-select regular-text"
                                                 name="evolutions[<?php echo (int) $evo_index; ?>][target_pokemon_id]"
                                                 data-placeholder="<?php esc_attr_e('Select target Pokémon', 'poke-hub'); ?>">
                                             <option value="0"><?php esc_html_e('— Select target —', 'poke-hub'); ?></option>
@@ -1693,7 +1693,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <label class="pokehub-evolution-label">
                                                 <?php esc_html_e('Item requirement', 'poke-hub'); ?>
                                             </label>
-                                            <select class="pokehub-item-select2 regular-text"
+                                            <select class="admin-lab-field-select regular-text"
                                                     name="evolutions[<?php echo (int) $evo_index; ?>][item_requirement_slug]"
                                                     data-placeholder="<?php esc_attr_e('Select item', 'poke-hub'); ?>">
                                                 <option value=""><?php esc_html_e('No item required', 'poke-hub'); ?></option>
@@ -1739,7 +1739,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <label class="pokehub-evolution-label">
                                                 <?php esc_html_e('Lure item', 'poke-hub'); ?>
                                             </label>
-                                            <select class="pokehub-lure-select2 regular-text"
+                                            <select class="admin-lab-field-select regular-text"
                                                     name="evolutions[<?php echo (int) $evo_index; ?>][lure_item_slug]"
                                                     data-placeholder="<?php esc_attr_e('Select lure', 'poke-hub'); ?>">
                                                 <option value=""><?php esc_html_e('No lure required', 'poke-hub'); ?></option>
@@ -1824,7 +1824,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                         <label class="pokehub-evolution-label">
                                             <?php esc_html_e('Weather requirement', 'poke-hub'); ?>
                                         </label>
-                                        <select class="pokehub-weather-select2 regular-text"
+                                        <select class="admin-lab-field-select regular-text"
                                                 name="evolutions[<?php echo (int) $evo_index; ?>][weather_requirement_slug]"
                                                 data-placeholder="<?php esc_attr_e('Select weather (optional)', 'poke-hub'); ?>">
                                             <option value=""><?php esc_html_e('No weather requirement', 'poke-hub'); ?></option>
@@ -1877,7 +1877,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             ?>
                             <tr>
                                 <td>
-                                    <select class="pokehub-pokemon-select2 regular-text"
+                                    <select class="admin-lab-field-select regular-text"
                                             name="evolutions[0][target_pokemon_id]"
                                             data-placeholder="<?php esc_attr_e('Select target Pokémon', 'poke-hub'); ?>">
                                         <option value="0"><?php esc_html_e('— Select target —', 'poke-hub'); ?></option>
@@ -1941,7 +1941,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                         <label class="pokehub-evolution-label">
                                             <?php esc_html_e('Item requirement', 'poke-hub'); ?>
                                         </label>
-                                        <select class="pokehub-item-select2 regular-text"
+                                        <select class="admin-lab-field-select regular-text"
                                                 name="evolutions[0][item_requirement_slug]"
                                                 data-placeholder="<?php esc_attr_e('Select item', 'poke-hub'); ?>">
                                             <option value=""><?php esc_html_e('No item required', 'poke-hub'); ?></option>
@@ -1971,7 +1971,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                         <label class="pokehub-evolution-label">
                                             <?php esc_html_e('Lure item', 'poke-hub'); ?>
                                         </label>
-                                        <select class="pokehub-lure-select2 regular-text"
+                                        <select class="admin-lab-field-select regular-text"
                                                 name="evolutions[0][lure_item_slug]"
                                                 data-placeholder="<?php esc_attr_e('Select lure', 'poke-hub'); ?>">
                                             <option value=""><?php esc_html_e('No lure required', 'poke-hub'); ?></option>
@@ -2043,7 +2043,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                     <label class="pokehub-evolution-label">
                                         <?php esc_html_e('Weather requirement', 'poke-hub'); ?>
                                     </label>
-                                    <select class="pokehub-weather-select2 regular-text"
+                                    <select class="admin-lab-field-select regular-text"
                                             name="evolutions[0][weather_requirement_slug]"
                                             data-placeholder="<?php esc_attr_e('Select weather (optional)', 'poke-hub'); ?>">
                                         <option value=""><?php esc_html_e('No weather requirement', 'poke-hub'); ?></option>
@@ -2094,7 +2094,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <?php endif; // all_pokemon_for_evo ?>
             <?php endif; // table ready ?>
         <?php endif; // is_edit ?>
-        </div> <!-- Fin section pokehub-section Evolutions -->
+        </div> <!-- Fin section admin-lab-form-section Evolutions -->
 
         <?php
         submit_button(

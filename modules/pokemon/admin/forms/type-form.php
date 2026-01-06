@@ -72,20 +72,20 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Name FR / Name EN -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="type_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="type_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
                             <p class="description"><?php esc_html_e('Example: Feu, Eau, Plante…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="type_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
                             <input type="text" id="type_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
                             <p class="description"><?php esc_html_e('At least one name is required.', 'poke-hub'); ?></p>
@@ -94,24 +94,24 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- Slug / Color / Sort Order -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="type_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                             <input type="text" id="type_slug" name="slug" value="<?php echo esc_attr($current_slug); ?>" />
                             <p class="description"><?php esc_html_e('Leave empty to auto-generate.', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="type_color"><?php esc_html_e('Color', 'poke-hub'); ?></label>
                             <input type="text" id="type_color" name="color" value="<?php echo esc_attr($current_color); ?>" 
                                    class="pokehub-color-field" style="max-width: 150px;" />
                             <p class="description"><?php esc_html_e('Background color (hex).', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="type_sort_order"><?php esc_html_e('Order', 'poke-hub'); ?></label>
                             <input type="number" id="type_sort_order" name="sort_order" value="<?php echo esc_attr($current_sort); ?>" 
                                    style="max-width: 150px;" />
@@ -121,7 +121,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- Icon -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Icon', 'poke-hub'); ?></label>
                     <div class="pokehub-type-icon-field">
                         <input type="hidden" class="pokehub-type-icon-url" name="icon" value="<?php echo esc_attr($current_icon); ?>" />
@@ -146,12 +146,12 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
             </div>
 
             <!-- Section: Defensive Properties (When this type is attacked) -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Defensive Properties (When Attacked)', 'poke-hub'); ?></h3>
                 <p class="description" style="margin-top: 0;"><?php esc_html_e('How this type reacts to incoming attacks.', 'poke-hub'); ?></p>
                 
                 <!-- Weak to (×2) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Weak to (×2)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types) && is_array($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -181,7 +181,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- Resists (×½) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Resists (×½)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -201,7 +201,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- Immune to (×0) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Immune to (×0)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -222,12 +222,12 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
             </div>
 
             <!-- Section: Offensive Properties (When this type attacks) -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Offensive Properties (When Attacking)', 'poke-hub'); ?></h3>
                 <p class="description" style="margin-top: 0;"><?php esc_html_e('How effective this type is when attacking other types.', 'poke-hub'); ?></p>
                 
                 <!-- Super effective (×2) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Super Effective against (×2)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -247,7 +247,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- Not very effective (×½) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Not Very Effective against (×½)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -267,7 +267,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 </div>
 
                 <!-- No effect (×0) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('No Effect against (×0)', 'poke-hub'); ?></label>
                     <?php if (!empty($all_types)) : ?>
                         <div class="pokehub-types-grid">
@@ -289,9 +289,9 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
 
             <!-- Section: Associated Weathers -->
             <?php if (!empty($all_weathers)) : ?>
-                <div class="pokehub-section">
+                <div class="admin-lab-form-section">
                     <h3><?php esc_html_e('Associated Weathers', 'poke-hub'); ?></h3>
-                    <div class="pokehub-form-group">
+                    <div class="admin-lab-form-group">
                         <div class="pokehub-types-grid">
                             <?php foreach ($all_weathers as $w) : ?>
                                 <?php

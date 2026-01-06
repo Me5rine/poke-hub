@@ -152,7 +152,7 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
                 }
                 
                 $actions['delete'] = sprintf(
-                    '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
+                    '<a href="%s" class="submitdelete admin-lab-button-delete" onclick="return confirm(\'%s\');">%s</a>',
                     esc_url($delete_url),
                     esc_attr__('Are you sure you want to delete this profile?', 'poke-hub'),
                     esc_html__('Delete', 'poke-hub')
@@ -195,7 +195,7 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
         
         $actions = [
             'delete' => sprintf(
-                '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
+                '<a href="%s" class="submitdelete admin-lab-button-delete" onclick="return confirm(\'%s\');">%s</a>',
                 esc_url($delete_url),
                 esc_attr__('Are you sure you want to delete this profile?', 'poke-hub'),
                 esc_html__('Delete', 'poke-hub')

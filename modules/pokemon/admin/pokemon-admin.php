@@ -877,13 +877,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
 
     $section = isset($_GET['ph_section']) ? sanitize_key($_GET['ph_section']) : 'overview';
 
-    // Le CSS admin est maintenant chargé pour toutes les sections
-    wp_enqueue_style(
-        'poke-hub-pokemon-admin',
-        POKE_HUB_URL . 'assets/css/poke-hub-pokemon-admin.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    // Le CSS admin unifié est chargé via admin-unified.css (dans le plugin principal)
 
     // On limite Select2 aux onglets qui en ont besoin (pokemon, backgrounds)
     // Mais on charge toujours le script d'évolutions pour pokemon

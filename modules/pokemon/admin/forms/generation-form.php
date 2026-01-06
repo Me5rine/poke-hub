@@ -82,13 +82,13 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Generation Number & Region -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="gen_number"><?php esc_html_e('Generation Number', 'poke-hub'); ?> *</label>
                             <input type="number" id="gen_number" name="generation_number" 
                                    value="<?php echo esc_attr($current_gen_number); ?>" 
@@ -96,8 +96,8 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                             <p class="description"><?php esc_html_e('Example: 1, 2, 3…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="gen_region"><?php esc_html_e('Region', 'poke-hub'); ?></label>
                             <select name="region_id" id="gen_region">
                                 <option value="0"><?php esc_html_e('-- No region --', 'poke-hub'); ?></option>
@@ -114,16 +114,16 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Name FR / Name EN -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="gen_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="gen_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
                             <p class="description"><?php esc_html_e('Example: Génération 1, Première génération…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="gen_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
                             <input type="text" id="gen_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
                             <p class="description"><?php esc_html_e('Example: Generation 1, First generation…', 'poke-hub'); ?></p>
@@ -132,7 +132,7 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Slug -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="gen_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                     <input type="text" id="gen_slug" name="slug" value="<?php echo esc_attr($current_slug); ?>" />
                     <p class="description"><?php esc_html_e('Leave empty to auto-generate from name.', 'poke-hub'); ?></p>

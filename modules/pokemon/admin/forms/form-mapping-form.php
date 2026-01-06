@@ -92,22 +92,22 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Game Master Identifiers -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Game Master Identifiers', 'poke-hub'); ?></h3>
                 <p class="description" style="margin-top: 0;">
                     <?php esc_html_e('These values come from the Game Master JSON file.', 'poke-hub'); ?>
                 </p>
                 
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="pokemon_id_proto"><?php esc_html_e('Pokémon ID (proto)', 'poke-hub'); ?> *</label>
                             <input type="text" id="pokemon_id_proto" name="pokemon_id_proto" value="<?php echo esc_attr($pokemon_id_proto); ?>" required />
                             <p class="description"><?php esc_html_e('Example: MEWTWO, PIKACHU, BULBASAUR…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="form_proto"><?php esc_html_e('Form (proto)', 'poke-hub'); ?></label>
                             <input type="text" id="form_proto" name="form_proto" value="<?php echo esc_attr($form_proto); ?>" />
                             <p class="description"><?php esc_html_e('Example: MEWTWO_A, PIKACHU_FALL_2019…', 'poke-hub'); ?></p>
@@ -117,10 +117,10 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Form Variant Association -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Form Variant Association', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="form_slug"><?php esc_html_e('Form Variant', 'poke-hub'); ?></label>
                     <select name="form_slug" id="form_slug">
                         <option value=""><?php esc_html_e('— Base form / no special variant —', 'poke-hub'); ?></option>
@@ -177,19 +177,19 @@ function poke_hub_pokemon_form_mappings_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Display Options -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Display Options', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="label_suffix"><?php esc_html_e('Label Suffix', 'poke-hub'); ?></label>
                             <input type="text" id="label_suffix" name="label_suffix" value="<?php echo esc_attr($label_suffix); ?>" />
                             <p class="description"><?php esc_html_e('Optional suffix appended to the Pokémon name (e.g. "Armored", "Fall 2019").', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="sort_order"><?php esc_html_e('Sort Order', 'poke-hub'); ?></label>
                             <input type="number" id="sort_order" name="sort_order" value="<?php echo esc_attr($sort_order); ?>" style="max-width: 150px;" />
                             <p class="description"><?php esc_html_e('Optional ordering between forms.', 'poke-hub'); ?></p>

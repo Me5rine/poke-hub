@@ -121,19 +121,19 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="title"><?php esc_html_e('Title', 'poke-hub'); ?> *</label>
                             <input type="text" id="title" name="title" value="<?php echo esc_attr($title); ?>" required />
                             <p class="description"><?php esc_html_e('Example: "Halloween Background", "Christmas Background"…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                             <input type="text" id="slug" name="slug" value="<?php echo esc_attr($slug); ?>" />
                             <p class="description"><?php esc_html_e('Leave empty to auto-generate from title.', 'poke-hub'); ?></p>
@@ -143,11 +143,11 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Background Image -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Background Image', 'poke-hub'); ?></h3>
                 
                 <div id="pokehub-background-image-field">
-                    <div class="pokehub-form-group">
+                    <div class="admin-lab-form-group">
                         <label for="image_url"><?php esc_html_e('Image URL', 'poke-hub'); ?></label>
                         <div style="display: flex; gap: 10px;">
                             <input type="url" id="image_url" name="image_url" value="<?php echo esc_attr($image_url); ?>" style="flex: 1;" />
@@ -176,12 +176,12 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Event Association -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Event Association', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="event_type"><?php esc_html_e('Event Type', 'poke-hub'); ?></label>
                             <select name="event_type" id="event_type">
                                 <option value=""><?php esc_html_e('None', 'poke-hub'); ?></option>
@@ -193,8 +193,8 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                             <p class="description"><?php esc_html_e('Type of event associated with this background.', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="event_id"><?php esc_html_e('Event', 'poke-hub'); ?></label>
                             <select name="event_id" id="event_id" style="max-width: 100%;">
                                 <option value="0"><?php esc_html_e('None', 'poke-hub'); ?></option>
@@ -227,10 +227,10 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Linked Pokémon -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Linked Pokémon', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="pokemon_ids"><?php esc_html_e('Pokémon', 'poke-hub'); ?></label>
                     <select name="pokemon_ids[]" id="pokemon_ids" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
                         <?php if (!empty($all_pokemon)) : ?>

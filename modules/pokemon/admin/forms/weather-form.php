@@ -86,20 +86,20 @@ function poke_hub_pokemon_weathers_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section: Basic Information -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Name FR / Name EN -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="name_fr" name="name_fr" value="<?php echo esc_attr($name_fr); ?>" />
                             <p class="description"><?php esc_html_e('Example: Pluie, Ensoleillé, Ciel couvert…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
                             <input type="text" id="name_en" name="name_en" value="<?php echo esc_attr($name_en); ?>" />
                             <p class="description"><?php esc_html_e('Example: Rain, Sunny, Partly Cloudy…', 'poke-hub'); ?></p>
@@ -108,7 +108,7 @@ function poke_hub_pokemon_weathers_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Slug -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                     <input type="text" id="slug" name="slug" value="<?php echo esc_attr($slug); ?>" />
                     <p class="description"><?php esc_html_e('Used as a key (e.g. "rain", "sunny", "partly_cloudy"). Leave empty to auto-generate.', 'poke-hub'); ?></p>
@@ -116,10 +116,10 @@ function poke_hub_pokemon_weathers_edit_form($edit_row = null) {
             </div>
 
             <!-- Section: Weather Image -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Weather Image', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="image_url"><?php esc_html_e('Image URL', 'poke-hub'); ?></label>
                     <input type="url" id="image_url" name="image_url" value="<?php echo esc_attr($image_url); ?>" />
                     <p class="description"><?php esc_html_e('Full URL to the weather icon (e.g. S3 bucket, CDN…).', 'poke-hub'); ?></p>

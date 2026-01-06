@@ -53,7 +53,9 @@ jQuery(function($) {
 
     function pokehubInitAttackSelect2(context) {
         var $ctx = context ? $(context) : $(document);
-        $ctx.find('select.pokehub-move-select').each(function() {
+        $ctx.find('select.admin-lab-field-select').filter(function() {
+            return $(this).closest('form, .admin-lab-form-section').length > 0;
+        }).each(function() {
             var $s = $(this);
             if ($s.data('select2')) {
                 return;
@@ -71,7 +73,9 @@ jQuery(function($) {
 
     function pokehubInitWeatherSelect2(context) {
         var $ctx = context ? $(context) : $(document);
-        $ctx.find('select.pokehub-weather-select2').each(function() {
+        $ctx.find('select.admin-lab-field-select').filter(function() {
+            return $(this).closest('form, .admin-lab-form-section').length > 0;
+        }).each(function() {
             var $s = $(this);
             if ($s.data('select2')) {
                 return;
@@ -91,7 +95,9 @@ jQuery(function($) {
 
     function pokehubInitItemSelect2(context) {
         var $ctx = context ? $(context) : $(document);
-        $ctx.find('select.pokehub-item-select2').each(function() {
+        $ctx.find('select.admin-lab-field-select').filter(function() {
+            return $(this).closest('form, .admin-lab-form-section').length > 0;
+        }).each(function() {
             var $s = $(this);
             if ($s.data('select2')) {
                 return;
@@ -111,7 +117,9 @@ jQuery(function($) {
 
     function pokehubInitLureSelect2(context) {
         var $ctx = context ? $(context) : $(document);
-        $ctx.find('select.pokehub-lure-select2').each(function() {
+        $ctx.find('select.admin-lab-field-select').filter(function() {
+            return $(this).closest('form, .admin-lab-form-section').length > 0;
+        }).each(function() {
             var $s = $(this);
             if ($s.data('select2')) {
                 return;
@@ -131,7 +139,9 @@ jQuery(function($) {
 
     function pokehubInitPokemonSelect2(context) {
         var $ctx = context ? $(context) : $(document);
-        $ctx.find('select.pokehub-pokemon-select2').each(function() {
+        $ctx.find('select.admin-lab-field-select').filter(function() {
+            return $(this).closest('form, .admin-lab-form-section').length > 0;
+        }).each(function() {
             var $s = $(this);
             if ($s.data('select2')) {
                 return;

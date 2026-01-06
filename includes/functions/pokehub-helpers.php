@@ -424,3 +424,132 @@ function pokehub_table_exists(string $table_name): bool {
 
     return ($found === $table_name);
 }
+
+/**
+ * Génère le HTML de pagination selon la documentation PLUGIN_INTEGRATION.md
+ * 
+ * Template global réutilisable pour toutes les paginations front-end.
+ * Utilise les classes génériques me5rine-lab-pagination-*.
+ * 
+ * @param array $args {
+ *     Arguments de la pagination
+ *     
+ *     @type int    $total_items  Nombre total d'éléments
+ *     @type int    $paged        Page courante (défaut: 1)
+ *     @type int    $total_pages  Nombre total de pages
+ *     @type string $page_var     Nom de la variable GET pour la pagination (défaut: 'pg')
+ *     @type string $text_domain  Domaine de traduction (défaut: 'poke-hub')
+ * }
+ * @return string HTML de la pagination (vide si total_pages <= 1)
+ */
+function poke_hub_render_pagination(array $args = []): string {
+    $args = wp_parse_args($args, [
+        'total_items' => 0,
+        'paged'        => 1,
+        'total_pages'  => 1,
+        'page_var'     => 'pg',
+        'text_domain'  => 'poke-hub',
+    ]);
+
+    $total_items = max(0, (int) $args['total_items']);
+    $paged       = max(1, (int) $args['paged']);
+    $total_pages = max(1, (int) $args['total_pages']);
+    $page_var    = sanitize_key($args['page_var']) ?: 'pg';
+    $text_domain = sanitize_text_field($args['text_domain']) ?: 'poke-hub';
+
+    // Ne pas afficher si une seule page ou moins
+    if ($total_pages <= 1) {
+        return '';
+    }
+
+    // S'assurer que paged ne dépasse pas total_pages
+    if ($paged > $total_pages) {
+        $paged = $total_pages;
+    }
+
+    ob_start();
+    ?>
+    <div class="me5rine-lab-pagination">
+        <span class="me5rine-lab-pagination-info">
+            <?php
+            printf(
+                /* translators: %s: number of items */
+                _n('%s résultat', '%s résultats', $total_items, $text_domain),
+                number_format_i18n($total_items)
+            );
+            ?>
+        </span>
+        <div class="me5rine-lab-pagination-links">
+            <?php
+            // Bouton première page
+            if ($paged > 1) :
+                ?>
+                <a href="<?php echo esc_url(add_query_arg($page_var, 1)); ?>" 
+                   class="me5rine-lab-pagination-button" 
+                   aria-label="<?php esc_attr_e('Première page', $text_domain); ?>">
+                    <span aria-hidden="true">«</span>
+                </a>
+                <?php
+            else :
+                ?>
+                <span class="me5rine-lab-pagination-button disabled" aria-hidden="true">«</span>
+                <?php
+            endif;
+
+            // Bouton précédente
+            if ($paged > 1) :
+                ?>
+                <a href="<?php echo esc_url(add_query_arg($page_var, $paged - 1)); ?>" 
+                   class="me5rine-lab-pagination-button" 
+                   aria-label="<?php esc_attr_e('Page précédente', $text_domain); ?>">
+                    <span aria-hidden="true">‹</span>
+                </a>
+                <?php
+            else :
+                ?>
+                <span class="me5rine-lab-pagination-button disabled" aria-hidden="true">‹</span>
+                <?php
+            endif;
+
+            // Page actuelle
+            ?>
+            <span class="me5rine-lab-pagination-button active">
+                <?php echo esc_html($paged); ?>
+            </span>
+            <?php
+
+            // Bouton suivante
+            if ($paged < $total_pages) :
+                ?>
+                <a href="<?php echo esc_url(add_query_arg($page_var, $paged + 1)); ?>" 
+                   class="me5rine-lab-pagination-button" 
+                   aria-label="<?php esc_attr_e('Page suivante', $text_domain); ?>">
+                    <span aria-hidden="true">›</span>
+                </a>
+                <?php
+            else :
+                ?>
+                <span class="me5rine-lab-pagination-button disabled" aria-hidden="true">›</span>
+                <?php
+            endif;
+
+            // Bouton dernière page
+            if ($paged < $total_pages) :
+                ?>
+                <a href="<?php echo esc_url(add_query_arg($page_var, $total_pages)); ?>" 
+                   class="me5rine-lab-pagination-button" 
+                   aria-label="<?php esc_attr_e('Dernière page', $text_domain); ?>">
+                    <span aria-hidden="true">»</span>
+                </a>
+                <?php
+            else :
+                ?>
+                <span class="me5rine-lab-pagination-button disabled" aria-hidden="true">»</span>
+                <?php
+            endif;
+            ?>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}

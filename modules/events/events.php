@@ -41,7 +41,17 @@ function poke_hub_events_assets() {
     wp_add_inline_script('select2', "jQuery(function($){
         var \$s=$('#pokehub-event-type-select');
         if(!\$s.length)return;
-        \$s.select2({placeholder:'" . esc_js(__('Select one or more types', 'poke-hub')) . "',allowClear:true,width:'resolve'});
+        // Find the closest form field wrapper for dropdownParent
+        var \$parent = \$s.closest('.me5rine-lab-form-field, .pokehub-event-type-filter-form');
+        if (!\$parent.length) {
+            \$parent = \$s.parent();
+        }
+        \$s.select2({
+            placeholder:'" . esc_js(__('Select one or more types', 'poke-hub')) . "',
+            allowClear:true,
+            width:'resolve',
+            dropdownParent: \$parent.length ? \$parent : $('body')
+        });
         \$s.on('change',()=>\$s.closest('form').submit());
     });");
 }
@@ -59,24 +69,8 @@ add_action('admin_enqueue_scripts', function ($hook) {
     // Nécessaire pour wp.media
     wp_enqueue_media();
 
-    // CSS admin commun (inclut les styles Events)
-    wp_enqueue_style(
-        'poke-hub-pokemon-admin',
-        POKE_HUB_URL . 'assets/css/poke-hub-pokemon-admin.css',
-        [],
-        POKE_HUB_VERSION
-    );
-
     // Select2 pour les sélections de Pokémon et le filtre de type d'événement
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
-    
-    // CSS spécifique pour les événements admin (après Select2)
-    wp_enqueue_style(
-        'poke-hub-events-admin',
-        POKE_HUB_URL . 'assets/css/poke-hub-events-admin.css',
-        ['select2'],
-        POKE_HUB_VERSION
-    );
 
     // Script commun pour la media frame + onglet URL
     wp_enqueue_script(

@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 1.7.7
+Version: 1.7.8
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -303,4 +303,44 @@ function poke_hub_load_modules() {
     }
 }
 add_action('plugins_loaded', 'poke_hub_load_modules', 20);
+
+/**
+ * Charger le CSS admin unifié pour toutes les pages admin du plugin
+ */
+function poke_hub_enqueue_admin_unified_styles($hook) {
+    // Vérifier si on est sur une page admin du plugin
+    $poke_hub_pages = [
+        'poke-hub',
+        'poke-hub-settings',
+        'poke-hub-pokemon',
+        'poke-hub-events',
+        'poke-hub-user-profiles',
+    ];
+    
+    $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
+    
+    // Vérifier aussi les pages Bonus (CPT)
+    $is_bonus_page = poke_hub_is_bonus_related();
+    
+    if (!in_array($page, $poke_hub_pages, true) && !$is_bonus_page) {
+        return;
+    }
+    
+    // Charger global-colors.css d'abord
+    wp_enqueue_style(
+        'poke-hub-global-colors',
+        POKE_HUB_URL . 'assets/css/global-colors.css',
+        [],
+        POKE_HUB_VERSION
+    );
+    
+    // Charger admin-unified.css ensuite
+    wp_enqueue_style(
+        'poke-hub-admin-unified',
+        POKE_HUB_URL . 'assets/css/admin-unified.css',
+        ['poke-hub-global-colors'],
+        POKE_HUB_VERSION
+    );
+}
+add_action('admin_enqueue_scripts', 'poke_hub_enqueue_admin_unified_styles');
 

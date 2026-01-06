@@ -235,19 +235,19 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
             <?php endif; ?>
 
             <!-- Section : Informations de base -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
                 
                 <!-- Nom FR / Nom EN sur la même ligne -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="attack_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="attack_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="attack_name_en"><?php esc_html_e('Name (English)', 'poke-hub'); ?> *</label>
                             <input type="text" id="attack_name_en" name="name_en" value="<?php echo esc_attr($current_name_en); ?>" />
                         </div>
@@ -255,24 +255,24 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Slug -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="attack_slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                     <input type="text" id="attack_slug" name="slug" value="<?php echo esc_attr($is_edit ? $edit_row->slug : ''); ?>" />
                     <p class="description"><?php esc_html_e('Leave empty to auto-generate from name.', 'poke-hub'); ?></p>
                 </div>
 
                 <!-- Game & Category -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="attack_game"><?php esc_html_e('Game', 'poke-hub'); ?></label>
                             <select name="game_key" id="attack_game">
                                 <option value="pokemon_go" <?php selected($game_key, 'pokemon_go'); ?>>Pokémon GO</option>
                             </select>
                         </div>
                     </div>
-                    <div class="pokehub-form-col-50">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
                             <label for="attack_category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
                             <select name="category" id="attack_category">
                                 <option value=""><?php esc_html_e('-- Select --', 'poke-hub'); ?></option>
@@ -284,7 +284,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                 </div>
 
                 <!-- Types (sur une seule ligne) -->
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Types', 'poke-hub'); ?></label>
                     <?php if (empty($all_types)) : ?>
                         <p class="description" style="color: #d63638;">
@@ -309,28 +309,28 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
             </div>
 
             <!-- Section : Global Stats -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Global Statistics', 'poke-hub'); ?></h3>
                 <p class="description"><?php esc_html_e('These statistics apply to both PvE and PvP unless overridden.', 'poke-hub'); ?></p>
                 
                 <!-- Duration & Damage Window sur la même ligne -->
-                <div class="pokehub-form-row">
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="global_duration_ms"><?php esc_html_e('Duration (ms)', 'poke-hub'); ?></label>
                             <input type="number" id="global_duration_ms" name="global_duration_ms" 
                                    value="<?php echo esc_attr($global['duration_ms']); ?>" min="0" />
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="global_damage_window_start_ms"><?php esc_html_e('Damage Window Start (ms)', 'poke-hub'); ?></label>
                             <input type="number" id="global_damage_window_start_ms" name="global_damage_window_start_ms" 
                                    value="<?php echo esc_attr($global['damage_window_start_ms']); ?>" min="0" />
                         </div>
                     </div>
-                    <div class="pokehub-form-col">
-                        <div class="pokehub-form-group">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
                             <label for="global_damage_window_end_ms"><?php esc_html_e('Damage Window End (ms)', 'poke-hub'); ?></label>
                             <input type="number" id="global_damage_window_end_ms" name="global_damage_window_end_ms" 
                                    value="<?php echo esc_attr($global['damage_window_end_ms']); ?>" min="0" />
@@ -340,34 +340,34 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
             </div>
 
             <!-- Section : Stats PvE & PvP côte à côte -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Battle Statistics', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-row">
+                <div class="admin-lab-form-row">
                     <!-- PvE Stats -->
-                    <div class="pokehub-form-col-50">
+                    <div class="admin-lab-form-col-50">
                         <h4><?php esc_html_e('PvE (Raids, Gyms)', 'poke-hub'); ?></h4>
                         
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pve_damage"><?php esc_html_e('Damage', 'poke-hub'); ?></label>
                             <input type="number" id="pve_damage" name="pve_damage" 
                                    value="<?php echo esc_attr($pve['damage']); ?>" min="0" />
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pve_energy"><?php esc_html_e('Energy', 'poke-hub'); ?></label>
                             <input type="number" id="pve_energy" name="pve_energy" 
                                    value="<?php echo esc_attr($pve['energy']); ?>" />
                             <p class="description"><?php esc_html_e('Positive = gain, Negative = cost', 'poke-hub'); ?></p>
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pve_dps"><?php esc_html_e('DPS', 'poke-hub'); ?></label>
                             <input type="text" id="pve_dps" name="pve_dps" step="0.001"
                                    value="<?php echo esc_attr($pve['dps']); ?>" />
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pve_eps"><?php esc_html_e('EPS', 'poke-hub'); ?></label>
                             <input type="text" id="pve_eps" name="pve_eps" step="0.001"
                                    value="<?php echo esc_attr($pve['eps']); ?>" />
@@ -375,39 +375,39 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                     </div>
 
                     <!-- PvP Stats -->
-                    <div class="pokehub-form-col-50">
+                    <div class="admin-lab-form-col-50">
                         <h4><?php esc_html_e('PvP (Battles)', 'poke-hub'); ?></h4>
                         
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_damage"><?php esc_html_e('Damage', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_damage" name="pvp_damage" 
                                    value="<?php echo esc_attr($pvp['damage']); ?>" min="0" />
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_energy"><?php esc_html_e('Energy', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_energy" name="pvp_energy" 
                                    value="<?php echo esc_attr($pvp['energy']); ?>" />
                             <p class="description"><?php esc_html_e('Positive = gain, Negative = cost', 'poke-hub'); ?></p>
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_duration_ms"><?php esc_html_e('Duration (ms)', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_duration_ms" name="pvp_duration_ms" 
                                    value="<?php echo esc_attr($pvp['duration_ms']); ?>" min="0" />
                             <p class="description"><?php esc_html_e('Leave 0 to use global duration.', 'poke-hub'); ?></p>
                         </div>
 
-                        <div class="pokehub-form-row">
-                            <div class="pokehub-form-col">
-                                <div class="pokehub-form-group">
+                        <div class="admin-lab-form-row">
+                            <div class="admin-lab-form-col">
+                                <div class="admin-lab-form-group">
                                     <label for="pvp_dps"><?php esc_html_e('DPS', 'poke-hub'); ?></label>
                                     <input type="text" id="pvp_dps" name="pvp_dps" step="0.001"
                                            value="<?php echo esc_attr($pvp['dps']); ?>" />
                                 </div>
                             </div>
-                            <div class="pokehub-form-col">
-                                <div class="pokehub-form-group">
+                            <div class="admin-lab-form-col">
+                                <div class="admin-lab-form-group">
                                     <label for="pvp_eps"><?php esc_html_e('EPS', 'poke-hub'); ?></label>
                                     <input type="text" id="pvp_eps" name="pvp_eps" step="0.001"
                                            value="<?php echo esc_attr($pvp['eps']); ?>" />
@@ -420,22 +420,22 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                         <h5 style="margin-top: 15px; margin-bottom: 10px;"><?php esc_html_e('Turn Statistics', 'poke-hub'); ?></h5>
                         <p class="description" style="margin-bottom: 10px;"><?php esc_html_e('1 turn = 0.5 seconds', 'poke-hub'); ?></p>
                         
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_turns"><?php esc_html_e('Turns', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_turns" name="pvp_turns" 
                                    value="<?php echo esc_attr($pvp['turns']); ?>" min="0" />
                         </div>
 
-                        <div class="pokehub-form-row">
-                            <div class="pokehub-form-col">
-                                <div class="pokehub-form-group">
+                        <div class="admin-lab-form-row">
+                            <div class="admin-lab-form-col">
+                                <div class="admin-lab-form-group">
                                     <label for="pvp_dpt"><?php esc_html_e('DPT', 'poke-hub'); ?></label>
                                     <input type="text" id="pvp_dpt" name="pvp_dpt" step="0.001"
                                            value="<?php echo esc_attr($pvp['dpt']); ?>" />
                                 </div>
                             </div>
-                            <div class="pokehub-form-col">
-                                <div class="pokehub-form-group">
+                            <div class="admin-lab-form-col">
+                                <div class="admin-lab-form-group">
                                     <label for="pvp_ept"><?php esc_html_e('EPT', 'poke-hub'); ?></label>
                                     <input type="text" id="pvp_ept" name="pvp_ept" step="0.001"
                                            value="<?php echo esc_attr($pvp['ept']); ?>" />
@@ -447,10 +447,10 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
             </div>
 
             <!-- Section : PvP Buffs/Debuffs -->
-            <div class="pokehub-section">
+            <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('PvP Buffs & Debuffs', 'poke-hub'); ?></h3>
                 
-                <div class="pokehub-form-group">
+                <div class="admin-lab-form-group">
                     <label for="pvp_buff_activation_chance"><?php esc_html_e('Activation Chance', 'poke-hub'); ?></label>
                     <input type="number" id="pvp_buff_activation_chance" name="pvp_buff_activation_chance" 
                            step="0.01" min="0" max="1" style="max-width: 200px;"
@@ -463,7 +463,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                     <div class="pokehub-buffs-col">
                         <h4><?php esc_html_e('Attacker', 'poke-hub'); ?></h4>
                         
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_attacker_attack_stat_stage_change"><?php esc_html_e('Attack Change', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_attacker_attack_stat_stage_change" 
                                    name="pvp_attacker_attack_stat_stage_change" 
@@ -472,7 +472,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                             <p class="description"><?php esc_html_e('Stat stage change (-4 to +4).', 'poke-hub'); ?></p>
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_attacker_defense_stat_stage_change"><?php esc_html_e('Defense Change', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_attacker_defense_stat_stage_change" 
                                    name="pvp_attacker_defense_stat_stage_change" 
@@ -486,7 +486,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                     <div class="pokehub-buffs-col">
                         <h4><?php esc_html_e('Target', 'poke-hub'); ?></h4>
                         
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_target_attack_stat_stage_change"><?php esc_html_e('Attack Change', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_target_attack_stat_stage_change" 
                                    name="pvp_target_attack_stat_stage_change" 
@@ -495,7 +495,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                             <p class="description"><?php esc_html_e('Stat stage change (-4 to +4).', 'poke-hub'); ?></p>
                         </div>
 
-                        <div class="pokehub-form-group">
+                        <div class="admin-lab-form-group">
                             <label for="pvp_target_defense_stat_stage_change"><?php esc_html_e('Defense Change', 'poke-hub'); ?></label>
                             <input type="number" id="pvp_target_defense_stat_stage_change" 
                                    name="pvp_target_defense_stat_stage_change" 
