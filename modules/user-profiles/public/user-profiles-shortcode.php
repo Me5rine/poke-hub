@@ -91,19 +91,18 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     
     ob_start();
     ?>
-    <?php if (!empty($success_message)) : ?>
-        <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-success">
-            <p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p>
-        </div>
-    <?php endif; ?>
-    
-    <?php if (!empty($error_message)) : ?>
-        <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-error">
-            <p><?php echo esc_html($error_message); ?></p>
-        </div>
-    <?php endif; ?>
-    
-    <div class="me5rine-lab-form-container">
+    <div class="me5rine-lab-profile-container">
+        <?php if (!empty($success_message)) : ?>
+            <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-success">
+                <p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($error_message)) : ?>
+            <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-error">
+                <p><?php echo esc_html($error_message); ?></p>
+            </div>
+        <?php endif; ?>
         <h3 class="me5rine-lab-title-medium"><?php esc_html_e('Pokémon GO Profile', 'poke-hub'); ?></h3>
         <?php if ($can_edit) : ?>
             <form method="post" action="" id="poke-hub-profile-form">
@@ -114,7 +113,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <div class="me5rine-lab-form-col">
                         <div class="me5rine-lab-form-field">
                             <label class="me5rine-lab-form-label" for="pokemon_go_username"><?php esc_html_e('Pokémon GO Username', 'poke-hub'); ?></label>
-                            <input type="text" name="pokemon_go_username" id="pokemon_go_username" value="<?php echo esc_attr($profile['pokemon_go_username']); ?>" class="me5rine-lab-form-input" placeholder="<?php esc_attr_e('Your in-game username', 'poke-hub'); ?>">
+                            <input type="text" name="pokemon_go_username" id="pokemon_go_username" value="<?php echo esc_attr($profile['pokemon_go_username'] ?? ''); ?>" class="me5rine-lab-form-input" placeholder="<?php esc_attr_e('Your in-game username', 'poke-hub'); ?>">
                         </div>
                     </div>
                     <div class="me5rine-lab-form-col">
@@ -123,7 +122,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="country" id="country" class="me5rine-lab-form-select<?php echo empty($profile['country']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['country']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a country --', 'poke-hub'); ?></option>
                                 <?php foreach ($countries as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'] ?? '', $label); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -140,7 +139,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="team" id="team" class="me5rine-lab-form-select<?php echo empty($profile['team']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['team']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($teams as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'], $value); ?>>
+                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'] ?? '', $value); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -152,15 +151,18 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <label class="me5rine-lab-form-label" for="friend_code"><?php esc_html_e('Friend Code', 'poke-hub'); ?></label>
                             <?php 
                             // Format friend code for display in input (with spaces)
-                            $formatted_friend_code = !empty($profile['friend_code']) && function_exists('poke_hub_format_friend_code')
-                                ? poke_hub_format_friend_code($profile['friend_code'])
-                                : $profile['friend_code'];
+                            $formatted_friend_code = '';
+                            if (!empty($profile['friend_code']) && function_exists('poke_hub_format_friend_code')) {
+                                $formatted_friend_code = poke_hub_format_friend_code($profile['friend_code']);
+                            } elseif (!empty($profile['friend_code'])) {
+                                $formatted_friend_code = $profile['friend_code'];
+                            }
                             ?>
                             <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="me5rine-lab-form-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
                             <label class="me5rine-lab-form-checkbox-item" for="friend_code_public">
-                                <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" class="me5rine-lab-form-checkbox" <?php checked($profile['friend_code_public'], true); ?>>
+                                <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" class="me5rine-lab-form-checkbox" <?php checked($profile['friend_code_public'] ?? false, true); ?>>
                                 <span class="me5rine-lab-form-checkbox-icon">
-                                    <i class="<?php echo $profile['friend_code_public'] ? 'um-icon-android-checkbox' : 'um-icon-android-checkbox-outline-blank'; ?>"></i>
+                                    <i class="<?php echo (!empty($profile['friend_code_public'])) ? 'um-icon-android-checkbox' : 'um-icon-android-checkbox-outline-blank'; ?>"></i>
                                 </span>
                                 <span class="me5rine-lab-form-checkbox-text"><?php esc_html_e('Display my friend code publicly on my profile', 'poke-hub'); ?></span>
                             </label>
@@ -175,9 +177,12 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <label class="me5rine-lab-form-label" for="xp"><?php esc_html_e('XP', 'poke-hub'); ?></label>
                             <?php 
                             // Format XP for display in input (with spaces)
-                            $formatted_xp = !empty($profile['xp']) && function_exists('poke_hub_format_xp')
-                                ? poke_hub_format_xp($profile['xp'])
-                                : $profile['xp'];
+                            $formatted_xp = '';
+                            if (!empty($profile['xp']) && function_exists('poke_hub_format_xp')) {
+                                $formatted_xp = poke_hub_format_xp($profile['xp']);
+                            } elseif (isset($profile['xp'])) {
+                                $formatted_xp = $profile['xp'];
+                            }
                             ?>
                             <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="me5rine-lab-form-input" pattern="[0-9\s]*" placeholder="0">
                         </div>
@@ -188,7 +193,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="scatterbug_pattern" id="scatterbug_pattern" class="me5rine-lab-form-select<?php echo empty($profile['scatterbug_pattern']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['scatterbug_pattern']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'], $value); ?>>
+                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'] ?? '', $value); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -225,46 +230,17 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     <button type="submit" class="me5rine-lab-form-button"><?php esc_html_e('Save Profile', 'poke-hub'); ?></button>
                 </div>
             </form>
-            <script>
-            (function() {
-                // Initialize Select2 if available (loaded via wp_enqueue_scripts)
-                if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
-                    jQuery(function($) {
-                        // Use class selector to avoid ID conflicts, and set dropdownParent correctly
-                        $('.me5rine-lab-form-select').each(function() {
-                            var $select = $(this);
-                            if (!$select.data('select2')) {
-                                // Find the closest form field wrapper for dropdownParent
-                                var $parent = $select.closest('.me5rine-lab-form-field');
-                                if (!$parent.length) {
-                                    $parent = $select.closest('.me5rine-lab-form-col');
-                                }
-                                if (!$parent.length) {
-                                    $parent = $select.parent();
-                                }
-                                $select.select2({
-                                    width: '100%',
-                                    allowClear: true,
-                                    placeholder: $select.find('option[value=""]').text() || 'Select...',
-                                    dropdownParent: $parent.length ? $parent : $('body')
-                                });
-                            }
-                        });
-                    });
-                }
-            })();
-            </script>
         <?php else : ?>
             <div class="me5rine-lab-form-view">
                 <!-- Row 1: Username and Country -->
                 <div class="me5rine-lab-form-view-row">
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Pokémon GO Username', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo esc_html($profile['pokemon_go_username'] ?: '—'); ?></span>
+                        <span class="me5rine-lab-form-view-value"><?php echo esc_html(!empty($profile['pokemon_go_username']) ? $profile['pokemon_go_username'] : '—'); ?></span>
                     </div>
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Country', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo esc_html($profile['country'] ?: '—'); ?></span>
+                        <span class="me5rine-lab-form-view-value"><?php echo esc_html(!empty($profile['country']) ? $profile['country'] : '—'); ?></span>
                     </div>
                 </div>
 
@@ -306,7 +282,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Scatterbug Pattern', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo esc_html($profile['scatterbug_pattern'] ?: '—'); ?></span>
+                        <span class="me5rine-lab-form-view-value"><?php echo esc_html(!empty($profile['scatterbug_pattern']) ? $profile['scatterbug_pattern'] : '—'); ?></span>
                     </div>
                 </div>
 

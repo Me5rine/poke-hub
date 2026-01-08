@@ -191,38 +191,8 @@ function poke_hub_user_profiles_frontend_assets() {
         true
     );
 
-    // Initialize Select2 for profile form selects (Ultimate Member)
-    wp_add_inline_script('select2', "
-    jQuery(document).ready(function($) {
-        if (typeof $.fn.select2 !== 'undefined') {
-            // Initialize Select2 on country, team, and scatterbug_pattern selects
-            // Use dropdownParent to keep dropdown in the same DOM context
-            // Use class selector to avoid ID conflicts
-            $('.me5rine-lab-form-select').each(function() {
-                var \$select = $(this);
-                if (!\$select.data('select2')) {
-                    // Find the closest form field wrapper for dropdownParent (uses me5rine-lab-form-field)
-                    var \$parent = \$select.closest('.me5rine-lab-form-field');
-                    if (!\$parent.length) {
-                        \$parent = \$select.closest('.me5rine-lab-form-col');
-                    }
-                    if (!\$parent.length) {
-                        \$parent = \$select.closest('.me5rine-lab-form-section');
-                    }
-                    if (!\$parent.length) {
-                        \$parent = \$select.parent();
-                    }
-                    \$select.select2({
-                        width: '100%',
-                        allowClear: true,
-                        placeholder: \$select.find('option[value=\"\"]').text() || 'Select...',
-                        dropdownParent: \$parent.length ? \$parent : $('body')
-                    });
-                }
-            });
-        }
-    });
-    ");
+    // Select2 initialization is now handled in poke-hub-user-profiles-um.js
+    // No need for inline script here to avoid conflicts
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_frontend_assets', 20);
 
@@ -253,33 +223,17 @@ function poke_hub_user_profiles_shortcode_assets() {
         true
     );
 
-    // Initialize Select2 for profile form selects (shortcode)
-    wp_add_inline_script('select2', "
-    jQuery(document).ready(function($) {
-        if (typeof $.fn.select2 !== 'undefined') {
-            // Use class selector to avoid ID conflicts, and set dropdownParent correctly
-            $('.me5rine-lab-form-select').each(function() {
-                var \$select = $(this);
-                if (!\$select.data('select2')) {
-                    // Find the closest form field wrapper for dropdownParent (shortcode uses me5rine-lab-form-field)
-                    var \$parent = \$select.closest('.me5rine-lab-form-field');
-                    if (!\$parent.length) {
-                        \$parent = \$select.closest('.me5rine-lab-form-col');
-                    }
-                    if (!\$parent.length) {
-                        \$parent = \$select.parent();
-                    }
-                    \$select.select2({
-                        width: '100%',
-                        allowClear: true,
-                        placeholder: \$select.find('option[value=\"\"]').text() || 'Select...',
-                        dropdownParent: \$parent.length ? \$parent : $('body')
-                    });
-                }
-            });
-        }
-    });
-    ");
+    // JavaScript for checkbox state management and Select2 initialization (using generic classes)
+    wp_enqueue_script(
+        'pokehub-user-profiles-um-script',
+        POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    // Select2 initialization is now handled in poke-hub-user-profiles-um.js
+    // No need for inline script here to avoid conflicts
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_shortcode_assets', 20);
 

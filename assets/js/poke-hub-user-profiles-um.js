@@ -168,7 +168,7 @@
 
         // Show warning message in the notification block at the top
         function showFormWarningMessage(message) {
-            var $container = $('.me5rine-lab-form-container');
+            var $container = $('.me5rine-lab-profile-container');
             if ($container.length === 0) {
                 return;
             }
@@ -278,6 +278,69 @@
             $friendCodeInput.removeClass('error');
             // Allow form submission to proceed normally
             return true;
+        });
+
+        // Initialize Select2 for profile form selects (centralized initialization)
+        // Only initialize if Select2 is available and elements exist
+        function initializeSelect2() {
+            if (typeof $.fn.select2 === 'undefined') {
+                return; // Select2 not loaded
+            }
+
+            $('.me5rine-lab-form-select').each(function() {
+                var $select = $(this);
+                
+                // Skip if already initialized
+                if ($select.data('select2')) {
+                    return;
+                }
+
+                // Skip if not a select element
+                if (!$select.is('select')) {
+                    return;
+                }
+
+                try {
+                    // Find the closest form field wrapper for dropdownParent
+                    var $parent = $select.closest('.me5rine-lab-form-field');
+                    if (!$parent.length) {
+                        $parent = $select.closest('.me5rine-lab-form-col');
+                    }
+                    if (!$parent.length) {
+                        $parent = $select.closest('.me5rine-lab-form-section');
+                    }
+                    if (!$parent.length) {
+                        $parent = $select.parent();
+                    }
+
+                    // Get placeholder text from the empty option
+                    var placeholder = $select.find('option[value=""]').text() || 'Select...';
+
+                    // Initialize Select2 with error handling
+                    $select.select2({
+                        width: '100%',
+                        allowClear: true,
+                        placeholder: placeholder,
+                        dropdownParent: $parent.length ? $parent : $('body')
+                    });
+                } catch (error) {
+                    // Silently fail if Select2 initialization fails to prevent breaking the page
+                    console.warn('Select2 initialization failed for element:', $select, error);
+                }
+            });
+        }
+
+        // Try to initialize Select2 when DOM is ready
+        initializeSelect2();
+
+        // Also try after a short delay in case Select2 loads later
+        setTimeout(function() {
+            initializeSelect2();
+        }, 100);
+
+        // Listen for Select2 load event if available (for dynamic loading)
+        $(document).on('select2:loaded', function() {
+            initializeSelect2();
         });
     });
 
