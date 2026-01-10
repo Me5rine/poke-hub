@@ -92,16 +92,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     ob_start();
     ?>
     <div class="me5rine-lab-profile-container">
-        <?php 
-        // Check for email change notification
-        $email_change_message = '';
-        if (function_exists('poke_hub_get_email_change_notification_message')) {
-            $email_change_message = poke_hub_get_email_change_notification_message();
-        }
-        // Allow other code to add messages via filter
-        $notification_message = apply_filters('poke_hub_profile_notification_message', $email_change_message);
-        
-        if (!empty($success_message)) : ?>
+        <?php if (!empty($success_message)) : ?>
             <div id="poke-hub-profile-message" class="me5rine-lab-form-message me5rine-lab-form-message-success">
                 <p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p>
             </div>

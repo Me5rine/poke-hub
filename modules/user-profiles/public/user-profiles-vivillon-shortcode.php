@@ -117,9 +117,11 @@ add_shortcode('poke_hub_vivillon', function ($atts) {
         // Get profile URL using the correct format
         $user = wp_get_current_user();
         if ($user && !empty($user->user_nicename)) {
-            // Use current site URL in multisite (not main site)
-            $site_url = is_multisite() ? get_site_url(get_current_blog_id()) : home_url();
-            $profile_url = $site_url . '/profil/' . $user->user_nicename . '/?tab=game-pokemon-go';
+            // Use configured base URL for profiles, or current site URL
+            $base_url = function_exists('poke_hub_get_user_profiles_base_url') 
+                ? poke_hub_get_user_profiles_base_url() 
+                : home_url();
+            $profile_url = $base_url . '/profil/' . $user->user_nicename . '/?tab=game-pokemon-go';
         }
     }
     

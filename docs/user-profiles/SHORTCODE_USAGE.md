@@ -222,7 +222,6 @@ If disabled, you will need to manually create pages with the shortcodes:
 - Helper functions: `modules/user-profiles/functions/user-profiles-helpers.php`
 - Friend codes helpers: `modules/user-profiles/functions/user-profiles-friend-codes-helpers.php`
 - Keycloak sync: `modules/user-profiles/functions/user-profiles-keycloak-sync.php`
-- Email change handler: `modules/user-profiles/functions/user-profiles-email-change-handler.php`
 - Pages creation: `modules/user-profiles/functions/user-profiles-pages.php`
 
 ### Assets

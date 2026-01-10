@@ -22,7 +22,6 @@ define('POKE_HUB_USER_PROFILES_URL', POKE_HUB_URL . 'modules/user-profiles/');
 require_once POKE_HUB_USER_PROFILES_PATH . '/includes/user-profiles-data.php';      // Centralized data definitions
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-helpers.php';   // Helpers (includes Ultimate Member sync)
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-keycloak-sync.php';   // Keycloak nickname synchronization
-require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-email-change-handler.php';   // Email change redirect handler
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-friend-codes-helpers.php';    // Friend codes helpers
 require_once POKE_HUB_USER_PROFILES_PATH . '/admin/user-profiles-admin.php';        // Admin interface
 require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-shortcode.php';   // Shortcode

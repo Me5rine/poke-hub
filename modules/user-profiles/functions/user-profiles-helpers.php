@@ -669,6 +669,20 @@ function poke_hub_get_team_label($team) {
 }
 
 /**
+ * Get base URL for user profile links from settings
+ * 
+ * @return string Base URL (with trailing slash removed)
+ */
+function poke_hub_get_user_profiles_base_url() {
+    $base_url = get_option('poke_hub_user_profiles_base_url', '');
+    if (!empty($base_url)) {
+        return rtrim($base_url, '/');
+    }
+    // Fallback to current site URL
+    return home_url();
+}
+
+/**
  * Replace URL domain with configured base URL or current site domain
  * Used when sites share database and plugins return URLs from main site
  * 
@@ -681,13 +695,11 @@ function poke_hub_replace_url_domain_with_current_site($url) {
     }
     
     // Get base URL from settings, or fallback to current site URL
-    $base_url = get_option('poke_hub_user_profiles_base_url', '');
-    if (empty($base_url)) {
-        $base_url = home_url();
-    }
+    $base_url = poke_hub_get_user_profiles_base_url();
     
     $base_domain = parse_url($base_url, PHP_URL_HOST);
     $base_scheme = parse_url($base_url, PHP_URL_SCHEME);
+    $base_port = parse_url($base_url, PHP_URL_PORT);
     
     if (empty($base_domain)) {
         return $url;
@@ -700,12 +712,15 @@ function poke_hub_replace_url_domain_with_current_site($url) {
         return $url;
     }
     
-    // Rebuild URL with base domain
+    // Rebuild URL with base domain and scheme
     $new_url = ($base_scheme ? $base_scheme . '://' : '') . $base_domain;
     
-    if (isset($parsed_url['port'])) {
-        $new_url .= ':' . $parsed_url['port'];
+    // Add port if specified in base URL
+    if ($base_port) {
+        $new_url .= ':' . $base_port;
     }
+    
+    // Preserve path, query, and fragment from original URL
     if (isset($parsed_url['path'])) {
         $new_url .= $parsed_url['path'];
     }
