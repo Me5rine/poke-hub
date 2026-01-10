@@ -1,0 +1,207 @@
+/* Friend Codes - Styles supplémentaires uniquement pour les fonctionnalités spécifiques */
+/* Les styles de base utilisent les classes globales me5rine-lab-* */
+
+/* Dashboard containers */
+.friend-codes-dashboard,
+.vivillon-dashboard {
+    /* Styles spécifiques si besoin */
+}
+
+/* Liste de cartes avec espacement */
+.friend-codes-dashboard .me5rine-lab-card-list,
+.vivillon-dashboard .me5rine-lab-card-list {
+    display: grid;
+    gap: 20px;
+}
+
+/* Liste spécifique */
+.user-profiles-friend-codes-list,
+.user-profiles-vivillon-codes-list {
+    /* Styles supplémentaires si besoin */
+}
+
+/* Message vide */
+.user-profiles-friend-codes-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--me5rine-lab-text-light, #5D697D);
+    font-style: italic;
+}
+
+/* Carte de code ami */
+.user-profiles-friend-code-card {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.user-profiles-friend-code-content {
+    flex: 1;
+}
+
+/* En-tête de la carte (code) */
+.user-profiles-friend-code-header {
+    margin-bottom: 10px;
+}
+
+/* Valeur du code ami */
+.poke-hub-friend-code-value {
+    font-family: monospace !important;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--me5rine-lab-secondary, #0485C8);
+    margin: 0 10px;
+}
+
+/* Nom d'utilisateur */
+.user-profiles-friend-code-username {
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+/* Métadonnées (pays, équipe, etc.) */
+.user-profiles-friend-code-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.9em;
+    color: var(--me5rine-lab-text-light, #5D697D);
+}
+
+.user-profiles-friend-code-meta-item {
+    /* Styles pour chaque élément de métadonnée */
+}
+
+/* Temps écoulé */
+.user-profiles-friend-code-time {
+    margin-top: 10px;
+    font-size: 0.85em;
+    color: var(--me5rine-lab-text-light, #5D697D);
+    font-style: italic;
+}
+
+/* QR Code */
+.user-profiles-friend-code-qr {
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.user-profiles-friend-code-qr-image {
+    width: 150px;
+    height: 150px;
+    border: 1px solid var(--me5rine-lab-border, #DEE5EC);
+    border-radius: 4px;
+    padding: 10px;
+    background: var(--me5rine-lab-bg, #ffffff);
+}
+
+.user-profiles-friend-code-qr-caption {
+    display: block;
+    margin-top: 5px;
+    color: var(--me5rine-lab-text-light, #5D697D);
+    font-size: 11px;
+}
+
+/* Bouton copier - icône simple */
+.poke-hub-friend-code-copy {
+    background: none !important;
+    border: none !important;
+    padding: 4px 6px !important;
+    margin-left: 8px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--me5rine-lab-text-light, #5D697D);
+    transition: color 0.2s ease;
+    vertical-align: middle;
+    border-radius: 3px;
+}
+
+.poke-hub-friend-code-copy:hover {
+    color: var(--me5rine-lab-secondary, #0485C8);
+    background: var(--me5rine-lab-bg-light, #f8f9fa) !important;
+}
+
+.poke-hub-friend-code-copy svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+/* Bouton copier - état copié */
+.poke-hub-friend-code-copy.copied {
+    color: #28a745 !important;
+    background: rgba(40, 167, 69, 0.1) !important;
+}
+
+.poke-hub-friend-code-copy.copied svg {
+    opacity: 1;
+}
+
+/* Header adaptatif - utilise me5rine-lab-form-block pour le style de base */
+/* Classes spécifiques minimales si besoin de personnalisation */
+
+/* Form styles */
+.user-profiles-friend-code-form-link-confirmation {
+    margin-top: 10px;
+}
+
+.user-profiles-friend-code-form-link-confirmation .me5rine-lab-form-button {
+    display: inline-block;
+    margin-top: 0;
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.user-profiles-friend-code-form-link-confirmation .me5rine-lab-form-button + .me5rine-lab-form-button {
+    margin-left: 10px;
+}
+
+.user-profiles-friend-code-form-login-link {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 6px 12px;
+    font-size: 13px;
+    margin-top: 0;
+    text-decoration: none;
+}
+
+.user-profiles-friend-code-form-required {
+    color: #dc3545;
+}
+
+.user-profiles-friend-code-form-profile-link {
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: var(--me5rine-lab-text-light, #5D697D);
+}
+
+.user-profiles-friend-code-form-profile-link a {
+    color: var(--me5rine-lab-secondary, #0485C8);
+    text-decoration: underline;
+}
+
+/* Classes spécifiques pour pages - styles supplémentaires si besoin */
+.friend-codes-dashboard,
+.vivillon-dashboard {
+    /* Styles spécifiques si besoin */
+}
+
+.user-profiles-friend-codes-list,
+.user-profiles-vivillon-codes-list {
+    /* Styles supplémentaires si besoin */
+}
+
+/* Responsive pour les cartes */
+@media (max-width: 768px) {
+    .friend-codes-dashboard .user-profiles-friend-code-card,
+    .vivillon-dashboard .user-profiles-friend-code-card {
+        flex-direction: column !important;
+    }
+    
+    .friend-codes-dashboard .user-profiles-friend-code-card > .user-profiles-friend-code-qr,
+    .vivillon-dashboard .user-profiles-friend-code-card > .user-profiles-friend-code-qr {
+        align-self: center;
+    }
+}

@@ -21,8 +21,20 @@ define('POKE_HUB_USER_PROFILES_URL', POKE_HUB_URL . 'modules/user-profiles/');
  */
 require_once POKE_HUB_USER_PROFILES_PATH . '/includes/user-profiles-data.php';      // Centralized data definitions
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-helpers.php';   // Helpers (includes Ultimate Member sync)
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-keycloak-sync.php';   // Keycloak nickname synchronization
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-email-change-handler.php';   // Email change redirect handler
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-friend-codes-helpers.php';    // Friend codes helpers
 require_once POKE_HUB_USER_PROFILES_PATH . '/admin/user-profiles-admin.php';        // Admin interface
 require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-shortcode.php';   // Shortcode
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-header.php';           // Header adaptatif
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-form.php';             // Reusable friend code form
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-filters-template.php'; // Reusable filters template
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-list-template.php';   // Reusable friend codes list template
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-shortcode.php';        // Friend codes public shortcode
+require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-vivillon-shortcode.php';            // Vivillon shortcode
+
+// Load pages creation function
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-pages.php';
 
 /**
  * Admin assets for admin interface
@@ -236,4 +248,133 @@ function poke_hub_user_profiles_shortcode_assets() {
     // No need for inline script here to avoid conflicts
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_shortcode_assets', 20);
+
+/**
+ * Front-end assets for friend codes shortcode
+ */
+function poke_hub_friend_codes_shortcode_assets() {
+    // Load assets if:
+    // 1. Shortcode is in post content, OR
+    // 2. On Ultimate Member profile page (shortcode may be rendered via do_shortcode() in templates)
+    global $post;
+    
+    $should_load = false;
+    
+    // Check if shortcode is in post content
+    if (is_a($post, 'WP_Post') && (has_shortcode($post->post_content, 'poke_hub_friend_codes') || has_shortcode($post->post_content, 'poke_hub_vivillon'))) {
+        $should_load = true;
+    }
+    
+    // Check if on Ultimate Member profile page
+    if (!$should_load && function_exists('um_is_core_page') && um_is_core_page('user')) {
+        $should_load = true;
+    }
+    
+    // Also check if we're on a page that might use the shortcode via do_shortcode()
+    // (e.g., in custom templates)
+    if (!$should_load && function_exists('um_get_requested_user') && um_get_requested_user()) {
+        $should_load = true;
+    }
+    
+    if (!$should_load) {
+        return;
+    }
+
+    // Select2 CSS for filters
+    wp_enqueue_style(
+        'select2',
+        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css',
+        [],
+        '4.1.0'
+    );
+
+    // Select2 JS
+    wp_enqueue_script(
+        'select2',
+        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
+        ['jquery'],
+        '4.1.0',
+        true
+    );
+
+    // Friend codes CSS
+    wp_enqueue_style(
+        'poke-hub-friend-codes',
+        POKE_HUB_URL . 'assets/css/user-profiles-friend-codes.css',
+        [],
+        POKE_HUB_VERSION
+    );
+
+    // Friend codes JS
+    wp_enqueue_script(
+        'poke-hub-friend-codes',
+        POKE_HUB_URL . 'assets/js/user-profiles-friend-codes.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+    
+    // Localize script for translations
+    wp_localize_script('poke-hub-friend-codes', 'pokeHubFriendCodes', [
+        'copySuccess' => __('✓ Copié!', 'poke-hub'),
+        'copyError' => __('Erreur lors de la copie', 'poke-hub'),
+    ]);
+
+    // Initialize Select2 for friend codes selects
+    wp_add_inline_script('poke-hub-friend-codes', "
+    jQuery(document).ready(function($) {
+        if (typeof $.fn.select2 !== 'undefined') {
+            $('.friend-codes-dashboard .me5rine-lab-form-select').select2({
+                width: '100%',
+                allowClear: true
+            });
+        }
+    });
+    ");
+}
+add_action('wp_enqueue_scripts', 'poke_hub_friend_codes_shortcode_assets', 20);
+
+// Load pages creation function
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-pages.php';
+
+/**
+ * Hook lors de l'activation du module user-profiles
+ * Note: WordPress convertit les tirets en underscores dans les noms d'actions
+ */
+add_action('poke_hub_user-profiles_module_activated', 'poke_hub_user_profiles_create_pages');
+add_action('poke_hub_user_profiles_module_activated', 'poke_hub_user_profiles_create_pages'); // Version avec underscore au cas où
+
+/**
+ * Créer les pages lors de l'activation du plugin si le module est actif
+ * Utiliser 'init' au lieu de 'plugins_loaded' pour éviter les erreurs de traduction et wp_rewrite
+ * Respecte l'option poke_hub_user_profiles_auto_create_pages
+ */
+add_action('init', function() {
+    if (!is_admin() || !current_user_can('manage_options')) {
+        return;
+    }
+    
+    if (!poke_hub_is_module_active('user-profiles')) {
+        return;
+    }
+    
+    // Vérifier si la création automatique est activée
+    $auto_create = get_option('poke_hub_user_profiles_auto_create_pages', true);
+    if (!$auto_create) {
+        return;
+    }
+    
+    // Vérifier si au moins une page n'existe pas
+    $friend_codes_page_id = get_option('poke_hub_user_profiles_page_friend-codes');
+    $vivillon_page_id = get_option('poke_hub_user_profiles_page_vivillon');
+    
+    // Si au moins une page manque, créer toutes les pages
+    if ((!$friend_codes_page_id || !get_post_status($friend_codes_page_id)) || 
+        (!$vivillon_page_id || !get_post_status($vivillon_page_id))) {
+        if (function_exists('poke_hub_user_profiles_create_pages')) {
+            poke_hub_user_profiles_create_pages();
+        }
+    }
+}, 20);
+
 

@@ -6,6 +6,56 @@ Ces règles CSS doivent être copiées dans votre fichier CSS de thème (ex: `as
 
 Ce fichier unifie TOUS les styles front-end réutilisables de tous les modules. Une seule modification de variable change le style partout.
 
+## ⚠️ Structure OBLIGATOIRE des Conteneurs
+
+Il existe **trois structures distinctes** selon le contexte. Utilisez la bonne structure selon votre cas d'usage.
+
+### 1. Profils Ultimate Member (UM)
+
+**Utilisation** : Uniquement pour les éléments affichés dans les profils Ultimate Member (onglets de profil).
+
+```html
+<div class="me5rine-lab-profile-container">
+    <h2 class="me5rine-lab-title"><?php _e('Titre de la section', 'text-domain'); ?></h2>
+    <p class="me5rine-lab-subtitle"><?php _e('Sous-titre optionnel', 'text-domain'); ?></p>
+    
+    <!-- Contenu -->
+</div>
+```
+
+### 2. Dashboards Front-End
+
+**Utilisation** : Pour les pages de dashboard front (liste de giveaways, socials dashboard, etc.).
+
+```html
+<div class="{nom-du-dashboard} me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du dashboard', 'text-domain'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+```
+
+**Exemple** : `socials-dashboard me5rine-lab-dashboard`, `my-giveaways-dashboard me5rine-lab-dashboard`
+
+### 3. Formulaires Front Complets
+
+**Utilisation** : Pour les formulaires complets en front (création/édition de campagne, etc.).
+
+```html
+<div class="{nom-du-formulaire}-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du formulaire', 'text-domain'); ?></h2>
+    
+    <form>
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Section', 'text-domain'); ?></h3>
+            <!-- Champs -->
+        </div>
+    </form>
+</div>
+```
+
+**Important** : Le titre principal est à l'extérieur du formulaire, les titres de sections sont dans les `me5rine-lab-form-block`.
+
 ## Variables CSS Unifiées
 
 Toutes les variables sont centralisées ici. Modifiez ces valeurs pour changer le style de tous les éléments front :
@@ -244,9 +294,14 @@ Pour les cartes, tuiles, et conteneurs similaires :
     letter-spacing: 0.5px;
 }
 
+/* Titre principal de page - OBLIGATOIRE pour toutes les pages front */
+/* DOIT être utilisé avec un élément <h2> */
 .me5rine-lab-title-large {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--me5rine-lab-text, #11161E);
+    margin: 0 0 var(--me5rine-lab-spacing-lg, 24px) 0;
+    line-height: 1.3;
 }
 
 .me5rine-lab-title-medium {
@@ -385,6 +440,117 @@ Les filtres utilisent les mêmes styles de base que les formulaires (`me5rine-la
     width: auto !important; /* Surcharge du width: 100% des formulaires */
 }
 ```
+
+## Système de Statuts Réutilisable
+
+Le système de statuts permet d'afficher des statuts avec des classes CSS prédéfinies (vert, orange, rouge, bleu) pour une cohérence visuelle dans tout le plugin.
+
+### Variables CSS pour les Statuts
+
+```css
+:root {
+    /* Couleurs de statut */
+    --me5rine-lab-status-success-bg: var(--admin-lab-status-success-bg, #d4edda);
+    --me5rine-lab-status-success-text: var(--admin-lab-status-success-text, #155724);
+    --me5rine-lab-status-success-border: var(--admin-lab-status-success-border, #c3e6cb);
+    
+    --me5rine-lab-status-warning-bg: var(--admin-lab-status-warning-bg, #fff3cd);
+    --me5rine-lab-status-warning-text: var(--admin-lab-status-warning-text, #856404);
+    --me5rine-lab-status-warning-border: var(--admin-lab-status-warning-border, #ffeaa7);
+    
+    --me5rine-lab-status-error-bg: var(--admin-lab-status-error-bg, #f8d7da);
+    --me5rine-lab-status-error-text: var(--admin-lab-status-error-text, #721c24);
+    --me5rine-lab-status-error-border: var(--admin-lab-status-error-border, #f5c6cb);
+    
+    --me5rine-lab-status-info-bg: var(--admin-lab-status-info-bg, #d1ecf1);
+    --me5rine-lab-status-info-text: var(--admin-lab-status-info-text, #0c5460);
+    --me5rine-lab-status-info-border: var(--admin-lab-status-info-border, #bee5eb);
+}
+```
+
+### Classes CSS pour les Statuts
+
+```css
+/* Classe de base pour tous les statuts */
+.me5rine-lab-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: var(--me5rine-lab-radius-sm, 6px);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
+/* Statut Success (vert) - Pour les statuts positifs (gagnant, validé, etc.) */
+.me5rine-lab-status-success {
+    background-color: var(--me5rine-lab-status-success-bg, #d4edda);
+    color: var(--me5rine-lab-status-success-text, #155724);
+    border-color: var(--me5rine-lab-status-success-border, #c3e6cb);
+}
+
+/* Statut Warning (orange) - Pour les statuts en attente (en attente de tirage, en cours de traitement, etc.) */
+.me5rine-lab-status-warning {
+    background-color: var(--me5rine-lab-status-warning-bg, #fff3cd);
+    color: var(--me5rine-lab-status-warning-text, #856404);
+    border-color: var(--me5rine-lab-status-warning-border, #ffeaa7);
+}
+
+/* Statut Error (rouge) - Pour les statuts négatifs (perdu, erreur, annulé, etc.) */
+.me5rine-lab-status-error {
+    background-color: var(--me5rine-lab-status-error-bg, #f8d7da);
+    color: var(--me5rine-lab-status-error-text, #721c24);
+    border-color: var(--me5rine-lab-status-error-border, #f5c6cb);
+}
+
+/* Statut Info (bleu) - Pour les statuts informatifs (en cours, actif, etc.) */
+.me5rine-lab-status-info {
+    background-color: var(--me5rine-lab-status-info-bg, #d1ecf1);
+    color: var(--me5rine-lab-status-info-text, #0c5460);
+    border-color: var(--me5rine-lab-status-info-border, #bee5eb);
+}
+```
+
+### Utilisation PHP
+
+Utilisez la fonction helper `admin_lab_render_status()` pour générer les statuts :
+
+```php
+// Exemple 1 : Statut simple
+echo admin_lab_render_status('Gagnant', 'success');
+// Génère : <span class="me5rine-lab-status me5rine-lab-status-success">Gagnant</span>
+
+// Exemple 2 : Statut avec tag personnalisé
+echo admin_lab_render_status('En attente', 'warning', 'div');
+// Génère : <div class="me5rine-lab-status me5rine-lab-status-warning">En attente</div>
+
+// Exemple 3 : Statut avec attributs supplémentaires
+echo admin_lab_render_status('Perdu', 'error', 'span', ['id' => 'status-1', 'class' => 'custom-class']);
+// Génère : <span id="status-1" class="me5rine-lab-status me5rine-lab-status-error custom-class">Perdu</span>
+```
+
+### Types de Statuts Disponibles
+
+- **`success`** (vert) : Pour les statuts positifs
+  - Exemples : Gagnant, Validé, Confirmé, Actif
+  
+- **`warning`** (orange) : Pour les statuts en attente
+  - Exemples : En attente de tirage, En cours de traitement, En attente de validation
+  
+- **`error`** (rouge) : Pour les statuts négatifs
+  - Exemples : Perdu, Erreur, Annulé, Refusé
+  
+- **`info`** (bleu) : Pour les statuts informatifs
+  - Exemples : En cours, Actif, En traitement
+
+### Cas d'Usage
+
+Ce système peut être utilisé pour :
+- Statuts de concours (gagnant, perdu, en attente, en cours)
+- Statuts de commandes (validée, en attente, annulée)
+- Statuts d'erreur (erreur, succès, avertissement)
+- Tout autre élément nécessitant un affichage de statut avec code couleur
 
 ## Select2 et Choices (Unifié avec les autres select)
 
@@ -611,24 +777,49 @@ Pour les tuiles d'actions sociales dans les formulaires de campagne :
 ## Messages et Notices Génériques
 
 ```css
-/* Notice générique */
-.me5rine-lab-notice {
-    margin: 1em 0;
-    padding: 1em;
-    border-left: 4px solid var(--me5rine-lab-border);
-    background-color: var(--me5rine-lab-bg-secondary);
-    border-radius: var(--me5rine-lab-radius-sm);
-}
-
-.me5rine-lab-notice p {
-    margin: 0;
-    color: var(--me5rine-lab-text-light);
+/* Message générique - Système unifié */
+.me5rine-lab-form-message {
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
     font-size: 14px;
-    line-height: 1.6;
 }
 
-/* Message d'état */
-.me5rine-lab-message {
+.me5rine-lab-form-message p {
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Message de succès */
+.me5rine-lab-form-message-success {
+    background: rgba(4, 133, 200, 0.1);
+    border: 1px solid var(--ph-secondary, #0485C8);
+    color: var(--ph-secondary, #0485C8);
+}
+
+/* Message d'erreur */
+.me5rine-lab-form-message-error {
+    background: rgba(214, 54, 56, 0.1);
+    border: 1px solid #d63638;
+    color: #d63638;
+}
+
+/* Message d'avertissement */
+.me5rine-lab-form-message-warning {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid #ff9800;
+    color: #ff9800;
+}
+
+/* Message d'information */
+.me5rine-lab-form-message-info {
+    background: rgba(4, 133, 200, 0.1);
+    border: 1px solid var(--ph-secondary, #0485C8);
+    color: var(--ph-secondary, #0485C8);
+}
+
+/* Message d'état vide */
+.me5rine-lab-state-message {
     padding: var(--me5rine-lab-spacing-md);
     background: var(--me5rine-lab-bg-secondary);
     border-radius: var(--me5rine-lab-radius-md);
@@ -1239,12 +1430,21 @@ Tous les dashboards et pages de profil utilisent ces classes génériques unifi�
    DASHBOARDS
    ============================================ */
 
-/* Container principal de dashboard */
+/* Container principal de dashboard - OBLIGATOIRE pour toutes les pages front */
 .me5rine-lab-dashboard {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--me5rine-lab-text-light);
     font-size: 14px;
     padding: var(--me5rine-lab-spacing-md);
+}
+
+/* Titre principal de page - OBLIGATOIRE pour toutes les pages front */
+.me5rine-lab-title-large {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--me5rine-lab-text, #11161E);
+    margin: 0 0 var(--me5rine-lab-spacing-lg, 24px) 0;
+    line-height: 1.3;
 }
 
 /* Header de dashboard (titre + actions) */
@@ -1591,14 +1791,34 @@ Tous les dashboards et pages de profil utilisent ces classes génériques unifi�
 
 Tous les éléments front utilisent maintenant ces classes génériques. Pour modifier le style global, changez simplement les variables CSS en haut du fichier.
 
-### Structure HTML Standardisée
+### Structure HTML Standardisée - Pages Front
+
+**IMPORTANT** : Toutes les pages front (add giveaway, edit giveaway, my giveaways, socials, dashboard, etc.) doivent respecter cette structure :
+
+1. **Div wrapper obligatoire** : Toutes les pages front doivent avoir une `<div class="me5rine-lab-dashboard">` qui englobe tout le contenu de la page
+2. **Titre obligatoire** : Le titre principal de la page doit être un `<h2 class="me5rine-lab-title-large">` et être le premier élément après l'ouverture de la div wrapper
+
+#### Structure Standardisée pour Toutes les Pages Front
+
+```html
+<div class="me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php esc_html_e('Page Title', 'text-domain'); ?></h2>
+    
+    <!-- Notices (si nécessaire) -->
+    <?php me5rine_display_profile_notice(); ?>
+    
+    <!-- Contenu de la page -->
+    <!-- ... -->
+</div>
+```
 
 #### Dashboard
 
 ```html
 <div class="me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large">Dashboard Title</h2>
+    
     <div class="me5rine-lab-dashboard-header">
-        <h1 class="me5rine-lab-title-large">Dashboard Title</h1>
         <a href="#" class="me5rine-lab-form-button">Action</a>
     </div>
     
@@ -1608,18 +1828,109 @@ Tous les éléments front utilisent maintenant ces classes génériques. Pour mo
 </div>
 ```
 
-#### Profil (Ultimate Member)
+#### 1. Profil Ultimate Member (UM)
+
+**Uniquement pour les éléments dans les profils Ultimate Member.**
 
 ```html
-<div class="me5rine-lab-profile-container me5rine-lab-form-block">
-    <div class="me5rine-lab-form-section">
-        <h2 class="me5rine-lab-title">Section Title</h2>
-        <p class="me5rine-lab-subtitle">Description</p>
-        
-        <!-- Contenu -->
-    </div>
+<div class="me5rine-lab-profile-container">
+    <h2 class="me5rine-lab-title"><?php _e('Titre de la section', 'text-domain'); ?></h2>
+    <p class="me5rine-lab-subtitle"><?php _e('Sous-titre optionnel', 'text-domain'); ?></p>
+    
+    <!-- Contenu -->
 </div>
 ```
+
+**Exemple complet :**
+```html
+<div class="me5rine-lab-profile-container">
+    <h2 class="me5rine-lab-title"><?php _e('My Giveaway Entries', 'giveaways'); ?></h2>
+    
+    <div class="me5rine-lab-form-container">
+        <form method="get" class="me5rine-lab-filters">
+            <!-- Filtres -->
+        </form>
+    </div>
+    
+    <table class="me5rine-lab-table">
+        <!-- Tableau -->
+    </table>
+</div>
+```
+
+#### 2. Dashboard Front-End
+
+**Pour les pages de dashboard front (liste, gestion, etc.).**
+
+```html
+<div class="{nom-du-dashboard} me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du dashboard', 'text-domain'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+```
+
+**Exemples :**
+```html
+<!-- Dashboard socials -->
+<div class="socials-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php esc_html_e('My Socialls', 'me5rine-lab'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+
+<!-- Dashboard giveaways -->
+<div class="my-giveaways-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php esc_html_e('My Giveaways', 'me5rine-lab'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+```
+
+#### 3. Formulaire Front Complet
+
+**Pour les formulaires complets (création/édition).**
+
+```html
+<div class="{nom-du-formulaire}-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du formulaire', 'text-domain'); ?></h2>
+    
+    <form>
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Section du formulaire', 'text-domain'); ?></h3>
+            
+            <!-- Champs -->
+        </div>
+        
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Autre section', 'text-domain'); ?></h3>
+            
+            <!-- Autres champs -->
+        </div>
+    </form>
+</div>
+```
+
+**Exemple :**
+```html
+<div class="campaign-form-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Create a Giveaway Campaign', 'me5rine-lab'); ?></h2>
+    
+    <form id="rafflepress-campaign-form" method="post">
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Title and dates', 'me5rine-lab'); ?></h3>
+            <!-- Champs titre et dates -->
+        </div>
+        
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Prizes', 'me5rine-lab'); ?></h3>
+            <!-- Champs prix -->
+        </div>
+    </form>
+</div>
+```
+
+**Important** : Le titre principal (`h2`) est à l'extérieur du formulaire, les titres de sections (`h3`) sont **à l'intérieur** des `me5rine-lab-form-block`.
 
 #### Carte avec Image
 
@@ -1897,4 +2208,264 @@ Composant visuel pour afficher un classement top 3 avec animation.
 ```
 
 **Note** : L'ordre d'affichage dans le HTML doit être 2, 1, 3 pour que l'affichage visuel soit correct (1 au centre, 2 à gauche, 3 à droite).
+
+## Options d'Écran - Système Générique Réutilisable
+
+Le système d'options d'écran permet aux utilisateurs d'afficher/masquer des colonnes dans les tableaux front-end, similaire aux options d'écran WordPress admin. Ce système est **générique et réutilisable** pour tous les tableaux du plugin.
+
+### Classes CSS Génériques
+
+```css
+/* Header avec actions (réutilisable pour tous les dashboards) */
+.me5rine-lab-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.me5rine-lab-dashboard-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Panneau d'options d'écran (générique) */
+.me5rine-lab-screen-options-panel {
+    background: var(--me5rine-lab-bg, #ffffff);
+    border: 1px solid var(--me5rine-lab-border, #DEE5EC);
+    border-radius: var(--me5rine-lab-radius-sm, 6px);
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: var(--me5rine-lab-shadow-md, 0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.me5rine-lab-screen-options-panel-content h4 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--me5rine-lab-text, #11161E);
+}
+
+.me5rine-lab-screen-options-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.me5rine-lab-screen-options-column-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.me5rine-lab-screen-options-column-item:hover {
+    background-color: var(--me5rine-lab-bg-secondary, #F9FAFB);
+}
+
+.me5rine-lab-screen-options-column-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.me5rine-lab-screen-options-column-item span {
+    font-size: 13px;
+    color: var(--me5rine-lab-text-light, #5D697D);
+    user-select: none;
+}
+
+.me5rine-lab-screen-options-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 10px;
+    border-top: 1px solid var(--me5rine-lab-border, #DEE5EC);
+}
+
+.me5rine-lab-screen-options-apply {
+    min-width: 100px;
+}
+
+/* Masquer les colonnes (générique pour tous les tableaux) */
+.me5rine-lab-table th.column-hidden,
+.me5rine-lab-table td.column-hidden {
+    display: none !important;
+}
+
+/* Responsive pour le header */
+@media screen and (max-width: 768px) {
+    .me5rine-lab-dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .me5rine-lab-dashboard-header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .me5rine-lab-dashboard-header-actions .me5rine-lab-form-button {
+        width: 100%;
+    }
+    
+    .me5rine-lab-screen-options-columns {
+        grid-template-columns: 1fr;
+    }
+}
+```
+
+### Structure HTML Standardisée
+
+```html
+<div class="me5rine-lab-dashboard">
+    <div class="me5rine-lab-dashboard-header">
+        <h3 class="me5rine-lab-title">Titre du Dashboard</h3>
+        <div class="me5rine-lab-dashboard-header-actions">
+            <button type="button" class="me5rine-lab-form-button me5rine-lab-form-button-secondary me5rine-lab-screen-options-toggle" aria-expanded="false">
+                Options d'écran
+            </button>
+            <a class="me5rine-lab-form-button" href="#">Action</a>
+        </div>
+    </div>
+    
+    <div class="me5rine-lab-screen-options-panel" style="display: none;">
+        <div class="me5rine-lab-screen-options-panel-content">
+            <h4>Afficher à l'écran</h4>
+            <div class="me5rine-lab-screen-options-columns">
+                <label class="me5rine-lab-screen-options-column-item">
+                    <input type="checkbox" 
+                           name="visible_columns[name]" 
+                           value="1" 
+                           data-column="name"
+                           checked>
+                    <span>Nom</span>
+                </label>
+                <label class="me5rine-lab-screen-options-column-item">
+                    <input type="checkbox" 
+                           name="visible_columns[date]" 
+                           value="1" 
+                           data-column="date"
+                           checked>
+                    <span>Date</span>
+                </label>
+                <!-- Autres colonnes... -->
+            </div>
+            <div class="me5rine-lab-screen-options-actions">
+                <button type="button" class="me5rine-lab-form-button me5rine-lab-screen-options-apply">
+                    Appliquer
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tableau avec colonnes masquables -->
+    <table class="me5rine-lab-table">
+        <thead>
+            <tr>
+                <th class="column-name" data-column="name">Nom</th>
+                <th class="column-date column-hidden" data-column="date">Date</th>
+                <!-- Autres colonnes... -->
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="column-name" data-column="name">Exemple</td>
+                <td class="column-date column-hidden" data-column="date">01/01/2024</td>
+                <!-- Autres cellules... -->
+            </tr>
+        </tbody>
+    </table>
+</div>
+```
+
+### JavaScript Requis
+
+Le JavaScript pour gérer l'affichage/masquage des colonnes doit être inclus. Exemple :
+
+```javascript
+document.addEventListener('DOMContentLoaded', function () {
+    const screenOptionsToggle = document.querySelector('.me5rine-lab-screen-options-toggle');
+    const screenOptionsPanel = document.querySelector('.me5rine-lab-screen-options-panel');
+    const screenOptionsApply = document.querySelector('.me5rine-lab-screen-options-apply');
+    const columnCheckboxes = document.querySelectorAll('.me5rine-lab-screen-options-column-item input[type="checkbox"]');
+    
+    if (screenOptionsToggle && screenOptionsPanel) {
+        // Toggle du panneau
+        screenOptionsToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isExpanded = screenOptionsPanel.style.display !== 'none';
+            screenOptionsPanel.style.display = isExpanded ? 'none' : 'block';
+            screenOptionsToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        });
+        
+        // Application des changements
+        if (screenOptionsApply) {
+            screenOptionsApply.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const visibleColumns = {};
+                columnCheckboxes.forEach(checkbox => {
+                    const columnName = checkbox.getAttribute('data-column');
+                    visibleColumns[columnName] = checkbox.checked;
+                });
+                
+                // Sauvegarder via AJAX et masquer/afficher les colonnes
+                // ... (code de sauvegarde AJAX)
+                
+                Object.keys(visibleColumns).forEach(columnName => {
+                    const isVisible = visibleColumns[columnName];
+                    const columnElements = document.querySelectorAll('[data-column="' + columnName + '"]');
+                    columnElements.forEach(el => {
+                        if (isVisible) {
+                            el.classList.remove('column-hidden');
+                        } else {
+                            el.classList.add('column-hidden');
+                        }
+                    });
+                });
+                
+                screenOptionsPanel.style.display = 'none';
+                screenOptionsToggle.setAttribute('aria-expanded', 'false');
+            });
+        }
+    }
+});
+```
+
+### Règles d'Utilisation
+
+1. **Classes génériques uniquement** : Toutes les classes utilisent le préfixe `me5rine-lab-` et sont génériques
+2. **Attribut `data-column`** : Chaque colonne (th et td) doit avoir un attribut `data-column` avec l'identifiant unique de la colonne
+3. **Classe `column-hidden`** : Les colonnes masquées doivent avoir la classe `column-hidden` sur les éléments `th` et `td`
+4. **Sauvegarde des préférences** : Les préférences doivent être sauvegardées par utilisateur (user meta) via AJAX
+5. **Valeurs par défaut** : Définir quelles colonnes sont masquées par défaut dans le code PHP
+
+### Exemple d'Implémentation PHP
+
+```php
+// Définir les colonnes par défaut
+$default_columns = [
+    'name' => true,
+    'date' => false, // Masqué par défaut
+    'status' => true,
+];
+
+// Récupérer les préférences utilisateur
+$saved_columns = get_user_meta($user_id, 'admin_lab_visible_columns', true);
+if (!is_array($saved_columns)) {
+    $saved_columns = $default_columns;
+}
+
+// Dans le HTML, appliquer les classes
+$is_visible = isset($saved_columns['date']) ? $saved_columns['date'] : false;
+$hidden_class = $is_visible ? '' : 'column-hidden';
+?>
+<th class="column-date <?php echo esc_attr($hidden_class); ?>" data-column="date">Date</th>
+<td class="column-date <?php echo esc_attr($hidden_class); ?>" data-column="date"><?php echo $date; ?></td>
+```
 

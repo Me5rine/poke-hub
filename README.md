@@ -453,6 +453,43 @@ Le module User Profiles permet aux utilisateurs de gérer leur profil Pokémon G
 - **Synchronisation** : Synchronisation automatique avec Ultimate Member pour le pays
 - **Système CSS générique** : Classes CSS réutilisables pour un design unifié
 
+#### Codes Amis (Friend Codes) et Prismillon (Scatterbug)
+
+Le module inclut un système complet de gestion des codes amis publics avec support pour les motifs Prismillon.
+
+##### Fonctionnalités des codes amis
+
+- **Formulaire d'ajout** : Les utilisateurs peuvent ajouter leur code ami public
+- **Gestion des utilisateurs** :
+  - Utilisateurs non connectés : 1 code par jour
+  - Utilisateurs connectés : Ajout illimité
+  - Pré-remplissage automatique depuis le profil utilisateur
+- **Affichage public** : Liste publique des codes amis disponibles
+- **Filtres** : Filtrage par pays et motif Prismillon (Scatterbug Pattern)
+- **Pagination** : Affichage paginé des codes (20 par défaut, configurable)
+- **Copie rapide** : Icône de copie pour copier le code d'un clic
+- **QR Codes** : Génération automatique de QR codes pour ajout rapide dans Pokémon GO
+- **Temps relatif** : Affichage du temps écoulé depuis l'ajout (ex: "il y a 17 min")
+- **Liaison avec profil** : Possibilité de lier un code existant à un compte utilisateur
+
+##### Données affichées
+
+Chaque code ami affiche :
+- **Code ami** : Formaté avec espaces (ex: `1234 5678 9012`)
+- **Nom Pokémon GO** : Pseudo du joueur
+- **Pays** : Pays du joueur
+- **Motif Prismillon** : Motif Scatterbug recherché
+- **Équipe** : Équipe du joueur (Mystic, Valor, Instinct)
+- **Date d'ajout** : Date complète et temps relatif
+- **QR Code** : Code QR pour scan direct
+
+##### Interface utilisateur
+
+- **Design moderne** : Cartes élégantes avec informations organisées
+- **Responsive** : Adaptation mobile et desktop
+- **Feedback visuel** : Confirmation visuelle lors de la copie du code
+- **Messages** : Messages de succès/erreur clairs pour l'ajout de codes
+
 ---
 
 ## Fonctionnalités
@@ -621,6 +658,54 @@ Affiche les bonus associés à un événement (post).
 
 // Ou pour un post spécifique
 [pokehub-event-bonuses post_id="123"]
+```
+
+### `[poke_hub_user_profile]`
+
+Affiche le formulaire ou la vue du profil Pokémon GO d'un utilisateur.
+
+#### Attributs
+
+- `user_id` : ID de l'utilisateur (optionnel, auto-détection par défaut)
+- `mode` : Mode d'affichage (`auto`, `edit`, `view`) - Défaut: `auto`
+
+#### Exemple
+
+```php
+// Afficher le profil de l'utilisateur actuel
+[poke_hub_user_profile]
+
+// Afficher le profil d'un utilisateur spécifique
+[poke_hub_user_profile user_id="123"]
+
+// Forcer le mode édition
+[poke_hub_user_profile mode="edit"]
+```
+
+### `[poke_hub_friend_codes]`
+
+Affiche la liste publique des codes amis avec formulaire d'ajout et filtres.
+
+#### Attributs
+
+- `per_page` : Nombre de codes par page - Défaut: `20` (min: 1, max: 100)
+
+#### Fonctionnalités
+
+- **Formulaire d'ajout** : Permet aux utilisateurs d'ajouter leur code ami
+- **Filtres** : Filtrage par pays et motif Prismillon
+- **Liste paginée** : Affichage paginé des codes amis publics
+- **Copie rapide** : Icône pour copier le code en un clic
+- **QR Codes** : Affichage des QR codes pour scan direct
+
+#### Exemple
+
+```php
+// Affichage par défaut (20 codes par page)
+[poke_hub_friend_codes]
+
+// Personnaliser le nombre de codes par page
+[poke_hub_friend_codes per_page="30"]
 ```
 
 ---
@@ -928,6 +1013,36 @@ Attaques spéciales par événement.
 - `attack_id` : ID de l'attaque
 - `is_forced` : Attaque forcée (booléen)
 
+### Tables du module User Profiles
+
+#### Table : `{prefix}_pokehub_user_profiles`
+
+Profils utilisateur Pokémon GO et codes amis publics.
+
+**Colonnes** :
+- `id` : ID unique
+- `user_id` : ID WordPress utilisateur (NULL pour utilisateurs anonymes)
+- `discord_id` : ID Discord (optionnel)
+- `team` : Équipe (`mystic`, `valor`, `instinct`)
+- `friend_code` : Code ami (12 chiffres)
+- `friend_code_public` : Code ami public (booléen, `1` = visible publiquement)
+- `xp` : Points d'expérience
+- `pokemon_go_username` : Pseudo Pokémon GO
+- `scatterbug_pattern` : Motif Prismillon (Scatterbug Pattern)
+- `country` : Pays (pour utilisateurs anonymes uniquement)
+- `reasons` : Raisons JSON (tableau de valeurs)
+- `created_at` : Date de création
+- `updated_at` : Date de mise à jour
+
+**Index** :
+- `user_id` : Recherche par utilisateur WordPress
+- `discord_id` : Recherche par ID Discord
+
+**Notes** :
+- Les codes amis publics sont ceux avec `friend_code_public = 1`
+- Pour les utilisateurs connectés, le `country` est stocké dans Ultimate Member usermeta (pas dans cette table)
+- Pour les utilisateurs anonymes, le `country` est stocké directement dans cette table
+
 ### Fonction helper
 
 Utilisez `pokehub_get_table('table_name')` pour obtenir le nom complet d'une table avec le préfixe :
@@ -1165,6 +1280,76 @@ $bonuses = poke_hub_get_event_bonuses($event_id);
 // Retourne un tableau d'objets bonus avec descriptions
 ```
 
+### Helpers du module User Profiles
+
+#### Récupérer un profil utilisateur
+
+```php
+// Par ID utilisateur WordPress
+$profile = poke_hub_get_user_profile($user_id);
+// Retourne un tableau avec toutes les données du profil
+```
+
+#### Récupérer les codes amis publics
+
+```php
+$args = [
+    'country' => 'France',
+    'scatterbug_pattern' => 'Continental',
+    'per_page' => 20,
+    'paged' => 1,
+    'orderby' => 'created_at',
+    'order' => 'DESC',
+];
+$friend_codes = poke_hub_get_public_friend_codes($args);
+// Retourne ['items' => [...], 'total' => X, 'total_pages' => Y]
+```
+
+#### Ajouter un code ami public
+
+```php
+$data = [
+    'friend_code' => '123456789012',
+    'pokemon_go_username' => 'MonPseudo',
+    'country' => 'France',
+    'scatterbug_pattern' => 'Continental',
+    'team' => 'mystic',
+];
+$result = poke_hub_add_public_friend_code($data, $is_logged_in);
+// Retourne ['success' => true/false, 'message' => '...']
+```
+
+#### Formater un code ami
+
+```php
+// Formater un code ami (ajoute des espaces)
+$formatted = poke_hub_format_friend_code('123456789012');
+// Retourne: "1234 5678 9012"
+```
+
+#### Nettoyer un code ami
+
+```php
+// Nettoyer un code ami (supprime espaces et caractères non numériques)
+$cleaned = poke_hub_clean_friend_code('1234 5678 9012');
+// Retourne: "123456789012"
+```
+
+#### Générer un QR code
+
+```php
+// Générer l'URL d'un QR code pour un code ami
+$qr_url = poke_hub_generate_friend_code_qr('123456789012');
+// Retourne l'URL du QR code
+```
+
+#### Récupérer les motifs Prismillon
+
+```php
+$patterns = poke_hub_get_scatterbug_patterns();
+// Retourne un tableau associatif des motifs Scatterbug
+```
+
 ### Hooks disponibles
 
 #### Actions
@@ -1324,13 +1509,14 @@ poke-hub/
 │   │   └── EVENEMENTS-DISTANTS.md
 │   └── user-profiles/               # Documentation du module User Profiles
 │       ├── README_USER_PROFILES.md
-│       ├── CSS_RULES.md
-│       ├── CSS_SYSTEM.md
 │       ├── SHORTCODE_USAGE.md
+│       ├── SYNCHRONIZATION.md
 │       ├── ULTIMATE_MEMBER_SETUP.md
-│       ├── PLUGIN_INTEGRATION.md
 │       ├── CUSTOMIZATION.md
 │       └── README_DATA_CENTRALIZATION.md
+│   ├── CSS_RULES.md                 # CSS à copier dans le thème (partagé)
+│   ├── CSS_SYSTEM.md                # Système de classes génériques (partagé)
+│   └── PLUGIN_INTEGRATION.md        # Guide d'intégration (partagé)
 ├── vendor/                          # Dépendances Composer
 │   ├── aws/                         # AWS SDK
 │   └── ...

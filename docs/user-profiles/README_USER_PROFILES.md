@@ -8,16 +8,25 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 
 - Édition du profil Pokémon GO (équipe, code ami, XP, pays, pseudo, motif Scatterbug, raisons)
 - Intégration avec Ultimate Member (onglet de profil)
-- Shortcode `[poke_hub_user_profile]` pour afficher le profil
-- Synchronisation avec Ultimate Member pour le pays
+- Shortcodes :
+  - `[poke_hub_user_profile]` - Profil Pokémon GO personnel
+  - `[poke_hub_friend_codes]` - Liste publique des codes amis avec filtres (pays, équipe, raison)
+  - `[poke_hub_vivillon]` - Liste des codes amis par motif Vivillon avec filtres (motif, pays)
+- Pages automatiques : création automatique des pages "friend-codes" et "vivillon" comme enfants de la page "pokemon-go" (configurable dans les settings)
+- Synchronisation :
+  - Ultimate Member pour le pays
+  - Keycloak pour le pseudo/nickname
+- Gestion du changement d'email : redirection automatique vers le profil avec notification
+- Templates réutilisables pour optimiser le code
 
 ## Documentation
 
 ### 📄 Fichiers Spécifiques au Module
 
-- **`SHORTCODE_USAGE.md`** → Documentation du shortcode `[poke_hub_user_profile]`
+- **`SHORTCODE_USAGE.md`** → Documentation des shortcodes (`[poke_hub_user_profile]`, `[poke_hub_friend_codes]`, `[poke_hub_vivillon]`)
 - **`ULTIMATE_MEMBER_SETUP.md`** → Configuration et dépannage pour Ultimate Member
 - **`CUSTOMIZATION.md`** → Comment personnaliser les listes (équipes, raisons) via les filtres WordPress
+- **`SYNCHRONIZATION.md`** → Synchronisation avec subscription_accounts et Keycloak
 - **`README_DATA_CENTRALIZATION.md`** → Architecture de centralisation des données
 
 ### 🎨 Documentation Générique (CSS)

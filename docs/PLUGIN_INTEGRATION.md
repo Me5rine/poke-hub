@@ -332,10 +332,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 ### Dashboards
 
+**IMPORTANT** : Toutes les pages front doivent respecter cette structure :
+1. Une div wrapper `<div class="me5rine-lab-dashboard">` qui englobe tout le contenu de la page
+2. Un titre principal `<h2 class="me5rine-lab-title-large">` comme premier élément après l'ouverture de la div
+
 ```html
 <div class="me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large">Dashboard Title</h2>
     <div class="me5rine-lab-dashboard-header">
-        <h1 class="me5rine-lab-title-large">Dashboard Title</h1>
         <a href="#" class="me5rine-lab-form-button">Action</a>
     </div>
     
@@ -345,20 +349,112 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 ```
 
-### Profils
+### Structures des Conteneurs Front-End
+
+Il existe **trois structures distinctes** selon le contexte :
+
+#### 1. Profils Ultimate Member (UM)
+
+**Uniquement pour les éléments dans les profils Ultimate Member.**
 
 ```html
-<div class="me5rine-lab-profile-container me5rine-lab-form-block">
-    <div class="me5rine-lab-form-section">
-        <h2 class="me5rine-lab-title">Section Title</h2>
-        <p class="me5rine-lab-subtitle">Description</p>
-        
-        <!-- Contenu -->
-    </div>
+<div class="me5rine-lab-profile-container">
+    <h2 class="me5rine-lab-title"><?php _e('Titre de la section', 'text-domain'); ?></h2>
+    <p class="me5rine-lab-subtitle"><?php _e('Sous-titre optionnel', 'text-domain'); ?></p>
+    
+    <!-- Contenu -->
 </div>
 ```
 
+**Exemple :**
+```html
+<div class="me5rine-lab-profile-container">
+    <h2 class="me5rine-lab-title"><?php _e('My Giveaway Entries', 'giveaways'); ?></h2>
+    
+    <div class="me5rine-lab-form-container">
+        <form method="get" class="me5rine-lab-filters">
+            <!-- Filtres -->
+        </form>
+    </div>
+    
+    <table class="me5rine-lab-table">
+        <!-- Tableau -->
+    </table>
+</div>
+```
+
+#### 2. Dashboards Front-End
+
+**Pour les pages de dashboard front (liste, gestion, etc.).**
+
+```html
+<div class="{nom-du-dashboard} me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du dashboard', 'text-domain'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+```
+
+**Exemples :**
+```html
+<!-- Dashboard socials -->
+<div class="socials-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php esc_html_e('My Socialls', 'me5rine-lab'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+
+<!-- Dashboard giveaways -->
+<div class="my-giveaways-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php esc_html_e('My Giveaways', 'me5rine-lab'); ?></h2>
+    
+    <!-- Contenu -->
+</div>
+```
+
+#### 3. Formulaires Front Complets
+
+**Pour les formulaires complets (création/édition).**
+
+```html
+<div class="{nom-du-formulaire}-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Titre du formulaire', 'text-domain'); ?></h2>
+    
+    <form>
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Section', 'text-domain'); ?></h3>
+            <!-- Champs -->
+        </div>
+    </form>
+</div>
+```
+
+**Exemple :**
+```html
+<div class="campaign-form-dashboard me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large"><?php _e('Create a Giveaway Campaign', 'me5rine-lab'); ?></h2>
+    
+    <form id="rafflepress-campaign-form" method="post">
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Title and dates', 'me5rine-lab'); ?></h3>
+            <!-- Champs -->
+        </div>
+        
+        <div class="me5rine-lab-form-block">
+            <h3 class="me5rine-lab-title-medium"><?php _e('Prizes', 'me5rine-lab'); ?></h3>
+            <!-- Champs -->
+        </div>
+    </form>
+</div>
+```
+
+**Important** : Le titre principal (`h2`) est à l'extérieur du formulaire, les titres de sections (`h3`) sont **à l'intérieur** des `me5rine-lab-form-block`.
+
 ### Messages et Notices
+
+**Système unifié** : Toutes les notices front-end utilisent maintenant `me5rine-lab-form-message` avec les variantes de type.
+
+#### HTML Direct
 
 ```html
 <!-- Message de succès -->
@@ -371,11 +467,52 @@ document.addEventListener('DOMContentLoaded', function () {
     <p>Une erreur est survenue.</p>
 </div>
 
+<!-- Message d'avertissement -->
+<div class="me5rine-lab-form-message me5rine-lab-form-message-warning">
+    <p>Attention !</p>
+</div>
+
+<!-- Message d'information -->
+<div class="me5rine-lab-form-message me5rine-lab-form-message-info">
+    <p>Information importante.</p>
+</div>
+
 <!-- Message d'état vide -->
 <p class="me5rine-lab-state-message">
     Aucun élément disponible.
 </p>
 ```
+
+#### Fonctions PHP
+
+**1. Notice via paramètres GET (redirection)**
+
+```php
+// Rediriger avec notice
+$redirect_url = add_query_arg([
+    'notice' => 'success',
+    'notice_msg' => rawurlencode('Votre concours a été créé avec succès !')
+], $url);
+wp_safe_redirect($redirect_url);
+exit;
+
+// Afficher la notice dans le template
+me5rine_display_profile_notice();
+```
+
+**2. Notice via transient (formulaires)**
+
+```php
+// Définir le transient après traitement
+set_transient('rafflepress_campaign_success', 'Votre concours a été créé avec succès !', 60);
+
+// Afficher la notice dans le template
+display_transient_message_front('rafflepress_campaign_success', 'success');
+display_transient_message_front('rafflepress_duplicate_error', 'error');
+display_transient_message_front('rafflepress_file_error', 'error');
+```
+
+**Types disponibles** : `success`, `error`, `warning`, `info`
 
 ### Podium (Top 3) - Composant Réutilisable
 

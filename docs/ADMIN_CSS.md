@@ -1272,4 +1272,5 @@ Tous les éléments admin utilisent maintenant ces classes génériques. Pour mo
 - Tous les modules utilisent les mêmes classes génériques
 - Les sections spécifiques (events, subscription, shortcodes) gardent leurs classes mais suivent les mêmes patterns
 - Les variables CSS sont centralisées dans `global-colors.css`
+- Le système d'options d'écran est **générique et réutilisable** pour tous les tableaux
 

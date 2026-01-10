@@ -666,6 +666,7 @@ class Pokehub_DB {
             xp BIGINT UNSIGNED NOT NULL DEFAULT 0,
             pokemon_go_username VARCHAR(191) NOT NULL DEFAULT '',
             scatterbug_pattern VARCHAR(50) NOT NULL DEFAULT '',
+            country VARCHAR(191) NULL DEFAULT NULL,
             reasons LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -676,17 +677,18 @@ class Pokehub_DB {
 
         dbDelta($sql_user_profiles);
         
-        // Migration: remove country column if it exists (country is now only in Ultimate Member usermeta)
-        $this->migrateUserProfilesRemoveCountryColumn($user_profiles_table);
+        // Migration: add country column if it doesn't exist (for anonymous users)
+        $this->migrateUserProfilesAddCountryColumn($user_profiles_table);
     }
     
     /**
-     * Migration: remove country column from user_profiles table.
-     * Country is now only stored in Ultimate Member usermeta.
+     * Migration: add country column to user_profiles table if it doesn't exist.
+     * Country is stored in Ultimate Member usermeta for logged-in users,
+     * and in this table column for anonymous users (user_id IS NULL).
      * 
      * @param string $table_name Name of the user_profiles table
      */
-    private function migrateUserProfilesRemoveCountryColumn($table_name) {
+    private function migrateUserProfilesAddCountryColumn($table_name) {
         global $wpdb;
         
         // Check if table exists
@@ -707,9 +709,9 @@ class Pokehub_DB {
             )
         );
         
-        if (!empty($column_exists) && (int) $column_exists > 0) {
-            // Remove country column
-            $wpdb->query("ALTER TABLE {$table_name} DROP COLUMN country");
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            // Add country column for anonymous users
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN country VARCHAR(191) NULL DEFAULT NULL AFTER scatterbug_pattern");
         }
     }
 }

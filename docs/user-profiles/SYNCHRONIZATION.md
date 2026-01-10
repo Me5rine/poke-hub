@@ -1,6 +1,15 @@
-# Synchronisation user_profiles ↔ subscription_accounts
+# Synchronisation User Profiles
 
 ## Vue d'ensemble
+
+Ce document décrit les différentes synchronisations du module User Profiles :
+- `user_profiles` ↔ `subscription_accounts` pour les IDs (user_id et discord_id)
+- Keycloak → WordPress pour le nickname/pseudo
+- Gestion du changement d'email avec redirection
+
+---
+
+## 1. Synchronisation user_profiles ↔ subscription_accounts
 
 La table `user_profiles` stocke les profils Pokémon GO et utilise `subscription_accounts` comme source de vérité pour les IDs (user_id et discord_id).
 
@@ -141,3 +150,85 @@ Récupère le WordPress user ID depuis `subscription_accounts`.
 
 4. **Flexibilité** : Permet d'avoir des profils avec seulement `user_id` (utilisateur WordPress sans Discord) ou seulement `discord_id` (bot Discord).
 
+---
+
+## 2. Synchronisation Keycloak → WordPress (Nickname)
+
+Le module synchronise automatiquement le pseudo/nickname depuis Keycloak vers WordPress.
+
+### Fonctionnement
+
+La synchronisation se fait automatiquement :
+- À la connexion (`wp_login`)
+- Lors de la mise à jour du profil (`profile_update`)
+- Lors de la mise à jour des meta Keycloak (`updated_user_meta` / `added_user_meta`)
+
+### Localisation du nickname Keycloak
+
+La fonction `poke_hub_get_keycloak_nickname()` recherche le nickname dans plusieurs emplacements :
+
+1. `keycloak_nickname` dans user_meta
+2. `keycloak_attributes['nickname']` dans user_meta
+3. `keycloak_jwt_claims['nickname']` dans user_meta
+4. Via le filtre `poke_hub_get_keycloak_nickname`
+
+### Synchronisation
+
+Le nickname Keycloak est synchronisé vers :
+- `display_name` de WordPress
+- `nickname` dans user_meta
+
+### Filtre personnalisé
+
+Si votre plugin Keycloak stocke le nickname ailleurs, utilisez le filtre :
+
+```php
+add_filter('poke_hub_get_keycloak_nickname', function($nickname, $user_id) {
+    // Votre code pour récupérer le nickname
+    $keycloak_data = get_user_meta($user_id, 'votre_meta_key', true);
+    return $keycloak_data['nickname'] ?? null;
+}, 10, 2);
+```
+
+### Action hook
+
+Après chaque synchronisation, l'action suivante est déclenchée :
+
+```php
+do_action('poke_hub_keycloak_nickname_synced', $user_id, $keycloak_nickname);
+```
+
+### Fichiers
+
+- Fonction de synchronisation : `modules/user-profiles/functions/user-profiles-keycloak-sync.php`
+
+---
+
+## 3. Gestion du changement d'email
+
+Lorsqu'un utilisateur change son email, WordPress le déconnecte automatiquement pour des raisons de sécurité. Le module gère la redirection et l'affichage d'une notification.
+
+### Fonctionnement
+
+1. **Détection du changement** : Via `profile_update` et `send_email_change_email`
+2. **Stockage temporaire** : Les informations sont stockées dans un transient et un cookie
+3. **Redirection après logout** : Redirection automatique vers la page de profil
+4. **Notification** : Affichage du message "Check your new email to log in." sur la page de profil
+
+### Message affiché
+
+Le message suivant est affiché sur la page de profil après le changement d'email :
+> "Check your new email to log in."
+
+Ce message est traduisible via le domaine `poke-hub`.
+
+### Fichiers
+
+- Gestion du changement d'email : `modules/user-profiles/functions/user-profiles-email-change-handler.php`
+
+### Hooks utilisés
+
+- `profile_update` - Détecte le changement d'email
+- `send_email_change_email` - Détecte l'envoi de l'email de confirmation
+- `wp_logout` - Redirige vers la page de profil
+- `poke_hub_profile_notification_message` - Filtre pour ajouter des messages de notification

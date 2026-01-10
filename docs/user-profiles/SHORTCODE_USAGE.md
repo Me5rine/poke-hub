@@ -1,6 +1,18 @@
-# Shortcode Usage - Pokémon GO User Profile
+# Shortcode Usage - Pokémon GO User Profiles
 
 ## Overview
+
+This module provides three shortcodes for displaying Pokémon GO user profiles and friend codes.
+
+## Shortcodes Available
+
+1. **`[poke_hub_user_profile]`** - Personal Pokémon GO profile form/view
+2. **`[poke_hub_friend_codes]`** - Public friend codes listing with filters
+3. **`[poke_hub_vivillon]`** - Vivillon patterns friend codes listing with filters
+
+---
+
+## 1. `[poke_hub_user_profile]` - Personal Profile
 
 The `[poke_hub_user_profile]` shortcode displays the Pokémon GO user profile form or view, depending on user permissions.
 
@@ -101,10 +113,124 @@ The shortcode uses Ultimate Member CSS classes by default:
 
 You can customize the appearance by adding CSS in your theme targeting these classes.
 
+---
+
+## 2. `[poke_hub_friend_codes]` - Friend Codes Listing
+
+Displays a public listing of friend codes with filtering options (country, team, reason).
+
+### Basic Usage
+
+```php
+echo do_shortcode('[poke_hub_friend_codes]');
+```
+
+### Features
+
+- Filter by country, team, or reason
+- Copy friend code to clipboard with one click
+- QR code display for easy scanning
+- Pagination support
+- Add/edit form for logged-in users
+- Anonymous users can add one friend code per day (rate limited)
+
+### URL Parameters
+
+- `country` - Filter by country name
+- `team` - Filter by team (valor, mystic, instinct)
+- `reason` - Filter by reason
+- `pg` - Page number for pagination
+
+### Example with Filters
+
+```
+/friend-codes/?country=France&team=valor&pg=2
+```
+
+---
+
+## 3. `[poke_hub_vivillon]` - Vivillon Patterns Listing
+
+Displays friend codes filtered by Vivillon pattern with filtering options.
+
+### Basic Usage
+
+```php
+echo do_shortcode('[poke_hub_vivillon]');
+```
+
+### Features
+
+- Filter by Vivillon pattern (required for adding code)
+- Filter by country
+- Copy friend code to clipboard
+- QR code display
+- Pagination support
+- Add/edit form for logged-in users (pattern is required)
+- Anonymous users can add one friend code per day
+
+### URL Parameters
+
+- `pattern` - Filter by scatterbug pattern (required when adding)
+- `country` - Filter by country name
+- `pg` - Page number for pagination
+
+### Example with Filters
+
+```
+/vivillon/?pattern=continental&country=France
+```
+
+---
+
+## Automatic Page Creation
+
+When the `user-profiles` module is activated, it can automatically create pages (if enabled in settings):
+
+1. **Parent page**: `pokemon-go` (if it doesn't exist)
+2. **Child pages**:
+   - `friend-codes` with shortcode `[poke_hub_friend_codes]`
+   - `vivillon` with shortcode `[poke_hub_vivillon]`
+
+These pages are created as children of the `pokemon-go` page and can be managed from WordPress admin.
+
+### Disable Automatic Page Creation
+
+You can disable automatic page creation in **Poké HUB > Settings > General** under "User Profiles Settings". 
+
+If disabled, you will need to manually create pages with the shortcodes:
+- Create a page with slug `friend-codes` and add `[poke_hub_friend_codes]` in the content
+- Create a page with slug `vivillon` and add `[poke_hub_vivillon]` in the content
+- Optionally create a parent page `pokemon-go` and set the other pages as children
+
+---
+
 ## Files
 
-- Shortcode function: `modules/user-profiles/public/user-profiles-shortcode.php`
+### Shortcodes
+- `[poke_hub_user_profile]`: `modules/user-profiles/public/user-profiles-shortcode.php`
+- `[poke_hub_friend_codes]`: `modules/user-profiles/public/user-profiles-friend-codes-shortcode.php`
+- `[poke_hub_vivillon]`: `modules/user-profiles/public/user-profiles-vivillon-shortcode.php`
+
+### Templates (Reusable)
+- Friend codes list: `modules/user-profiles/public/user-profiles-friend-codes-list-template.php`
+- Filters: `modules/user-profiles/public/user-profiles-friend-codes-filters-template.php`
+- Header: `modules/user-profiles/public/user-profiles-friend-codes-header.php`
+- Form: `modules/user-profiles/public/user-profiles-friend-codes-form.php`
+
+### Helpers
 - Helper functions: `modules/user-profiles/functions/user-profiles-helpers.php`
-- CSS: Must be in your theme (see `../CSS_RULES.md` at docs root)
-- JavaScript: `assets/js/poke-hub-user-profiles-um.js` (enqueued automatically)
+- Friend codes helpers: `modules/user-profiles/functions/user-profiles-friend-codes-helpers.php`
+- Keycloak sync: `modules/user-profiles/functions/user-profiles-keycloak-sync.php`
+- Email change handler: `modules/user-profiles/functions/user-profiles-email-change-handler.php`
+- Pages creation: `modules/user-profiles/functions/user-profiles-pages.php`
+
+### Assets
+- CSS: `assets/css/user-profiles-friend-codes.css` (centralized in main plugin assets)
+- JavaScript: `assets/js/user-profiles-friend-codes.js` (centralized in main plugin assets)
+- JavaScript (Ultimate Member): `assets/js/poke-hub-user-profiles-um.js`
+
+### Styling
+
+The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Additional specific styles are in `user-profiles-friend-codes.css`.
 

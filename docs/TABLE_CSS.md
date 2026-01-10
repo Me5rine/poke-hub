@@ -720,3 +720,82 @@ Tous les tableaux front doivent utiliser cette structure pour la pagination :
 ### Responsive
 
 Les filtres et la pagination s'adaptent automatiquement sur mobile grâce aux styles définis dans FRONT_CSS.md. Aucun CSS spécifique n'est nécessaire.
+
+## Options d'Écran - Affichage/Masquage de Colonnes
+
+Le système d'options d'écran permet aux utilisateurs d'afficher/masquage des colonnes dans les tableaux. Ce système est **générique et réutilisable** pour tous les tableaux.
+
+### Classes CSS Génériques
+
+Les classes CSS pour les options d'écran sont définies dans `ADMIN_CSS.md` (section "Options d'Écran - Système Générique Réutilisable"). Toutes les classes utilisent le préfixe `me5rine-lab-` :
+
+- `.me5rine-lab-dashboard-header` : Header du dashboard avec actions
+- `.me5rine-lab-dashboard-header-actions` : Container des actions du header
+- `.me5rine-lab-screen-options-toggle` : Bouton pour ouvrir/fermer le panneau
+- `.me5rine-lab-screen-options-panel` : Panneau d'options d'écran
+- `.me5rine-lab-screen-options-panel-content` : Contenu du panneau
+- `.me5rine-lab-screen-options-columns` : Grid des colonnes
+- `.me5rine-lab-screen-options-column-item` : Item de colonne (checkbox + label)
+- `.me5rine-lab-screen-options-actions` : Actions du panneau (bouton Appliquer)
+- `.me5rine-lab-screen-options-apply` : Bouton Appliquer
+- `.column-hidden` : Classe pour masquer une colonne (sur `th` et `td`)
+
+### Structure HTML Standardisée
+
+**IMPORTANT** : Toutes les pages front doivent respecter cette structure :
+1. Une div wrapper `<div class="me5rine-lab-dashboard">` qui englobe tout le contenu de la page
+2. Un titre principal `<h2 class="me5rine-lab-title-large">` comme premier élément après l'ouverture de la div
+
+```html
+<div class="me5rine-lab-dashboard">
+    <h2 class="me5rine-lab-title-large">Titre de la Page</h2>
+    <div class="me5rine-lab-dashboard-header">
+        <div class="me5rine-lab-dashboard-header-actions">
+            <button type="button" class="me5rine-lab-form-button me5rine-lab-form-button-secondary me5rine-lab-screen-options-toggle" aria-expanded="false">
+                Options d'écran
+            </button>
+        </div>
+    </div>
+    
+    <div class="me5rine-lab-screen-options-panel" style="display: none;">
+        <div class="me5rine-lab-screen-options-panel-content">
+            <h4>Afficher à l'écran</h4>
+            <div class="me5rine-lab-screen-options-columns">
+                <label class="me5rine-lab-screen-options-column-item">
+                    <input type="checkbox" name="visible_columns[name]" value="1" data-column="name" checked>
+                    <span>Nom</span>
+                </label>
+            </div>
+            <div class="me5rine-lab-screen-options-actions">
+                <button type="button" class="me5rine-lab-form-button me5rine-lab-screen-options-apply">Appliquer</button>
+            </div>
+        </div>
+    </div>
+    
+    <table class="me5rine-lab-table">
+        <thead>
+            <tr>
+                <th class="column-name" data-column="name">Nom</th>
+                <th class="column-date column-hidden" data-column="date">Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="column-name" data-column="name">Exemple</td>
+                <td class="column-date column-hidden" data-column="date">01/01/2024</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+```
+
+### Règles d'Utilisation
+
+1. **Attribut `data-column`** : Chaque colonne (th et td) doit avoir un attribut `data-column` avec l'identifiant unique
+2. **Classe `column-hidden`** : Les colonnes masquées doivent avoir la classe `column-hidden` sur les éléments `th` et `td`
+3. **Classes génériques** : Toutes les classes utilisent le préfixe `me5rine-lab-` et sont génériques
+4. **Sauvegarde des préférences** : Les préférences doivent être sauvegardées par utilisateur (user meta) via AJAX
+
+### Documentation Complète
+
+Pour la documentation complète du système d'options d'écran (CSS, JavaScript, PHP), voir `FRONT_CSS.md` (section "Options d'Écran - Système Générique Réutilisable").

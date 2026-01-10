@@ -37,6 +37,17 @@ function poke_hub_register_settings() {
         ]
     );
 
+    // User Profiles: création automatique des pages
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_user_profiles_auto_create_pages',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => true,
+        ]
+    );
+
 }
 add_action('admin_init', 'poke_hub_register_settings');
 
