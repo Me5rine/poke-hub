@@ -155,7 +155,8 @@ function poke_hub_get_public_friend_codes($args = []) {
             $codes_public_1 = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE friend_code != '' AND friend_code_public = 1");
             $codes_public_null = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE friend_code != '' AND friend_code_public IS NULL");
             $codes_public_0 = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE friend_code != '' AND friend_code_public = 0");
-            error_log('[POKE-HUB] friend-codes: Codes with public=1: ' . $codes_public_1 . ', NULL: ' . $codes_public_null . ', 0: ' . $codes_public_0);
+            $codes_will_show = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE friend_code != '' AND (friend_code_public = 1 OR friend_code_public IS NULL)");
+            error_log('[POKE-HUB] friend-codes: Codes with public=1: ' . $codes_public_1 . ', NULL: ' . $codes_public_null . ', private(0): ' . $codes_public_0 . ', will show: ' . $codes_will_show);
         } else {
             error_log('[POKE-HUB] friend-codes: WARNING - Table does not exist: ' . $table_name);
         }
@@ -163,14 +164,15 @@ function poke_hub_get_public_friend_codes($args = []) {
     
     // Build WHERE clause (use 'up.' prefix for table aliases)
     // Include all codes with non-empty friend_code
-    // For public display, include codes where friend_code_public = 1 or NULL/0 (legacy codes)
-    // This ensures existing codes from the main site are included
+    // For public display, include codes where friend_code_public = 1 or NULL (legacy codes)
+    // Exclude codes where friend_code_public = 0 (explicitly set to private)
     $where = [
         "up.friend_code IS NOT NULL",
         "up.friend_code != ''", 
         "LENGTH(TRIM(up.friend_code)) >= 12", // At least 12 digits (may have spaces in stored format)
-        // Include all codes that are public OR have NULL/0 for friend_code_public (legacy codes or anonymous)
-        "(up.friend_code_public = 1 OR up.friend_code_public IS NULL OR up.friend_code_public = 0)"
+        // Include only codes that are public (1) OR have NULL for friend_code_public (legacy codes)
+        // Exclude codes where friend_code_public = 0 (explicitly set to private)
+        "(up.friend_code_public = 1 OR up.friend_code_public IS NULL)"
     ];
     $where_values = [];
     
