@@ -111,7 +111,9 @@ add_shortcode('poke_hub_friend_codes', function ($atts) {
         // Get profile URL using the correct format
         $user = wp_get_current_user();
         if ($user && !empty($user->user_nicename)) {
-            $profile_url = home_url('/profil/' . $user->user_nicename . '/?tab=game-pokemon-go');
+            // Use current site URL in multisite (not main site)
+            $site_url = is_multisite() ? get_site_url(get_current_blog_id()) : home_url();
+            $profile_url = $site_url . '/profil/' . $user->user_nicename . '/?tab=game-pokemon-go';
         }
     }
     

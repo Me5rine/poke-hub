@@ -669,6 +669,57 @@ function poke_hub_get_team_label($team) {
 }
 
 /**
+ * Replace URL domain with configured base URL or current site domain
+ * Used when sites share database and plugins return URLs from main site
+ * 
+ * @param string $url Original URL
+ * @return string URL with configured base URL or current site domain
+ */
+function poke_hub_replace_url_domain_with_current_site($url) {
+    if (empty($url)) {
+        return $url;
+    }
+    
+    // Get base URL from settings, or fallback to current site URL
+    $base_url = get_option('poke_hub_user_profiles_base_url', '');
+    if (empty($base_url)) {
+        $base_url = home_url();
+    }
+    
+    $base_domain = parse_url($base_url, PHP_URL_HOST);
+    $base_scheme = parse_url($base_url, PHP_URL_SCHEME);
+    
+    if (empty($base_domain)) {
+        return $url;
+    }
+    
+    $parsed_url = parse_url($url);
+    
+    // If domain is already the base domain, return as is
+    if (isset($parsed_url['host']) && $parsed_url['host'] === $base_domain) {
+        return $url;
+    }
+    
+    // Rebuild URL with base domain
+    $new_url = ($base_scheme ? $base_scheme . '://' : '') . $base_domain;
+    
+    if (isset($parsed_url['port'])) {
+        $new_url .= ':' . $parsed_url['port'];
+    }
+    if (isset($parsed_url['path'])) {
+        $new_url .= $parsed_url['path'];
+    }
+    if (isset($parsed_url['query'])) {
+        $new_url .= '?' . $parsed_url['query'];
+    }
+    if (isset($parsed_url['fragment'])) {
+        $new_url .= '#' . $parsed_url['fragment'];
+    }
+    
+    return $new_url;
+}
+
+/**
  * Get Ultimate Member profile tab URL for Pokémon GO profile.
  * Requires Ultimate Member plugin to be active.
  *
@@ -681,6 +732,10 @@ function poke_hub_get_um_profile_tab_url($user_id) {
     }
     
     $profile_url = um_user_profile_url($user_id);
+    
+    // Replace domain with current site domain (sites share database, so UM may return URLs from main site)
+    $profile_url = poke_hub_replace_url_domain_with_current_site($profile_url);
+    
     if (empty($profile_url)) {
         return '';
     }

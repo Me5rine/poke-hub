@@ -73,7 +73,10 @@ function poke_hub_redirect_after_email_change_logout() {
     setcookie('poke_hub_email_change_key', '', time() - 3600, '/', '', is_ssl(), true);
     
     // Get profile URL (Ultimate Member profile or custom profile page)
+    // Since sites share database, Ultimate Member may return URLs from the main site
+    // We need to replace the domain with the current site's domain
     $profile_url = '';
+    $current_site_url = home_url();
     
     // Try Ultimate Member profile URL first
     if (function_exists('um_user_profile_url')) {
@@ -82,14 +85,19 @@ function poke_hub_redirect_after_email_change_logout() {
         $profile_url = um_get_user_profile_url($user_id);
     }
     
+    // Replace domain with current site domain (sites share database, so UM may return URLs from main site)
+    if (function_exists('poke_hub_replace_url_domain_with_current_site')) {
+        $profile_url = poke_hub_replace_url_domain_with_current_site($profile_url);
+    }
+    
     // Fallback: try to get profile URL from user
     if (empty($profile_url) && function_exists('get_author_posts_url')) {
         $profile_url = get_author_posts_url($user_id);
     }
     
-    // If still no profile URL, use home URL
+    // If still no profile URL, use current site home URL
     if (empty($profile_url)) {
-        $profile_url = home_url();
+        $profile_url = $current_site_url;
     }
     
     // Set transient for notification message (will be displayed on profile page)

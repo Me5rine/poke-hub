@@ -101,31 +101,37 @@ $can_manage_cleanup = true;
         </div>
     <?php endif; ?>
 
-    <?php if (in_array('user-profiles', $active_modules, true)): ?>
-        <h2><?php _e('User Profiles Settings', 'poke-hub'); ?></h2>
-        <p><?php _e('Configure automatic page creation for the User Profiles module.', 'poke-hub'); ?></p>
+    <h2><?php _e('Module Settings', 'poke-hub'); ?></h2>
+    <p><?php _e('Configure settings for individual modules. These settings apply when modules are activated.', 'poke-hub'); ?></p>
 
-        <?php
-        $auto_create_pages = get_option('poke_hub_user_profiles_auto_create_pages', true);
-        ?>
-        <table class="form-table">
-            <tr valign="top">
-                <th scope="row"><?php _e('Auto-create pages', 'poke-hub'); ?></th>
-                <td>
-                    <label>
-                        <input type="checkbox"
-                               name="poke_hub_user_profiles_auto_create_pages"
-                               value="1"
-                            <?php checked((bool) $auto_create_pages, true); ?> />
-                        <?php _e('Automatically create "Friend Codes" and "Vivillon Patterns" pages when the module is activated.', 'poke-hub'); ?>
-                    </label>
-                    <p class="description">
-                        <?php _e('If disabled, you will need to manually create pages with the shortcodes [poke_hub_friend_codes] and [poke_hub_vivillon].', 'poke-hub'); ?>
-                    </p>
-                </td>
-            </tr>
-        </table>
-    <?php endif; ?>
+    <?php
+    $auto_create_pages = get_option('poke_hub_user_profiles_auto_create_pages', true);
+    ?>
+    <table class="form-table">
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_user_profiles_auto_create_pages">
+                    <?php _e('User Profiles: Auto-create pages', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <label>
+                    <input type="checkbox"
+                           name="poke_hub_user_profiles_auto_create_pages"
+                           id="poke_hub_user_profiles_auto_create_pages"
+                           value="1"
+                        <?php checked((bool) $auto_create_pages, true); ?> />
+                    <?php _e('Automatically create "Friend Codes" and "Vivillon Patterns" pages when the User Profiles module is activated.', 'poke-hub'); ?>
+                </label>
+                <p class="description">
+                    <?php _e('If disabled, you will need to manually create pages with the shortcodes [poke_hub_friend_codes] and [poke_hub_vivillon] after activating the module.', 'poke-hub'); ?>
+                    <?php if (!in_array('user-profiles', $active_modules, true)): ?>
+                        <br><em><?php _e('Note: The User Profiles module is not currently activated.', 'poke-hub'); ?></em>
+                    <?php endif; ?>
+                </p>
+            </td>
+        </tr>
+    </table>
 
     <?php submit_button(); ?>
 </form>

@@ -124,8 +124,10 @@ function poke_hub_render_friend_code_form($args = []) {
         <?php if (!$args['is_logged_in']) : ?>
             <?php
             // Get login URL with redirect to current page
-            $current_url = home_url($_SERVER['REQUEST_URI']);
-            $login_url = home_url('/wp-login.php?redirect_to=' . urlencode($current_url));
+            // Use current site URL in multisite (not main site)
+            $site_url = is_multisite() ? get_site_url(get_current_blog_id()) : home_url();
+            $current_url = $site_url . $_SERVER['REQUEST_URI'];
+            $login_url = $site_url . '/wp-login.php?redirect_to=' . urlencode($current_url);
             ?>
             <div class="me5rine-lab-form-message me5rine-lab-form-message-warning">
                 <p>

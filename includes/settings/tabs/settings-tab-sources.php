@@ -35,6 +35,9 @@ $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base
 // Pokémon tables prefix - toujours disponible
 $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
 
+// User Profiles base URL - pour les sites partageant une base de données
+$user_profiles_base_url = get_option('poke_hub_user_profiles_base_url', '');
+
 // === Traitement du formulaire dédié à cet onglet ===
 if (!empty($_POST['poke_hub_sources_submit'])) {
 
@@ -78,6 +81,12 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
         $pokemon_remote_prefix = sanitize_text_field(wp_unslash($_POST['poke_hub_pokemon_remote_prefix']));
         update_option('poke_hub_pokemon_remote_prefix', $pokemon_remote_prefix);
         $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+    }
+
+    // User Profiles base URL
+    if (isset($_POST['poke_hub_user_profiles_base_url'])) {
+        $user_profiles_base_url = esc_url_raw(wp_unslash($_POST['poke_hub_user_profiles_base_url']));
+        update_option('poke_hub_user_profiles_base_url', $user_profiles_base_url);
     }
 
     $messages[] = [
@@ -186,6 +195,32 @@ foreach ($messages as $msg) {
                     placeholder="https://backup.example.com/pokemon">
                 <p class="description">
                     <?php _e('Optional. If set, this URL will be used as a fallback source with the same slug-based filenames when the primary source is unavailable.', 'poke-hub'); ?>
+                </p>
+            </td>
+        </tr>
+    </table>
+
+    <h2><?php _e('User Profiles Source', 'poke-hub'); ?></h2>
+    <p><?php _e('Configure the base URL for user profile links. Useful when sites share a database.', 'poke-hub'); ?></p>
+
+    <table class="form-table">
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_user_profiles_base_url">
+                    <?php _e('Base URL for profile links', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <input type="url"
+                       name="poke_hub_user_profiles_base_url"
+                       id="poke_hub_user_profiles_base_url"
+                       value="<?php echo esc_attr($user_profiles_base_url); ?>"
+                       class="regular-text"
+                       placeholder="<?php echo esc_attr(home_url()); ?>">
+                <p class="description">
+                    <?php _e('Base URL to use for user profile links. Leave empty to use the current site URL. This setting is useful when multiple sites share the same database and user tables.', 'poke-hub'); ?>
+                    <br>
+                    <strong><?php _e('Current site URL:', 'poke-hub'); ?></strong> <code><?php echo esc_html(home_url()); ?></code>
                 </p>
             </td>
         </tr>
