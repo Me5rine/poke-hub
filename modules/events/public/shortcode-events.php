@@ -222,6 +222,7 @@ function poke_hub_shortcode_events($atts) {
      * 🌍 Wrapper global avec classes utiles
      */
     $wrapper_classes = [
+        'poke-hub-dashboard',
         'pokehub-events-wrapper',
         'pokehub-events-wrapper--status-' . $status,
     ];
