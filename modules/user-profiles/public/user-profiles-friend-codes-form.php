@@ -124,12 +124,9 @@ function poke_hub_render_friend_code_form($args = []) {
         <?php if (!$args['is_logged_in']) : ?>
             <?php
             // Get login URL with redirect to current page
-            // Use configured base URL for profiles, or current site URL
-            $site_url = function_exists('poke_hub_get_user_profiles_base_url') 
-                ? poke_hub_get_user_profiles_base_url() 
-                : home_url();
-            $current_url = $site_url . $_SERVER['REQUEST_URI'];
-            $login_url = $site_url . '/wp-login.php?redirect_to=' . urlencode($current_url);
+            $login_url = function_exists('poke_hub_get_login_url_with_redirect') 
+                ? poke_hub_get_login_url_with_redirect() 
+                : wp_login_url(home_url($_SERVER['REQUEST_URI']));
             ?>
             <div class="me5rine-lab-form-message me5rine-lab-form-message-warning">
                 <p>

@@ -853,7 +853,7 @@
         }, 100);
         
         if (leaderboard.length === 0) {
-            html += '<p class="pokedle-leaderboard-empty">Aucun score pour le moment.</p>';
+            html += '<p class="pokedle-leaderboard-empty">' + (gameData.i18n.noScoresYet || 'No scores yet.') + '</p>';
             $content.html(html);
             return;
         }
@@ -866,16 +866,17 @@
             html += '<div class="pokedle-leaderboard-top3">';
             top3.forEach((entry, index) => {
                 const rank = index + 1;
-                const rankText = rank === 1 ? '1er' : rank === 2 ? '2e' : '3e';
+                const rankText = rank === 1 ? (gameData.i18n.first || '1st') : rank === 2 ? (gameData.i18n.second || '2nd') : (gameData.i18n.third || '3rd');
                 const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : 'rank-3';
                 
                 html += `<div class="me5rine-lab-card pokedle-leaderboard-card ${rankClass}">`;
                 html += `<div class="pokedle-card-rank">${rankText}</div>`;
-                html += `<div class="pokedle-card-avatar">${getInitials(entry.display_name || 'Anonyme')}</div>`;
-                html += `<div class="pokedle-card-username">${entry.display_name || 'Anonyme'}</div>`;
+                html += `<div class="pokedle-card-avatar">${getInitials(entry.display_name || (gameData.i18n.anonymous || 'Anonymous'))}</div>`;
+                html += `<div class="pokedle-card-username">${entry.display_name || (gameData.i18n.anonymous || 'Anonymous')}</div>`;
                 html += `<div class="pokedle-card-score">`;
                 html += `<span class="pokedle-card-score-value">${entry.attempts}</span>`;
-                html += `<span class="pokedle-card-score-label"> tentatives</span>`;
+                const attemptsText = entry.attempts === 1 ? (gameData.i18n.attempt || 'attempt') : (gameData.i18n.attempts || 'attempts');
+                html += `<span class="pokedle-card-score-label"> ${attemptsText}</span>`;
                 html += `<div class="pokedle-card-trophy">🏆</div>`;
                 html += `</div>`;
                 html += `<div class="pokedle-card-time">${formatTime(entry.completion_time)}</div>`;

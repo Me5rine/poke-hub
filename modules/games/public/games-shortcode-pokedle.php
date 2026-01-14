@@ -15,7 +15,7 @@ function poke_hub_shortcode_pokedle($atts) {
 
     // Vérifier que le module pokemon est actif
     if (!poke_hub_is_module_active('pokemon')) {
-        return '<p>' . esc_html__('Le module Pokémon doit être actif pour jouer au Pokedle.', 'poke-hub') . '</p>';
+        return '<p>' . esc_html__('The Pokémon module must be active to play Pokedle.', 'poke-hub') . '</p>';
     }
 
     // Récupérer la date et génération depuis les paramètres URL (pour l'historique)
@@ -30,20 +30,20 @@ function poke_hub_shortcode_pokedle($atts) {
     if ($selected_generation_id > 0) {
         $available_pokemon = poke_hub_games_get_pokemon_by_generation($selected_generation_id);
         if (empty($available_pokemon)) {
-            return '<p>' . esc_html__('Aucun Pokémon disponible pour cette génération.', 'poke-hub') . '</p>';
+            return '<p>' . esc_html__('No Pokémon available for this generation.', 'poke-hub') . '</p>';
         }
     } else {
         // Mode toutes générations par défaut
         $available_pokemon = poke_hub_games_get_all_pokemon();
         if (empty($available_pokemon)) {
-            return '<p>' . esc_html__('Aucun Pokémon disponible pour le jeu.', 'poke-hub') . '</p>';
+            return '<p>' . esc_html__('No Pokémon available for the game.', 'poke-hub') . '</p>';
         }
     }
     
     // Récupérer le Pokémon du jour pour cette date et génération
     $daily_pokemon = poke_hub_pokedle_get_daily_pokemon_from_list($available_pokemon, $selected_date);
     if (!$daily_pokemon) {
-        return '<p>' . esc_html__('Aucun Pokémon disponible pour le jeu.', 'poke-hub') . '</p>';
+        return '<p>' . esc_html__('No Pokémon available for the game.', 'poke-hub') . '</p>';
     }
     
     // Sauvegarder le Pokémon du jour dans la table dédiée
@@ -189,11 +189,11 @@ function poke_hub_shortcode_pokedle($atts) {
                 <div class="me5rine-lab-dashboard-header">
                     <h2 class="me5rine-lab-title-large"><?php echo esc_html__('Pokedle', 'poke-hub'); ?></h2>
                     <button id="pokedle-change-game" class="me5rine-lab-form-button me5rine-lab-form-button-secondary">
-                        <?php echo esc_html__('Choisir un autre Pokedle', 'poke-hub'); ?>
+                        <?php echo esc_html__('Choose another Pokedle', 'poke-hub'); ?>
                     </button>
                 </div>
                 <p class="me5rine-lab-subtitle" id="pokedle-description">
-                    <?php echo esc_html__('Devinez le Pokémon mystère du jour !', 'poke-hub'); ?>
+                    <?php echo esc_html__('Guess the mystery Pokémon of the day!', 'poke-hub'); ?>
                 </p>
                 <div class="pokedle-game-info">
                     <span id="pokedle-current-mode" class="me5rine-lab-status me5rine-lab-status-info"><?php echo esc_html__('All Generations', 'poke-hub'); ?></span>
@@ -203,7 +203,7 @@ function poke_hub_shortcode_pokedle($atts) {
             
             <!-- Sélecteur de Pokedle (masqué par défaut) -->
             <div id="pokedle-game-selector" class="pokedle-game-selector" style="display:none;">
-                <h3 class="me5rine-lab-title-medium"><?php echo esc_html__('Choisir un Pokedle', 'poke-hub'); ?></h3>
+                <h3 class="me5rine-lab-title-medium"><?php echo esc_html__('Choose a Pokedle', 'poke-hub'); ?></h3>
                 <div class="me5rine-lab-filters">
                     <div class="me5rine-lab-filter-group">
                         <label for="pokedle-select-date" class="me5rine-lab-form-label me5rine-lab-filter-label">
@@ -213,10 +213,10 @@ function poke_hub_shortcode_pokedle($atts) {
                     </div>
                     <div class="me5rine-lab-filter-group">
                         <label for="pokedle-select-generation" class="me5rine-lab-form-label me5rine-lab-filter-label">
-                            <?php echo esc_html__('Génération', 'poke-hub'); ?>
+                            <?php echo esc_html__('Generation', 'poke-hub'); ?>
                         </label>
                         <select id="pokedle-select-generation" class="me5rine-lab-form-select me5rine-lab-filter-select">
-                            <option value="all" <?php selected($selected_generation_id, 0); ?>><?php echo esc_html__('Toutes les générations', 'poke-hub'); ?></option>
+                            <option value="all" <?php selected($selected_generation_id, 0); ?>><?php echo esc_html__('All Generations', 'poke-hub'); ?></option>
                             <?php foreach ($all_generations as $gen): ?>
                                 <option value="<?php echo esc_attr($gen['id']); ?>" <?php selected($selected_generation_id, $gen['id']); ?>>
                                     <?php echo esc_html($gen['name_fr'] ?: $gen['name_en']); ?>
@@ -225,7 +225,7 @@ function poke_hub_shortcode_pokedle($atts) {
                         </select>
                     </div>
                     <button id="pokedle-load-game" class="me5rine-lab-form-button">
-                        <?php echo esc_html__('Charger ce Pokedle', 'poke-hub'); ?>
+                        <?php echo esc_html__('Load this Pokedle', 'poke-hub'); ?>
                     </button>
                 </div>
             </div>
@@ -233,12 +233,17 @@ function poke_hub_shortcode_pokedle($atts) {
             <?php if ($user_score && $user_score['is_success']): ?>
                 <div class="pokedle-completed">
                     <p>
-                        <?php echo esc_html__('Vous avez déjà résolu le Pokedle d\'aujourd\'hui en', 'poke-hub'); ?>
+                        <?php echo esc_html__('You have already solved today\'s Pokedle in', 'poke-hub'); ?>
                         <strong><?php echo esc_html($user_score['attempts']); ?></strong>
-                        <?php echo esc_html__('tentative(s) !', 'poke-hub'); ?>
+                        <?php 
+                        $attempts_text = $user_score['attempts'] === 1 
+                            ? esc_html__('attempt', 'poke-hub') 
+                            : esc_html__('attempts', 'poke-hub');
+                        echo $attempts_text;
+                        ?>!
                     </p>
                     <button class="me5rine-lab-form-button pokedle-show-result" data-pokemon-id="<?php echo esc_attr($daily_pokemon['id']); ?>">
-                        <?php echo esc_html__('Voir le résultat', 'poke-hub'); ?>
+                        <?php echo esc_html__('View Result', 'poke-hub'); ?>
                     </button>
                 </div>
             <?php endif; ?>
@@ -249,14 +254,14 @@ function poke_hub_shortcode_pokedle($atts) {
                     type="text" 
                     id="pokedle-pokemon-input" 
                     class="me5rine-lab-form-input pokedle-pokemon-input" 
-                    placeholder="<?php echo esc_attr__('Tapez le nom d\'un Pokémon...', 'poke-hub'); ?>"
+                    placeholder="<?php echo esc_attr__('Type a Pokémon name...', 'poke-hub'); ?>"
                     autocomplete="off"
                 />
                 <button id="pokedle-submit" class="me5rine-lab-form-button">
-                    <?php echo esc_html__('Deviner', 'poke-hub'); ?>
+                    <?php echo esc_html__('Guess', 'poke-hub'); ?>
                 </button>
                 <button id="pokedle-show-answer" class="me5rine-lab-form-button me5rine-lab-form-button-secondary" style="display:none;">
-                    <?php echo esc_html__('Voir la réponse', 'poke-hub'); ?>
+                    <?php echo esc_html__('See Answer', 'poke-hub'); ?>
                 </button>
             </div>
 
@@ -281,7 +286,7 @@ function poke_hub_shortcode_pokedle($atts) {
         </div>
 
             <div class="pokedle-leaderboard">
-                <h3 class="me5rine-lab-title-medium"><?php echo esc_html__('Classement du jour', 'poke-hub'); ?></h3>
+                <h3 class="me5rine-lab-title-medium"><?php echo esc_html__('Today\'s Leaderboard', 'poke-hub'); ?></h3>
                 <div id="pokedle-leaderboard-content">
                     <!-- Le classement sera chargé via AJAX -->
                 </div>
@@ -305,7 +310,7 @@ function poke_hub_pokedle_ajax_submit_guess() {
     $is_all_generations_mode = isset($_POST['is_all_generations_mode']) ? filter_var($_POST['is_all_generations_mode'], FILTER_VALIDATE_BOOLEAN) : true;
 
     if ($pokemon_id <= 0 || $daily_pokemon_id <= 0) {
-        wp_send_json_error(['message' => __('Données invalides.', 'poke-hub')]);
+        wp_send_json_error(['message' => __('Invalid data.', 'poke-hub')]);
     }
 
     $comparison = poke_hub_pokedle_compare_pokemon($pokemon_id, $daily_pokemon_id);
@@ -408,7 +413,7 @@ function poke_hub_pokedle_ajax_save_score() {
     $score_data = isset($_POST['score_data']) ? (array) $_POST['score_data'] : [];
 
     if ($pokemon_id <= 0 || $attempts <= 0) {
-        wp_send_json_error(['message' => __('Données invalides.', 'poke-hub')]);
+        wp_send_json_error(['message' => __('Invalid data.', 'poke-hub')]);
     }
 
     $score_id = poke_hub_pokedle_save_score(

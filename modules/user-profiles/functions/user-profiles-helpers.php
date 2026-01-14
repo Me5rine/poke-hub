@@ -809,6 +809,68 @@ function poke_hub_get_um_profile_tab_url($user_id) {
 }
 
 /**
+ * Get user profile URL for Pokémon GO tab
+ * 
+ * @param int|null $user_id User ID. If null, uses current user ID
+ * @return string Profile URL or empty string if user not found
+ */
+function poke_hub_get_user_profile_url($user_id = null) {
+    if ($user_id === null) {
+        if (!is_user_logged_in()) {
+            return '';
+        }
+        $user_id = get_current_user_id();
+    }
+    
+    $user = get_userdata($user_id);
+    if (!$user || empty($user->user_nicename)) {
+        return '';
+    }
+    
+    // Use configured base URL for profiles, or current site URL
+    $base_url = function_exists('poke_hub_get_user_profiles_base_url') 
+        ? poke_hub_get_user_profiles_base_url() 
+        : home_url();
+    
+    return $base_url . '/profil/' . $user->user_nicename . '/?tab=game-pokemon-go';
+}
+
+/**
+ * Get login URL with redirect option
+ * Always uses current site URL (not the configured base URL) to ensure proper redirection
+ * 
+ * @param string $redirect_type Redirect type: 'current' (default) or 'profile'
+ * @param string|null $custom_url Optional custom redirect URL (overrides redirect_type)
+ * @return string Login URL with redirect parameter
+ */
+function poke_hub_get_login_url_with_redirect($redirect_type = 'current', $custom_url = null) {
+    $redirect_url = '';
+    
+    // If custom URL provided, use it
+    if ($custom_url !== null) {
+        $redirect_url = $custom_url;
+    } elseif ($redirect_type === 'profile') {
+        // Redirect to user profile
+        $profile_url = function_exists('poke_hub_get_user_profile_url') 
+            ? poke_hub_get_user_profile_url() 
+            : '';
+        
+        if (!empty($profile_url)) {
+            $redirect_url = $profile_url;
+        } else {
+            // Fallback to current page if profile URL not available
+            $redirect_url = home_url($_SERVER['REQUEST_URI']);
+        }
+    } else {
+        // Default: redirect to current page
+        $redirect_url = home_url($_SERVER['REQUEST_URI']);
+    }
+    
+    // Always use current site URL for login redirect (not the configured base URL)
+    return home_url('/wp-login.php?redirect_to=' . urlencode($redirect_url));
+}
+
+/**
  * Format XP number with spaces (French format: groups of 3)
  * 
  * @param int|string $xp XP value
