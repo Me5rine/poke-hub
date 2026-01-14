@@ -133,7 +133,7 @@ function poke_hub_render_friend_code_form($args = []) {
             ?>
             <div class="me5rine-lab-form-message me5rine-lab-form-message-warning">
                 <p>
-                    <?php esc_html_e('You are not logged in. You can add one friend code per day. Log in for unlimited features.', 'poke-hub'); ?>
+                    <?php esc_html_e('You are not logged in. You can add or update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'); ?>
                     <a href="<?php echo esc_url($login_url); ?>" class="me5rine-lab-form-button me5rine-lab-form-button-secondary user-profiles-friend-code-form-login-link">
                         <?php esc_html_e('Log In', 'poke-hub'); ?>
                     </a>

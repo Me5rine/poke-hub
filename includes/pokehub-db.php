@@ -47,6 +47,10 @@ class Pokehub_DB {
         if (in_array('user-profiles', $active_modules, true)) {
             $this->createUserProfilesTables();
         }
+
+        if (in_array('games', $active_modules, true)) {
+            $this->createGamesTables();
+        }
     }
 
     /**
@@ -713,5 +717,81 @@ class Pokehub_DB {
             // Add country column for anonymous users
             $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN country VARCHAR(191) NULL DEFAULT NULL AFTER scatterbug_pattern");
         }
+    }
+
+    /**
+     * Création de toutes les tables liées aux jeux :
+     * - games_scores : stocke les scores des joueurs (connectés et anonymes)
+     * - pokedle_daily : stocke les Pokedle quotidiens (date, génération, Pokémon)
+     * - games_points : stocke les points des joueurs par période (quotidien/semaine/mois/année/total)
+     */
+    private function createGamesTables() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $scores_table = pokehub_get_table('games_scores');
+        $pokedle_daily_table = pokehub_get_table('pokedle_daily');
+        $points_table = pokehub_get_table('games_points');
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        // Table principale des scores de jeux
+        $sql_scores = "CREATE TABLE {$scores_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NULL DEFAULT NULL,
+            game_type VARCHAR(50) NOT NULL DEFAULT 'pokedle',
+            game_date DATE NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            is_success TINYINT(1) NOT NULL DEFAULT 0,
+            completion_time INT UNSIGNED NOT NULL DEFAULT 0,
+            score_data LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id (user_id),
+            KEY game_type (game_type),
+            KEY game_date (game_date),
+            KEY pokemon_id (pokemon_id),
+            KEY is_success (is_success),
+            UNIQUE KEY unique_user_game_date (user_id, game_type, game_date)
+        ) {$charset_collate};";
+
+        // Table des Pokedle quotidiens (historique indépendant des scores)
+        $sql_pokedle_daily = "CREATE TABLE {$pokedle_daily_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            game_date DATE NOT NULL,
+            generation_id BIGINT UNSIGNED NULL DEFAULT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY game_date (game_date),
+            KEY generation_id (generation_id),
+            KEY pokemon_id (pokemon_id),
+            UNIQUE KEY unique_date_generation (game_date, generation_id)
+        ) {$charset_collate};";
+
+        // Table des points des joueurs par période
+        $sql_points = "CREATE TABLE {$points_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            period_type VARCHAR(20) NOT NULL,
+            period_start DATE NOT NULL,
+            period_end DATE NULL,
+            points INT UNSIGNED NOT NULL DEFAULT 0,
+            games_completed INT UNSIGNED NOT NULL DEFAULT 0,
+            games_succeeded INT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id (user_id),
+            KEY period_type (period_type),
+            KEY period_start (period_start),
+            KEY points (points),
+            UNIQUE KEY unique_user_period (user_id, period_type, period_start)
+        ) {$charset_collate};";
+
+        dbDelta($sql_scores);
+        dbDelta($sql_pokedle_daily);
+        dbDelta($sql_points);
     }
 }

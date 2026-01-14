@@ -1,0 +1,628 @@
+/**
+ * Poke Hub - Games Styles
+ * Styles spécifiques pour le module Games (Pokedle uniquement)
+ * Les classes globales du thème sont utilisées au maximum (me5rine-lab-*)
+ */
+
+/* Container principal - utilise la classe globale dashboard */
+.poke-hub-pokedle {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Sélecteur de Pokedle - utilise les classes globales de filtres */
+
+/* Input Container */
+.pokedle-input-container {
+    position: relative;
+    display: flex;
+    gap: 10px;
+}
+
+/* Autocomplete - spécifique au Pokedle */
+.pokedle-autocomplete {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 5px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.pokedle-autocomplete-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.pokedle-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.pokedle-autocomplete-image {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Attempts Header - En-tête des colonnes - spécifique au Pokedle */
+.pokedle-attempts-header {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    margin-bottom: 8px;
+}
+
+.pokedle-header-cell {
+    min-width: 100px;
+    width: 100px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Attempts Grid - spécifique au Pokedle */
+.pokedle-attempts {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pokedle-attempt-row {
+    margin-bottom: 12px;
+}
+
+.pokedle-attempt-hints-row {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+}
+
+.pokedle-hint-cell {
+    min-width: 100px;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+/* Cellule image Pokémon - spécifique au Pokedle */
+.pokedle-pokemon-image-cell {
+    padding: 8px;
+    min-width: 100px;
+    width: 100px;
+    flex-shrink: 0;
+    border: 3px dashed #e74c3c;
+}
+
+.pokedle-pokemon-sprite {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+/* États des cellules - Couleurs spécifiques pour les états du jeu */
+.pokedle-hint-cell.correct {
+    background-color: #2ecc71;
+}
+
+.pokedle-hint-cell.misplaced {
+    background-color: #f39c12; /* Orange pour les types mal placés */
+}
+
+.pokedle-hint-cell.wrong {
+    background-color: #e74c3c;
+}
+
+.pokedle-hint-cell.missing {
+    background-color: #95a5a6;
+}
+
+.pokedle-hint-cell.higher {
+    background-color: #f39c12;
+}
+
+.pokedle-hint-cell.lower {
+    background-color: #9b59b6;
+}
+
+/* Indices révélés progressivement - spécifique au Pokedle */
+.pokedle-revealed-hints {
+    display: none;
+}
+
+/* Leaderboard - Top 3 Cards - utilise me5rine-lab-card du thème */
+.pokedle-leaderboard-top3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--me5rine-lab-spacing-lg, 24px);
+    margin-bottom: 30px;
+}
+
+/* Surcharges spécifiques pour les cartes de classement */
+.pokedle-leaderboard-card {
+    position: relative; /* Nécessaire pour le positionnement absolu de .pokedle-card-rank */
+    transition: all 0.3s ease;
+}
+
+.pokedle-leaderboard-card.rank-1 {
+    border-color: #ffd700;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.pokedle-leaderboard-card.rank-2 {
+    border-color: #c0c0c0;
+    box-shadow: 0 4px 12px rgba(192, 192, 192, 0.3);
+}
+
+.pokedle-leaderboard-card.rank-3 {
+    border-color: #cd7f32;
+    box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
+}
+
+.pokedle-card-rank {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-weight: 700;
+    font-size: 0.9em;
+    z-index: 10; /* S'assurer que le rang est au-dessus du contenu */
+}
+
+.pokedle-card-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--me5rine-lab-spacing-md, 16px);
+    font-weight: 700;
+    font-size: 1.5em;
+}
+
+.pokedle-card-score-value {
+    font-weight: 700;
+    font-size: 1.8em;
+    color: #ffd700;
+}
+
+.pokedle-card-progress {
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.pokedle-card-progress-bar {
+    height: 100%;
+    background: #ffd700;
+    transition: width 0.3s ease;
+}
+
+/* Liste du reste - utilise me5rine-lab-card-with-image du thème */
+.pokedle-leaderboard-item {
+    display: grid;
+    grid-template-columns: 60px 50px 1fr 80px 30px 80px;
+    align-items: center;
+    gap: var(--me5rine-lab-spacing-md, 16px);
+}
+
+.pokedle-item-rank {
+    text-align: center;
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.pokedle-item-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.pokedle-item-score {
+    font-weight: 700;
+    font-size: 1.1em;
+    color: #ffd700;
+    text-align: right;
+}
+
+/* Badges de rang - spécifique au classement */
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 1em;
+}
+
+.pokedle-leaderboard-table tbody tr.rank-1 .rank-badge {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #b8860b;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+.pokedle-leaderboard-table tbody tr.rank-2 .rank-badge {
+    background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+    color: #696969;
+    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+}
+
+.pokedle-leaderboard-table tbody tr.rank-3 .rank-badge {
+    background: linear-gradient(135deg, #cd7f32 0%, #e6a85c 100%);
+    color: #8b4513;
+    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+}
+
+/* Onglets du leaderboard - utilise les styles de tabs du thème */
+.pokedle-leaderboard-tabs {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-sm, 8px);
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--me5rine-lab-border, var(--admin-lab-color-borders, #DEE5EC));
+    padding-bottom: 0;
+}
+
+.pokedle-leaderboard-tab {
+    padding: 14px 28px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: all 0.3s;
+    margin-bottom: -2px;
+}
+
+.pokedle-leaderboard-tab:hover {
+    background-color: var(--me5rine-lab-bg-secondary, var(--admin-lab-color-th-background, #F9FAFB));
+}
+
+.pokedle-leaderboard-tab.active {
+    border-bottom-color: var(--me5rine-lab-secondary, var(--admin-lab-color-secondary, #0485C8));
+    background-color: transparent;
+}
+
+/* Table du leaderboard - utilise me5rine-lab-table du thème */
+.pokedle-leaderboard-table th.col-rank {
+    width: 80px;
+    text-align: center;
+}
+
+.pokedle-leaderboard-table th.col-attempts,
+.pokedle-leaderboard-table th.col-time {
+    width: 120px;
+    text-align: center;
+}
+
+.pokedle-leaderboard-table td.col-rank {
+    text-align: center;
+}
+
+.pokedle-leaderboard-table td.col-attempts,
+.pokedle-leaderboard-table td.col-time {
+    text-align: center;
+}
+
+.pokedle-leaderboard-table thead {
+    background: var(--me5rine-lab-secondary, var(--admin-lab-color-secondary, #0485C8));
+}
+
+.pokedle-leaderboard-empty {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.1em;
+}
+
+.pokedle-game-info {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-md, 16px);
+    flex-wrap: wrap;
+}
+
+.pokedle-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pokedle-game-container {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pokedle-card-username,
+.pokedle-card-score,
+.pokedle-card-time {
+    text-align: center;
+}
+
+.pokedle-card-username {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-bottom: var(--me5rine-lab-spacing-md, 16px);
+}
+
+.pokedle-card-score {
+    margin-bottom: var(--me5rine-lab-spacing-sm, 8px);
+    position: relative;
+}
+
+.pokedle-card-score-label {
+    font-size: 0.9em;
+    margin-left: 4px;
+}
+
+.pokedle-card-trophy {
+    display: inline-block;
+    margin-left: var(--me5rine-lab-spacing-sm, 8px);
+    font-size: 1.2em;
+}
+
+.pokedle-card-time {
+    font-size: 0.9em;
+    margin-bottom: var(--me5rine-lab-spacing-md, 16px);
+}
+
+.pokedle-item-username {
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.pokedle-item-trophy {
+    font-size: 1em;
+    text-align: center;
+}
+
+.pokedle-item-time {
+    font-size: 0.9em;
+    text-align: right;
+}
+
+.pokedle-leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-sm, 8px);
+}
+
+.pokedle-leaderboard-item {
+    transition: all 0.2s ease;
+}
+
+.pokedle-leaderboard-item:hover {
+    transform: translateX(4px);
+}
+
+.pokedle-leaderboard-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.pokedle-leaderboard-table tbody tr {
+    transition: all 0.2s;
+}
+
+.pokedle-leaderboard-table tbody tr:hover {
+    transform: scale(1.01);
+}
+
+.pokedle-leaderboard-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pokedle-attempts-header {
+        gap: 6px;
+    }
+
+    .pokedle-header-cell {
+        min-width: 60px;
+        width: 60px;
+        height: 35px;
+        font-size: 10px;
+    }
+
+    .pokedle-attempt-hints-row {
+        gap: 6px;
+    }
+
+    .pokedle-hint-cell {
+        min-width: 60px;
+        height: 70px;
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+
+    .pokedle-pokemon-image-cell {
+        min-width: 70px;
+    }
+
+    .pokedle-autocomplete-image {
+        width: 40px;
+        height: 40px;
+    }
+
+    .pokedle-leaderboard-top3 {
+        grid-template-columns: 1fr;
+    }
+
+    .pokedle-leaderboard-item {
+        grid-template-columns: 50px 40px 1fr 70px 25px 70px;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pokedle-attempts-header {
+        gap: 4px;
+    }
+
+    .pokedle-header-cell {
+        min-width: 50px;
+        width: 50px;
+        height: 30px;
+        font-size: 9px;
+    }
+
+    .pokedle-attempt-hints-row {
+        gap: 4px;
+    }
+
+    .pokedle-hint-cell {
+        min-width: 50px;
+        height: 60px;
+        font-size: 11px;
+        padding: 4px 6px;
+    }
+
+    .pokedle-pokemon-image-cell {
+        min-width: 60px;
+    }
+
+    .rank-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9em;
+    }
+}
+
+/* ===== Classement général des mini-jeux ===== */
+.poke-hub-games-leaderboard {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.poke-hub-leaderboard-content {
+    margin-top: var(--me5rine-lab-spacing-lg, 24px);
+}
+
+.poke-hub-leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-md, 16px);
+}
+
+.poke-hub-leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: var(--me5rine-lab-spacing-md, 16px);
+    padding: var(--me5rine-lab-spacing-md, 16px);
+}
+
+.poke-hub-leaderboard-item.rank-1 {
+    border-color: #ffd700;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.poke-hub-leaderboard-item.rank-2 {
+    border-color: #c0c0c0;
+    box-shadow: 0 4px 12px rgba(192, 192, 192, 0.3);
+}
+
+.poke-hub-leaderboard-item.rank-3 {
+    border-color: #cd7f32;
+    box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
+}
+
+.poke-hub-leaderboard-rank {
+    font-weight: 700;
+    font-size: 1.2em;
+    min-width: 40px;
+    text-align: center;
+}
+
+.poke-hub-leaderboard-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1em;
+    background: var(--me5rine-lab-secondary, var(--admin-lab-color-secondary, #0485C8));
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.poke-hub-leaderboard-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--me5rine-lab-spacing-xs, 4px);
+}
+
+.poke-hub-leaderboard-name {
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+.poke-hub-leaderboard-stats {
+    display: flex;
+    gap: var(--me5rine-lab-spacing-md, 16px);
+    font-size: 0.9em;
+    color: var(--me5rine-lab-text-secondary, #666);
+}
+
+.poke-hub-leaderboard-points {
+    font-weight: 600;
+}
+
+.poke-hub-leaderboard-points strong {
+    color: var(--me5rine-lab-secondary, var(--admin-lab-color-secondary, #0485C8));
+    font-size: 1.1em;
+}
+
+.poke-hub-leaderboard-games {
+    color: var(--me5rine-lab-text-secondary, #666);
+}
+
+@media (max-width: 768px) {
+    .poke-hub-leaderboard-item {
+        flex-wrap: wrap;
+    }
+    
+    .poke-hub-leaderboard-stats {
+        flex-direction: column;
+        gap: var(--me5rine-lab-spacing-xs, 4px);
+    }
+}

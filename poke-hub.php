@@ -124,6 +124,18 @@ function poke_hub_admin_menu() {
         );
     }
 
+    // 🔥 Sous-menu Games (si module games actif)
+    if (in_array('games', $active_modules, true)) {
+        add_submenu_page(
+            'poke-hub',
+            __('Games', 'poke-hub'),
+            __('Games', 'poke-hub'),
+            'manage_options',
+            'poke-hub-games',
+            'poke_hub_games_admin_ui'
+        );
+    }
+
     // Sous-menu Settings → toujours visible
     add_submenu_page(
         'poke-hub',
@@ -147,6 +159,7 @@ function poke_hub_admin_pages() {
         'poke-hub-pokemon',
         'poke-hub-events',
         'poke-hub-user-profiles',
+        'poke-hub-games',
     ];
 }
 
@@ -315,6 +328,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-pokemon',
         'poke-hub-events',
         'poke-hub-user-profiles',
+        'poke-hub-games',
     ];
     
     $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';

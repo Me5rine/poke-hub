@@ -36,8 +36,9 @@ function poke_hub_get_client_ip() {
 }
 
 /**
- * Check if anonymous user can add a friend code (1 time per day limit)
+ * Check if anonymous user can add or update a friend code (1 time every 2 days limit)
  * Uses cookie-based tracking since we don't have IP column
+ * This limitation applies to BOTH additions and updates to encourage registration
  *
  * @param string $ip_address IP address (not used for cookie tracking, but kept for future use)
  * @return bool True if allowed, false if rate limited
@@ -47,9 +48,9 @@ function poke_hub_can_anonymous_add_friend_code($ip_address = null) {
     $cookie_name = 'poke_hub_friend_code_last_add';
     $last_add_timestamp = isset($_COOKIE[$cookie_name]) ? (int) $_COOKIE[$cookie_name] : 0;
     
-    // If last add was less than 24 hours ago, deny
+    // If last add/update was less than 48 hours (2 days) ago, deny
     $time_since_last = time() - $last_add_timestamp;
-    if ($time_since_last < (24 * 60 * 60)) {
+    if ($time_since_last < (48 * 60 * 60)) {
         return false;
     }
     
@@ -59,21 +60,23 @@ function poke_hub_can_anonymous_add_friend_code($ip_address = null) {
     $table_name = pokehub_get_table('user_profiles');
     
     if (!empty($table_name)) {
-        $yesterday = date('Y-m-d H:i:s', strtotime('-24 hours'));
+        $two_days_ago = date('Y-m-d H:i:s', strtotime('-48 hours'));
         
-        // Check if this specific friend code was added recently
+        // Check if this specific friend code was added/updated recently
         // This prevents duplicate submissions
         $friend_code_to_check = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
         if (!empty($friend_code_to_check)) {
             $cleaned = preg_replace('/[^0-9]/', '', $friend_code_to_check);
             if (strlen($cleaned) === 12) {
+                // Check both created_at and updated_at to catch updates
                 $existing = $wpdb->get_var($wpdb->prepare(
                     "SELECT COUNT(*) FROM {$table_name} 
                     WHERE user_id IS NULL 
                     AND friend_code = %s 
-                    AND created_at >= %s",
+                    AND (created_at >= %s OR updated_at >= %s)",
                     $cleaned,
-                    $yesterday
+                    $two_days_ago,
+                    $two_days_ago
                 ));
                 
                 if ((int) $existing > 0) {
@@ -87,12 +90,12 @@ function poke_hub_can_anonymous_add_friend_code($ip_address = null) {
 }
 
 /**
- * Set cookie to track anonymous friend code addition
+ * Set cookie to track anonymous friend code addition/update
  */
 function poke_hub_set_friend_code_add_cookie() {
     $cookie_name = 'poke_hub_friend_code_last_add';
     $cookie_value = time();
-    $cookie_expire = time() + (24 * 60 * 60); // 24 hours
+    $cookie_expire = time() + (48 * 60 * 60); // 48 hours (2 days)
     
     setcookie($cookie_name, $cookie_value, $cookie_expire, '/', '', is_ssl(), true);
     $_COOKIE[$cookie_name] = $cookie_value; // Set for current request
@@ -372,35 +375,50 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         error_log('[POKE-HUB] add-friend-code: Using table: ' . $table_name);
     }
     
-    // Check rate limiting for anonymous users
+    // Check if profile exists or if friend code exists (anywhere)
+    $existing_by_user = null;
+    $existing_by_code = null;
+    $existing_by_code_with_user = null;
+    
+    if (!$is_logged_in) {
+        // For anonymous users, check if this exact friend code already exists (update scenario)
+        $existing_by_code = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, user_id, created_at, updated_at FROM {$table_name} WHERE friend_code = %s LIMIT 1",
+            $friend_code
+        ), ARRAY_A);
+    }
+    
+    // Check rate limiting for anonymous users - applies to BOTH additions AND updates
+    // This encourages users to register for unlimited updates
     if (!$is_logged_in) {
         $ip_address = poke_hub_get_client_ip();
         
-        // Check if this exact friend code was already added by this IP today
-        $yesterday = date('Y-m-d H:i:s', strtotime('-24 hours'));
-        $existing_today = $wpdb->get_var($wpdb->prepare(
+        // Check if this exact friend code was already added/updated in the last 2 days
+        $two_days_ago = date('Y-m-d H:i:s', strtotime('-48 hours'));
+        $existing_recent = $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM {$table_name} 
             WHERE user_id IS NULL 
             AND friend_code = %s 
-            AND created_at >= %s
+            AND (created_at >= %s OR updated_at >= %s)
             LIMIT 1",
             $friend_code,
-            $yesterday
+            $two_days_ago,
+            $two_days_ago
         ));
         
-        if ($existing_today) {
+        if ($existing_recent) {
             return [
                 'success' => false,
-                'message' => __('You have already added this friend code recently. You can add one new friend code per day. Log in for more features.', 'poke-hub'),
+                'message' => __('You have already added or updated this friend code recently. You can update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'),
                 'profile_id' => null,
             ];
         }
         
-        // Check rate limiting (1 per day per IP)
+        // Check rate limiting (1 every 2 days per IP) - applies to both additions and updates
         if (!poke_hub_can_anonymous_add_friend_code($ip_address)) {
             return [
                 'success' => false,
-                'message' => __('You can only add one friend code per day. Log in to add more codes.', 'poke-hub'),
+                'message' => __('You can only add or update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'),
                 'profile_id' => null,
             ];
         }
@@ -429,11 +447,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         $ip_address = poke_hub_get_client_ip();
     }
     
-    // Check if profile exists or if friend code exists (anywhere)
-    $existing_by_user = null;
-    $existing_by_code = null;
-    $existing_by_code_with_user = null;
-    
+    // Continue checking if profile exists (for logged-in users)
     if ($user_id) {
         // For logged in users, check if they already have a profile
         $existing_by_user = $wpdb->get_row($wpdb->prepare(
@@ -529,12 +543,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             ];
         }
     } else {
-        // For anonymous users, check if friend code already exists (anywhere)
-        $existing_by_code = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, user_id FROM {$table_name} WHERE friend_code = %s LIMIT 1",
-            $friend_code
-        ), ARRAY_A);
-        
+        // For anonymous users, we already checked $existing_by_code above
         // If code exists and is linked to a user, prevent duplicate
         if ($existing_by_code && !empty($existing_by_code['user_id'])) {
             return [
@@ -544,27 +553,9 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             ];
         }
         
-        // If code exists but is anonymous (same code added before), prevent duplicate
-        // Rate limiting checks same IP, but we also prevent same code from being added twice
+        // If this is an update (code exists and is anonymous), set existing_by_user for update logic
         if ($existing_by_code && empty($existing_by_code['user_id'])) {
-            // Check if it was added recently (today) - prevent exact duplicates
-            $yesterday = date('Y-m-d H:i:s', strtotime('-24 hours'));
-            $recent_entry = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM {$table_name} 
-                WHERE id = %d 
-                AND created_at >= %s
-                LIMIT 1",
-                $existing_by_code['id'],
-                $yesterday
-            ));
-            
-            if ($recent_entry) {
-                return [
-                    'success' => false,
-                    'message' => __('This friend code has already been added recently. Log in to link it to your account if it is yours.', 'poke-hub'),
-                    'profile_id' => null,
-                ];
-            }
+            $existing_by_user = $existing_by_code;
         }
     }
     
@@ -573,18 +564,52 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         // Determine if this is an update or insert (use $existing_by_user checked earlier)
         $was_existing = !empty($existing_by_user);
         
+        // Get existing profile data to preserve fields that are not being updated
+        $existing_profile_data = [];
+        if ($was_existing && function_exists('poke_hub_get_user_profile')) {
+            $existing_profile_data = poke_hub_get_user_profile($user_id);
+        }
+        
         // Prepare profile data in the format expected by poke_hub_save_user_profile
+        // Only include fields that are provided (non-empty) to preserve existing data
         $profile_for_save = [
-            'friend_code' => $friend_code,
-            'friend_code_public' => 1,
-            'pokemon_go_username' => isset($data['pokemon_go_username']) ? sanitize_text_field($data['pokemon_go_username']) : '',
-            'scatterbug_pattern' => isset($data['scatterbug_pattern']) ? sanitize_text_field($data['scatterbug_pattern']) : '',
-            'team' => isset($data['team']) ? sanitize_text_field($data['team']) : '',
+            'friend_code' => $friend_code, // Always update friend_code as it's required
+            'friend_code_public' => 1, // Always set to public for friend codes page
         ];
+        
+        // Only add fields that are provided (non-empty) to preserve existing data
+        if (isset($data['pokemon_go_username']) && !empty(trim($data['pokemon_go_username']))) {
+            $profile_for_save['pokemon_go_username'] = sanitize_text_field($data['pokemon_go_username']);
+        } elseif ($was_existing && !empty($existing_profile_data['pokemon_go_username'])) {
+            // Preserve existing value if not provided
+            $profile_for_save['pokemon_go_username'] = $existing_profile_data['pokemon_go_username'];
+        }
+        
+        if (isset($data['scatterbug_pattern']) && !empty(trim($data['scatterbug_pattern']))) {
+            $profile_for_save['scatterbug_pattern'] = sanitize_text_field($data['scatterbug_pattern']);
+        } elseif ($was_existing && !empty($existing_profile_data['scatterbug_pattern'])) {
+            // Preserve existing value if not provided
+            $profile_for_save['scatterbug_pattern'] = $existing_profile_data['scatterbug_pattern'];
+        }
+        
+        if (isset($data['team']) && !empty(trim($data['team']))) {
+            $profile_for_save['team'] = sanitize_text_field($data['team']);
+        } elseif ($was_existing && !empty($existing_profile_data['team'])) {
+            // Preserve existing value if not provided
+            $profile_for_save['team'] = $existing_profile_data['team'];
+        }
         
         // Add country if provided
         if (isset($data['country']) && !empty($data['country'])) {
             $profile_for_save['country'] = sanitize_text_field($data['country']);
+        } elseif ($was_existing && !empty($existing_profile_data['country'])) {
+            // Preserve existing value if not provided
+            $profile_for_save['country'] = $existing_profile_data['country'];
+        }
+        
+        // Preserve XP if it exists
+        if ($was_existing && isset($existing_profile_data['xp']) && $existing_profile_data['xp'] > 0) {
+            $profile_for_save['xp'] = $existing_profile_data['xp'];
         }
         
         // Use the standard save function (handles country in usermeta automatically)
@@ -610,8 +635,53 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         $existing = $existing_by_user;
         
         if ($existing) {
-            // Update existing profile
-            $update_data = $profile_data;
+            // Get existing profile data to preserve fields that are not being updated
+            $existing_row = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE id = %d LIMIT 1",
+                $existing['id']
+            ), ARRAY_A);
+            
+            // Update existing profile - only update fields that are provided (non-empty)
+            $update_data = [
+                'friend_code' => $friend_code, // Always update friend_code as it's required
+                'friend_code_public' => 1, // Always set to public for friend codes page
+            ];
+            
+            // Only update fields that are provided (non-empty) to preserve existing data
+            if (isset($data['pokemon_go_username']) && !empty(trim($data['pokemon_go_username']))) {
+                $update_data['pokemon_go_username'] = sanitize_text_field($data['pokemon_go_username']);
+            } elseif ($existing_row && !empty($existing_row['pokemon_go_username'])) {
+                // Preserve existing value if not provided
+                $update_data['pokemon_go_username'] = $existing_row['pokemon_go_username'];
+            }
+            
+            if (isset($data['scatterbug_pattern']) && !empty(trim($data['scatterbug_pattern']))) {
+                $update_data['scatterbug_pattern'] = sanitize_text_field($data['scatterbug_pattern']);
+            } elseif ($existing_row && !empty($existing_row['scatterbug_pattern'])) {
+                // Preserve existing value if not provided
+                $update_data['scatterbug_pattern'] = $existing_row['scatterbug_pattern'];
+            }
+            
+            if (isset($data['team']) && !empty(trim($data['team']))) {
+                $update_data['team'] = sanitize_text_field($data['team']);
+            } elseif ($existing_row && !empty($existing_row['team'])) {
+                // Preserve existing value if not provided
+                $update_data['team'] = $existing_row['team'];
+            }
+            
+            // Preserve XP if it exists
+            if ($existing_row && isset($existing_row['xp']) && $existing_row['xp'] > 0) {
+                $update_data['xp'] = (int) $existing_row['xp'];
+            }
+            
+            // Handle country for anonymous users
+            if (!$user_id && isset($data['country']) && !empty($data['country'])) {
+                $update_data['country'] = sanitize_text_field($data['country']);
+            } elseif ($existing_row && !empty($existing_row['country'])) {
+                // Preserve existing value if not provided
+                $update_data['country'] = $existing_row['country'];
+            }
+            
             if ($user_id) {
                 $update_data['user_id'] = $user_id;
             }

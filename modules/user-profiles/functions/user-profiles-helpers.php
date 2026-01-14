@@ -357,13 +357,61 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
     }
 
     if ($existing_row) {
-        // Update existing row
+        // Get full existing row data to preserve fields that are not being updated
+        $existing_full_row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE id = %d LIMIT 1",
+            $existing_row['id']
+        ), ARRAY_A);
+        
+        // Update existing row - merge with existing data to preserve fields not provided
         // Merge user_id and discord_id if we have both
         if ($wp_user_id !== null && empty($existing_row['user_id'])) {
             $data['user_id'] = $wp_user_id;
         }
         if ($discord_id_value !== null && empty($existing_row['discord_id'])) {
             $data['discord_id'] = $discord_id_value;
+        }
+        
+        // Preserve existing values for fields that are not provided (empty) in the update
+        // Only update fields that are explicitly provided (non-empty) or are required
+        if ($existing_full_row) {
+            // Preserve pokemon_go_username if not provided or empty
+            // Check if field was provided in profile array and if it's non-empty
+            $username_provided = array_key_exists('pokemon_go_username', $profile);
+            if ((!$username_provided || empty($pokemon_go_username)) && !empty($existing_full_row['pokemon_go_username'])) {
+                $data['pokemon_go_username'] = $existing_full_row['pokemon_go_username'];
+            }
+            
+            // Preserve scatterbug_pattern if not provided or empty
+            $pattern_provided = array_key_exists('scatterbug_pattern', $profile);
+            if ((!$pattern_provided || empty($scatterbug_pattern)) && !empty($existing_full_row['scatterbug_pattern'])) {
+                $data['scatterbug_pattern'] = $existing_full_row['scatterbug_pattern'];
+            }
+            
+            // Preserve team if not provided or empty
+            $team_provided = array_key_exists('team', $profile);
+            if ((!$team_provided || empty($team)) && !empty($existing_full_row['team'])) {
+                $data['team'] = $existing_full_row['team'];
+            }
+            
+            // Preserve reasons if not provided or empty
+            $reasons_provided = array_key_exists('reasons', $profile);
+            if ((!$reasons_provided || empty($reasons_json)) && !empty($existing_full_row['reasons'])) {
+                $data['reasons'] = $existing_full_row['reasons'];
+            }
+            
+            // Preserve XP if not provided (and existing is > 0)
+            $xp_provided = array_key_exists('xp', $profile);
+            if ((!$xp_provided || $xp === 0) && isset($existing_full_row['xp']) && $existing_full_row['xp'] > 0) {
+                $data['xp'] = (int) $existing_full_row['xp'];
+            }
+            
+            // Preserve friend_code_public if friend_code is not being updated
+            // (only if friend_code is not provided or empty in the update)
+            $friend_code_provided = array_key_exists('friend_code', $profile);
+            if ((!$friend_code_provided || empty($friend_code)) && isset($existing_full_row['friend_code_public'])) {
+                $data['friend_code_public'] = (int) $existing_full_row['friend_code_public'];
+            }
         }
 
         // Build format array dynamically based on $data keys

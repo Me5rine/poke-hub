@@ -26,6 +26,7 @@ $available_modules = array(
     'bonus'         => __('Bonus', 'poke-hub'),
     'pokemon'       => __('Pokémon', 'poke-hub'),
     'user-profiles' => __('User Profiles', 'poke-hub'),
+    'games'         => __('Games', 'poke-hub'),
 );
 
 // Option : suppression des données à la désinstallation
@@ -63,6 +64,12 @@ $can_manage_cleanup = true;
                     if ($module_key === 'user-profiles' && !$is_me5rine_lab_active) {
                         $disabled = 'disabled';
                         $message  = ' <em>(' . __('Requires Me5rine LAB (subscription_accounts table)', 'poke-hub') . ')</em>';
+                    }
+
+                    // Dépendance : Games → Pokémon
+                    if ($module_key === 'games' && !in_array('pokemon', $active_modules, true)) {
+                        $disabled = 'disabled';
+                        $message  = ' <em>(' . __('Requires Pokémon module', 'poke-hub') . ')</em>';
                     }
 
                     $checked = in_array($module_key, $active_modules, true) ? 'checked="checked"' : '';
@@ -127,6 +134,52 @@ $can_manage_cleanup = true;
                     <?php _e('If disabled, you will need to manually create pages with the shortcodes [poke_hub_friend_codes] and [poke_hub_vivillon] after activating the module.', 'poke-hub'); ?>
                     <?php if (!in_array('user-profiles', $active_modules, true)): ?>
                         <br><em><?php _e('Note: The User Profiles module is not currently activated.', 'poke-hub'); ?></em>
+                    <?php endif; ?>
+                </p>
+            </td>
+        </tr>
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_games_auto_create_pages">
+                    <?php _e('Games: Auto-create pages', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <label>
+                    <input type="checkbox"
+                           name="poke_hub_games_auto_create_pages"
+                           id="poke_hub_games_auto_create_pages"
+                           value="1"
+                        <?php checked((bool) get_option('poke_hub_games_auto_create_pages', true), true); ?> />
+                    <?php _e('Automatically create "Pokedle" page when the Games module is activated.', 'poke-hub'); ?>
+                </label>
+                <p class="description">
+                    <?php _e('If disabled, you will need to manually create a page with the shortcode [pokedle] after activating the module.', 'poke-hub'); ?>
+                    <?php if (!in_array('games', $active_modules, true)): ?>
+                        <br><em><?php _e('Note: The Games module is not currently activated.', 'poke-hub'); ?></em>
+                    <?php endif; ?>
+                </p>
+            </td>
+        </tr>
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_games_dev_mode">
+                    <?php _e('Games: Development mode', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <label>
+                    <input type="checkbox"
+                           name="poke_hub_games_dev_mode"
+                           id="poke_hub_games_dev_mode"
+                           value="1"
+                        <?php checked((bool) get_option('poke_hub_games_dev_mode', false), true); ?> />
+                    <?php _e('Enable development mode for games (Pokémon changes on each page refresh, scores are not checked).', 'poke-hub'); ?>
+                </label>
+                <p class="description">
+                    <?php _e('⚠️ Development mode: The daily Pokémon will change on every page refresh and previous scores will be ignored. Use this only for testing!', 'poke-hub'); ?>
+                    <?php if (!in_array('games', $active_modules, true)): ?>
+                        <br><em><?php _e('Note: The Games module is not currently activated.', 'poke-hub'); ?></em>
                     <?php endif; ?>
                 </p>
             </td>

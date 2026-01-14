@@ -169,6 +169,12 @@ add_action('admin_init', function () {
         'user-profiles' => [
             pokehub_get_table('user_profiles'),
         ],
+
+        'games' => [
+            pokehub_get_table('games_scores'),
+            pokehub_get_table('pokedle_daily'),
+            pokehub_get_table('games_points'),
+        ],
     ];
 
     global $wpdb;

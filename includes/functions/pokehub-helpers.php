@@ -257,6 +257,11 @@ function pokehub_get_table(string $key): string {
         'special_event_pokemon_attacks' => ['scope' => 'local', 'suffix' => 'special_event_pokemon_attacks'],
         'special_event_bonus'           => ['scope' => 'local', 'suffix' => 'special_event_bonus'],
 
+        // ==== Tables locales Games ====
+        'games_scores'                  => ['scope' => 'local', 'suffix' => 'games_scores'],
+        'pokedle_daily'                 => ['scope' => 'local', 'suffix' => 'pokedle_daily'],
+        'games_points'                  => ['scope' => 'local', 'suffix' => 'games_points'],
+
         // ==== Tables distantes (JV Actu / remote WP) ====
         'remote_posts'              => ['scope' => 'remote', 'suffix' => 'posts'],
         'remote_postmeta'           => ['scope' => 'remote', 'suffix' => 'postmeta'],

@@ -1614,6 +1614,16 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         $template_id = $entry['templateId'] ?? '';
         $data        = $entry['data'] ?? [];
 
+        // ---------------------------------------------------------------------
+        // FIX: Ignorer les templates se terminant par _NORMAL dans le templateId
+        // (ex: V0029_POKEMON_NIDORAN_NORMAL) car ce sont des doublons explicites
+        // de l'entrée de base (V0029_POKEMON_NIDORAN).
+        // Ces entrées créent des doublons lors de l'import.
+        // ---------------------------------------------------------------------
+        if ( preg_match( '/_NORMAL$/', $template_id ) ) {
+            continue;
+        }
+
         if ( isset( $data['pokemonSettings'] ) && is_array( $data['pokemonSettings'] ) && ! empty( $tables['pokemon'] ) ) {
             $stats = poke_hub_pokemon_import_from_pokemon_settings(
                 $template_id,
@@ -1648,6 +1658,13 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     ) {
         foreach ( $decoded as $entry ) {
             if ( ! is_array( $entry ) ) {
+                continue;
+            }
+
+            $template_id = $entry['templateId'] ?? '';
+            
+            // Ignorer les templates se terminant par _NORMAL (doublons)
+            if ( preg_match( '/_NORMAL$/', $template_id ) ) {
                 continue;
             }
 

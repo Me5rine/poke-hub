@@ -48,6 +48,28 @@ function poke_hub_register_settings() {
         ]
     );
 
+    // Games: création automatique des pages
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_games_auto_create_pages',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => true,
+        ]
+    );
+
+    // Games: mode développement (réinitialisation à chaque refresh)
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_games_dev_mode',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => false,
+        ]
+    );
+
 }
 add_action('admin_init', 'poke_hub_register_settings');
 
