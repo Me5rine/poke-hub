@@ -1,0 +1,61 @@
+/* Styles pour le module Bonus - Poké HUB */
+
+/* Shortcode [pokehub-bonus] */
+.pokehub-bonuses-shortcode {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pokehub-bonus-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.pokehub-bonus-item-image {
+    flex-shrink: 0;
+}
+
+.pokehub-bonus-item-content h3 {
+    margin: 0 0 0.5rem 0;
+}
+
+.pokehub-bonus-item-content p {
+    margin: 0;
+}
+
+/* Affichage des bonus d'événement */
+.pokehub-event-bonuses {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pokehub-event-bonus {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.pokehub-event-bonus-image {
+    flex-shrink: 0;
+}
+
+.pokehub-event-bonus-content {
+    flex: 1;
+}
+
+.pokehub-event-bonus-title {
+    margin: 0 0 0.5rem 0;
+}
+
+.pokehub-event-bonus-desc {
+    margin: 0 0 0.5rem 0;
+}
+
+.pokehub-event-bonus-desc-global {
+    margin: 0;
+}
+
+

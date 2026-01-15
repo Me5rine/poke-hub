@@ -31,12 +31,15 @@ require_once POKE_HUB_BONUS_PATH . '/admin/bonus-metabox.php';       // Metabox 
  * Optionnel pour l'instant, mais prêt à être utilisé.
  */
 function poke_hub_bonus_assets() {
-    // CSS des blocs de bonus (à créer dans ton thème ou plugin)
-    wp_enqueue_style(
-        'pokehub-bonus-style',
-        POKE_HUB_URL . 'assets/css/poke-hub-bonus-front.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    // CSS des blocs de bonus (vérifier l'existence du fichier avant de l'enregistrer)
+    $css_file = POKE_HUB_PATH . 'assets/css/poke-hub-bonus-front.css';
+    if (file_exists($css_file)) {
+        wp_enqueue_style(
+            'pokehub-bonus-style',
+            POKE_HUB_URL . 'assets/css/poke-hub-bonus-front.css',
+            [],
+            POKE_HUB_VERSION
+        );
+    }
 }
 add_action('wp_enqueue_scripts', 'poke_hub_bonus_assets');

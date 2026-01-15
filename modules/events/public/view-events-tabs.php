@@ -17,19 +17,19 @@ $base_url = remove_query_arg(['status', 'pg', 'paged']);
 ?>
 <div class="pokehub-events-tabs">
     <a href="<?php echo esc_url(add_query_arg('status', 'current', $base_url)); ?>"
-       class="tab me5rine-lab-form-button <?php echo $current_status === 'current' ? 'active' : ''; ?>">
+       class="tab me5rine-lab-form-button me5rine-lab-form-button-initial <?php echo $current_status === 'current' ? 'active' : ''; ?>">
         <?php esc_html_e('Ongoing', 'poke-hub'); ?>
     </a>
     <a href="<?php echo esc_url(add_query_arg('status', 'upcoming', $base_url)); ?>"
-       class="tab me5rine-lab-form-button <?php echo $current_status === 'upcoming' ? 'active' : ''; ?>">
+       class="tab me5rine-lab-form-button me5rine-lab-form-button-initial <?php echo $current_status === 'upcoming' ? 'active' : ''; ?>">
         <?php esc_html_e('Upcoming', 'poke-hub'); ?>
     </a>
     <a href="<?php echo esc_url(add_query_arg('status', 'past', $base_url)); ?>"
-       class="tab me5rine-lab-form-button <?php echo $current_status === 'past' ? 'active' : ''; ?>">
+       class="tab me5rine-lab-form-button me5rine-lab-form-button-initial <?php echo $current_status === 'past' ? 'active' : ''; ?>">
         <?php esc_html_e('Past', 'poke-hub'); ?>
     </a>
     <a href="<?php echo esc_url(add_query_arg('status', 'all', $base_url)); ?>"
-       class="tab me5rine-lab-form-button <?php echo $current_status === 'all' ? 'active' : ''; ?>">
+       class="tab me5rine-lab-form-button me5rine-lab-form-button-initial <?php echo $current_status === 'all' ? 'active' : ''; ?>">
         <?php esc_html_e('All', 'poke-hub'); ?>
     </a>
 </div>
