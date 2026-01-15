@@ -1,5 +1,6 @@
+.pokehub-events-wrapper,
 .pokehub-events-wrapper a:hover {
-    color: #ffffff;
+    color: #ffffff !important;
 }
 
 .pokehub-event-type-filter-form {
