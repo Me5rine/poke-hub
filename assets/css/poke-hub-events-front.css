@@ -12,10 +12,6 @@
     display: none;
 }
 
-.pokehub-event-type-filter-form .select2.select2-container.select2-container--default {
-    width: 100% !important;
-}
-
 .pokehub-events-tabs {
     padding: 10px 0;
     display: block;

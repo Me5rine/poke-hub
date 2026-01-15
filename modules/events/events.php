@@ -52,6 +52,13 @@ function poke_hub_events_assets() {
             width:'resolve',
             dropdownParent: \$parent.length ? \$parent : $('body')
         });
+        // S'assurer que les classes du thème sont appliquées au conteneur Select2
+        setTimeout(function() {
+            var \$container = \$s.next('.select2-container');
+            if (\$container.length) {
+                \$container.addClass('me5rine-lab-form-select-wrapper');
+            }
+        }, 100);
         \$s.on('change',()=>\$s.closest('form').submit());
     });");
 }
