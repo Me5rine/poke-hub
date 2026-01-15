@@ -1,6 +1,5 @@
-.pokehub-events-wrapper,
 .pokehub-events-wrapper a:hover {
-    color: #ffffff !important;
+    color: #ffffff;
 }
 
 .pokehub-event-type-filter-form {
@@ -63,7 +62,7 @@
     border-radius: 10px;
     overflow: hidden;
     text-decoration: none !important;
-    color: #fff;
+    color: #fff !important;
     border-left: 6px solid var(--event-color, #ff9800);
     background-color: #101010; /* ✅ fond uni */
     cursor: pointer;
