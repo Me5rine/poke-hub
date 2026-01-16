@@ -37,30 +37,23 @@ function poke_hub_events_assets() {
     // JS Select2
     wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
 
-    // Init inline
-    wp_add_inline_script('select2', "jQuery(function($){
-        var \$s=$('#pokehub-event-type-select');
-        if(!\$s.length)return;
-        // Find the closest form field wrapper for dropdownParent
-        var \$parent = \$s.closest('.me5rine-lab-form-field, .pokehub-event-type-filter-form');
-        if (!\$parent.length) {
-            \$parent = \$s.parent();
-        }
-        \$s.select2({
-            placeholder:'" . esc_js(__('Select one or more types', 'poke-hub')) . "',
-            allowClear:true,
-            width:'resolve',
-            dropdownParent: \$parent.length ? \$parent : $('body')
+    // Initialisation centralisée de Select2 pour le front-end
+    wp_enqueue_script(
+        'pokehub-front-select2',
+        POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    // Soumission automatique du formulaire lors du changement (spécifique aux événements)
+    wp_add_inline_script('pokehub-front-select2', "
+        jQuery(function($){
+            $('#pokehub-event-type-select').on('select2:select select2:unselect', function(){
+                $(this).closest('form').submit();
+            });
         });
-        // S'assurer que les classes du thème sont appliquées au conteneur Select2
-        setTimeout(function() {
-            var \$container = \$s.next('.select2-container');
-            if (\$container.length) {
-                \$container.addClass('me5rine-lab-form-select-wrapper');
-            }
-        }, 100);
-        \$s.on('change',()=>\$s.closest('form').submit());
-    });");
+    ");
 }
 add_action('wp_enqueue_scripts', 'poke_hub_events_assets');
 
