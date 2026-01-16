@@ -202,8 +202,17 @@ function poke_hub_user_profiles_frontend_assets() {
         true
     );
 
-    // Select2 initialization is now handled in poke-hub-user-profiles-um.js
-    // No need for inline script here to avoid conflicts
+    // Initialisation centralisée de Select2 pour le front-end
+    wp_enqueue_script(
+        'pokehub-front-select2',
+        POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    // Select2 initialization is now handled by pokehub-front-select2.js
+    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_frontend_assets', 20);
 
@@ -234,7 +243,7 @@ function poke_hub_user_profiles_shortcode_assets() {
         true
     );
 
-    // JavaScript for checkbox state management and Select2 initialization (using generic classes)
+    // JavaScript for checkbox state management (using generic classes)
     wp_enqueue_script(
         'pokehub-user-profiles-um-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
@@ -243,8 +252,17 @@ function poke_hub_user_profiles_shortcode_assets() {
         true
     );
 
-    // Select2 initialization is now handled in poke-hub-user-profiles-um.js
-    // No need for inline script here to avoid conflicts
+    // Initialisation centralisée de Select2 pour le front-end
+    wp_enqueue_script(
+        'pokehub-front-select2',
+        POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    // Select2 initialization is now handled by pokehub-front-select2.js
+    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_shortcode_assets', 20);
 
@@ -319,17 +337,17 @@ function poke_hub_friend_codes_shortcode_assets() {
         'copyError' => __('Erreur lors de la copie', 'poke-hub'),
     ]);
 
-    // Initialize Select2 for friend codes selects
-    wp_add_inline_script('poke-hub-friend-codes', "
-    jQuery(document).ready(function($) {
-        if (typeof $.fn.select2 !== 'undefined') {
-            $('.friend-codes-dashboard .me5rine-lab-form-select').select2({
-                width: '100%',
-                allowClear: true
-            });
-        }
-    });
-    ");
+    // Initialisation centralisée de Select2 pour le front-end
+    wp_enqueue_script(
+        'pokehub-front-select2',
+        POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
+        ['jquery', 'select2'],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    // Select2 initialization is now handled by pokehub-front-select2.js
+    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_friend_codes_shortcode_assets', 20);
 
