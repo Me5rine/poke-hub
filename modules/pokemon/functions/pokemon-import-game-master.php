@@ -401,6 +401,72 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $flags['has_purified'] = 1;
     }
 
+    // Auto-détection des données régionales lors de l'import Game Master
+    // Vérifier si ce Pokémon/form devrait être marqué comme régional
+    // IMPORTANT: Wrapper dans try/catch pour éviter de bloquer l'import en cas d'erreur
+    try {
+        if ( function_exists( 'poke_hub_pokemon_should_be_regional_on_import' ) ) {
+            $should_be_regional = poke_hub_pokemon_should_be_regional_on_import( $template_id, $form_slug, $pokemon_id_proto );
+            
+            if ( $should_be_regional ) {
+                // Récupérer les pays associés depuis la config auto (fallback si mapping n'existe pas)
+                $regional_countries = [];
+                if ( function_exists( 'poke_hub_pokemon_get_regional_countries_for_import' ) ) {
+                    $regional_countries = poke_hub_pokemon_get_regional_countries_for_import( $template_id, $form_slug, $pokemon_id_proto );
+                }
+                
+                // Les pays et région_slugs sont maintenant stockés dans pokemon_regional_mappings (single source of truth)
+                // Si un mapping existe déjà, on le met à jour avec les données de la config auto si nécessaire
+                // Sinon, on crée un nouveau mapping avec les données de la config auto
+                if ( function_exists( 'poke_hub_pokemon_get_regional_mapping_by_pattern' ) && !empty( $slug ) ) {
+                    $existing_mapping = poke_hub_pokemon_get_regional_mapping_by_pattern( $slug );
+                    $existing_mapping_id = !empty( $existing_mapping ) && !empty( $existing_mapping['id'] ) 
+                        ? (int) $existing_mapping['id'] 
+                        : null;
+                    
+                    // Si le mapping existe déjà, on garde ses données (priorité sur config auto)
+                    // Si le mapping n'existe pas, on crée un nouveau mapping avec les données de la config auto
+                    if ( empty( $existing_mapping ) && !empty( $regional_countries ) ) {
+                        // Créer un nouveau mapping avec les données de la config auto
+                        $mapping_data = [
+                            'pattern_slug' => $slug,
+                            'countries' => $regional_countries,
+                            'region_slugs' => [], // Laissé vide, sera rempli manuellement depuis l'admin
+                            'description' => '', // Laissé vide, sera rempli manuellement depuis l'admin
+                        ];
+                        
+                        if ( function_exists( 'poke_hub_pokemon_save_regional_mapping' ) ) {
+                            poke_hub_pokemon_save_regional_mapping( $mapping_data, null );
+                        }
+                    }
+                }
+                
+                // Préserver les données régionales existantes si elles existent déjà
+                $existing_regional = [];
+                if ( $row ) {
+                    $existing_extra = json_decode( $row->extra ?? '{}', true );
+                    if ( is_array( $existing_extra ) && isset( $existing_extra['regional'] ) && is_array( $existing_extra['regional'] ) ) {
+                        $existing_regional = $existing_extra['regional'];
+                    }
+                }
+                
+                // Construire les données régionales
+                // IMPORTANT: On ne stocke plus countries et region_slugs dans extra['regional']
+                // Ces données sont maintenant dans pokemon_regional_mappings (single source of truth)
+                // On garde seulement is_regional, description, et map_image_id
+                $extra['regional'] = [
+                    'is_regional'  => true,
+                    'description'  => $existing_regional['description'] ?? '',
+                    'map_image_id' => isset( $existing_regional['map_image_id'] ) ? (int) $existing_regional['map_image_id'] : 0,
+                ];
+            }
+        }
+    } catch ( Exception $e ) {
+        // En cas d'erreur, logger mais continuer l'import
+        error_log( '[POKE-HUB] Error during regional detection for ' . $pokemon_id_proto . '/' . $form_slug . ': ' . $e->getMessage() );
+        // Ne pas définir $extra['regional'] si erreur, on laisse les données existantes intactes
+    }
+
     $extra_json = wp_json_encode( $extra );
 
     // Préparer les données pour l'insertion/mise à jour
@@ -1304,7 +1370,6 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
     }
 
     // Si durationTurns est présent, on calcule la durée PvP spécifique
-    // Note: Dans le Game Master, durationTurns est stocké avec -1 par rapport à la valeur réelle
     // Il faut donc ajouter 1 pour obtenir la durée correcte
     // Source: dataminers ("Turns in the Game Master are one less than what is displayed")
     $real_turns = 0;
@@ -1391,7 +1456,6 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
 
     // Stats PvP (damage, dps, eps, energy) - context = "pvp"
     // Si durationTurns est présent et différent de la durée globale, on stocke duration_ms dans les stats PvP
-    // Les stats globales (duration, damage_window) sont gérées par moveSettings
     $wpdb->delete(
         $stats_table,
         [
@@ -1479,7 +1543,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         return new \WP_Error( 'missing_helper', 'pokehub_get_table() is required.' );
     }
 
-    // Note: Translations are now handled via Bulbapedia during import
     // pour éviter les timeouts et les erreurs API (trop d'appels simultanés)
     if ( ! defined( 'POKE_HUB_GM_IMPORT_IN_PROGRESS' ) ) {
         define( 'POKE_HUB_GM_IMPORT_IN_PROGRESS', true );
@@ -1489,7 +1552,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         @set_time_limit( 300 );
     }
 
-    // Helper générique, déplacé dans un autre fichier
     $json = poke_hub_pokemon_load_gamemaster_json( $source );
     if ( is_wp_error( $json ) ) {
         return $json;
@@ -1543,8 +1605,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     $seen_pokemon_slugs = [];
     $seen_attack_slugs    = [];
 
-    // Index des genres (male/female) à partir des blocs SPAWN_*
-    // Helper poke_hub_gm_build_gender_index() déplacé dans un autre fichier.
     $gender_index = function_exists( 'poke_hub_gm_build_gender_index' )
         ? poke_hub_gm_build_gender_index( $decoded )
         : [];

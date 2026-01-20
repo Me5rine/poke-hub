@@ -69,6 +69,8 @@ class Pokehub_DB {
      * - pokemon_type_weakness_links
      * - pokemon_type_resistance_links
      * - pokemon_form_mappings
+     * - pokemon_regional_regions (ensembles de pays géographiques)
+     * - pokemon_regional_mappings (mapping pattern Vivillon => pays/régions)
      */
     private function createPokemonTables() {
         global $wpdb;
@@ -94,6 +96,8 @@ class Pokehub_DB {
         $items_table           = pokehub_get_table('items');
         $backgrounds_table     = pokehub_get_table('pokemon_backgrounds');
         $background_pokemon_links = pokehub_get_table('pokemon_background_pokemon_links');
+        $regional_regions_table = pokehub_get_table('pokemon_regional_regions');
+        $regional_mappings_table = pokehub_get_table('pokemon_regional_mappings');
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
@@ -481,8 +485,152 @@ class Pokehub_DB {
         dbDelta($sql_items);
         dbDelta($sql_backgrounds);
         dbDelta($sql_background_pokemon_links);
+        
+        // 17) Table des régions géographiques (Europe, Asie, Hémisphère Est, etc.)
+        $sql_regional_regions = "CREATE TABLE {$regional_regions_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(100) NOT NULL,
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            countries LONGTEXT NULL COMMENT 'JSON array of country labels',
+            description TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug),
+            KEY name_fr (name_fr(191)),
+            KEY name_en (name_en(191))
+        ) {$charset_collate};";
+        
+        // 18) Table du mapping régional (pattern Vivillon => pays/régions)
+        $sql_regional_mappings = "CREATE TABLE {$regional_mappings_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            pattern_slug VARCHAR(100) NOT NULL COMMENT 'Pattern slug (e.g., continental, archipelago)',
+            countries LONGTEXT NULL COMMENT 'JSON array of country labels',
+            region_slugs LONGTEXT NULL COMMENT 'JSON array of region slugs (references to pokemon_regional_regions)',
+            description TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY pattern_slug (pattern_slug)
+        ) {$charset_collate};";
+        
+        dbDelta($sql_regional_regions);
+        dbDelta($sql_regional_mappings);
+        
+        // Seed initial regional data if tables are empty
+        // Only seed if this is a fresh install (tables are empty)
+        $regions_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$regional_regions_table}");
+        $mappings_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$regional_mappings_table}");
+        
+        if ($regions_count === 0 && $mappings_count === 0) {
+            $this->seedRegionalData();
+        }
     }
-
+    
+    /**
+     * Seed initial regional data
+     * Only inserts if tables are empty
+     * 
+     * @param bool $force If true, will seed even if tables are not empty (use with caution)
+     * @return bool True if data was seeded, false otherwise
+     */
+    /**
+     * DEPRECATED: Use poke_hub_seed_regional_data() from pokemon module instead
+     * This method is kept for backward compatibility but delegates to the new function
+     * 
+     * @param bool $force Force update even if data already exists
+     * @return bool True on success, false on failure
+     * @deprecated Use poke_hub_seed_regional_data() from modules/pokemon/includes/pokemon-regional-seed.php instead
+     */
+    public function seedRegionalData($force = false) {
+        if (function_exists('poke_hub_seed_regional_data')) {
+            return poke_hub_seed_regional_data($force);
+        }
+        return false;
+    }
+    
+    /**
+     * Ensure regional data is seeded if tables exist but are empty
+     * Can be called at any time to check and seed data
+     * 
+     * @return bool True if data was seeded or already exists, false if tables don't exist
+     */
+    public function ensureRegionalDataSeeded() {
+        return $this->seedRegionalData(false);
+    }
+    
+    /**
+     * Ensure regional tables exist, create them if they don't
+     * Uses Pokemon table prefix (remote if configured) for a single source of truth
+     * 
+     * @return bool True if tables exist or were created, false on error
+     */
+    public function ensureRegionalTablesExist() {
+        global $wpdb;
+        
+        $regional_regions_table = pokehub_get_table('pokemon_regional_regions');
+        $regional_mappings_table = pokehub_get_table('pokemon_regional_mappings');
+        
+        if (empty($regional_regions_table) || empty($regional_mappings_table)) {
+            return false;
+        }
+        
+        // Check if tables exist
+        $regions_table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$regional_regions_table}'") === $regional_regions_table);
+        $mappings_table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$regional_mappings_table}'") === $regional_mappings_table);
+        
+        // If both exist, nothing to do
+        if ($regions_table_exists && $mappings_table_exists) {
+            return true;
+        }
+        
+        // Create missing tables
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        // Create regional_regions table if it doesn't exist
+        if (!$regions_table_exists) {
+            $sql_regional_regions = "CREATE TABLE {$regional_regions_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                slug VARCHAR(100) NOT NULL,
+                name_fr VARCHAR(191) NOT NULL DEFAULT '',
+                name_en VARCHAR(191) NOT NULL DEFAULT '',
+                countries LONGTEXT NULL COMMENT 'JSON array of country labels',
+                description TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY slug (slug),
+                KEY name_fr (name_fr(191)),
+                KEY name_en (name_en(191))
+            ) {$charset_collate};";
+            
+            dbDelta($sql_regional_regions);
+        }
+        
+        // Create regional_mappings table if it doesn't exist
+        if (!$mappings_table_exists) {
+            $sql_regional_mappings = "CREATE TABLE {$regional_mappings_table} (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                pattern_slug VARCHAR(191) NOT NULL COMMENT 'Pokemon slug or form slug (e.g., vivillon-archipelago)',
+                countries LONGTEXT NULL COMMENT 'JSON array of country labels',
+                region_slugs LONGTEXT NULL COMMENT 'JSON array of region slugs',
+                description TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY pattern_slug (pattern_slug),
+                KEY created_at (created_at)
+            ) {$charset_collate};";
+            
+            dbDelta($sql_regional_mappings);
+        }
+        
+        return true;
+    }
+    
     /**
      * Création de toutes les tables liées aux événements spéciaux :
      * - special_events
@@ -664,6 +812,7 @@ class Pokehub_DB {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id BIGINT UNSIGNED NULL DEFAULT NULL,
             discord_id VARCHAR(191) NULL DEFAULT NULL,
+            profile_type VARCHAR(50) NOT NULL DEFAULT 'classic',
             team VARCHAR(50) NOT NULL DEFAULT '',
             friend_code VARCHAR(12) NOT NULL DEFAULT '',
             friend_code_public TINYINT(1) NOT NULL DEFAULT 1,
@@ -676,13 +825,20 @@ class Pokehub_DB {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY user_id (user_id),
-            KEY discord_id (discord_id)
+            KEY discord_id (discord_id),
+            KEY profile_type (profile_type)
         ) {$charset_collate};";
 
         dbDelta($sql_user_profiles);
         
         // Migration: add country column if it doesn't exist (for anonymous users)
         $this->migrateUserProfilesAddCountryColumn($user_profiles_table);
+        
+        // Migration: add profile_type column if it doesn't exist
+        $this->migrateUserProfilesAddProfileTypeColumn($user_profiles_table);
+        
+        // Migration: add country_custom column if it doesn't exist (for custom countries like "Hawaï")
+        $this->migrateUserProfilesAddCountryCustomColumn($user_profiles_table);
     }
     
     /**
@@ -716,6 +872,85 @@ class Pokehub_DB {
         if (empty($column_exists) || (int) $column_exists === 0) {
             // Add country column for anonymous users
             $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN country VARCHAR(191) NULL DEFAULT NULL AFTER scatterbug_pattern");
+        }
+    }
+    
+    /**
+     * Migration: add profile_type column to user_profiles table if it doesn't exist.
+     * profile_type can be: 'classic' (WordPress user), 'discord' (Discord ID only), 'anonymous' (no user, no Discord)
+     * 
+     * @param string $table_name Name of the user_profiles table
+     */
+    private function migrateUserProfilesAddProfileTypeColumn($table_name) {
+        global $wpdb;
+        
+        // Check if table exists
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Check if profile_type column exists
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'profile_type'",
+                DB_NAME,
+                $table_name
+            )
+        );
+        
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            // Add profile_type column
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN profile_type VARCHAR(50) NOT NULL DEFAULT 'classic' AFTER discord_id");
+            
+            // Add index for profile_type
+            $wpdb->query("ALTER TABLE {$table_name} ADD INDEX profile_type (profile_type)");
+            
+            // Determine and set profile_type for existing profiles
+            // classic: has user_id (regardless of discord_id)
+            // discord: has discord_id but no user_id
+            // anonymous: has neither user_id nor discord_id
+            $wpdb->query("UPDATE {$table_name} SET profile_type = 'classic' WHERE user_id IS NOT NULL");
+            $wpdb->query("UPDATE {$table_name} SET profile_type = 'discord' WHERE user_id IS NULL AND discord_id IS NOT NULL");
+            $wpdb->query("UPDATE {$table_name} SET profile_type = 'anonymous' WHERE user_id IS NULL AND discord_id IS NULL");
+        }
+    }
+    
+    /**
+     * Migration: add country_custom column to user_profiles table if it doesn't exist.
+     * country_custom stores the custom country name (like "Hawaï") that was selected by the user,
+     * while the actual UM country is stored in UM usermeta (for logged-in users) or in country column (for anonymous users).
+     * This allows us to display "Hawaï" to the user even though UM stores "États-Unis d'Amérique".
+     * 
+     * @param string $table_name Name of the user_profiles table
+     */
+    private function migrateUserProfilesAddCountryCustomColumn($table_name) {
+        global $wpdb;
+        
+        // Check if table exists
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Check if country_custom column exists
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'country_custom'",
+                DB_NAME,
+                $table_name
+            )
+        );
+        
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            // Add country_custom column after country column
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN country_custom VARCHAR(191) NULL DEFAULT NULL AFTER country");
         }
     }
 

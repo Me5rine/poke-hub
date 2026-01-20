@@ -171,6 +171,18 @@
     color: #dc3545;
 }
 
+/* Validation errors for vivillon country/pattern */
+#country.error,
+#scatterbug_pattern.error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+
+.vivillon-validation-error {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
 .user-profiles-friend-code-form-profile-link {
     margin-top: 15px;
     font-size: 0.9em;

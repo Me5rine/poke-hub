@@ -423,3 +423,124 @@ function poke_hub_events_render_list(array $events): void {
 
     echo '</div>';
 }
+
+/**
+ * Rendu des dates d'événement avec feux verts/rouges
+ * 
+ * @param int $start_ts Timestamp de début
+ * @param int $end_ts Timestamp de fin
+ * @return string HTML
+ */
+function pokehub_render_event_dates($start_ts, $end_ts) {
+    if (!$start_ts || !$end_ts) {
+        return '';
+    }
+
+    // Formatage des dates
+    $start_day_short = poke_hub_events_format_datetime($start_ts, 'D');
+    $start_day_num = poke_hub_events_format_datetime($start_ts, 'j');
+    $start_month_short = poke_hub_events_format_datetime($start_ts, 'M');
+    $start_time = poke_hub_events_format_datetime($start_ts, 'H:i');
+
+    $end_day_short = poke_hub_events_format_datetime($end_ts, 'D');
+    $end_day_num = poke_hub_events_format_datetime($end_ts, 'j');
+    $end_month_short = poke_hub_events_format_datetime($end_ts, 'M');
+    $end_time = poke_hub_events_format_datetime($end_ts, 'H:i');
+
+    $start_label = sprintf(
+        '%s %s %s %s',
+        $start_day_short,
+        $start_day_num,
+        $start_month_short,
+        $start_time
+    );
+
+    $end_label = sprintf(
+        '%s %s %s %s',
+        $end_day_short,
+        $end_day_num,
+        $end_month_short,
+        $end_time
+    );
+
+    ob_start();
+    ?>
+    <div class="pokehub-event-dates-block">
+        <div class="event-dates-row">
+            <div class="event-date-chip event-date-chip--start">
+                <span class="event-date-dot event-date-dot--start"></span>
+                <span class="event-date-text"><?php echo esc_html($start_label); ?></span>
+            </div>
+
+            <span class="event-date-middle">···</span>
+
+            <div class="event-date-chip event-date-chip--end">
+                <span class="event-date-dot event-date-dot--end"></span>
+                <span class="event-date-text"><?php echo esc_html($end_label); ?></span>
+            </div>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * Ajoute automatiquement les dates d'événement au début du contenu
+ * pour certains post types (ex: post, pokehub_event).
+ */
+function pokehub_events_append_dates_to_content($content) {
+    static $in_dates_filter = false;
+
+    // Si on est déjà en train de traiter les dates, on ne refait rien
+    if ($in_dates_filter) {
+        return $content;
+    }
+
+    // Pas dans l'admin ou les feeds
+    if (is_admin() || is_feed()) {
+        return $content;
+    }
+
+    if (!in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+
+    global $post;
+    if (!$post) {
+        return $content;
+    }
+
+    $post_type = get_post_type($post);
+
+    // Post types sur lesquels on active l'injection auto
+    $allowed_post_types = apply_filters('pokehub_events_dates_auto_post_types', [
+        'post',
+        'pokehub_event',
+    ]);
+
+    if (!in_array($post_type, $allowed_post_types, true)) {
+        return $content;
+    }
+
+    // Vérifier si les dates existent via le helper centralisé
+    $dates = poke_hub_events_get_post_dates($post->ID);
+    
+    if (!$dates['start_ts'] || !$dates['end_ts']) {
+        return $content;
+    }
+    
+    $start_ts = $dates['start_ts'];
+    $end_ts = $dates['end_ts'];
+
+    $in_dates_filter = true;
+    $dates_html = pokehub_render_event_dates($start_ts, $end_ts);
+    $in_dates_filter = false;
+
+    if (empty($dates_html)) {
+        return $content;
+    }
+
+    // Ajout au début du contenu
+    return $dates_html . $content;
+}
+add_filter('the_content', 'pokehub_events_append_dates_to_content', 10);

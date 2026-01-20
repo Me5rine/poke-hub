@@ -964,3 +964,285 @@ function poke_hub_pokemon_is_temp_evo_mega( string $temp_evo_id ): bool {
 function poke_hub_pokemon_is_temp_evo_primal( string $temp_evo_id ): bool {
     return ( $temp_evo_id === 'TEMP_EVOLUTION_PRIMAL' );
 }
+
+/**
+ * Get regional Pokémon auto-configuration for Game Master import.
+ * Now reads from pokemon-regional-data.php as SINGLE SOURCE OF TRUTH
+ *
+ * @return array
+ */
+function poke_hub_pokemon_get_regional_auto_config() {
+    $default_config = [];
+
+    // Load from single source of truth
+    if (!function_exists('poke_hub_get_all_regional_data')) {
+        return apply_filters('poke_hub_pokemon_regional_auto_config', $default_config);
+    }
+    
+    $all_data = poke_hub_get_all_regional_data();
+    $vivillon_data = $all_data['vivillon'] ?? [];
+    
+    // Add Vivillon patterns with auto_detect flag
+    // These are special cases that need pattern-based detection
+    $default_config['VIVILLON_'] = [
+        'countries' => [],
+        'auto_detect_countries' => true,
+    ];
+    $default_config['SCATTERBUG_'] = [
+        'countries' => [],
+        'auto_detect_countries' => true,
+    ];
+    $default_config['SPEWPA_'] = [
+        'countries' => [],
+        'auto_detect_countries' => true,
+    ];
+    
+    // NOTE: All other regional Pokémon are now defined by their EXACT slug in form_based_mappings
+    // This function is mainly kept for Vivillon pattern detection and backward compatibility
+    // The actual regional detection is done by checking the exact slug in poke_hub_pokemon_get_regional_countries_for_import()
+
+    return apply_filters('poke_hub_pokemon_regional_auto_config', $default_config);
+}
+
+/**
+ * Get countries for a specific Pokémon/form during Game Master import.
+ *
+ * @param string $template_id
+ * @param string $form_slug
+ * @param string $pokemon_id_proto
+ * @return array
+ */
+function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_slug, $pokemon_id_proto) {
+    $countries = [];
+
+    // Build the exact slug (same way as in import: pokemon-slug or pokemon-form-slug)
+    // This is the SIMPLIFIED way: use EXACT slug that matches database!
+    $slug_base = '';
+    $exact_slug = '';
+    if (function_exists('poke_hub_pokemon_gm_id_to_slug')) {
+        $slug_base = poke_hub_pokemon_gm_id_to_slug($pokemon_id_proto);
+        $exact_slug = $slug_base;
+        if (!empty($form_slug)) {
+            $exact_slug .= '-' . $form_slug;
+        }
+    }
+
+    // 0) FIRST PRIORITY: Check by EXACT slug in form_based_mappings (unified system)
+    // This is the SINGLE SOURCE OF TRUTH - if slug matches, use it!
+    // ALL regional Pokémon are now defined by their EXACT slug (as stored in database)
+    // This avoids ambiguity and ensures only the correct forms are marked as regional
+    // IMPORTANT: For base Pokémon (no form), we check the base slug (e.g., "farfetchd")
+    // For Pokémon with forms, we check the full slug (e.g., "farfetchd-galar")
+    // This way, "farfetchd" (base) can be regional while "farfetchd-galar" is not
+    if (!empty($exact_slug) && function_exists('poke_hub_get_all_regional_data')) {
+        $all_data = poke_hub_get_all_regional_data();
+        $form_based_mappings = $all_data['form_based_mappings'] ?? [];
+        
+        // Check exact slug match first (most precise - includes form if present)
+        // Example: "farfetchd-galar" → checks if "farfetchd-galar" is in form_based_mappings
+        if (isset($form_based_mappings[$exact_slug]) && is_array($form_based_mappings[$exact_slug])) {
+            $mapping = $form_based_mappings[$exact_slug];
+            if (!empty($mapping) && is_array($mapping)) {
+                $countries = $mapping;
+                // Found by exact slug → continue to resolve regions to countries below
+                // (don't return here, need to resolve regions)
+            }
+        }
+        
+        // If not found and no form, also check base slug (for base Pokémon regionals)
+        // Example: "farfetchd" (no form) → checks if "farfetchd" is in form_based_mappings
+        if (empty($countries) && empty($form_slug) && !empty($slug_base) && isset($form_based_mappings[$slug_base]) && is_array($form_based_mappings[$slug_base])) {
+            $mapping = $form_based_mappings[$slug_base];
+            if (!empty($mapping) && is_array($mapping)) {
+                $countries = $mapping;
+                // Found by base slug → continue to resolve regions to countries below
+            }
+        }
+    }
+
+    // IMPORTANT: If found by exact slug, skip all pokemon_id_proto matching (it's less precise and causes false positives)
+    // The old $regional_pokemon system using pokemon_id_proto is deprecated and should not be used
+    // CRITICAL: If form_slug is present, NEVER match by pokemon_id_proto (would incorrectly mark all forms as regional)
+    // Example: "farfetchd-galar" should NOT match "FARFETCHD" → only exact slug match allowed
+    // If exact slug not found and form_slug exists, the Pokémon is NOT regional (return empty)
+    if (!empty($countries)) {
+        // Found by exact slug → skip all legacy pokemon_id_proto matching
+        // Continue to resolution step below
+    } elseif (!empty($form_slug)) {
+        // Has form_slug but NOT found in form_based_mappings → NOT regional
+        // Do NOT fall back to pokemon_id_proto matching (would mark all forms incorrectly)
+        // Continue to check Vivillon patterns (special case)
+    } else {
+        // Base Pokémon (no form) but NOT found in form_based_mappings → NOT regional
+        // Do NOT use pokemon_id_proto matching anymore (would incorrectly mark all forms as regional)
+        // All regional Pokémon MUST be defined by EXACT slug in form_based_mappings
+        // Return empty to indicate it's not regional
+        return [];
+    }
+
+    // 2) Form-based overrides - REMOVED
+    // All form-based regionals (Basculin, Shellos, Flabébé, Oricorio, Tauros Paldea)
+    // are now defined by their EXACT slug in form_based_mappings
+    // The slug exact matching in section 0 handles all these cases
+    // No need for pokemon_id_proto-based detection anymore
+
+    // 3) VIVILLON PATTERNS - Check FIRST (before pokemon_id_proto matching)
+    // Extract pattern from form_slug if it's in format "pokemon-pattern" (e.g., "vivillon-continental", "scatterbug-archipelago")
+    if (empty($countries) && !empty($form_slug)) {
+        $form_slug_lower = strtolower((string) $form_slug);
+        $pattern_from_slug = '';
+        
+        // Check if form_slug contains a dash and extract pattern (e.g., "vivillon-continental" -> "continental")
+        if (preg_match('/^(scatterbug|spewpa|vivillon)-(.+)$/i', $form_slug_lower, $matches)) {
+            $pattern_from_slug = $matches[2]; // Extract pattern part after dash
+        } else {
+            // If no dash, assume form_slug IS the pattern (backward compatibility)
+            $pattern_from_slug = $form_slug_lower;
+        }
+        
+        // Try to find pattern in Vivillon mapping
+        // IMPORTANT: Le mapping utilise maintenant le pattern uniquement (e.g., "continental"),
+        // pas le pattern_slug complet (e.g., "vivillon-continental")
+        if (!empty($pattern_from_slug) && function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
+            $vivillon_mapping = poke_hub_get_vivillon_pattern_country_mapping();
+            if (!empty($vivillon_mapping) && is_array($vivillon_mapping)) {
+                // Chercher directement avec le pattern extrait (e.g., "continental")
+                if (isset($vivillon_mapping[$pattern_from_slug]) && is_array($vivillon_mapping[$pattern_from_slug])) {
+                    $countries = $vivillon_mapping[$pattern_from_slug];
+                } else {
+                    // Fallback: chercher dans toutes les clés qui finissent par le pattern
+                    // (pour gérer les cas où le pattern_slug dans la table est "vivillon-continental")
+                    foreach ($vivillon_mapping as $key => $value) {
+                        if (is_array($value) && (
+                            $key === $pattern_from_slug || 
+                            preg_match('/-' . preg_quote($pattern_from_slug, '/') . '$/i', $key) ||
+                            preg_match('/^' . preg_quote($pattern_from_slug, '/') . '-/i', $key)
+                        )) {
+                            // Merge les pays si plusieurs entrées correspondent (e.g., scatterbug-continental + vivillon-continental)
+                            if (!empty($countries)) {
+                                $countries = array_unique(array_merge($countries, $value));
+                            } else {
+                                $countries = $value;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4) pokemon_id_proto match - REMOVED
+    // All regional Pokémon MUST be defined by EXACT slug in form_based_mappings
+    // This section was REMOVED to avoid false positives (marking all forms of a Pokémon as regional)
+    // If exact slug is not found in form_based_mappings, the Pokémon is NOT regional
+    // No fallback to pokemon_id_proto matching anymore - only exact slug matching is allowed
+
+    // 5) RESOLVE generic regions (Europe, Asie, Hémisphère Est, etc.) to actual Ultimate Member country labels
+    if (!empty($countries) && is_array($countries)) {
+        $resolved_countries = [];
+        foreach ($countries as $country_or_region) {
+            // Check if it's a generic region name
+            $resolved = poke_hub_pokemon_get_countries_for_region($country_or_region);
+            if (!empty($resolved)) {
+                // It was a region, add resolved countries
+                $resolved_countries = array_merge($resolved_countries, $resolved);
+            } else {
+                // It's already a country name (or empty), keep as is
+                if (!empty($country_or_region)) {
+                    $resolved_countries[] = $country_or_region;
+                }
+            }
+        }
+        // Remove duplicates and re-index
+        $countries = array_values(array_unique($resolved_countries));
+    }
+
+    return apply_filters(
+        'poke_hub_pokemon_get_regional_countries_for_import',
+        $countries,
+        $template_id,
+        $form_slug,
+        $pokemon_id_proto
+    );
+}
+
+/**
+ * Check if a Pokémon/form should be automatically marked as regional during Game Master import.
+ *
+ * @param string $template_id
+ * @param string $form_slug
+ * @param string $pokemon_id_proto
+ * @return bool
+ */
+function poke_hub_pokemon_should_be_regional_on_import($template_id, $form_slug, $pokemon_id_proto) {
+
+    // First, check if a mapping exists in the database for this exact slug
+    // This is the single source of truth - if a mapping exists, it's regional
+    if (function_exists('poke_hub_pokemon_gm_id_to_slug') && function_exists('poke_hub_pokemon_get_regional_mapping_by_pattern')) {
+        // Build the slug the same way as in the import
+        $slug_base = poke_hub_pokemon_gm_id_to_slug($pokemon_id_proto);
+        $slug = $slug_base;
+        if (!empty($form_slug)) {
+            $slug .= '-' . $form_slug;
+        }
+        
+        // Check if mapping exists in database
+        $existing_mapping = poke_hub_pokemon_get_regional_mapping_by_pattern($slug);
+        if (!empty($existing_mapping)) {
+            // Mapping exists => definitely regional
+            // Check if it has countries or region_slugs
+            $has_countries = !empty($existing_mapping['countries']) && is_array($existing_mapping['countries']) && count($existing_mapping['countries']) > 0;
+            $has_regions = !empty($existing_mapping['region_slugs']) && is_array($existing_mapping['region_slugs']) && count($existing_mapping['region_slugs']) > 0;
+            if ($has_countries || $has_regions) {
+                return true;
+            }
+        }
+    }
+
+    $countries = poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_slug, $pokemon_id_proto);
+
+    // If there are explicit countries/regions => regional
+    if (!empty($countries) && is_array($countries)) {
+        return true;
+    }
+
+    // If config exists but countries empty, we should NOT automatically mark as regional
+    // (ex: worldwide forms or placeholder entries).
+    $auto_config = poke_hub_pokemon_get_regional_auto_config();
+    if (isset($auto_config[$template_id]) && is_array($auto_config[$template_id])) {
+        $cfg = $auto_config[$template_id];
+        return (!empty($cfg['countries']) && is_array($cfg['countries']) && count($cfg['countries']) > 0);
+    }
+
+    // Pattern/pokemon_id config: same rule (only if countries are actually set)
+    foreach ($auto_config as $key => $config) {
+        if (!is_array($config)) {
+            continue;
+        }
+
+        $matches = false;
+
+        if (strpos($key, '_') === strlen($key) - 1) {
+            $prefix = rtrim($key, '_');
+            $matches = (strpos($pokemon_id_proto, $prefix) === 0);
+        } else {
+            $matches = ($key === $pokemon_id_proto);
+        }
+
+        if ($matches) {
+            if (!empty($config['auto_detect_countries'])) {
+                // Vivillon etc. => will be handled by resolver; if it returns empty, it's not regional.
+                return !empty($countries);
+            }
+            return (!empty($config['countries']) && is_array($config['countries']) && count($config['countries']) > 0);
+        }
+    }
+
+    return apply_filters(
+        'poke_hub_pokemon_should_be_regional_on_import',
+        false,
+        $template_id,
+        $form_slug,
+        $pokemon_id_proto
+    );
+}

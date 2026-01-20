@@ -182,8 +182,10 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         }
     }
 
-    // Release / regional (global, pas spécifiques à un jeu pour l’instant)
+    // Release / regional (global, pas spécifiques à un jeu pour l'instant)
     $release  = is_array($extra['release']  ?? null) ? $extra['release']  : [];
+    // Note: We read regional data from pokemon_regional_mappings table, not from extra['regional']
+    // extra['regional'] only contains is_regional, description, and map_image_id
     $regional = is_array($extra['regional'] ?? null) ? $extra['regional'] : [];
 
     // ================================
@@ -817,6 +819,123 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <label for="regional_description"><?php esc_html_e('Regional description', 'poke-hub'); ?></label>
                 <textarea name="regional_description" id="regional_description" rows="3" style="width: 100%;"><?php echo esc_textarea($regional['description'] ?? ''); ?></textarea>
                 <p class="description"><?php esc_html_e('Example: Available only in North America, etc.', 'poke-hub'); ?></p>
+            </div>
+            
+            <?php
+            // Get countries list for multiselect (from Pokémon module helper, independent of user-profiles)
+            $countries = [];
+            if (function_exists('poke_hub_pokemon_get_countries')) {
+                $countries = poke_hub_pokemon_get_countries();
+            }
+            
+            // Get geographic regions list for multiselect
+            $regions_list = [];
+            if (function_exists('poke_hub_pokemon_get_regional_regions_from_db')) {
+                $regions_list = poke_hub_pokemon_get_regional_regions_from_db();
+            }
+            
+            // Get selected countries and region_slugs from pokemon_regional_mappings table (single source of truth)
+            // Use Pokémon slug as pattern_slug to find the mapping
+            $selected_countries = [];
+            $selected_region_slugs = [];
+            
+            // Read countries and region_slugs ONLY from pokemon_regional_mappings (single source of truth)
+            // Use Pokémon slug as pattern_slug to find the mapping
+            if (!empty($slug) && function_exists('poke_hub_pokemon_get_regional_mapping_by_pattern')) {
+                // Try to get mapping by Pokémon slug (e.g., 'tauros-paldea-combat' or 'vivillon-continental')
+                $mapping = poke_hub_pokemon_get_regional_mapping_by_pattern($slug);
+                
+                // If not found and we have a form_variant_id, try with form_slug only (e.g., 'continental' for Vivillon)
+                // This is useful for Vivillon patterns where form_slug might be the pattern
+                if (empty($mapping) && !empty($form_variant_id)) {
+                    $form_variants_table = pokehub_get_table('pokemon_form_variants');
+                    if ($form_variants_table) {
+                        $form_variant_row = $wpdb->get_row(
+                            $wpdb->prepare("SELECT form_slug FROM {$form_variants_table} WHERE id = %d", $form_variant_id)
+                        );
+                        if ($form_variant_row && !empty($form_variant_row->form_slug)) {
+                            // Try with form_slug as pattern (e.g., 'continental')
+                            $mapping = poke_hub_pokemon_get_regional_mapping_by_pattern($form_variant_row->form_slug);
+                            
+                            // If still not found, try with slug-form_slug combination
+                            if (empty($mapping) && !empty($slug) && !empty($form_variant_row->form_slug)) {
+                                $combined_slug = $slug . '-' . $form_variant_row->form_slug;
+                                $mapping = poke_hub_pokemon_get_regional_mapping_by_pattern($combined_slug);
+                            }
+                        }
+                    }
+                }
+                
+                if (!empty($mapping)) {
+                    $selected_countries = isset($mapping['countries']) && is_array($mapping['countries']) 
+                        ? $mapping['countries'] 
+                        : [];
+                    $selected_region_slugs = isset($mapping['region_slugs']) && is_array($mapping['region_slugs']) 
+                        ? $mapping['region_slugs'] 
+                        : [];
+                }
+            }
+            
+            // Note: We no longer read from extra['regional']['countries'] or extra['regional']['region_slugs']
+            // pokemon_regional_mappings is the single source of truth
+            ?>
+            
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
+                        <label for="regional_countries"><?php esc_html_e('Countries', 'poke-hub'); ?></label>
+                        <?php if (!empty($countries)) : ?>
+                            <select name="regional_countries[]" id="regional_countries" multiple="multiple" style="width: 100%; min-height: 150px;">
+                                <?php foreach ($countries as $label => $value) : ?>
+                                    <option value="<?php echo esc_attr($value); ?>" <?php selected(in_array($value, $selected_countries, true)); ?>>
+                                        <?php echo esc_html($value); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php else : ?>
+                            <textarea name="regional_countries_text" id="regional_countries_text" rows="5" style="width: 100%;" placeholder="<?php esc_attr_e('Enter countries separated by commas, e.g.: France, Spain, Italy', 'poke-hub'); ?>"><?php echo esc_textarea(!empty($selected_countries) ? implode(', ', $selected_countries) : ''); ?></textarea>
+                            <p class="description" style="color: #d63638;">
+                                <?php esc_html_e('Note: Countries list is not available. Enter countries manually, separated by commas.', 'poke-hub'); ?>
+                            </p>
+                        <?php endif; ?>
+                        <p class="description">
+                            <?php esc_html_e('Select countries where this regional Pokémon is available.', 'poke-hub'); ?>
+                        </p>
+                    </div>
+                </div>
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
+                        <label for="regional_regions"><?php esc_html_e('Geographic Regions', 'poke-hub'); ?></label>
+                        <?php if (!empty($regions_list)) : ?>
+                            <select name="regional_regions[]" id="regional_regions" multiple="multiple" style="width: 100%; min-height: 150px;">
+                                <?php foreach ($regions_list as $region) : ?>
+                                    <?php
+                                    $region_slug = $region['slug'] ?? '';
+                                    $region_name = '';
+                                    if (!empty($region['name_fr'])) {
+                                        $region_name = $region['name_fr'];
+                                    } elseif (!empty($region['name_en'])) {
+                                        $region_name = $region['name_en'];
+                                    } else {
+                                        $region_name = $region_slug;
+                                    }
+                                    ?>
+                                    <option value="<?php echo esc_attr($region_slug); ?>" <?php selected(in_array($region_slug, $selected_region_slugs, true)); ?>>
+                                        <?php echo esc_html($region_name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php else : ?>
+                            <textarea name="regional_regions_text" id="regional_regions_text" rows="5" style="width: 100%;" placeholder="<?php esc_attr_e('Enter region slugs separated by commas, e.g.: europe, asia, north-america', 'poke-hub'); ?>"><?php echo esc_textarea(!empty($selected_region_slugs) ? implode(', ', $selected_region_slugs) : ''); ?></textarea>
+                            <p class="description" style="color: #d63638;">
+                                <?php esc_html_e('Note: Regions list is not available. Enter region slugs manually, separated by commas.', 'poke-hub'); ?>
+                            </p>
+                        <?php endif; ?>
+                        <p class="description">
+                            <?php esc_html_e('Select geographic regions where this regional Pokémon is available.', 'poke-hub'); ?>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 

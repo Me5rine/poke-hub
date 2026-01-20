@@ -157,6 +157,8 @@ add_action('admin_init', function () {
             pokehub_get_table('items'),
             pokehub_get_table('pokemon_backgrounds'),
             pokehub_get_table('pokemon_background_pokemon_links'),
+            pokehub_get_table('pokemon_regional_regions'),
+            pokehub_get_table('pokemon_regional_mappings'),
         ],
 
         'events' => [

@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 1.9.2
+Version: 1.9.3
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -46,6 +46,17 @@ require_once POKE_HUB_INCLUDES_DIR . 'pokehub-db.php';
 
 /**
  * Déclaration du menu d'admin Poké HUB.
+ * Ordre souhaité :
+ * 1. Dashboard
+ * 2. Pokémon
+ * 3. Bonus
+ * 4. Events
+ * 5. Raids (à venir)
+ * 6. Eggs (à venir)
+ * 7. Quests
+ * 8. User Profiles
+ * 9. Games
+ * 10. Settings
  */
 function poke_hub_admin_menu() {
 
@@ -66,8 +77,7 @@ function poke_hub_admin_menu() {
         60
     );
 
-    // Ajout d’un premier sous-menu "Dashboard"
-    // (comme WordPress empêche l'entrée top-level d’être cliquée parfois)
+    // 1. Dashboard (priorité 10)
     add_submenu_page(
         'poke-hub',
         __('Dashboard', 'poke-hub'),
@@ -76,8 +86,17 @@ function poke_hub_admin_menu() {
         'poke-hub',
         'poke_hub_dashboard_page'
     );
+}
 
-    // 🔥 Sous-menu Pokémon (si module pokemon actif)
+/**
+ * 2. Sous-menu Pokémon (priorité 11)
+ */
+function poke_hub_admin_menu_pokemon() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
     if (in_array('pokemon', $active_modules, true)) {
         add_submenu_page(
             'poke-hub',
@@ -88,20 +107,18 @@ function poke_hub_admin_menu() {
             'poke_hub_pokemon_admin_ui'
         );
     }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_pokemon', 11);
 
-    // 🔥 Sous-menu Events (si module events actif)
-    if (in_array('events', $active_modules, true)) {
-        add_submenu_page(
-            'poke-hub',
-            __('Events', 'poke-hub'),
-            __('Events', 'poke-hub'),
-            'manage_options',
-            'poke-hub-events',
-            'pokehub_render_special_events_page' // ou URL si CPT
-        );
+/**
+ * 3. Sous-menu Bonus (priorité 12)
+ */
+function poke_hub_admin_menu_bonus() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
     }
     
-    // 🔥 Sous-menu BONUS (seulement si module bonus actif)
     if (in_array('bonus', $active_modules, true)) {
         add_submenu_page(
             'poke-hub',
@@ -111,8 +128,90 @@ function poke_hub_admin_menu() {
             'edit.php?post_type=pokehub_bonus'
         );
     }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_bonus', 12);
 
-    // 🔥 Sous-menu User Profiles (si module user-profiles actif)
+/**
+ * 4. Sous-menu Events (priorité 13)
+ */
+function poke_hub_admin_menu_events() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
+    if (in_array('events', $active_modules, true)) {
+        add_submenu_page(
+            'poke-hub',
+            __('Events', 'poke-hub'),
+            __('Events', 'poke-hub'),
+            'manage_options',
+            'poke-hub-events',
+            'pokehub_render_special_events_page'
+        );
+    }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_events', 13);
+
+/**
+ * 5. Sous-menu Raids (priorité 14) - À venir
+ */
+function poke_hub_admin_menu_raids() {
+    // TODO: À implémenter quand le module Raids sera créé
+    /*
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
+    if (in_array('raids', $active_modules, true)) {
+        add_submenu_page(
+            'poke-hub',
+            __('Raids', 'poke-hub'),
+            __('Raids', 'poke-hub'),
+            'manage_options',
+            'poke-hub-raids',
+            'poke_hub_raids_admin_ui'
+        );
+    }
+    */
+}
+add_action('admin_menu', 'poke_hub_admin_menu_raids', 14);
+
+/**
+ * 6. Sous-menu Eggs (priorité 15) - À venir
+ */
+function poke_hub_admin_menu_eggs() {
+    // TODO: À implémenter quand le module Eggs sera créé
+    /*
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
+    if (in_array('eggs', $active_modules, true)) {
+        add_submenu_page(
+            'poke-hub',
+            __('Eggs', 'poke-hub'),
+            __('Eggs', 'poke-hub'),
+            'manage_options',
+            'poke-hub-eggs',
+            'poke_hub_eggs_admin_ui'
+        );
+    }
+    */
+}
+add_action('admin_menu', 'poke_hub_admin_menu_eggs', 15);
+
+/**
+ * 8. Sous-menu User Profiles (priorité 17)
+ */
+function poke_hub_admin_menu_user_profiles() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
     if (in_array('user-profiles', $active_modules, true)) {
         add_submenu_page(
             'poke-hub',
@@ -123,8 +222,18 @@ function poke_hub_admin_menu() {
             'poke_hub_user_profiles_admin_ui'
         );
     }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_user_profiles', 17);
 
-    // 🔥 Sous-menu Games (si module games actif)
+/**
+ * 9. Sous-menu Games (priorité 18)
+ */
+function poke_hub_admin_menu_games() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    
     if (in_array('games', $active_modules, true)) {
         add_submenu_page(
             'poke-hub',
@@ -135,8 +244,13 @@ function poke_hub_admin_menu() {
             'poke_hub_games_admin_ui'
         );
     }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_games', 18);
 
-    // Sous-menu Settings → toujours visible
+/**
+ * 10. Sous-menu Settings (priorité 19) - Dernier élément
+ */
+function poke_hub_admin_menu_settings() {
     add_submenu_page(
         'poke-hub',
         __('Settings', 'poke-hub'),
@@ -146,6 +260,7 @@ function poke_hub_admin_menu() {
         'poke_hub_settings_ui'
     );
 }
+add_action('admin_menu', 'poke_hub_admin_menu_settings', 19);
 
 add_action('admin_menu', 'poke_hub_admin_menu');
 
@@ -316,6 +431,26 @@ function poke_hub_load_modules() {
     }
 }
 add_action('plugins_loaded', 'poke_hub_load_modules', 20);
+
+/**
+ * Ensure regional data is seeded if tables exist but are empty
+ * Runs on admin_init to check periodically
+ */
+function poke_hub_ensure_regional_data_seeded() {
+    // Only run if Pokemon module is active
+    if (!function_exists('poke_hub_is_module_active') || !poke_hub_is_module_active('pokemon')) {
+        return;
+    }
+    
+    // Only run in admin or if user is logged in (to avoid performance issues on frontend)
+    if (!is_admin() && !is_user_logged_in()) {
+        return;
+    }
+    
+    // Check and seed if needed (only runs if tables are empty)
+    Pokehub_DB::getInstance()->ensureRegionalDataSeeded();
+}
+add_action('admin_init', 'poke_hub_ensure_regional_data_seeded');
 
 /**
  * Charger le CSS admin unifié pour toutes les pages admin du plugin

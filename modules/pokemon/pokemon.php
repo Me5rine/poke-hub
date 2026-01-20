@@ -16,8 +16,11 @@ define('POKE_HUB_POKEMON_URL', POKE_HUB_URL . 'modules/pokemon/');
 require_once __DIR__ . '/admin/pokemon-admin.php';
 require_once __DIR__ . '/includes/pokemon-helpers.php';
 require_once __DIR__ . '/includes/pokemon-cp-helpers.php';
-require_once __DIR__ . '/includes/pokemon-images-helpers.php';
-require_once __DIR__ . '/includes/pokemon-import-game-master-helpers.php';
+require_once __DIR__ . '/includes/pokemon-regional-helpers.php';
+require_once __DIR__ . '/includes/pokemon-regional-db-helpers.php';
+require_once __DIR__ . '/includes/pokemon-regional-data.php'; // SINGLE SOURCE OF TRUTH for all regional data
+require_once __DIR__ . '/includes/pokemon-regional-seed.php';
+require_once __DIR__ . '/includes/pokemon-import-game-master-helpers.php'; // Contains regional auto-config functions for Game Master import
 require_once __DIR__ . '/includes/pokemon-items-helpers.php';
 require_once __DIR__ . '/includes/pokemon-weathers-helpers.php';
 require_once __DIR__ . '/includes/pokemon-official-names-fetcher.php';

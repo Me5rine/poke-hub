@@ -58,4 +58,158 @@
     margin: 0;
 }
 
+/* ===== Affichage visuel des bonus (cartes avec badges) ===== */
+
+.pokehub-bonuses-visual {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.pokehub-bonus-card {
+    background: #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pokehub-bonus-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.pokehub-bonus-card-inner {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+}
+
+.pokehub-bonus-card-header {
+    width: 100%;
+}
+
+.pokehub-bonus-card-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+}
+
+.pokehub-bonus-card-icon-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
+}
+
+.pokehub-bonus-card-icon {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pokehub-bonus-card-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: brightness(0) invert(1); /* Icône blanche */
+}
+
+.pokehub-bonus-card-icon-placeholder {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.pokehub-bonus-card-badge {
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    background: #d32f2f;
+    color: #ffffff;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.5);
+    border: 2px solid #1a1a1a;
+    z-index: 2;
+}
+
+.pokehub-bonus-card-description {
+    width: 100%;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.5;
+    margin-top: 0.5rem;
+}
+
+/* Layout en liste (alternative) */
+.pokehub-bonuses-layout-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pokehub-bonuses-layout-list .pokehub-bonus-card {
+    max-width: 100%;
+}
+
+.pokehub-bonuses-layout-list .pokehub-bonus-card-inner {
+    flex-direction: row;
+    text-align: left;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.pokehub-bonuses-layout-list .pokehub-bonus-card-icon-wrapper {
+    min-height: auto;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.pokehub-bonuses-layout-list .pokehub-bonus-card-header {
+    flex: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pokehub-bonuses-visual {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .pokehub-bonus-card-inner {
+        padding: 1rem;
+    }
+    
+    .pokehub-bonus-card-icon {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .pokehub-bonus-card-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+    }
+}
+
 

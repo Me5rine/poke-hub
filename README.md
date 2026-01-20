@@ -281,7 +281,6 @@ Le module inclut plusieurs helpers :
 
 - **pokemon-helpers.php** : Fonctions utilitaires générales
 - **pokemon-cp-helpers.php** : Calculs de CP
-- **pokemon-images-helpers.php** : Gestion des images/sprites
 - **pokemon-import-game-master-helpers.php** : Helpers pour l'import GM
 - **pokemon-items-helpers.php** : Gestion des items
 - **pokemon-weathers-helpers.php** : Gestion des météos
@@ -1488,7 +1487,6 @@ poke-hub/
 │   │   ├── includes/                # Helpers et utilitaires
 │   │   │   ├── pokemon-helpers.php
 │   │   │   ├── pokemon-cp-helpers.php
-│   │   │   ├── pokemon-images-helpers.php
 │   │   │   ├── pokemon-import-game-master-helpers.php
 │   │   │   ├── pokemon-items-helpers.php
 │   │   │   ├── pokemon-weathers-helpers.php

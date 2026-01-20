@@ -23,5 +23,6 @@ function poke_hub_get_modules_registry(): array {
         'pokemon'       => 'pokemon/pokemon.php',
         'user-profiles' => 'user-profiles/user-profiles.php',
         'games'         => 'games/games.php',
+        'blocks'        => 'blocks/blocks.php',
     ];
 }

@@ -33,6 +33,7 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
         return [
             'cb'                  => '<input type="checkbox" />',
             'user'                => __('User', 'poke-hub'),
+            'profile_type'        => __('Type', 'poke-hub'),
             'team'                => __('Team', 'poke-hub'),
             'friend_code'         => __('Friend Code', 'poke-hub'),
             'xp'                  => __('XP', 'poke-hub'),
@@ -172,16 +173,38 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             }
         }
         
-        // Pas d'utilisateur WordPress (peut-être seulement Discord ID)
+        // Pas d'utilisateur WordPress (Discord ou Anonymous)
         $discord_id = !empty($item->discord_id) ? esc_html($item->discord_id) : '';
+        $profile_type = isset($item->profile_type) ? $item->profile_type : 'classic';
         
-        // Actions pour profil Discord uniquement
+        // Get profile type label
+        $profile_type_labels = [
+            'classic' => __('Classic', 'poke-hub'),
+            'discord' => __('Discord', 'poke-hub'),
+            'anonymous' => __('Anonymous', 'poke-hub'),
+        ];
+        $profile_type_label = isset($profile_type_labels[$profile_type]) ? $profile_type_labels[$profile_type] : $profile_type;
+        
+        // URL d'édition par profile_id
+        $edit_url_args = [
+            'page'      => 'poke-hub-user-profiles',
+            'action'    => 'edit',
+            'profile_id' => $profile_id,
+        ];
+        $preserve_params = ['filter_team', 'filter_scatterbug_pattern', 's', 'paged', 'orderby', 'order'];
+        foreach ($preserve_params as $param) {
+            if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                $edit_url_args[$param] = sanitize_text_field($_GET[$param]);
+            }
+        }
+        $edit_url = add_query_arg($edit_url_args, admin_url('admin.php'));
+        
+        // URL pour supprimer
         $delete_url_args = [
             'page'        => 'poke-hub-user-profiles',
             'action'      => 'delete',
             'profile_id'  => $profile_id,
         ];
-        $preserve_params = ['filter_team', 'filter_scatterbug_pattern', 's', 'paged', 'orderby', 'order'];
         foreach ($preserve_params as $param) {
             if (isset($_GET[$param]) && $_GET[$param] !== '') {
                 $delete_url_args[$param] = sanitize_text_field($_GET[$param]);
@@ -194,6 +217,11 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
         );
         
         $actions = [
+            'edit' => sprintf(
+                '<a href="%s">%s</a>',
+                esc_url($edit_url),
+                esc_html__('Edit', 'poke-hub')
+            ),
             'delete' => sprintf(
                 '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
                 esc_url($delete_url),
@@ -202,10 +230,20 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             ),
         ];
         
+        $title = sprintf(
+            '<strong>%s</strong>',
+            esc_html($profile_type_label)
+        );
+        
+        if ($discord_id) {
+            $title .= '<br><small>' . sprintf(__('Discord ID: %s', 'poke-hub'), esc_html($discord_id)) . '</small>';
+        } elseif ($profile_type === 'anonymous') {
+            $title .= '<br><small>' . __('No account linked', 'poke-hub') . '</small>';
+        }
+        
         return sprintf(
-            '<em>%s</em>%s %s',
-            __('Discord only', 'poke-hub'),
-            $discord_id ? '<br><small>' . $discord_id . '</small>' : '',
+            '%s %s',
+            $title,
             $this->row_actions($actions)
         );
     }
@@ -253,11 +291,25 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
                 }
                 return esc_html($empty_dash);
 
+            case 'profile_type':
+                $profile_type = isset($item->profile_type) ? $item->profile_type : 'classic';
+                $profile_type_labels = [
+                    'classic' => __('Classic (WordPress user)', 'poke-hub'),
+                    'discord' => __('Discord', 'poke-hub'),
+                    'anonymous' => __('Anonymous (Front without login)', 'poke-hub'),
+                ];
+                return isset($profile_type_labels[$profile_type]) 
+                    ? esc_html($profile_type_labels[$profile_type]) 
+                    : esc_html($profile_type);
+
             case 'country':
                 $country = '';
                 $user_id = !empty($item->user_id) ? (int) $item->user_id : 0;
                 if ($user_id > 0) {
                     $country = get_user_meta($user_id, 'country', true);
+                } elseif (isset($item->country)) {
+                    // For anonymous profiles, country is stored in table
+                    $country = $item->country;
                 }
                 return !empty($country) ? esc_html($country) : esc_html($empty_dash);
 

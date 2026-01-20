@@ -21,14 +21,13 @@ define('POKE_HUB_BONUS_URL', POKE_HUB_URL . 'modules/bonus/');
  * (à créer si ce n'est pas déjà fait)
  */
 require_once POKE_HUB_BONUS_PATH . '/functions/bonus-cpt.php';       // CPT pokehub_bonus
-require_once POKE_HUB_BONUS_PATH . '/functions/bonus-helpers.php';   // Helpers de récupération
-require_once POKE_HUB_BONUS_PATH . '/functions/bonus-shortcodes.php';   // Helpers de récupération
+require_once POKE_HUB_BONUS_PATH . '/functions/bonus-helpers.php';   // Helpers de récupération et rendu visuel
+require_once POKE_HUB_BONUS_PATH . '/functions/bonus-shortcodes.php';   // Shortcodes
 require_once POKE_HUB_BONUS_PATH . '/admin/bonus-metabox.php';       // Metabox sur posts/events
 // require_once POKE_HUB_BONUS_PATH . '/public/shortcode-bonus.php'; // (plus tard, si besoin)
 
 /**
  * Assets front pour l'affichage des bonus.
- * Optionnel pour l'instant, mais prêt à être utilisé.
  */
 function poke_hub_bonus_assets() {
     // CSS des blocs de bonus (vérifier l'existence du fichier avant de l'enregistrer)
@@ -42,4 +41,5 @@ function poke_hub_bonus_assets() {
         );
     }
 }
+add_action('wp_enqueue_scripts', 'poke_hub_bonus_assets');
 add_action('wp_enqueue_scripts', 'poke_hub_bonus_assets');

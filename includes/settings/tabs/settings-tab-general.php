@@ -27,6 +27,7 @@ $available_modules = array(
     'pokemon'       => __('Pokémon', 'poke-hub'),
     'user-profiles' => __('User Profiles', 'poke-hub'),
     'games'         => __('Games', 'poke-hub'),
+    'blocks'        => __('Blocks', 'poke-hub'),
 );
 
 // Option : suppression des données à la désinstallation

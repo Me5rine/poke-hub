@@ -1,0 +1,32 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/event-dates",
+	"title": "Dates d'événement",
+	"category": "pokehub",
+	"icon": "calendar-alt",
+	"description": "Affiche les dates de début et de fin d'un événement avec des indicateurs visuels (feux verts/rouges).",
+	"keywords": ["dates", "événement", "event", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		},
+		"startDate": {
+			"type": "string",
+			"default": ""
+		},
+		"endDate": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+

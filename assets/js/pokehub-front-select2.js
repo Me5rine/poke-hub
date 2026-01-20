@@ -61,14 +61,17 @@
         }
 
         // Configuration par défaut
+        var placeholderText = $select.data('placeholder') || 
+                              $select.attr('data-placeholder') ||
+                              $select.find('option[value=""]').first().text() || 
+                              'Select...';
+        
         var config = {
             width: '100%',
             allowClear: true,
-            placeholder: function() {
-                return $(this).data('placeholder') || 
-                       $(this).attr('data-placeholder') ||
-                       $(this).find('option[value=""]').text() || 
-                       'Select...';
+            placeholder: {
+                id: '',
+                text: placeholderText
             },
             dropdownParent: $parent.length ? $parent : $('body')
         };

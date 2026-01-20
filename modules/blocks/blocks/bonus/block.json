@@ -1,0 +1,32 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/bonus",
+	"title": "Bonus",
+	"category": "pokehub",
+	"icon": "awards",
+	"description": "Affiche les bonus de l'événement sous forme de cartes visuelles avec icônes et badges.",
+	"keywords": ["bonus", "récompense", "reward", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		},
+		"bonusIds": {
+			"type": "array",
+			"default": []
+		},
+		"layout": {
+			"type": "string",
+			"default": "cards"
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+

@@ -23,7 +23,9 @@ require_once POKE_HUB_USER_PROFILES_PATH . '/includes/user-profiles-data.php';  
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-helpers.php';   // Helpers (includes Ultimate Member sync)
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-keycloak-sync.php';   // Keycloak nickname synchronization
 require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-friend-codes-helpers.php';    // Friend codes helpers
-require_once POKE_HUB_USER_PROFILES_PATH . '/admin/user-profiles-admin.php';        // Admin interface
+require_once POKE_HUB_USER_PROFILES_PATH . '/functions/user-profiles-country-detection.php';        // Country detection via AJAX
+require_once POKE_HUB_USER_PROFILES_PATH . '/admin/user-profiles-admin.php';
+require_once POKE_HUB_USER_PROFILES_PATH . '/admin/forms/user-profile-form.php';        // Admin interface
 require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-shortcode.php';   // Shortcode
 require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-header.php';           // Header adaptatif
 require_once POKE_HUB_USER_PROFILES_PATH . '/public/user-profiles-friend-codes-form.php';             // Reusable friend code form
@@ -76,18 +78,14 @@ function poke_hub_user_profiles_admin_assets($hook) {
     wp_add_inline_script('select2', "
     jQuery(document).ready(function($) {
         if (typeof $.fn.select2 !== 'undefined') {
-            // Initialize Select2 on country, team, and scatterbug_pattern selects
-            // IMPORTANT: Only target <select> elements, not table headers
-            // Only in forms (not in table headers or filters)
+            // Only target <select> elements, not table headers
             $('select#country, select#team, select#scatterbug_pattern').each(function() {
                 var \$select = $(this);
                 // Skip if it's in a table header (thead) or in filter nav
                 if (\$select.closest('thead, .tablenav').length > 0) {
                     return;
                 }
-                // Only initialize on actual select elements in forms
                 if (!\$select.data('select2') && \$select.is('select')) {
-                    // Find the closest form field wrapper for dropdownParent (admin uses admin-lab-form-section)
                     var \$parent = \$select.closest('.admin-lab-form-section, .form-table, td');
                     if (!\$parent.length) {
                         \$parent = \$select.parent();
@@ -211,8 +209,6 @@ function poke_hub_user_profiles_frontend_assets() {
         true
     );
 
-    // Select2 initialization is now handled by pokehub-front-select2.js
-    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_frontend_assets', 20);
 
@@ -243,14 +239,104 @@ function poke_hub_user_profiles_shortcode_assets() {
         true
     );
 
+    // Shared country detection script (must be loaded before scripts that use it)
+    wp_enqueue_script(
+        'poke-hub-country-detection',
+        POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
+        ['jquery'],
+        POKE_HUB_VERSION,
+        true
+    );
+    
+    // Localize AJAX URL and nonce for country detection
+    wp_localize_script('poke-hub-country-detection', 'pokeHubAjax', [
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('poke_hub_detect_country')
+    ]);
+    
     // JavaScript for checkbox state management (using generic classes)
     wp_enqueue_script(
         'pokehub-user-profiles-um-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'poke-hub-country-detection'],
         POKE_HUB_VERSION,
         true
     );
+    
+    // Prepare vivillon pattern/country mapping for JavaScript validation and filtering
+    $vivillon_mapping = []; // country => patterns array
+    $pattern_to_countries_mapping = []; // pattern => countries array
+    if (function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
+        $mapping = poke_hub_get_vivillon_pattern_country_mapping();
+        
+        // Debug: log mapping info
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub UM] Mapping patterns count: ' . count($mapping));
+            if (!empty($mapping)) {
+                $sample_pattern = array_key_first($mapping);
+                $sample_countries = is_array($mapping[$sample_pattern]) ? array_slice($mapping[$sample_pattern], 0, 5) : [];
+                error_log('[PokeHub UM] Sample pattern "' . $sample_pattern . '" has ' . count($mapping[$sample_pattern] ?? []) . ' countries, sample: ' . implode(', ', $sample_countries));
+            }
+        }
+        
+        // Create both mappings: country => patterns and pattern => countries
+        foreach ($mapping as $pattern => $countries) {
+            if (is_array($countries)) {
+                // Store pattern => countries mapping
+                $pattern_to_countries_mapping[$pattern] = $countries;
+                
+                // Invert mapping: country => patterns array
+                foreach ($countries as $country) {
+                    // Normalize country name (trim whitespace)
+                    $country = trim($country);
+                    if (empty($country)) {
+                        continue;
+                    }
+                    if (!isset($vivillon_mapping[$country])) {
+                        $vivillon_mapping[$country] = [];
+                    }
+                    $vivillon_mapping[$country][] = $pattern;
+                }
+            }
+        }
+        
+        // Debug: check if États-Unis is in mapping
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $total_countries = count($vivillon_mapping);
+            error_log('[PokeHub UM] Total unique countries in mapping: ' . $total_countries);
+            if (isset($vivillon_mapping["États-Unis d'Amérique"])) {
+                error_log('[PokeHub UM] ✓ États-Unis d\'Amérique found with patterns: ' . implode(', ', $vivillon_mapping["États-Unis d'Amérique"]));
+            } else {
+                error_log('[PokeHub UM] ✗ États-Unis d\'Amérique NOT found!');
+            }
+        }
+    }
+    
+    // Localize script for validation and filtering
+    wp_localize_script('pokehub-user-profiles-um-script', 'pokeHubFriendCodes', [
+        'vivillonMapping' => $vivillon_mapping, // country => patterns
+        'patternToCountriesMapping' => $pattern_to_countries_mapping, // pattern => countries
+        'validationError' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),
+        'countryMismatchMessage' => __('Your saved country does not match your detected location.', 'poke-hub'),
+        'countryMismatchSuggestion' => __('Would you like to update your country to match your current location?', 'poke-hub'),
+        'updateCountryButtonText' => __('Update to detected country', 'poke-hub'),
+        'countryUpdatedMessage' => __('Country updated successfully!', 'poke-hub'),
+    ]);
+
+    // Shared country detection script (must be loaded before scripts that use it)
+    wp_enqueue_script(
+        'poke-hub-country-detection',
+        POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
+        ['jquery'],
+        POKE_HUB_VERSION,
+        true
+    );
+    
+    // Localize AJAX URL and nonce for country detection
+    wp_localize_script('poke-hub-country-detection', 'pokeHubAjax', [
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('poke_hub_detect_country')
+    ]);
 
     // Initialisation centralisée de Select2 pour le front-end
     wp_enqueue_script(
@@ -261,8 +347,6 @@ function poke_hub_user_profiles_shortcode_assets() {
         true
     );
 
-    // Select2 initialization is now handled by pokehub-front-select2.js
-    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_shortcode_assets', 20);
 
@@ -270,9 +354,6 @@ add_action('wp_enqueue_scripts', 'poke_hub_user_profiles_shortcode_assets', 20);
  * Front-end assets for friend codes shortcode
  */
 function poke_hub_friend_codes_shortcode_assets() {
-    // Load assets if:
-    // 1. Shortcode is in post content, OR
-    // 2. On Ultimate Member profile page (shortcode may be rendered via do_shortcode() in templates)
     global $post;
     
     $should_load = false;
@@ -322,19 +403,102 @@ function poke_hub_friend_codes_shortcode_assets() {
         POKE_HUB_VERSION
     );
 
-    // Friend codes JS
+    // Shared country detection script (must be loaded before scripts that use it)
     wp_enqueue_script(
-        'poke-hub-friend-codes',
-        POKE_HUB_URL . 'assets/js/user-profiles-friend-codes.js',
-        ['jquery', 'select2'],
+        'poke-hub-country-detection',
+        POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
+        ['jquery'],
         POKE_HUB_VERSION,
         true
     );
     
-    // Localize script for translations
+    // Localize AJAX URL and nonce for country detection
+    wp_localize_script('poke-hub-country-detection', 'pokeHubAjax', [
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('poke_hub_detect_country')
+    ]);
+    
+    // Friend codes JS
+    wp_enqueue_script(
+        'poke-hub-friend-codes',
+        POKE_HUB_URL . 'assets/js/user-profiles-friend-codes.js',
+        ['jquery', 'select2', 'poke-hub-country-detection'],
+        POKE_HUB_VERSION,
+        true
+    );
+    
+    // Prepare vivillon pattern/country mapping for JavaScript validation and filtering
+    $vivillon_mapping = []; // country => patterns array
+    $pattern_to_countries_mapping = []; // pattern => countries array
+    if (function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
+        $mapping = poke_hub_get_vivillon_pattern_country_mapping();
+        
+        // Debug: log mapping info
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Friend Codes] Mapping patterns count: ' . count($mapping));
+            if (!empty($mapping)) {
+                $sample_pattern = array_key_first($mapping);
+                $sample_countries = is_array($mapping[$sample_pattern]) ? array_slice($mapping[$sample_pattern], 0, 5) : [];
+                error_log('[PokeHub Friend Codes] Sample pattern "' . $sample_pattern . '" has ' . count($mapping[$sample_pattern] ?? []) . ' countries, sample: ' . implode(', ', $sample_countries));
+            }
+        }
+        
+        // Create both mappings: country => patterns and pattern => countries
+        foreach ($mapping as $pattern => $countries) {
+            if (is_array($countries)) {
+                // Store pattern => countries mapping
+                $pattern_to_countries_mapping[$pattern] = $countries;
+                
+                // Invert mapping: country => patterns array
+                foreach ($countries as $country) {
+                    // Normalize country name (trim whitespace)
+                    $country = trim($country);
+                    if (empty($country)) {
+                        continue;
+                    }
+                    if (!isset($vivillon_mapping[$country])) {
+                        $vivillon_mapping[$country] = [];
+                    }
+                    $vivillon_mapping[$country][] = $pattern;
+                }
+            }
+        }
+        
+        // Debug: check if États-Unis is in mapping
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $total_countries = count($vivillon_mapping);
+            error_log('[PokeHub Friend Codes] Total unique countries in mapping: ' . $total_countries);
+            if (isset($vivillon_mapping["États-Unis d'Amérique"])) {
+                error_log('[PokeHub Friend Codes] ✓ États-Unis d\'Amérique found with patterns: ' . implode(', ', $vivillon_mapping["États-Unis d'Amérique"]));
+            } else {
+                error_log('[PokeHub Friend Codes] ✗ États-Unis d\'Amérique NOT found! Searching for similar...');
+                $similar = [];
+                foreach (array_keys($vivillon_mapping) as $country_key) {
+                    if (stripos($country_key, 'états') !== false || stripos($country_key, 'united') !== false || stripos($country_key, 'usa') !== false || stripos($country_key, 'amérique') !== false) {
+                        $similar[] = $country_key;
+                    }
+                }
+                if (!empty($similar)) {
+                    error_log('[PokeHub Friend Codes] Similar countries found: ' . implode(', ', $similar));
+                }
+                // List all countries to see what we have
+                $all_countries = array_keys($vivillon_mapping);
+                error_log('[PokeHub Friend Codes] All countries (first 20): ' . implode(', ', array_slice($all_countries, 0, 20)));
+            }
+        }
+    }
+    
+    // Localize script for translations, validation and filtering
     wp_localize_script('poke-hub-friend-codes', 'pokeHubFriendCodes', [
-        'copySuccess' => __('✓ Copié!', 'poke-hub'),
-        'copyError' => __('Erreur lors de la copie', 'poke-hub'),
+        'copySuccess' => __('✓ Copied!', 'poke-hub'),
+        'copyError' => __('Error copying to clipboard', 'poke-hub'),
+        'vivillonMapping' => $vivillon_mapping, // country => patterns
+        'patternToCountriesMapping' => $pattern_to_countries_mapping, // pattern => countries
+        'validationError' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),
+        'countryMismatchMessage' => __('Your saved country does not match your detected location.', 'poke-hub'),
+        'countryMismatchSuggestion' => __('Would you like to update your country to match your current location?', 'poke-hub'),
+        'updateCountryButtonText' => __('Update to detected country', 'poke-hub'),
+        'countryUpdatedMessage' => __('Country updated successfully!', 'poke-hub'),
     ]);
 
     // Initialisation centralisée de Select2 pour le front-end
@@ -346,8 +510,6 @@ function poke_hub_friend_codes_shortcode_assets() {
         true
     );
 
-    // Select2 initialization is now handled by pokehub-front-select2.js
-    // No need for inline script here to avoid conflicts and ensure consistent styling
 }
 add_action('wp_enqueue_scripts', 'poke_hub_friend_codes_shortcode_assets', 20);
 

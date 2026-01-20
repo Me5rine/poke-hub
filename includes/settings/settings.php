@@ -123,6 +123,7 @@ function poke_hub_settings_ui() {
     if ($translation_enabled) {
         $allowed_tabs[] = 'translation';
     }
+    // Note: "regional-mapping" removed - functionality moved to Pokémon admin section
 
     // Si on demande un onglet non autorisé (ex: désactivation de pokemon
     // alors qu'on est sur gamemaster), on revient sur "general"
@@ -159,6 +160,8 @@ function poke_hub_settings_ui() {
                 . esc_html__('Translation', 'poke-hub') . '</a>';
     }
 
+    // Note: "Regional Mapping" tab removed - functionality moved to Pokémon admin section (Geographic Regions)
+
     echo '</nav>';
 
     // Inclusion des onglets
@@ -173,6 +176,7 @@ function poke_hub_settings_ui() {
     } elseif ($active_tab === 'translation') {
         include $tabs_dir . 'settings-tab-translation.php';
     }
+    // Note: "regional-mapping" tab removed - functionality moved to Pokémon admin section (Geographic Regions)
 
     echo '</div>';
 }

@@ -246,6 +246,8 @@ function pokehub_get_table(string $key): string {
         'pokemon_backgrounds'        => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
         'backgrounds'               => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
         'pokemon_background_pokemon_links' => ['scope' => 'local',  'suffix' => 'pokemon_background_pokemon_links'],
+        'pokemon_regional_regions'   => ['scope' => 'local',  'suffix' => 'pokemon_regional_regions'],
+        'pokemon_regional_mappings'  => ['scope' => 'local',  'suffix' => 'pokemon_regional_mappings'],
 
         //=== table de mapping des formes / costumes / clones ===
         'pokemon_form_mappings'      => ['scope' => 'local',  'suffix' => 'pokemon_form_mappings'],
@@ -297,6 +299,8 @@ function pokehub_get_table(string $key): string {
         'remote_pokemon_backgrounds'       => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_backgrounds'],
         'remote_pokemon_background_pokemon_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_background_pokemon_links'],
         'remote_pokemon_form_mappings'      => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_form_mappings'],
+        'remote_pokemon_regional_regions'   => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_regional_regions'],
+        'remote_pokemon_regional_mappings'  => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_regional_mappings'],
 
         // ==== Tables globales partagées (ME5RINE_LAB_GLOBAL_PREFIX) ====
         'user_profiles'                    => ['scope' => 'global', 'suffix' => 'pokehub_user_profiles'],

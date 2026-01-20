@@ -65,7 +65,12 @@ function poke_hub_render_friend_code_form($args = []) {
         $friend_code_value = $_POST['friend_code'];
     } elseif (!empty($args['existing_profile']['friend_code'])) {
         $existing_code = $args['existing_profile']['friend_code'];
-        $friend_code_value = chunk_split($existing_code, 4, ' ');
+        // Format friend code with spaces, removing trailing space from chunk_split
+        if (function_exists('poke_hub_format_friend_code')) {
+            $friend_code_value = poke_hub_format_friend_code($existing_code);
+        } else {
+            $friend_code_value = rtrim(chunk_split($existing_code, 4, ' '), ' ');
+        }
     }
     
     $pokemon_go_username_value = '';
@@ -129,12 +134,10 @@ function poke_hub_render_friend_code_form($args = []) {
                 : wp_login_url(home_url($_SERVER['REQUEST_URI']));
             ?>
             <div class="me5rine-lab-form-message me5rine-lab-form-message-warning">
-                <p>
-                    <?php esc_html_e('You are not logged in. You can add or update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'); ?>
-                    <a href="<?php echo esc_url($login_url); ?>" class="me5rine-lab-form-button me5rine-lab-form-button-secondary me5rine-lab-form-message-button me5rine-lab-form-message-warning-button user-profiles-friend-code-form-login-link">
-                        <?php esc_html_e('Log In', 'poke-hub'); ?>
-                    </a>
-                </p>
+                <p><?php esc_html_e('You are not logged in. You can add or update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'); ?></p>
+                <a href="<?php echo esc_url($login_url); ?>" class="me5rine-lab-form-button me5rine-lab-form-button-secondary me5rine-lab-form-message-button me5rine-lab-form-message-warning-button user-profiles-friend-code-form-login-link">
+                    <?php esc_html_e('Log In', 'poke-hub'); ?>
+                </a>
             </div>
         <?php endif; ?>
         

@@ -6,9 +6,9 @@ Le système de gestion des images Pokémon est déjà en place dans le plugin. C
 
 ## Fichiers principaux
 
-### `modules/pokemon/includes/pokemon-images-helpers.php`
+### `includes/functions/pokemon-public-helpers.php`
 
-Ce fichier contient toutes les fonctions de gestion des images Pokémon :
+Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponibles même si le module Pokémon n'est pas actif) :
 
 #### Fonctions disponibles
 
@@ -297,6 +297,8 @@ function poke_hub_pokemon_image_exists($url) {
     return !is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200;
 }
 ```
+
+
 
 
 

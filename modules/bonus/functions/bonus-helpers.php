@@ -188,3 +188,133 @@ function pokehub_bonus_append_to_content($content) {
     return $content . $bonus_html;
 }
 add_filter('the_content', 'pokehub_bonus_append_to_content', 20);
+
+/**
+ * Rendu visuel des bonus (cartes avec badges)
+ * 
+ * @param array $bonuses Liste des bonus
+ * @param string $layout Layout ('cards' par défaut)
+ * @return string HTML
+ */
+function pokehub_render_bonuses_visual($bonuses, $layout = 'cards') {
+    if (empty($bonuses)) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <section class="pokehub-bonuses-visual pokehub-bonuses-layout-<?php echo esc_attr($layout); ?>">
+        <?php foreach ($bonuses as $bonus) : 
+            // Extraire le ratio du titre ou de la description (ex: "1/2", "1/4")
+            $ratio = '';
+            $title = $bonus['title'] ?? '';
+            $description = $bonus['event_description'] ?? ($bonus['description'] ?? '');
+            
+            // Chercher un pattern comme "1/2", "1/4", etc. dans le titre ou la description
+            if (preg_match('/(\d+\/\d+)/', $title . ' ' . $description, $matches)) {
+                $ratio = $matches[1];
+            }
+            
+            $image_url = $bonus['image_url'] ?? '';
+            $bonus_title = $bonus['title'] ?? '';
+            $bonus_description = $bonus['event_description'] ?? ($bonus['description'] ?? '');
+        ?>
+            <article class="pokehub-bonus-card">
+                <div class="pokehub-bonus-card-inner">
+                    <div class="pokehub-bonus-card-header">
+                        <h3 class="pokehub-bonus-card-title"><?php echo esc_html($bonus_title); ?></h3>
+                    </div>
+                    
+                    <div class="pokehub-bonus-card-icon-wrapper">
+                        <?php if ($image_url) : ?>
+                            <div class="pokehub-bonus-card-icon">
+                                <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($bonus_title); ?>" />
+                                <?php if ($ratio) : ?>
+                                    <span class="pokehub-bonus-card-badge"><?php echo esc_html($ratio); ?></span>
+                                <?php endif; ?>
+                            </div>
+                        <?php else : ?>
+                            <div class="pokehub-bonus-card-icon pokehub-bonus-card-icon-placeholder">
+                                <?php if ($ratio) : ?>
+                                    <span class="pokehub-bonus-card-badge"><?php echo esc_html($ratio); ?></span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <?php if (!empty($bonus_description)) : ?>
+                        <div class="pokehub-bonus-card-description">
+                            <?php echo wp_kses_post($bonus_description); ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </section>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * Améliore l'affichage automatique des bonus avec le style visuel
+ */
+function pokehub_bonus_append_to_content_visual($content) {
+    static $in_bonus_filter = false;
+
+    // Si on est déjà en train de traiter les bonus, on ne refait rien
+    if ($in_bonus_filter) {
+        return $content;
+    }
+
+    // Pas dans l'admin ou les feeds
+    if (is_admin() || is_feed()) {
+        return $content;
+    }
+
+    if (!in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+
+    global $post;
+    if (!$post) {
+        return $content;
+    }
+
+    $post_type = get_post_type($post);
+
+    // Post types sur lesquels on active l'injection auto
+    $allowed_post_types = apply_filters('pokehub_bonus_auto_post_types', [
+        'post',
+        'pokehub_event',
+    ]);
+
+    if (!in_array($post_type, $allowed_post_types, true)) {
+        return $content;
+    }
+
+    $in_bonus_filter = true;
+    $bonuses = pokehub_get_bonuses_for_post($post->ID);
+    $in_bonus_filter = false;
+
+    if (empty($bonuses)) {
+        return $content;
+    }
+
+    // Utiliser le nouveau rendu visuel
+    $bonus_html = pokehub_render_bonuses_visual($bonuses, 'cards');
+
+    if (empty($bonus_html)) {
+        return $content;
+    }
+
+    // Ajout à la fin du contenu
+    return $content . $bonus_html;
+}
+
+// Remplacer l'ancien filtre par le nouveau (priorité plus basse pour être exécuté après)
+add_action('plugins_loaded', function() {
+    // Retirer l'ancien filtre s'il existe
+    remove_filter('the_content', 'pokehub_bonus_append_to_content', 20);
+    // Ajouter le nouveau filtre avec le rendu visuel
+    add_filter('the_content', 'pokehub_bonus_append_to_content_visual', 20);
+}, 25); // Priorité 25 pour être exécuté après le chargement des helpers

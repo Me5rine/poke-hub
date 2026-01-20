@@ -12,6 +12,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`ULTIMATE_MEMBER_SETUP.md`** - Configuration Ultimate Member
 - **`CUSTOMIZATION.md`** - Personnalisation des listes
 - **`README_DATA_CENTRALIZATION.md`** - Architecture de centralisation
+- **`COUNTRIES-STORAGE-FORMAT.md`** - Format de stockage des pays en base de données
 
 ### Documentation Générique (`docs/` - racine)
 

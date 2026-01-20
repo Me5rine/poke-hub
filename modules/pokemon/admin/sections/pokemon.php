@@ -1479,6 +1479,32 @@ function poke_hub_pokemon_handle_pokemon_form() {
     $regional_is_regional  = !empty($_POST['regional_is_regional']);
     $regional_description  = isset($_POST['regional_description']) ? wp_kses_post(wp_unslash($_POST['regional_description'])) : '';
     $regional_map_image_id = isset($_POST['regional_map_image_id']) ? (int) $_POST['regional_map_image_id'] : 0;
+    
+    // Countries and region_slugs - will be saved to pokemon_regional_mappings (single source of truth)
+    $regional_countries = [];
+    if (isset($_POST['regional_countries']) && is_array($_POST['regional_countries'])) {
+        // From multiselect
+        $regional_countries = array_map('sanitize_text_field', wp_unslash($_POST['regional_countries']));
+        $regional_countries = array_filter($regional_countries); // Remove empty values
+    } elseif (isset($_POST['regional_countries_text']) && !empty(trim($_POST['regional_countries_text']))) {
+        // From textarea fallback (comma-separated)
+        $countries_text = sanitize_text_field(wp_unslash($_POST['regional_countries_text']));
+        $regional_countries = array_map('trim', explode(',', $countries_text));
+        $regional_countries = array_filter($regional_countries); // Remove empty values
+    }
+    
+    // Geographic regions (multiselect or textarea fallback)
+    $regional_region_slugs = [];
+    if (isset($_POST['regional_regions']) && is_array($_POST['regional_regions'])) {
+        // From multiselect
+        $regional_region_slugs = array_map('sanitize_key', wp_unslash($_POST['regional_regions']));
+        $regional_region_slugs = array_filter($regional_region_slugs); // Remove empty values
+    } elseif (isset($_POST['regional_regions_text']) && !empty(trim($_POST['regional_regions_text']))) {
+        // From textarea fallback (comma-separated)
+        $regions_text = sanitize_text_field(wp_unslash($_POST['regional_regions_text']));
+        $regional_region_slugs = array_map('sanitize_key', array_map('trim', explode(',', $regions_text)));
+        $regional_region_slugs = array_filter($regional_region_slugs); // Remove empty values
+    }
 
     // ---------- Attaques (fast / charged) ----------
 
@@ -1548,11 +1574,58 @@ function poke_hub_pokemon_handle_pokemon_form() {
         $has_purified = 1;
     }
 
+    // Save regional data: countries and region_slugs go to pokemon_regional_mappings table (single source of truth)
+    // Only is_regional, description, and map_image_id stay in extra['regional']
+    // IMPORTANT: pattern_slug = Pokémon slug (e.g., 'tauros-paldea-combat' or 'vivillon-continental')
+    // This ensures the mapping table is the single source of truth for countries/regions
+    if ($regional_is_regional && !empty($slug)) {
+        // Determine pattern_slug: use Pokémon slug (single source of truth)
+        $pattern_slug = $slug;
+        
+        // Save or update mapping in pokemon_regional_mappings
+        if (function_exists('poke_hub_pokemon_get_regional_mapping_by_pattern') && function_exists('poke_hub_pokemon_save_regional_mapping')) {
+            $existing_mapping = poke_hub_pokemon_get_regional_mapping_by_pattern($pattern_slug);
+            $existing_mapping_id = !empty($existing_mapping) && !empty($existing_mapping['id']) 
+                ? (int) $existing_mapping['id'] 
+                : null;
+            
+            // Preserve existing description if mapping exists and form doesn't provide one
+            $mapping_description = $regional_description;
+            if (empty($mapping_description) && !empty($existing_mapping) && !empty($existing_mapping['description'])) {
+                $mapping_description = $existing_mapping['description'];
+            }
+            
+            $mapping_data = [
+                'pattern_slug' => $pattern_slug,
+                'countries' => $regional_countries,
+                'region_slugs' => $regional_region_slugs,
+                'description' => $mapping_description,
+            ];
+            
+            poke_hub_pokemon_save_regional_mapping($mapping_data, $existing_mapping_id);
+        }
+    } elseif ($is_update && !empty($slug)) {
+        // If Pokémon is no longer regional, remove the mapping (optional - you may want to keep it)
+        // For now, we'll leave the mapping in place even if is_regional is false
+        // This allows restoring the regional status without losing the mapping data
+    }
+    
+    // Only save is_regional, description, and map_image_id in extra (not countries/region_slugs - they're in the mappings table)
+    // IMPORTANT: Clean up any legacy countries/region_slugs from extra['regional'] to ensure single source of truth
     $extra['regional'] = [
         'is_regional'  => $regional_is_regional,
-        'description'  => $regional_description,
+        'description'  => $regional_description, // Can be overridden in mappings table
         'map_image_id' => $regional_map_image_id,
     ];
+    
+    // Remove any legacy countries/region_slugs from extra['regional'] if they exist (migration cleanup)
+    // This ensures we don't have duplicate data in extra
+    if (isset($extra['regional']['countries'])) {
+        unset($extra['regional']['countries']);
+    }
+    if (isset($extra['regional']['region_slugs'])) {
+        unset($extra['regional']['region_slugs']);
+    }
 
     // Infos de variante (génériques, pas spécifiques à un jeu)
     $extra['variant_category']   = $variant_category;

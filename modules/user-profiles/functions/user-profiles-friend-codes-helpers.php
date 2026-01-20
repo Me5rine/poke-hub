@@ -64,7 +64,7 @@ function poke_hub_can_anonymous_add_friend_code($ip_address = null) {
         
         // Check if this specific friend code was added/updated recently
         // This prevents duplicate submissions
-        $friend_code_to_check = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
+        $friend_code_to_check = isset($_POST['friend_code']) ? trim(sanitize_text_field($_POST['friend_code'])) : '';
         if (!empty($friend_code_to_check)) {
             $cleaned = preg_replace('/[^0-9]/', '', $friend_code_to_check);
             if (strlen($cleaned) === 12) {
@@ -224,7 +224,6 @@ function poke_hub_get_public_friend_codes($args = []) {
         $where_values_count = $where_values;
     }
     
-    // Note: team and reason filters are already in $where, so they're automatically included in count_where_sql
     
     $count_query .= " WHERE {$count_where_sql}";
     
@@ -334,7 +333,8 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
     $user_id = $is_logged_in ? get_current_user_id() : null;
     
     // Validate friend code
-    $friend_code_raw = isset($data['friend_code']) ? sanitize_text_field($data['friend_code']) : '';
+    // Trim to remove any trailing spaces that might come from formatting
+    $friend_code_raw = isset($data['friend_code']) ? trim(sanitize_text_field($data['friend_code'])) : '';
     if (empty($friend_code_raw)) {
         return [
             'success' => false,
@@ -357,6 +357,20 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             'message' => __('Friend code must contain exactly 12 digits.', 'poke-hub'),
             'profile_id' => null,
         ];
+    }
+    
+    // Validate country/pattern combination if both are provided (for Vivillon)
+    if (!empty($data['country']) && !empty($data['scatterbug_pattern'])) {
+        if (function_exists('poke_hub_validate_vivillon_country_pattern')) {
+            $is_valid = poke_hub_validate_vivillon_country_pattern($data['country'], $data['scatterbug_pattern']);
+            if (!$is_valid) {
+                return [
+                    'success' => false,
+                    'message' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+            }
+        }
     }
     
     // Get table name first
@@ -433,15 +447,32 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         'team' => isset($data['team']) ? sanitize_text_field($data['team']) : '',
     ];
     
+    // Determine profile_type based on available identifiers
+    // classic: has user_id (WordPress user)
+    // discord: has discord_id but no user_id (Discord bot only)
+    // anonymous: has neither user_id nor discord_id (front without login)
+    if ($user_id) {
+        $profile_data['profile_type'] = 'classic';
+        $profile_data['user_id'] = $user_id;
+    } else {
+        // No user_id - check if discord_id exists (from $data)
+        $discord_id_from_data = isset($data['discord_id']) && !empty($data['discord_id']) ? sanitize_text_field($data['discord_id']) : null;
+        if ($discord_id_from_data) {
+            $profile_data['profile_type'] = 'discord';
+            $profile_data['discord_id'] = $discord_id_from_data;
+        } else {
+            // Neither user_id nor discord_id = anonymous
+            $profile_data['profile_type'] = 'anonymous';
+        }
+    }
+    
     // Store country: for anonymous users, store in table; for logged-in users, store in usermeta
     if (!$user_id && isset($data['country']) && !empty($data['country'])) {
         // For anonymous users, store country directly in the table
         $profile_data['country'] = sanitize_text_field($data['country']);
     }
     
-    if ($user_id) {
-        $profile_data['user_id'] = $user_id;
-    } else {
+    if (!$user_id && !isset($profile_data['discord_id'])) {
         // For anonymous users, we track by IP and friend code
         // The rate limiting function checks by IP and date
         $ip_address = poke_hub_get_client_ip();
@@ -571,43 +602,50 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         }
         
         // Prepare profile data in the format expected by poke_hub_save_user_profile
-        // Only include fields that are provided (non-empty) to preserve existing data
+        // IMPORTANT: If a field is explicitly provided (even if empty), use it (allows deletion)
+        // Only preserve existing values if fields are NOT provided in the form data
         $profile_for_save = [
             'friend_code' => $friend_code, // Always update friend_code as it's required
             'friend_code_public' => 1, // Always set to public for friend codes page
         ];
         
-        // Only add fields that are provided (non-empty) to preserve existing data
-        if (isset($data['pokemon_go_username']) && !empty(trim($data['pokemon_go_username']))) {
+        // pokemon_go_username: only preserve if NOT provided in form (allows deletion if provided empty)
+        $username_provided = array_key_exists('pokemon_go_username', $data);
+        if ($username_provided) {
             $profile_for_save['pokemon_go_username'] = sanitize_text_field($data['pokemon_go_username']);
         } elseif ($was_existing && !empty($existing_profile_data['pokemon_go_username'])) {
-            // Preserve existing value if not provided
+            // Preserve existing value only if NOT provided in form
             $profile_for_save['pokemon_go_username'] = $existing_profile_data['pokemon_go_username'];
         }
         
-        if (isset($data['scatterbug_pattern']) && !empty(trim($data['scatterbug_pattern']))) {
+        // scatterbug_pattern: only preserve if NOT provided in form (allows deletion if provided empty)
+        $pattern_provided = array_key_exists('scatterbug_pattern', $data);
+        if ($pattern_provided) {
             $profile_for_save['scatterbug_pattern'] = sanitize_text_field($data['scatterbug_pattern']);
         } elseif ($was_existing && !empty($existing_profile_data['scatterbug_pattern'])) {
-            // Preserve existing value if not provided
+            // Preserve existing value only if NOT provided in form
             $profile_for_save['scatterbug_pattern'] = $existing_profile_data['scatterbug_pattern'];
         }
         
-        if (isset($data['team']) && !empty(trim($data['team']))) {
+        // team: only preserve if NOT provided in form (allows deletion if provided empty)
+        $team_provided = array_key_exists('team', $data);
+        if ($team_provided) {
             $profile_for_save['team'] = sanitize_text_field($data['team']);
         } elseif ($was_existing && !empty($existing_profile_data['team'])) {
-            // Preserve existing value if not provided
+            // Preserve existing value only if NOT provided in form
             $profile_for_save['team'] = $existing_profile_data['team'];
         }
         
-        // Add country if provided
-        if (isset($data['country']) && !empty($data['country'])) {
+        // country: only preserve if NOT provided in form (allows deletion if provided empty)
+        $country_provided = array_key_exists('country', $data);
+        if ($country_provided) {
             $profile_for_save['country'] = sanitize_text_field($data['country']);
         } elseif ($was_existing && !empty($existing_profile_data['country'])) {
-            // Preserve existing value if not provided
+            // Preserve existing value only if NOT provided in form
             $profile_for_save['country'] = $existing_profile_data['country'];
         }
         
-        // Preserve XP if it exists
+        // Preserve XP if it exists and not provided (XP is not in friend codes form, so preserve)
         if ($was_existing && isset($existing_profile_data['xp']) && $existing_profile_data['xp'] > 0) {
             $profile_for_save['xp'] = $existing_profile_data['xp'];
         }
@@ -641,49 +679,71 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 $existing['id']
             ), ARRAY_A);
             
-            // Update existing profile - only update fields that are provided (non-empty)
+            // Determine profile_type for update based on available identifiers
+            $profile_type_for_update = 'anonymous'; // Default for anonymous users
+            if ($user_id) {
+                $profile_type_for_update = 'classic';
+            } elseif (isset($data['discord_id']) && !empty($data['discord_id'])) {
+                $profile_type_for_update = 'discord';
+            } elseif ($existing_row && !empty($existing_row['user_id'])) {
+                $profile_type_for_update = 'classic';
+            } elseif ($existing_row && !empty($existing_row['discord_id'])) {
+                $profile_type_for_update = 'discord';
+            }
+            
+            // Update existing profile - allow deletion if fields are explicitly provided (even if empty)
             $update_data = [
                 'friend_code' => $friend_code, // Always update friend_code as it's required
                 'friend_code_public' => 1, // Always set to public for friend codes page
+                'profile_type' => $profile_type_for_update, // Always update profile_type to ensure correctness
             ];
             
-            // Only update fields that are provided (non-empty) to preserve existing data
-            if (isset($data['pokemon_go_username']) && !empty(trim($data['pokemon_go_username']))) {
+            // pokemon_go_username: only preserve if NOT provided in form (allows deletion if provided empty)
+            $username_provided = array_key_exists('pokemon_go_username', $data);
+            if ($username_provided) {
                 $update_data['pokemon_go_username'] = sanitize_text_field($data['pokemon_go_username']);
             } elseif ($existing_row && !empty($existing_row['pokemon_go_username'])) {
-                // Preserve existing value if not provided
+                // Preserve existing value only if NOT provided in form
                 $update_data['pokemon_go_username'] = $existing_row['pokemon_go_username'];
             }
             
-            if (isset($data['scatterbug_pattern']) && !empty(trim($data['scatterbug_pattern']))) {
+            // scatterbug_pattern: only preserve if NOT provided in form (allows deletion if provided empty)
+            $pattern_provided = array_key_exists('scatterbug_pattern', $data);
+            if ($pattern_provided) {
                 $update_data['scatterbug_pattern'] = sanitize_text_field($data['scatterbug_pattern']);
             } elseif ($existing_row && !empty($existing_row['scatterbug_pattern'])) {
-                // Preserve existing value if not provided
+                // Preserve existing value only if NOT provided in form
                 $update_data['scatterbug_pattern'] = $existing_row['scatterbug_pattern'];
             }
             
-            if (isset($data['team']) && !empty(trim($data['team']))) {
+            // team: only preserve if NOT provided in form (allows deletion if provided empty)
+            $team_provided = array_key_exists('team', $data);
+            if ($team_provided) {
                 $update_data['team'] = sanitize_text_field($data['team']);
             } elseif ($existing_row && !empty($existing_row['team'])) {
-                // Preserve existing value if not provided
+                // Preserve existing value only if NOT provided in form
                 $update_data['team'] = $existing_row['team'];
             }
             
-            // Preserve XP if it exists
+            // Preserve XP if it exists (XP is not in friend codes form, so preserve)
             if ($existing_row && isset($existing_row['xp']) && $existing_row['xp'] > 0) {
                 $update_data['xp'] = (int) $existing_row['xp'];
             }
             
-            // Handle country for anonymous users
-            if (!$user_id && isset($data['country']) && !empty($data['country'])) {
+            // country: only preserve if NOT provided in form (allows deletion if provided empty)
+            $country_provided = array_key_exists('country', $data);
+            if ($country_provided) {
                 $update_data['country'] = sanitize_text_field($data['country']);
             } elseif ($existing_row && !empty($existing_row['country'])) {
-                // Preserve existing value if not provided
+                // Preserve existing value only if NOT provided in form
                 $update_data['country'] = $existing_row['country'];
             }
             
             if ($user_id) {
                 $update_data['user_id'] = $user_id;
+            } elseif (isset($data['discord_id']) && !empty($data['discord_id'])) {
+                // If updating with discord_id, set it
+                $update_data['discord_id'] = sanitize_text_field($data['discord_id']);
             }
             
             $format = [];
@@ -706,6 +766,17 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             $profile_id = $existing['id'];
         } else {
             // Insert new
+            // Ensure profile_type is set correctly (should already be set above, but double-check)
+            if (!isset($profile_data['profile_type'])) {
+                if ($user_id) {
+                    $profile_data['profile_type'] = 'classic';
+                } elseif (isset($profile_data['discord_id']) && !empty($profile_data['discord_id'])) {
+                    $profile_data['profile_type'] = 'discord';
+                } else {
+                    $profile_data['profile_type'] = 'anonymous';
+                }
+            }
+            
             // Prepare format array based on what fields are present
             $format_array = [];
             foreach ($profile_data as $key => $value) {

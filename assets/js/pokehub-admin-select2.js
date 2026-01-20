@@ -159,12 +159,145 @@ jQuery(function($) {
         });
     }
 
+    // Initialisation Select2 pour les quêtes (Pokémon et Items)
+    function pokehubInitQuestPokemonSelect2(context) {
+        var $ctx = context ? $(context) : $(document);
+        var pokemonList = typeof pokehubQuestsData !== 'undefined' ? pokehubQuestsData.pokemon : [];
+        
+        // Multiselect pour les Pokémon (récompenses Pokémon)
+        $ctx.find('select.pokehub-select-pokemon').each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) {
+                return;
+            }
+            
+            var placeholder = $select.attr('data-placeholder') || 'Select Pokémon';
+            var isMultiple = $select.attr('multiple') !== undefined;
+            
+            $select.select2({
+                data: pokemonList,
+                placeholder: placeholder,
+                allowClear: true,
+                multiple: isMultiple,
+                width: '100%',
+                language: {
+                    noResults: function() { return 'No Pokémon found'; },
+                    searching: function() { return 'Searching...'; }
+                }
+            });
+        });
+        
+        // Select simple pour les Pokémon resources (candy, mega energy)
+        $ctx.find('select.pokehub-select-pokemon-resource').each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) {
+                return;
+            }
+            
+            // Déterminer quelle liste utiliser selon le contexte
+            var $rewardEditor = $select.closest('.pokehub-quest-reward-editor');
+            var rewardType = $rewardEditor.find('.pokehub-reward-type').val();
+            var isMegaEnergy = rewardType === 'mega_energy';
+            var isCandy = rewardType === 'candy';
+            
+            var resourceList = [];
+            if (isMegaEnergy && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.mega_pokemon) {
+                resourceList = pokehubQuestsData.mega_pokemon;
+            } else if (isCandy && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.base_pokemon) {
+                resourceList = pokehubQuestsData.base_pokemon;
+            } else {
+                resourceList = pokemonList;
+            }
+            
+            var placeholder = $select.attr('data-placeholder') || 'Select a Pokémon';
+            
+            $select.select2({
+                data: resourceList,
+                placeholder: placeholder,
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() { return 'No Pokémon found'; },
+                    searching: function() { return 'Searching...'; }
+                }
+            });
+            
+            // Re-initialiser quand le type de récompense change
+            $rewardEditor.find('.pokehub-reward-type').on('change', function() {
+                var rewardType = $(this).val();
+                var isMegaEnergyNow = rewardType === 'mega_energy';
+                var isCandyNow = rewardType === 'candy';
+                
+                var newList = [];
+                if (isMegaEnergyNow && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.mega_pokemon) {
+                    newList = pokehubQuestsData.mega_pokemon;
+                } else if (isCandyNow && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.base_pokemon) {
+                    newList = pokehubQuestsData.base_pokemon;
+                } else {
+                    newList = pokemonList;
+                }
+                
+                // Mettre à jour les données du Select2
+                $select.empty();
+                $select.select2('destroy');
+                $select.select2({
+                    data: newList,
+                    placeholder: placeholder,
+                    allowClear: true,
+                    width: '100%',
+                    language: {
+                        noResults: function() { return 'No Pokémon found'; },
+                        searching: function() { return 'Searching...'; }
+                    }
+                });
+            });
+        });
+    }
+    
+    function pokehubInitQuestItemSelect2(context) {
+        var $ctx = context ? $(context) : $(document);
+        var itemsList = typeof pokehubQuestsData !== 'undefined' ? pokehubQuestsData.items : [];
+        
+        $ctx.find('select.pokehub-select-item').each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) {
+                return;
+            }
+            
+            var placeholder = $select.attr('data-placeholder') || 'Select an item';
+            
+            $select.select2({
+                data: itemsList,
+                placeholder: placeholder,
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() { return 'No item found'; },
+                    searching: function() { return 'Searching...'; }
+                }
+            }).on('change', function() {
+                var $nameField = $select.closest('.pokehub-reward-other-fields').find('.pokehub-item-name-field');
+                var selectedId = $select.val();
+                if (selectedId && itemsList.length > 0) {
+                    var item = itemsList.find(function(i) { return i.id == selectedId; });
+                    if (item) {
+                        $nameField.val(item.name_fr || item.name_en || '');
+                    }
+                } else {
+                    $nameField.val('');
+                }
+            });
+        });
+    }
+
     // Exposer les fonctions globalement
     window.pokehubInitAttackSelect2 = pokehubInitAttackSelect2;
     window.pokehubInitWeatherSelect2 = pokehubInitWeatherSelect2;
     window.pokehubInitItemSelect2 = pokehubInitItemSelect2;
     window.pokehubInitLureSelect2 = pokehubInitLureSelect2;
     window.pokehubInitPokemonSelect2 = pokehubInitPokemonSelect2;
+    window.pokehubInitQuestPokemonSelect2 = pokehubInitQuestPokemonSelect2;
+    window.pokehubInitQuestItemSelect2 = pokehubInitQuestItemSelect2;
     
     // Initialiser sur le document
     pokehubInitAttackSelect2(document);
@@ -172,5 +305,31 @@ jQuery(function($) {
     pokehubInitItemSelect2(document);
     pokehubInitLureSelect2(document);
     pokehubInitPokemonSelect2(document);
+    pokehubInitQuestPokemonSelect2(document);
+    pokehubInitQuestItemSelect2(document);
+    
+    // Initialiser Select2 pour le champ multiselect des pays régionaux
+    $('#regional_countries').each(function() {
+        var $select = $(this);
+        if ($select.length && !$select.data('select2')) {
+            $select.select2({
+                width: '100%',
+                placeholder: 'Sélectionner des pays...',
+                allowClear: true
+            });
+        }
+    });
+    
+    // Initialiser Select2 pour le champ multiselect des régions géographiques
+    $('#regional_regions').each(function() {
+        var $select = $(this);
+        if ($select.length && !$select.data('select2')) {
+            $select.select2({
+                width: '100%',
+                placeholder: 'Sélectionner des régions...',
+                allowClear: true
+            });
+        }
+    });
 });
 

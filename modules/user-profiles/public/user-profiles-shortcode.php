@@ -19,7 +19,8 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
     $error_message = '';
     if ($can_edit && isset($_POST['poke_hub_save_profile_front']) && wp_verify_nonce($_POST['poke_hub_profile_nonce'], 'poke_hub_save_profile_front')) {
         // Clean and validate friend code (must be exactly 12 digits)
-        $friend_code_raw = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
+        // Trim to remove any trailing spaces that might come from formatting
+        $friend_code_raw = isset($_POST['friend_code']) ? trim(sanitize_text_field($_POST['friend_code'])) : '';
         $friend_code = '';
         
         if (!empty($friend_code_raw)) {
@@ -37,6 +38,19 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
             }
         }
     
+        // Validate country/pattern combination if both are provided (for Vivillon)
+        $country = isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '';
+        $scatterbug_pattern = isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '';
+        
+        if (!empty($country) && !empty($scatterbug_pattern)) {
+            if (function_exists('poke_hub_validate_vivillon_country_pattern')) {
+                $is_valid = poke_hub_validate_vivillon_country_pattern($country, $scatterbug_pattern);
+                if (!$is_valid) {
+                    $error_message = __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub');
+                }
+            }
+        }
+        
         // Only save if no validation errors
         if (empty($error_message)) {
             $profile = [
@@ -44,9 +58,9 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                 'friend_code'         => $friend_code,
                 'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
                 'xp'                  => isset($_POST['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($_POST['xp']) : absint(preg_replace('/[^0-9]/', '', $_POST['xp']))) : 0,
-                'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
+                'country'             => $country,
                 'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
-                'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
+                'scatterbug_pattern'  => $scatterbug_pattern,
                 'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
             ];
 
@@ -54,7 +68,6 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                 $save_result = poke_hub_save_user_profile($user_id, $profile);
                 if ($save_result) {
                     // Force Ultimate Member to refetch user data if available
-                    // Note: poke_hub_save_user_profile() already purges UM cache internally
                     if (function_exists('poke_hub_purge_um_user_cache')) {
                         poke_hub_purge_um_user_cache($user_id);
                     }
@@ -370,24 +383,6 @@ add_shortcode('poke_hub_user_profile', function ($atts) {
         if ($user_id <= 0 && is_user_logged_in()) {
             $user_id = get_current_user_id();
         }
-    }
-    
-    // Debug mode
-    if ($atts['debug'] === 'true' || $atts['debug'] === true || $atts['debug'] === '1') {
-        $debug_info = [
-            'module_active' => poke_hub_is_module_active('user-profiles'),
-            'user_id_from_attr' => (int) $atts['user_id'],
-            'user_id_detected' => $user_id,
-            'um_profile_id' => function_exists('um_profile_id') ? um_profile_id() : 'N/A',
-            'um_get_requested_user' => function_exists('um_get_requested_user') ? um_get_requested_user() : 'N/A',
-            'current_user_id' => is_user_logged_in() ? get_current_user_id() : 0,
-            'functions_available' => [
-                'poke_hub_get_user_profile' => function_exists('poke_hub_get_user_profile'),
-                'poke_hub_get_teams' => function_exists('poke_hub_get_teams'),
-                'poke_hub_get_reasons' => function_exists('poke_hub_get_reasons'),
-            ],
-        ];
-        return '<pre style="background: #f0f0f0; padding: 10px; border: 1px solid #ccc;">' . esc_html(print_r($debug_info, true)) . '</pre>';
     }
     
     if ($user_id <= 0) {

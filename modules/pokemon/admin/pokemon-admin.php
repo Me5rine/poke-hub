@@ -33,6 +33,8 @@ function poke_hub_pokemon_get_section_label($section) {
             return __('Items', 'poke-hub');
         case 'backgrounds':
             return __('Backgrounds', 'poke-hub');
+        case 'regional_regions':
+            return __('Geographic Regions', 'poke-hub');
         case 'overview':
         default:
             return __('Pokémon data', 'poke-hub');
@@ -52,6 +54,7 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/form-mappings.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/weathers.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/backgrounds.php'; // 🔹 NOUVEAU
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regional-regions.php'; // Geographic Regions
 
 /**
  * Screen options pour la page Pokémon (onglet "Pokémon" + "Attacks").
@@ -536,6 +539,40 @@ function poke_hub_pokemon_admin_ui() {
                     echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_backgrounds_edit_form()</h1></div>';
                 }
                 break;
+
+            case 'regional_regions':
+                $edit_data = null;
+                
+                if ($action === 'edit' && !empty($_GET['id'])) {
+                    $id = (int) $_GET['id'];
+                    if (function_exists('poke_hub_pokemon_get_regional_regions_from_db')) {
+                        $regions = poke_hub_pokemon_get_regional_regions_from_db();
+                        foreach ($regions as $region) {
+                            if ((int) $region['id'] === $id) {
+                                $edit_data = $region;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (function_exists('poke_hub_regional_region_edit_form')) {
+                    // Temporarily override back URL for form
+                    add_filter('poke_hub_regional_region_back_url', function() {
+                        return add_query_arg(
+                            [
+                                'page'       => 'poke-hub-pokemon',
+                                'ph_section' => 'regional_regions',
+                            ],
+                            admin_url('admin.php')
+                        );
+                    }, 10);
+                    
+                    poke_hub_regional_region_edit_form($edit_data);
+                } else {
+                    echo '<div class="wrap"><h1>Missing function: poke_hub_regional_region_edit_form()</h1></div>';
+                }
+                break;
         }
 
         return;
@@ -688,6 +725,20 @@ function poke_hub_pokemon_admin_ui() {
             ];
             break;
 
+        case 'regional_regions':
+            $add_button = [
+                'label' => __('Add Geographic Region', 'poke-hub'),
+                'url'   => add_query_arg(
+                    [
+                        'page'       => 'poke-hub-pokemon',
+                        'ph_section' => 'regional_regions',
+                        'action'     => 'add',
+                    ],
+                    admin_url('admin.php')
+                ),
+            ];
+            break;
+
         default:
             $add_button = null;
             break;
@@ -706,6 +757,7 @@ function poke_hub_pokemon_admin_ui() {
         'weathers'      => __('Weathers', 'poke-hub'),
         'items'         => __('Items', 'poke-hub'),
         'backgrounds'   => __('Backgrounds', 'poke-hub'),
+        'regional_regions' => __('Geographic Regions', 'poke-hub'),
     ];
     ?>
     <div class="wrap">
@@ -829,6 +881,14 @@ function poke_hub_pokemon_admin_ui() {
                         poke_hub_pokemon_admin_backgrounds_screen();
                     } else {
                         echo '<p>Backgrounds screen not implemented yet.</p>';
+                    }
+                    break;
+
+                case 'regional_regions':
+                    if (function_exists('poke_hub_pokemon_admin_regional_regions_screen')) {
+                        poke_hub_pokemon_admin_regional_regions_screen();
+                    } else {
+                        echo '<p>Regional regions screen not implemented yet.</p>';
                     }
                     break;
 

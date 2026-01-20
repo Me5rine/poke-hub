@@ -60,8 +60,10 @@ function poke_hub_user_profiles_admin_ui() {
     $admin_error_message = '';
     if (isset($_POST['poke_hub_save_profile']) && wp_verify_nonce($_POST['poke_hub_profile_nonce'], 'poke_hub_save_profile')) {
         $user_id_to_save = isset($_POST['user_id']) ? (int) $_POST['user_id'] : 0;
+        $profile_id_to_save = isset($_POST['profile_id']) ? (int) $_POST['profile_id'] : 0;
         
-        if ($user_id_to_save > 0) {
+        // Allow saving by profile_id even if user_id is 0 (for anonymous/discord profiles)
+        if ($profile_id_to_save > 0 || $user_id_to_save > 0) {
             // Clean and validate friend code (must be exactly 12 digits)
             $friend_code_raw = isset($_POST['friend_code']) ? sanitize_text_field($_POST['friend_code']) : '';
             $friend_code = '';
@@ -93,6 +95,13 @@ function poke_hub_user_profiles_admin_ui() {
                     'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
                     'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
                 ];
+                
+                // If profile_id is provided, include it in profile array for update by ID
+                if ($profile_id_to_save > 0) {
+                    $profile['id'] = $profile_id_to_save;
+                    // Use user_id 0 or null if profile_id is used (will be handled by save function)
+                    $user_id_to_save = $user_id_to_save > 0 ? $user_id_to_save : null;
+                }
 
                 poke_hub_save_user_profile($user_id_to_save, $profile);
                 echo '<div class="notice notice-success is-dismissible"><p>' . __('Pokémon GO profile updated successfully', 'poke-hub') . '</p></div>';
@@ -102,180 +111,27 @@ function poke_hub_user_profiles_admin_ui() {
         }
     }
 
-    // Edit user view
-    if ($action === 'edit' && $user_id > 0) {
-        poke_hub_render_user_profile_form($user_id);
-        return;
+    // Edit user view - support both user_id and profile_id
+    if ($action === 'edit') {
+        if ($profile_id > 0) {
+            if (function_exists('poke_hub_render_user_profile_form_by_id')) {
+                poke_hub_render_user_profile_form_by_id($profile_id);
+            } else {
+                wp_die(__('Form functions not loaded.', 'poke-hub'));
+            }
+            return;
+        } elseif ($user_id > 0) {
+            if (function_exists('poke_hub_render_user_profile_form')) {
+                poke_hub_render_user_profile_form($user_id);
+            } else {
+                wp_die(__('Form functions not loaded.', 'poke-hub'));
+            }
+            return;
+        }
     }
 
     // Users list view
     poke_hub_render_user_profiles_list();
-}
-
-/**
- * Render user profile edit form
- */
-function poke_hub_render_user_profile_form($user_id) {
-    $user = get_userdata($user_id);
-    if (!$user) {
-        wp_die(__('User not found.', 'poke-hub'));
-    }
-
-    $profile = poke_hub_get_user_profile($user_id);
-    $teams = poke_hub_get_teams();
-    $reasons = poke_hub_get_reasons();
-    $scatterbug_patterns = poke_hub_get_scatterbug_patterns();
-    $countries = function_exists('poke_hub_get_countries') ? poke_hub_get_countries() : [];
-
-    ?>
-    <div class="wrap">
-        <h1><?php echo esc_html(sprintf(__('Edit Profile: %s', 'poke-hub'), $user->display_name)); ?></h1>
-        <p class="description">
-            <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
-        </p>
-
-        <form method="post" action="" id="poke-hub-profile-admin-form">
-            <?php wp_nonce_field('poke_hub_save_profile', 'poke_hub_profile_nonce'); ?>
-            <input type="hidden" name="user_id" value="<?php echo esc_attr($user_id); ?>">
-
-            <div class="admin-lab-form-section">
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="team" class="admin-lab-field-label"><?php _e('Team', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <select name="team" id="team" class="admin-lab-field-select">
-                                <option value=""><?php _e('-- Select a team --', 'poke-hub'); ?></option>
-                                <?php foreach ($teams as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'], $value); ?>>
-                                        <?php echo esc_html($label); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="friend_code" class="admin-lab-field-label"><?php _e('Friend Code', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <?php 
-                            // Format friend code for display in input (with spaces)
-                            $formatted_friend_code = !empty($profile['friend_code']) && function_exists('poke_hub_format_friend_code')
-                                ? poke_hub_format_friend_code($profile['friend_code'])
-                                : $profile['friend_code'];
-                            ?>
-                            <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="admin-lab-field-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
-                            <p class="description"><?php _e('Your Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="friend_code_public" class="admin-lab-field-label"><?php _e('Friend Code Visibility', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" <?php checked($profile['friend_code_public'], true); ?>>
-                                <?php _e('Display friend code publicly on user profile', 'poke-hub'); ?>
-                            </label>
-                            <p class="description"><?php _e('If unchecked, the friend code will only be visible to the user and administrators.', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="xp" class="admin-lab-field-label"><?php _e('XP', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <?php 
-                            // Format XP for display in input (with spaces)
-                            $formatted_xp = !empty($profile['xp']) && function_exists('poke_hub_format_xp')
-                                ? poke_hub_format_xp($profile['xp'])
-                                : $profile['xp'];
-                            ?>
-                            <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="admin-lab-field-input" pattern="[0-9\s]*" placeholder="0">
-                            <p class="description"><?php _e('Your total XP in Pokémon GO', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="country" class="admin-lab-field-label"><?php _e('Country', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <select name="country" id="country" class="admin-lab-field-select">
-                                <option value=""><?php _e('-- Select a country --', 'poke-hub'); ?></option>
-                                <?php foreach ($countries as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
-                                        <?php echo esc_html($label); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="description">
-                                <?php _e('Your country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
-                            </p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="pokemon_go_username" class="admin-lab-field-label"><?php _e('Pokémon GO Username', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" name="pokemon_go_username" id="pokemon_go_username" value="<?php echo esc_attr($profile['pokemon_go_username']); ?>" class="admin-lab-field-input">
-                            <p class="description"><?php _e('Your in-game username', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="scatterbug_pattern" class="admin-lab-field-label"><?php _e('Scatterbug Pattern', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <select name="scatterbug_pattern" id="scatterbug_pattern" class="admin-lab-field-select">
-                                <option value=""><?php _e('-- Select a pattern --', 'poke-hub'); ?></option>
-                                <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'], $value); ?>>
-                                        <?php echo esc_html($label); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="description"><?php _e('The Scatterbug/Vivillon pattern for your region', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label class="admin-lab-field-label"><?php _e('Reasons', 'poke-hub'); ?></label>
-                        </th>
-                        <td>
-                            <fieldset>
-                                <?php foreach ($reasons as $value => $label) : ?>
-                                    <?php
-                                    // Ensure value is string for comparison (profile['reasons'] is already normalized as strings)
-                                    $value_str = (string) $value;
-                                    $is_checked = in_array($value_str, $profile['reasons'], true);
-                                    ?>
-                                    <label>
-                                        <input type="checkbox" name="reasons[]" value="<?php echo esc_attr($value); ?>" <?php checked($is_checked); ?>>
-                                        <?php echo esc_html($label); ?>
-                                    </label><br>
-                                <?php endforeach; ?>
-                            </fieldset>
-                            <p class="description"><?php _e('Select why you are here (you can select multiple options)', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-                </table>
-
-                <input type="hidden" name="poke_hub_save_profile" value="1">
-                <?php submit_button(__('Save Profile', 'poke-hub')); ?>
-            </div>
-        </form>
-    </div>
-    <?php
 }
 
 /**
