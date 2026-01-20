@@ -231,15 +231,15 @@ function poke_hub_get_public_friend_codes($args = []) {
     // Get total count
     $count_query = "SELECT COUNT(DISTINCT up.id) FROM {$table_name} AS up";
     
-    // If country filter, we need to join with usermeta and check both table column and usermeta
+    // If country filter, we need to join with usermeta and check country_custom (priority), table column, and usermeta
     if ($country_filter) {
         $count_query .= " LEFT JOIN {$wpdb->usermeta} AS um ON up.user_id = um.user_id AND um.meta_key = 'country'";
         $count_where = array_merge($where, [
-            "(up.country = %s OR um.meta_value = %s)"
+            "(up.country_custom = %s OR up.country = %s OR um.meta_value = %s)"
         ]);
         $count_where_sql = implode(' AND ', $count_where);
         $country_filter_value = sanitize_text_field($args['country']);
-        $where_values_count = array_merge($where_values, [$country_filter_value, $country_filter_value]);
+        $where_values_count = array_merge($where_values, [$country_filter_value, $country_filter_value, $country_filter_value]);
     } else {
         $count_where_sql = $base_where_sql;
         $where_values_count = $where_values;
@@ -264,9 +264,10 @@ function poke_hub_get_public_friend_codes($args = []) {
     
     // Get items
     $offset = ($args['paged'] - 1) * $args['per_page'];
-    // Use COALESCE to get country from table (for anonymous) or usermeta (for logged-in users)
+    // Use COALESCE to get country: prioritize country_custom, then table column (for anonymous), then usermeta (for logged-in users)
     $query = "SELECT up.*, 
                      COALESCE(
+                         NULLIF(up.country_custom, ''), 
                          NULLIF(up.country, ''), 
                          um_country.meta_value, 
                          ''
@@ -275,14 +276,14 @@ function poke_hub_get_public_friend_codes($args = []) {
               LEFT JOIN {$wpdb->usermeta} AS um_country ON up.user_id = um_country.user_id AND um_country.meta_key = 'country'";
     
     // Build WHERE clause for items query
-    // For country filter, check both table column (anonymous) and usermeta (logged-in)
+    // For country filter, check country_custom (priority), table column (anonymous), and usermeta (logged-in)
     if ($country_filter) {
         $items_where = array_merge($where, [
-            "(up.country = %s OR um_country.meta_value = %s)"
+            "(up.country_custom = %s OR up.country = %s OR um_country.meta_value = %s)"
         ]);
         $items_where_sql = implode(' AND ', $items_where);
         $country_filter_value = sanitize_text_field($args['country']);
-        $query_values = array_merge($where_values, [$country_filter_value, $country_filter_value]);
+        $query_values = array_merge($where_values, [$country_filter_value, $country_filter_value, $country_filter_value]);
     } else {
         $items_where_sql = $base_where_sql;
         $query_values = $where_values;
@@ -381,9 +382,22 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
     }
     
     // Validate country/pattern combination if both are provided (for Vivillon)
+    // IMPORTANT: Validate using the ORIGINAL country (custom country if applicable) BEFORE mapping
+    // This ensures "Hawaï" + "ocean" is validated correctly, not "États-Unis d'Amérique" + "ocean"
     if (!empty($data['country']) && !empty($data['scatterbug_pattern'])) {
         if (function_exists('poke_hub_validate_vivillon_country_pattern')) {
-            $is_valid = poke_hub_validate_vivillon_country_pattern($data['country'], $data['scatterbug_pattern']);
+            // Use the original country from form (which may be a custom country like "Hawaï")
+            // The validation function will handle custom countries directly
+            $country_for_validation = $data['country'];
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] Validating country/pattern: country="' . $country_for_validation . '", pattern="' . $data['scatterbug_pattern'] . '"');
+                error_log('[PokeHub Friend Codes] User ID: ' . ($user_id ?? 'NULL') . ', is_logged_in: ' . ($is_logged_in ? 'true' : 'false'));
+                error_log('[PokeHub Friend Codes] Data received: ' . print_r($data, true));
+            }
+            $is_valid = poke_hub_validate_vivillon_country_pattern($country_for_validation, $data['scatterbug_pattern']);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] Validation result: ' . ($is_valid ? 'VALID' : 'INVALID'));
+            }
             if (!$is_valid) {
                 return [
                     'success' => false,
@@ -488,9 +502,39 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
     }
     
     // Store country: for anonymous users, store in table; for logged-in users, store in usermeta
+    // IMPORTANT: Handle custom countries mapping (like "Hawaï" -> "États-Unis d'Amérique")
     if (!$user_id && isset($data['country']) && !empty($data['country'])) {
         // For anonymous users, store country directly in the table
-        $profile_data['country'] = sanitize_text_field($data['country']);
+        $country = sanitize_text_field($data['country']);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Friend Codes] Processing country for anonymous user: "' . $country . '"');
+        }
+        
+        // Check if country is a custom country and map it to UM country
+        $custom_to_um = function_exists('poke_hub_get_custom_country_to_um_mapping') 
+            ? poke_hub_get_custom_country_to_um_mapping() 
+            : [];
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Friend Codes] Custom to UM mapping keys: ' . implode(', ', array_keys($custom_to_um)));
+        }
+        
+        if (isset($custom_to_um[$country])) {
+            // Country is a custom country (e.g., "Hawaï")
+            $profile_data['country_custom'] = $country; // Store custom country name
+            $profile_data['country'] = $custom_to_um[$country]; // Store UM country
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] ✓ "' . $country . '" is a custom country, mapping to UM country: "' . $custom_to_um[$country] . '"');
+                error_log('[PokeHub Friend Codes] Will save: country_custom="' . $profile_data['country_custom'] . '", country="' . $profile_data['country'] . '"');
+            }
+        } else {
+            // Country is NOT a custom country
+            $profile_data['country'] = $country;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] "' . $country . '" is NOT a custom country, saving as-is: country="' . $profile_data['country'] . '"');
+            }
+        }
     }
     
     if (!$user_id && !isset($profile_data['discord_id'])) {
@@ -571,8 +615,33 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             
             if ($result !== false) {
                 // Update country: for logged-in users, store in usermeta
+                // IMPORTANT: Handle custom countries mapping (like "Hawaï" -> "États-Unis d'Amérique")
                 if (isset($data['country']) && !empty($data['country'])) {
-                    update_user_meta($user_id, 'country', sanitize_text_field($data['country']));
+                    $country = sanitize_text_field($data['country']);
+                    
+                    // Check if country is a custom country and map it to UM country
+                    $custom_to_um = function_exists('poke_hub_get_custom_country_to_um_mapping') 
+                        ? poke_hub_get_custom_country_to_um_mapping() 
+                        : [];
+                    $country_for_um = isset($custom_to_um[$country]) ? $custom_to_um[$country] : $country;
+                    
+                    // Update Ultimate Member's country (primary and only source for logged-in users)
+                    update_user_meta($user_id, 'country', $country_for_um);
+                    
+                    // Update country_custom in table if it's a custom country
+                    if (isset($custom_to_um[$country])) {
+                        $wpdb->query($wpdb->prepare(
+                            "UPDATE {$table_name} SET country_custom = %s WHERE id = %d",
+                            $country,
+                            $existing_by_code['id']
+                        ));
+                    } else {
+                        $wpdb->query($wpdb->prepare(
+                            "UPDATE {$table_name} SET country_custom = NULL WHERE id = %d",
+                            $existing_by_code['id']
+                        ));
+                    }
+                    
                     // Remove country from table since it's now linked to a user
                     $wpdb->update($table_name, ['country' => null], ['id' => $existing_by_code['id']], ['%s'], ['%d']);
                 }
@@ -701,12 +770,20 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         // For anonymous users, use direct database operations
         $existing = $existing_by_user;
         
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Friend Codes] Anonymous user path: existing=' . ($existing ? 'YES (ID: ' . $existing['id'] . ')' : 'NO') . ', existing_by_code=' . ($existing_by_code ? 'YES (ID: ' . $existing_by_code['id'] . ')' : 'NO'));
+        }
+        
         if ($existing) {
             // Get existing profile data to preserve fields that are not being updated
             $existing_row = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM {$table_name} WHERE id = %d LIMIT 1",
                 $existing['id']
             ), ARRAY_A);
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] UPDATE path for anonymous: existing_row=' . print_r($existing_row, true));
+            }
             
             // Determine profile_type for update based on available identifiers
             $profile_type_for_update = 'anonymous'; // Default for anonymous users
@@ -760,9 +837,53 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             }
             
             // country: only preserve if NOT provided in form (allows deletion if provided empty)
+            // IMPORTANT: Handle custom countries mapping (like "Hawaï" -> "États-Unis d'Amérique")
             $country_provided = array_key_exists('country', $data);
+            $country_custom_to_set = null;
             if ($country_provided) {
-                $update_data['country'] = sanitize_text_field($data['country']);
+                $country = sanitize_text_field($data['country']);
+                
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[PokeHub Friend Codes] UPDATE: Processing country for anonymous user: "' . $country . '"');
+                }
+                
+                if (empty($country)) {
+                    // If country is empty, clear country_custom
+                    $country_custom_to_set = null;
+                    $update_data['country'] = '';
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('[PokeHub Friend Codes] UPDATE: Country is empty, clearing country_custom');
+                    }
+                } else {
+                    // Check if country is a custom country and map it to UM country
+                    $custom_to_um = function_exists('poke_hub_get_custom_country_to_um_mapping') 
+                        ? poke_hub_get_custom_country_to_um_mapping() 
+                        : [];
+                    
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('[PokeHub Friend Codes] UPDATE: Custom to UM mapping keys: ' . implode(', ', array_keys($custom_to_um)));
+                    }
+                    
+                    if (isset($custom_to_um[$country])) {
+                        // Country is a custom country (e.g., "Hawaï")
+                        $country_custom_to_set = $country; // Store custom country name
+                        $country = $custom_to_um[$country]; // Replace with UM country for storage
+                        $update_data['country'] = $country;
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            error_log('[PokeHub Friend Codes] UPDATE: ✓ "' . $country_custom_to_set . '" is a custom country, mapping to UM country: "' . $country . '"');
+                            error_log('[PokeHub Friend Codes] UPDATE: Will save: country_custom="' . $country_custom_to_set . '", country="' . $update_data['country'] . '"');
+                        }
+                        // Don't add country_custom to $update_data, we'll handle it separately with a direct SQL query
+                    } else {
+                        // Country is NOT a custom country, clear country_custom (to remove old custom country)
+                        $country_custom_to_set = null;
+                        $update_data['country'] = $country;
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            error_log('[PokeHub Friend Codes] UPDATE: "' . $country . '" is NOT a custom country, will clear country_custom');
+                        }
+                        // Don't add country_custom to $update_data, we'll handle it separately with a direct SQL query
+                    }
+                }
             } elseif ($existing_row && !empty($existing_row['country'])) {
                 // Preserve existing value only if NOT provided in form
                 $update_data['country'] = $existing_row['country'];
@@ -784,6 +905,11 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 }
             }
             
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] UPDATE: About to update with data: ' . print_r($update_data, true));
+                error_log('[PokeHub Friend Codes] UPDATE: country_provided=' . ($country_provided ? 'YES' : 'NO') . ', country_custom_to_set=' . ($country_custom_to_set ?? 'NULL'));
+            }
+            
             $result = $wpdb->update(
                 $table_name,
                 $update_data,
@@ -791,6 +917,57 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 $format,
                 ['%d']
             );
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                if ($result !== false) {
+                    error_log('[PokeHub Friend Codes] UPDATE: Success, rows affected: ' . $result);
+                } else {
+                    error_log('[PokeHub Friend Codes] UPDATE ERROR: ' . $wpdb->last_error);
+                }
+                // Verify what was actually saved
+                $saved_row = $wpdb->get_row($wpdb->prepare(
+                    "SELECT id, country, country_custom, scatterbug_pattern FROM {$table_name} WHERE id = %d",
+                    $existing['id']
+                ), ARRAY_A);
+                if ($saved_row) {
+                    error_log('[PokeHub Friend Codes] UPDATE: Saved data - country="' . ($saved_row['country'] ?? 'NULL') . '", country_custom="' . ($saved_row['country_custom'] ?? 'NULL') . '", scatterbug_pattern="' . ($saved_row['scatterbug_pattern'] ?? 'NULL') . '"');
+                }
+            }
+            
+            // Handle country_custom separately (always use direct SQL query for consistency)
+            // $wpdb->update() doesn't update fields to NULL reliably, so we use a direct query
+            if ($country_provided) {
+                if ($country_custom_to_set === null) {
+                    // Clear country_custom
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('[PokeHub Friend Codes] UPDATE: Clearing country_custom for profile ID ' . $existing['id']);
+                    }
+                    $wpdb->query($wpdb->prepare(
+                        "UPDATE {$table_name} SET country_custom = NULL WHERE id = %d",
+                        $existing['id']
+                    ));
+                    if (defined('WP_DEBUG') && WP_DEBUG && $wpdb->last_error) {
+                        error_log('[PokeHub Friend Codes] UPDATE ERROR clearing country_custom: ' . $wpdb->last_error);
+                    }
+                } else {
+                    // Set country_custom
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('[PokeHub Friend Codes] UPDATE: Setting country_custom="' . $country_custom_to_set . '" for profile ID ' . $existing['id']);
+                    }
+                    $wpdb->query($wpdb->prepare(
+                        "UPDATE {$table_name} SET country_custom = %s WHERE id = %d",
+                        $country_custom_to_set,
+                        $existing['id']
+                    ));
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        if ($wpdb->last_error) {
+                            error_log('[PokeHub Friend Codes] UPDATE ERROR setting country_custom: ' . $wpdb->last_error);
+                        } else {
+                            error_log('[PokeHub Friend Codes] UPDATE: ✓ country_custom set successfully');
+                        }
+                    }
+                }
+            }
             
             $profile_id = $existing['id'];
         } else {
@@ -816,6 +993,10 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 }
             }
             
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Friend Codes] INSERT: profile_data = ' . print_r($profile_data, true));
+            }
+            
             $result = $wpdb->insert(
                 $table_name,
                 $profile_data,
@@ -824,8 +1005,22 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             
             if ($result !== false) {
                 $profile_id = $wpdb->insert_id;
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[PokeHub Friend Codes] INSERT: Success, profile_id = ' . $profile_id);
+                    // Verify what was actually saved
+                    $saved_row = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id, country, country_custom, scatterbug_pattern FROM {$table_name} WHERE id = %d",
+                        $profile_id
+                    ), ARRAY_A);
+                    if ($saved_row) {
+                        error_log('[PokeHub Friend Codes] INSERT: Saved data - country="' . ($saved_row['country'] ?? 'NULL') . '", country_custom="' . ($saved_row['country_custom'] ?? 'NULL') . '", scatterbug_pattern="' . ($saved_row['scatterbug_pattern'] ?? 'NULL') . '"');
+                    }
+                }
             } else {
                 $profile_id = null;
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[PokeHub Friend Codes] INSERT ERROR: ' . $wpdb->last_error);
+                }
             }
         }
     }

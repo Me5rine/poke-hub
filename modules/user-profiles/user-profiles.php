@@ -300,7 +300,7 @@ function poke_hub_user_profiles_shortcode_assets() {
             }
         }
         
-        // Debug: check if États-Unis is in mapping
+        // Debug: check if États-Unis and Hawaï are in mapping
         if (defined('WP_DEBUG') && WP_DEBUG) {
             $total_countries = count($vivillon_mapping);
             error_log('[PokeHub UM] Total unique countries in mapping: ' . $total_countries);
@@ -308,6 +308,27 @@ function poke_hub_user_profiles_shortcode_assets() {
                 error_log('[PokeHub UM] ✓ États-Unis d\'Amérique found with patterns: ' . implode(', ', $vivillon_mapping["États-Unis d'Amérique"]));
             } else {
                 error_log('[PokeHub UM] ✗ États-Unis d\'Amérique NOT found!');
+            }
+            if (isset($vivillon_mapping['Hawaï'])) {
+                error_log('[PokeHub UM] ✓ Hawaï found with patterns: ' . implode(', ', $vivillon_mapping['Hawaï']));
+            } else {
+                error_log('[PokeHub UM] ✗ Hawaï NOT found in JavaScript mapping!');
+                // Check if Hawaï is in the source mapping (pattern => countries)
+                $hawaii_found = false;
+                foreach ($mapping as $pattern => $countries) {
+                    if (is_array($countries) && in_array('Hawaï', $countries, true)) {
+                        error_log('[PokeHub UM] Hawaï is in source mapping for pattern "' . $pattern . '"');
+                        $hawaii_found = true;
+                    }
+                }
+                if (!$hawaii_found) {
+                    error_log('[PokeHub UM] ✗ Hawaï NOT found in source mapping either!');
+                }
+            }
+            if (isset($vivillon_mapping['Açores'])) {
+                error_log('[PokeHub UM] ✓ Açores found with patterns: ' . implode(', ', $vivillon_mapping['Açores']));
+            } else {
+                error_log('[PokeHub UM] ✗ Açores NOT found!');
             }
         }
     }

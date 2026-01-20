@@ -1292,6 +1292,11 @@ function poke_hub_get_vivillon_pattern_country_mapping() {
     // 1) D'abord, essayer de récupérer depuis la table pokemon_regional_mappings (nouvelle source de vérité)
     if (function_exists('poke_hub_pokemon_get_regional_mappings_from_db')) {
         $mappings_from_table = poke_hub_pokemon_get_regional_mappings_from_db();
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Mapping] Retrieved ' . count($mappings_from_table) . ' mappings from database');
+        }
+        
         if (!empty($mappings_from_table)) {
             // Convertir le format de la table en format attendu (pattern => countries array)
             // IMPORTANT: Normaliser les pattern_slug pour correspondre au form_slug du Game Master
@@ -1319,6 +1324,16 @@ function poke_hub_get_vivillon_pattern_country_mapping() {
                 
                 // Dédupliquer et nettoyer
                 $resolved_countries = array_unique(array_filter($resolved_countries));
+                
+                if (defined('WP_DEBUG') && WP_DEBUG && $pattern_only === 'ocean') {
+                    error_log('[PokeHub Mapping] Pattern "ocean" has ' . count($resolved_countries) . ' countries');
+                    if (in_array('Hawaï', $resolved_countries, true)) {
+                        error_log('[PokeHub Mapping] ✓ Hawaï found in ocean pattern from DB');
+                    } else {
+                        error_log('[PokeHub Mapping] ✗ Hawaï NOT found in ocean pattern from DB');
+                        error_log('[PokeHub Mapping] Ocean countries: ' . implode(', ', array_slice($resolved_countries, 0, 10)) . '...');
+                    }
+                }
                 
                 // Stocker sous le pattern uniquement (pas le pattern_slug complet)
                 // Si plusieurs mappings partagent le même pattern (scatterbug-continental, vivillon-continental),
@@ -1616,7 +1631,27 @@ function poke_hub_get_vivillon_patterns_for_country($country_name) {
         return [];
     }
     
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] poke_hub_get_vivillon_patterns_for_country called with country: ' . $country_name);
+    }
+    
     $mapping = poke_hub_get_vivillon_pattern_country_mapping();
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] Mapping retrieved, patterns count: ' . count($mapping));
+        // Check if Hawaï is in any pattern's countries
+        $found_hawaii = false;
+        foreach ($mapping as $pattern => $countries) {
+            if (is_array($countries) && in_array('Hawaï', $countries, true)) {
+                error_log('[PokeHub Validation] ✓ Hawaï found in pattern "' . $pattern . '"');
+                $found_hawaii = true;
+            }
+        }
+        if (!$found_hawaii) {
+            error_log('[PokeHub Validation] ✗ Hawaï NOT found in any pattern!');
+        }
+    }
+    
     $patterns = [];
     
     // Normaliser le pays fourni pour éviter les problèmes d'apostrophes typographiques, espaces, etc.
@@ -1626,6 +1661,10 @@ function poke_hub_get_vivillon_patterns_for_country($country_name) {
         : 'poke_hub_normalize_um_label_safe';
     
     $country_norm = $normalize($country_name);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] Country normalized: "' . $country_name . '" -> "' . $country_norm . '"');
+    }
     
     // Le mapping est au format: ['pattern_slug' => ['country1', 'country2', ...], ...]
     // Parcourir le mapping pour trouver les motifs correspondant au pays
@@ -1641,7 +1680,14 @@ function poke_hub_get_vivillon_patterns_for_country($country_name) {
         // Comparer les versions normalisées
         if (in_array($country_norm, $countries_norm, true)) {
             $patterns[] = $pattern;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[PokeHub Validation] ✓ Pattern "' . $pattern . '" matches country "' . $country_name . '"');
+            }
         }
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] Found ' . count($patterns) . ' patterns for "' . $country_name . '": ' . implode(', ', $patterns));
     }
     
     return $patterns;
@@ -1677,16 +1723,39 @@ function poke_hub_get_countries_for_vivillon_pattern($pattern_slug) {
 function poke_hub_validate_vivillon_country_pattern($country_name, $pattern_slug) {
     // Si l'un des deux est vide, on ne valide pas (la validation de champ requis se fait ailleurs)
     if (empty($country_name) || empty($pattern_slug)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Validation] poke_hub_validate_vivillon_country_pattern: Empty country or pattern, returning true');
+        }
         return true; // On retourne true pour ne pas bloquer si un champ est vide
     }
     
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] Validating: country="' . $country_name . '", pattern="' . $pattern_slug . '"');
+    }
+    
+    // IMPORTANT: Les pays custom (comme "Hawaï") sont directement dans le mapping, pas besoin de mapper vers UM
+    // La fonction poke_hub_get_vivillon_patterns_for_country cherche directement dans le mapping
+    // qui contient les pays custom comme "Hawaï", "Açores", etc.
     $valid_patterns = poke_hub_get_vivillon_patterns_for_country($country_name);
     
     // Si aucun motif n'est défini pour ce pays, on accepte (pour ne pas bloquer les nouveaux pays)
     if (empty($valid_patterns)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub Validation] No patterns found for "' . $country_name . '", returning true (allow)');
+        }
         return true;
     }
     
-    return in_array($pattern_slug, $valid_patterns, true);
+    $is_valid = in_array($pattern_slug, $valid_patterns, true);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub Validation] Validation result: ' . ($is_valid ? 'VALID' : 'INVALID') . ' for country="' . $country_name . '", pattern="' . $pattern_slug . '"');
+        if (!$is_valid) {
+            error_log('[PokeHub Validation] Valid patterns for "' . $country_name . '": ' . implode(', ', $valid_patterns));
+            error_log('[PokeHub Validation] Requested pattern "' . $pattern_slug . '" NOT in valid patterns list');
+        }
+    }
+    
+    return $is_valid;
 }
 

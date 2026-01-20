@@ -869,17 +869,26 @@
             $patternSelect.removeClass('error');
             hideCountryPatternError();
             
-            // Validate if both are filled
-            if (country && pattern) {
-                var isValid = validateVivillonCountryPattern(country, pattern);
-                if (!isValid) {
-                    $countrySelect.addClass('error');
-                    $patternSelect.addClass('error');
-                    var errorMessage = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.validationError) 
-                        ? pokeHubFriendCodes.validationError 
-                        : 'The selected country and Vivillon pattern do not match. Please select a valid combination.';
-                    showCountryPatternError($form, errorMessage);
+            // IMPORTANT: Only validate if pattern changed, not if country changed
+            // When country changes, the pattern might still be the old one, which would cause false validation errors
+            // Validation will happen on form submission anyway
+            var $changedSelect = $(this);
+            if ($changedSelect.is('#scatterbug_pattern')) {
+                // Pattern changed - validate only if both are filled
+                if (country && pattern) {
+                    var isValid = validateVivillonCountryPattern(country, pattern);
+                    if (!isValid) {
+                        $countrySelect.addClass('error');
+                        $patternSelect.addClass('error');
+                        var errorMessage = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.validationError) 
+                            ? pokeHubFriendCodes.validationError 
+                            : 'The selected country and Vivillon pattern do not match. Please select a valid combination.';
+                        showCountryPatternError($form, errorMessage);
+                    }
                 }
+            } else {
+                // Country changed - clear any existing errors (pattern might not match new country yet)
+                hideCountryPatternError();
             }
         });
         

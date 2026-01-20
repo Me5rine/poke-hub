@@ -165,7 +165,14 @@ function poke_hub_pokemon_get_regional_mappings_from_db() {
     
     $table = poke_hub_pokemon_get_regional_mappings_table();
     if (empty($table)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub DB] poke_hub_pokemon_get_regional_mappings_from_db: Table is empty');
+        }
         return [];
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub DB] poke_hub_pokemon_get_regional_mappings_from_db: Querying table: ' . $table);
     }
     
     $results = $wpdb->get_results(
@@ -174,6 +181,10 @@ function poke_hub_pokemon_get_regional_mappings_from_db() {
          ORDER BY pattern_slug ASC",
         ARRAY_A
     );
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub DB] poke_hub_pokemon_get_regional_mappings_from_db: Found ' . count($results) . ' rows');
+    }
     
     if (empty($results)) {
         return [];
@@ -197,6 +208,24 @@ function poke_hub_pokemon_get_regional_mappings_from_db() {
             }
         }
         
+        // Log specifically for ocean pattern and Hawaï
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (stripos($row['pattern_slug'], 'ocean') !== false) {
+                error_log('[PokeHub DB] Pattern "' . $row['pattern_slug'] . '" has ' . count($countries) . ' countries');
+                if (in_array('Hawaï', $countries, true)) {
+                    error_log('[PokeHub DB] ✓ Hawaï found in "' . $row['pattern_slug'] . '" countries array');
+                } else {
+                    error_log('[PokeHub DB] ✗ Hawaï NOT found in "' . $row['pattern_slug'] . '" countries array');
+                    if (count($countries) > 0) {
+                        error_log('[PokeHub DB] Sample countries in "' . $row['pattern_slug'] . '": ' . implode(', ', array_slice($countries, 0, 5)) . '...');
+                    }
+                }
+                if (!empty($region_slugs)) {
+                    error_log('[PokeHub DB] Pattern "' . $row['pattern_slug'] . '" has ' . count($region_slugs) . ' region_slugs: ' . implode(', ', $region_slugs));
+                }
+            }
+        }
+        
         $mappings[] = [
             'id' => (int) $row['id'],
             'pattern_slug' => $row['pattern_slug'],
@@ -204,6 +233,10 @@ function poke_hub_pokemon_get_regional_mappings_from_db() {
             'region_slugs' => $region_slugs,
             'description' => $row['description'] ?? '',
         ];
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('[PokeHub DB] poke_hub_pokemon_get_regional_mappings_from_db: Returning ' . count($mappings) . ' mappings');
     }
     
     return $mappings;

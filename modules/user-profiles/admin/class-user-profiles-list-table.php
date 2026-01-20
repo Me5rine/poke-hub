@@ -303,13 +303,20 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
                     : esc_html($profile_type);
 
             case 'country':
+                // Prioritize country_custom for display, then table country, then usermeta
                 $country = '';
-                $user_id = !empty($item->user_id) ? (int) $item->user_id : 0;
-                if ($user_id > 0) {
-                    $country = get_user_meta($user_id, 'country', true);
-                } elseif (isset($item->country)) {
+                if (!empty($item->country_custom)) {
+                    // Priority: country_custom (for display)
+                    $country = $item->country_custom;
+                } elseif (!empty($item->country)) {
                     // For anonymous profiles, country is stored in table
                     $country = $item->country;
+                } else {
+                    // For logged-in users, check usermeta
+                    $user_id = !empty($item->user_id) ? (int) $item->user_id : 0;
+                    if ($user_id > 0) {
+                        $country = get_user_meta($user_id, 'country', true);
+                    }
                 }
                 return !empty($country) ? esc_html($country) : esc_html($empty_dash);
 
