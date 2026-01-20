@@ -619,6 +619,13 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         return false;
     }
 
+    // If friend_code was updated, purge Nginx Helper cache so the change appears immediately
+    if (isset($profile['friend_code'])) {
+        if (function_exists('poke_hub_purge_friend_codes_cache')) {
+            poke_hub_purge_friend_codes_cache();
+        }
+    }
+
     // Sync country with Ultimate Member (country is the single source of truth)
     // Country is ONLY stored in Ultimate Member usermeta, NOT in our table
     // If country is explicitly provided in profile (even if empty), update it (allowing deletion)
@@ -1168,6 +1175,13 @@ function poke_hub_get_um_to_custom_country_mapping($pattern_slug = '') {
  * @return array Countries list (code => label) or empty array if Ultimate Member is not available
  */
 function poke_hub_get_countries() {
+    // Cache avec transient (24 heures) pour éviter les appels répétés à UM et le tri
+    $cache_key = 'poke_hub_countries_list';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+    
     // Check if Ultimate Member is available
     if (!function_exists('UM') || !is_object(UM())) {
         return [];
@@ -1213,6 +1227,11 @@ function poke_hub_get_countries() {
         // This ensures consistent ordering when accents are the only difference
         return strcasecmp($a, $b);
     });
+    
+    // Cache pour 24 heures
+    if (!empty($countries)) {
+        set_transient($cache_key, $countries, DAY_IN_SECONDS);
+    }
     
     return $countries;
 }

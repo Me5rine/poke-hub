@@ -72,24 +72,6 @@ add_shortcode('poke_hub_friend_codes', function ($atts) {
             $form_message = $result['message'];
             $form_message_type = 'error';
         }
-            $result = poke_hub_add_public_friend_code($form_data, $is_logged_in);
-        
-        if ($result['success']) {
-            $form_message = $result['message'];
-            $form_message_type = 'success';
-            
-            // Clear form fields on success
-            $_POST = [];
-        } elseif (isset($result['needs_link_confirmation']) && $result['needs_link_confirmation']) {
-            // Code exists and needs to be linked
-            $form_message = $result['message'];
-            $form_message_type = 'warning';
-            $needs_link_confirmation = true;
-            $pending_link_data = $form_data; // Store data to resubmit with link confirmation
-        } else {
-            $form_message = $result['message'];
-            $form_message_type = 'error';
-        }
     }
     
     // Get filters from URL

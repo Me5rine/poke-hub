@@ -155,3 +155,5 @@ Les blocs Gutenberg peuvent être étendus pour inclure des sélecteurs de Poké
 
 
 
+
+

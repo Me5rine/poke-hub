@@ -19,6 +19,13 @@ if (!defined('ABSPATH')) {
  * @return array Associative array form_slug => label (French or English name)
  */
 function poke_hub_pokemon_get_scatterbug_patterns(): array {
+    // Cache avec transient (12 heures) pour éviter les requêtes DB répétées
+    $cache_key = 'poke_hub_scatterbug_patterns';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+    
     if (!function_exists('pokehub_get_table')) {
         return [];
     }
@@ -85,14 +92,6 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
     
     $patterns = $wpdb->get_results($sql);
     
-    // Debug temporaire : vérifier les résultats (à retirer en production)
-    error_log('[POKE-HUB] Scatterbug - SQL: ' . $sql);
-    error_log('[POKE-HUB] Scatterbug - last_error: ' . ($wpdb->last_error ?: 'aucune erreur'));
-    error_log('[POKE-HUB] Scatterbug - patterns count: ' . (is_array($patterns) ? count($patterns) : 'pas un tableau'));
-    if (is_array($patterns) && count($patterns) > 0) {
-        error_log('[POKE-HUB] Scatterbug - premiers patterns: ' . print_r(array_slice($patterns, 0, 3), true));
-    }
-    
     // Vérifier s'il y a eu une erreur SQL
     if ($wpdb->last_error) {
         // En cas d'erreur SQL, retourner un tableau vide
@@ -124,6 +123,11 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
         }
 
         $result[$form_slug] = $label;
+    }
+
+    // Cache pour 12 heures (43200 secondes)
+    if (!empty($result)) {
+        set_transient($cache_key, $result, 12 * HOUR_IN_SECONDS);
     }
 
     // Si aucun pattern trouvé, retourner un tableau vide
@@ -1227,7 +1231,14 @@ function poke_hub_get_vivillon_pattern_country_mapping_from_db() {
  * @return array Mapping au format: ['pattern_slug' => ['country1', 'country2', ...], ...]
  */
 function poke_hub_get_vivillon_pattern_country_mapping() {
-    // Cache statique pour éviter de récupérer les mappings à chaque appel (important pour l'import Game Master)
+    // Cache avec transient (12 heures) pour éviter les requêtes DB répétées
+    $cache_key = 'poke_hub_vivillon_pattern_mapping';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+    
+    // Cache statique pour éviter de récupérer les mappings à chaque appel dans la même requête
     static $cached_mapping = null;
     static $cached_checked = false;
     
@@ -1293,6 +1304,10 @@ function poke_hub_get_vivillon_pattern_country_mapping() {
                  * @return array Mapping modifié
                  */
                 $cached_mapping = apply_filters('poke_hub_vivillon_pattern_country_mapping', $mapping);
+                // Cache pour 12 heures
+                if (!empty($cached_mapping)) {
+                    set_transient('poke_hub_vivillon_pattern_mapping', $cached_mapping, 12 * HOUR_IN_SECONDS);
+                }
                 return $cached_mapping;
             } else {
                 // DB mapping is incomplete, will fallback to hardcoded data
@@ -1315,6 +1330,10 @@ function poke_hub_get_vivillon_pattern_country_mapping() {
          * @return array Mapping modifié
          */
         $cached_mapping = apply_filters('poke_hub_vivillon_pattern_country_mapping', $mapping_from_db);
+        // Cache pour 12 heures
+        if (!empty($cached_mapping)) {
+            set_transient('poke_hub_vivillon_pattern_mapping', $cached_mapping, 12 * HOUR_IN_SECONDS);
+        }
         return $cached_mapping;
     }
     
@@ -1538,6 +1557,10 @@ function poke_hub_get_vivillon_pattern_country_mapping() {
      * @return array Mapping modifié
      */
     $cached_mapping = apply_filters('poke_hub_vivillon_pattern_country_mapping', $mapping);
+    // Cache pour 12 heures
+    if (!empty($cached_mapping)) {
+        set_transient('poke_hub_vivillon_pattern_mapping', $cached_mapping, 12 * HOUR_IN_SECONDS);
+    }
     return $cached_mapping;
 }
 

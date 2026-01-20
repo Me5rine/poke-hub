@@ -451,6 +451,145 @@ function pokehub_table_exists(string $table_name): bool {
  * }
  * @return string HTML de la pagination (vide si total_pages <= 1)
  */
+/**
+ * Purge Nginx Helper cache for specific URLs or patterns
+ * This is a global function that can be used across all modules (events, user-profiles, etc.)
+ * 
+ * @param array|string $urls URLs to purge (string for single URL, array for multiple)
+ *                           If empty array, purges only current page
+ *                           If null/empty, purges all cache (use with caution)
+ * @param bool $purge_all If true, purges entire cache regardless of URLs (use with caution)
+ * @return bool True if purge was attempted, false otherwise
+ */
+function poke_hub_purge_nginx_cache($urls = null, $purge_all = false) {
+    // If explicitly requested to purge all
+    if ($purge_all) {
+        // Purge Nginx Helper cache completely if available
+        if (function_exists('rt_wp_nginx_helper_purge_all')) {
+            rt_wp_nginx_helper_purge_all();
+            return true;
+        }
+        
+        // Alternative: Use action hook if available
+        if (has_action('rt_nginx_helper_purge_all')) {
+            do_action('rt_nginx_helper_purge_all');
+            return true;
+        }
+        
+        // Fallback: WordPress cache flush
+        if (function_exists('wp_cache_flush')) {
+            wp_cache_flush();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Normalize URLs parameter
+    $urls_to_purge = [];
+    
+    if ($urls === null) {
+        // No URLs provided - purge only current page
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $urls_to_purge[] = home_url($_SERVER['REQUEST_URI']);
+        }
+    } elseif (is_string($urls)) {
+        // Single URL provided
+        $urls_to_purge[] = $urls;
+    } elseif (is_array($urls)) {
+        // Multiple URLs provided
+        $urls_to_purge = array_filter(array_map('trim', $urls));
+    }
+    
+    // If no URLs to purge, return false
+    if (empty($urls_to_purge)) {
+        return false;
+    }
+    
+    // Try to purge specific URLs
+    if (function_exists('rt_wp_nginx_helper_purge_url')) {
+        foreach ($urls_to_purge as $url) {
+            rt_wp_nginx_helper_purge_url($url);
+        }
+        return true;
+    }
+    
+    // Alternative: Try action hook for URL-specific purge
+    if (has_action('rt_nginx_helper_purge_url')) {
+        foreach ($urls_to_purge as $url) {
+            do_action('rt_nginx_helper_purge_url', $url);
+        }
+        return true;
+    }
+    
+    // Fallback: Purge all if URL-specific purge is not available
+    // (better to purge all than nothing, but log it)
+    if (function_exists('rt_wp_nginx_helper_purge_all')) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[PokeHub] URL-specific purge not available, purging all cache instead');
+        }
+        rt_wp_nginx_helper_purge_all();
+        return true;
+    }
+    
+    // Last resort: WordPress cache flush
+    if (function_exists('wp_cache_flush')) {
+        wp_cache_flush();
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Find pages/posts containing specific shortcodes and return their URLs
+ * Useful for purging cache of pages that display dynamic content
+ * 
+ * @param array $shortcodes Array of shortcode names (e.g., ['poke_hub_friend_codes', 'poke_hub_vivillon'])
+ * @return array Array of URLs
+ */
+function poke_hub_get_pages_with_shortcodes(array $shortcodes) {
+    if (empty($shortcodes)) {
+        return [];
+    }
+    
+    $urls = [];
+    
+    // Search in published pages
+    $pages = get_pages([
+        'post_status' => 'publish',
+        'number' => 100, // Limit to avoid too many queries
+    ]);
+    
+    foreach ($pages as $page) {
+        foreach ($shortcodes as $shortcode) {
+            if (has_shortcode($page->post_content, $shortcode)) {
+                $urls[] = get_permalink($page->ID);
+                break; // Only add once per page
+            }
+        }
+    }
+    
+    // Also search in published posts
+    $posts = get_posts([
+        'post_status' => 'publish',
+        'numberposts' => 100,
+        'post_type' => 'any',
+    ]);
+    
+    foreach ($posts as $post) {
+        foreach ($shortcodes as $shortcode) {
+            if (has_shortcode($post->post_content, $shortcode)) {
+                $urls[] = get_permalink($post->ID);
+                break; // Only add once per post
+            }
+        }
+    }
+    
+    // Remove duplicates and return
+    return array_unique(array_filter($urls));
+}
+
 function poke_hub_render_pagination(array $args = []): string {
     $args = wp_parse_args($args, [
         'total_items' => 0,

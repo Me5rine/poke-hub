@@ -47,3 +47,5 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-event-qu
 
 
 
+
+
