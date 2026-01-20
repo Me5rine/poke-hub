@@ -6,7 +6,6 @@
 // Immediate execution test - this should ALWAYS run
 (function() {
     'use strict';
-    console.log('[PokeHub Country Detection] Script file executing NOW');
     window.pokeHubCountryDetectionLoaded = true;
 })();
 
@@ -16,15 +15,11 @@
     
     function initWhenReady() {
         if (typeof jQuery === 'undefined') {
-            console.log('[PokeHub Country Detection] Waiting for jQuery...');
             setTimeout(initWhenReady, 50);
             return;
         }
         
-        console.log('[PokeHub Country Detection] jQuery found, initializing');
-        
         (function($) {
-            console.log('[PokeHub Country Detection] Inside jQuery wrapper');
     
     // Global lock to prevent multiple simultaneous API calls (shared across all scripts)
     window.phCountryDetectPromise = window.phCountryDetectPromise || null;
@@ -62,22 +57,13 @@
     
     // Detect country via WordPress AJAX endpoint (server-side, no CORS issues)
     window.pokeHubDetectCountry = function() {
-        if (typeof console !== 'undefined' && console.log) {
-            console.log('[PokeHub Country Detection] pokeHubDetectCountry called');
-        }
         var cached = getCachedCountryData();
         if (cached && (cached.code || cached.name)) {
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] Using cached data', cached);
-            }
             return Promise.resolve(cached);
         }
         
         // If already fetching, return the same promise
         if (window.phCountryDetectPromise) {
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] Already fetching, reusing promise');
-            }
             return window.phCountryDetectPromise;
         }
         
@@ -85,10 +71,6 @@
         var ajaxUrl = (typeof pokeHubAjax !== 'undefined' && pokeHubAjax.ajaxurl) 
             ? pokeHubAjax.ajaxurl 
             : ((typeof ajaxurl !== 'undefined') ? ajaxurl : '/wp-admin/admin-ajax.php');
-        
-        if (typeof console !== 'undefined' && console.log) {
-            console.log('[PokeHub Country Detection] Fetching from', ajaxUrl);
-        }
         
         // Build form data (compatible with older browsers)
         var formData = 'action=poke_hub_detect_country';
@@ -111,32 +93,17 @@
             return response.json();
         })
         .then(function(response) {
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] API response', response);
-                if (response && !response.success && response.data) {
-                    console.log('[PokeHub Country Detection] Error details:', response.data);
-                }
-            }
             if (response && response.success && response.data) {
                 var code = response.data.code || null;
                 var name = response.data.name || null;
                 if (code || name) {
                     setCachedCountryData(code, name);
-                    if (typeof console !== 'undefined' && console.log) {
-                        console.log('[PokeHub Country Detection] Success', { code: code, name: name });
-                    }
                     return { code: code, name: name };
                 }
-            }
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] No data in response');
             }
             return { code: null, name: null };
         })
         .catch(function(error) {
-            if (typeof console !== 'undefined' && console.error) {
-                console.error('[PokeHub Country Detection] Error', error);
-            }
             return { code: null, name: null };
         })
         .finally(function() {
@@ -149,14 +116,7 @@
     // Function to select country by code or name
     window.pokeHubSelectCountry = function($select, countryCode, countryName) {
         if (!$select || !$select.length) {
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] Select country: no select element found');
-            }
             return false;
-        }
-        
-        if (typeof console !== 'undefined' && console.log) {
-            console.log('[PokeHub Country Detection] Select country: trying to match', { code: countryCode, name: countryName });
         }
         
         var selectedValue = null;
@@ -213,15 +173,9 @@
             } else {
                 $select.trigger('change');
             }
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Country Detection] Select country: matched and selected', selectedValue);
-            }
             return true;
         }
         
-        if (typeof console !== 'undefined' && console.log) {
-            console.log('[PokeHub Country Detection] Select country: no match found');
-        }
         return false;
     };
     

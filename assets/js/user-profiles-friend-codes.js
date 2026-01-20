@@ -2,42 +2,21 @@
  * Friend Codes JavaScript
  */
 
-// Immediate log to verify script execution
-console.log('[PokeHub Friend Codes] Script file loaded and executing');
 window.pokeHubFriendCodesLoaded = true;
 
 (function($) {
     'use strict';
     
-    console.log('[PokeHub Friend Codes] Inside jQuery wrapper, jQuery available:', typeof $ !== 'undefined');
-    
     // Ensure DOM is ready
     $(document).ready(function() {
-        // Log initialization for debugging
-        console.log('[PokeHub Friend Codes] Script initialized, DOM ready');
-        console.log('[PokeHub Friend Codes] Checking for #country field...');
-        var $countryTest = $('#country');
-        console.log('[PokeHub Friend Codes] #country found?', $countryTest.length > 0);
-        if ($countryTest.length > 0) {
-            console.log('[PokeHub Friend Codes] #country value:', $countryTest.val());
-            console.log('[PokeHub Friend Codes] #country element:', $countryTest[0]);
-        }
-        console.log('[PokeHub Friend Codes] pokeHubDetectCountry available?', typeof window.pokeHubDetectCountry !== 'undefined');
-        console.log('[PokeHub Friend Codes] pokeHubSelectCountry available?', typeof window.pokeHubSelectCountry !== 'undefined');
-        console.log('[PokeHub Friend Codes] pokeHubLockCountryField available?', typeof window.pokeHubLockCountryField !== 'undefined');
-        
         // Auto-detect country from IP if country field is empty (optional, non-blocking)
         // This runs on all pages where the friend codes script is loaded
         // Uses shared detection script: poke-hub-country-detection.js
         function autoDetectCountry() {
-            console.log('[PokeHub Friend Codes] autoDetectCountry called');
             var $countrySelect = $('#country');
             if ($countrySelect.length === 0) {
-                console.log('[PokeHub Friend Codes] No country field found');
                 return; // No country field on this page
             }
-            
-            console.log('[PokeHub Friend Codes] Country field found', $countrySelect);
             
             // Get saved country value (before auto-detection)
             var savedCountry = $countrySelect.val() || '';
@@ -52,7 +31,6 @@ window.pokeHubFriendCodesLoaded = true;
             
             // Only attempt auto-detection if field is empty or has placeholder value
             if (hasSavedValue && !isAutoDetected) {
-                console.log('[PokeHub Friend Codes] Field already has saved value', savedCountry);
                 // Check if saved country matches detected country
                 checkCountryMismatch($countrySelect, savedCountry);
                 return; // Field already has a value, but check for mismatch
@@ -60,17 +38,13 @@ window.pokeHubFriendCodesLoaded = true;
             
             // Check if already auto-detected to avoid multiple attempts
             if ($countrySelect.attr('data-auto-detected') === '1') {
-                console.log('[PokeHub Friend Codes] Already auto-detected');
                 return;
             }
             
             // Use shared detection function (from poke-hub-country-detection.js)
             if (typeof window.pokeHubDetectCountry !== 'function') {
-                console.error('[PokeHub Friend Codes] pokeHubDetectCountry function not found');
                 return; // Shared script not loaded
             }
-            
-            console.log('[PokeHub Friend Codes] Starting detection');
             
             // Store saved country value for later comparison
             var savedCountryBeforeDetection = savedCountry || '';
@@ -78,29 +52,22 @@ window.pokeHubFriendCodesLoaded = true;
             // Get country data (from cache or WordPress AJAX endpoint)
             window.pokeHubDetectCountry()
                 .then(function(countryData) {
-                    console.log('[PokeHub Friend Codes] Country data received', countryData);
                     if (!countryData || (!countryData.code && !countryData.name)) {
-                        console.log('[PokeHub Friend Codes] No country data');
                         return false;
                     }
                     
                     // Try to select the country by code or name (using shared function)
                     if (typeof window.pokeHubSelectCountry === 'function') {
-                        var result = window.pokeHubSelectCountry($countrySelect, countryData.code, countryData.name);
-                        console.log('[PokeHub Friend Codes] Select result', result);
-                        return result;
+                        return window.pokeHubSelectCountry($countrySelect, countryData.code, countryData.name);
                     }
-                    console.error('[PokeHub Friend Codes] pokeHubSelectCountry function not found');
                     return false;
                 })
                 .then(function(selected) {
-                    console.log('[PokeHub Friend Codes] Selection result', selected);
                     if (!selected) {
                         return;
                     }
                     
                     var selectedValue = $countrySelect.val();
-                    console.log('[PokeHub Friend Codes] Selected value', selectedValue);
                     if (!selectedValue) {
                         return;
                     }
@@ -113,10 +80,7 @@ window.pokeHubFriendCodesLoaded = true;
                     
                     // Lock field and show indicator (using shared function)
                     if (typeof window.pokeHubLockCountryField === 'function') {
-                        console.log('[PokeHub Friend Codes] Locking field');
                         window.pokeHubLockCountryField($countrySelect, selectedValue);
-                    } else {
-                        console.error('[PokeHub Friend Codes] pokeHubLockCountryField function not found');
                     }
                     
                     // Apply filtering after country is auto-detected and locked
@@ -192,15 +156,12 @@ window.pokeHubFriendCodesLoaded = true;
         }
         
         // Run detection once after a delay to ensure Select2 is initialized
-        console.log('[PokeHub Friend Codes] === Scheduling autoDetectCountry in 500ms ===');
         setTimeout(function() { 
-            console.log('[PokeHub Friend Codes] === EXECUTING autoDetectCountry (delayed) ===');
             autoDetectCountry();
         }, 500);
         
         // Also try after a shorter delay
         setTimeout(function() {
-            console.log('[PokeHub Friend Codes] === EXECUTING autoDetectCountry (100ms delay) ===');
             autoDetectCountry();
         }, 100);
         
@@ -219,7 +180,6 @@ window.pokeHubFriendCodesLoaded = true;
                 var isAutoDetected = $countrySelect.attr('data-auto-detected') === '1';
                 
                 if (hasSavedValue && !isAutoDetected) {
-                    console.log('[PokeHub Friend Codes] Checking country mismatch for saved value:', savedCountry);
                     checkCountryMismatch($countrySelect, savedCountry);
                 }
             }
@@ -521,16 +481,6 @@ window.pokeHubFriendCodesLoaded = true;
         
         // Filter patterns based on selected country
         if (country) {
-            // Debug: log country and available patterns
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Filter] Filtering patterns for country:', country);
-                console.log('[PokeHub Filter] Country select value:', $countrySelect.val());
-                console.log('[PokeHub Filter] Country select disabled:', $countrySelect.prop('disabled'));
-                console.log('[PokeHub Filter] Hidden input value:', $countrySelect.siblings('input[name="country"][type="hidden"]').val());
-                var allCountries = Object.keys(pokeHubFriendCodes.vivillonMapping || {});
-                console.log('[PokeHub Filter] Total countries in mapping:', allCountries.length);
-                console.log('[PokeHub Filter] Available countries in mapping (first 20):', allCountries.slice(0, 20));
-            }
             
             // Find the exact key in mapping - try multiple methods
             var mappingKey = country;
@@ -579,34 +529,25 @@ window.pokeHubFriendCodesLoaded = true;
                 }
             }
             
-            // Debug: log found patterns
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[PokeHub Filter] Valid patterns for', country, '(using key:', mappingKey, '):', validPatterns);
-                if (validPatterns.length === 0) {
-                    console.warn('[PokeHub Filter] No patterns found for country:', country);
-                    // Show character codes to debug encoding issues
-                    console.log('[PokeHub Filter] Country char codes:', Array.from(country).map(function(c) { return c.charCodeAt(0); }));
-                    // Try to find similar country names
-                    var countryKeys = Object.keys(pokeHubFriendCodes.vivillonMapping || {});
-                    var similarKeys = countryKeys.filter(function(key) {
-                        var keyLower = key.toLowerCase();
-                        var countryLower = country.toLowerCase();
-                        return keyLower.indexOf(countryLower) !== -1 || 
-                               countryLower.indexOf(keyLower) !== -1 ||
-                               (keyLower.indexOf('états') !== -1 && countryLower.indexOf('états') !== -1);
-                    });
-                    if (similarKeys.length > 0) {
-                        console.log('[PokeHub Filter] Similar country keys found:', similarKeys);
-                        // Use the first similar key that matches closely
-                        for (var j = 0; j < similarKeys.length; j++) {
-                            var similarKey = similarKeys[j];
-                            // Prefer exact length match or very close
-                            if (Math.abs(similarKey.length - country.length) <= 2) {
-                                mappingKey = similarKey;
-                                validPatterns = pokeHubFriendCodes.vivillonMapping[mappingKey];
-                                console.log('[PokeHub Filter] Using similar key:', mappingKey, 'with patterns:', validPatterns);
-                                break;
-                            }
+            // Try to find similar country names if no patterns found
+            if (validPatterns.length === 0) {
+                var countryKeys = Object.keys(pokeHubFriendCodes.vivillonMapping || {});
+                var similarKeys = countryKeys.filter(function(key) {
+                    var keyLower = key.toLowerCase();
+                    var countryLower = country.toLowerCase();
+                    return keyLower.indexOf(countryLower) !== -1 || 
+                           countryLower.indexOf(keyLower) !== -1 ||
+                           (keyLower.indexOf('états') !== -1 && countryLower.indexOf('états') !== -1);
+                });
+                if (similarKeys.length > 0) {
+                    // Use the first similar key that matches closely
+                    for (var j = 0; j < similarKeys.length; j++) {
+                        var similarKey = similarKeys[j];
+                        // Prefer exact length match or very close
+                        if (Math.abs(similarKey.length - country.length) <= 2) {
+                            mappingKey = similarKey;
+                            validPatterns = pokeHubFriendCodes.vivillonMapping[mappingKey];
+                            break;
                         }
                     }
                 }
@@ -625,12 +566,17 @@ window.pokeHubFriendCodesLoaded = true;
             }
             
             // Add valid patterns
+            // Check if the mapping key exists in the mapping (anti-false-positive)
+            var hasMappingKey = Object.prototype.hasOwnProperty.call(pokeHubFriendCodes.vivillonMapping, mappingKey);
             originalPatternOptions.forEach(function(opt) {
                 if (!opt.value || opt.value === '' || opt.value === '0') {
                     return; // Skip placeholder, already added
                 }
                 
-                var isValid = validPatterns.length === 0 || validPatterns.indexOf(opt.value) !== -1;
+                // If key doesn't exist in mapping → all patterns valid (fallback)
+                // If key exists but array is empty → all patterns valid (or empty, but we choose all for UX)
+                // If key exists and has values → filter normally
+                var isValid = !hasMappingKey || validPatterns.length === 0 || validPatterns.indexOf(opt.value) !== -1;
                 if (isValid) {
                     var $newOption = $('<option>').val(opt.value).text(opt.text);
                     if (opt.value === selectedPatternValue) {
@@ -646,66 +592,12 @@ window.pokeHubFriendCodesLoaded = true;
                 selectedPatternValue = '';
             }
             
-            // Reinitialize Select2 if it was initialized
-            // But only if the dropdown is not currently open (to avoid closing it while user is selecting)
+            // Update Select2 if it was initialized - try to avoid destroy/reinitialize if possible
             if (isPatternSelect2) {
                 var isPatternOpen = $patternSelect.data('select2') && $patternSelect.data('select2').isOpen();
-                $patternSelect.select2('destroy');
-                // Reinitialize with allowClear to enable the clear button (X) only when a value is selected
-                var $parent = $patternSelect.closest('.me5rine-lab-form-field');
-                if (!$parent.length) {
-                    $parent = $patternSelect.closest('.me5rine-lab-form-col');
-                }
-                if (!$parent.length) {
-                    $parent = $patternSelect.closest('.me5rine-lab-form-section');
-                }
-                if (!$parent.length) {
-                    $parent = $patternSelect.parent();
-                }
-                // Get placeholder text from empty option
-                var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
-                // Ensure empty option exists for placeholder
-                var $emptyOption = $patternSelect.find('option[value=""]').first();
-                if ($emptyOption.length === 0) {
-                    $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
-                }
-                $patternSelect.select2({
-                    width: '100%',
-                    allowClear: true,
-                    placeholder: {
-                        id: '',
-                        text: placeholderText
-                    },
-                    dropdownParent: $parent.length ? $parent : $('body')
-                });
-                if (selectedPatternValue) {
-                    $patternSelect.val(selectedPatternValue);
-                } else {
-                    // Ensure empty value is set to show placeholder
-                    $patternSelect.val('');
-                }
-                // If the dropdown was open, reopen it after reinitialization
-                if (isPatternOpen) {
-                    setTimeout(function() {
-                        $patternSelect.select2('open');
-                    }, 10);
-                }
-            }
-        } else {
-            // No country selected, restore all patterns
-            var originalPatternOptions = $patternSelect.data('original-options') || [];
-            if (originalPatternOptions.length > 0) {
-                $patternSelect.find('option').remove();
-                originalPatternOptions.forEach(function(opt) {
-                    var $newOption = $('<option>').val(opt.value).text(opt.text);
-                    if (opt.selected || (opt.value === currentPatternValue && currentPatternValue)) {
-                        $newOption.prop('selected', true);
-                    }
-                    $patternSelect.append($newOption);
-                });
                 
-                if (isPatternSelect2) {
-                    var isPatternOpen = $patternSelect.data('select2') && $patternSelect.data('select2').isOpen();
+                // Only destroy/reinitialize if dropdown is not open (to avoid breaking user interaction)
+                if (!isPatternOpen) {
                     $patternSelect.select2('destroy');
                     // Reinitialize with allowClear to enable the clear button (X) only when a value is selected
                     var $parent = $patternSelect.closest('.me5rine-lab-form-field');
@@ -734,17 +626,86 @@ window.pokeHubFriendCodesLoaded = true;
                         },
                         dropdownParent: $parent.length ? $parent : $('body')
                     });
-                    if (currentPatternValue) {
-                        $patternSelect.val(currentPatternValue);
+                    if (selectedPatternValue) {
+                        $patternSelect.val(selectedPatternValue);
                     } else {
                         // Ensure empty value is set to show placeholder
                         $patternSelect.val('');
                     }
-                    // If the dropdown was open, reopen it after reinitialization
-                    if (isPatternOpen) {
-                        setTimeout(function() {
-                            $patternSelect.select2('open');
-                        }, 10);
+                    // Trigger change to update Select2 display
+                    $patternSelect.trigger('change.select2');
+                } else {
+                    // If dropdown is open, just update the value and trigger change
+                    if (selectedPatternValue) {
+                        $patternSelect.val(selectedPatternValue);
+                    } else {
+                        $patternSelect.val('');
+                    }
+                    $patternSelect.trigger('change.select2');
+                }
+            }
+        } else {
+            // No country selected, restore all patterns
+            var originalPatternOptions = $patternSelect.data('original-options') || [];
+            if (originalPatternOptions.length > 0) {
+                $patternSelect.find('option').remove();
+                originalPatternOptions.forEach(function(opt) {
+                    var $newOption = $('<option>').val(opt.value).text(opt.text);
+                    if (opt.selected || (opt.value === currentPatternValue && currentPatternValue)) {
+                        $newOption.prop('selected', true);
+                    }
+                    $patternSelect.append($newOption);
+                });
+                
+                if (isPatternSelect2) {
+                    var isPatternOpen = $patternSelect.data('select2') && $patternSelect.data('select2').isOpen();
+                    
+                    // Only destroy/reinitialize if dropdown is not open
+                    if (!isPatternOpen) {
+                        $patternSelect.select2('destroy');
+                        // Reinitialize with allowClear to enable the clear button (X) only when a value is selected
+                        var $parent = $patternSelect.closest('.me5rine-lab-form-field');
+                        if (!$parent.length) {
+                            $parent = $patternSelect.closest('.me5rine-lab-form-col');
+                        }
+                        if (!$parent.length) {
+                            $parent = $patternSelect.closest('.me5rine-lab-form-section');
+                        }
+                        if (!$parent.length) {
+                            $parent = $patternSelect.parent();
+                        }
+                        // Get placeholder text from empty option
+                        var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
+                        // Ensure empty option exists for placeholder
+                        var $emptyOption = $patternSelect.find('option[value=""]').first();
+                        if ($emptyOption.length === 0) {
+                            $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
+                        }
+                        $patternSelect.select2({
+                            width: '100%',
+                            allowClear: true,
+                            placeholder: {
+                                id: '',
+                                text: placeholderText
+                            },
+                            dropdownParent: $parent.length ? $parent : $('body')
+                        });
+                        if (currentPatternValue) {
+                            $patternSelect.val(currentPatternValue);
+                        } else {
+                            // Ensure empty value is set to show placeholder
+                            $patternSelect.val('');
+                        }
+                        // Trigger change to update Select2 display
+                        $patternSelect.trigger('change.select2');
+                    } else {
+                        // If dropdown is open, just update the value and trigger change
+                        if (currentPatternValue) {
+                            $patternSelect.val(currentPatternValue);
+                        } else {
+                            $patternSelect.val('');
+                        }
+                        $patternSelect.trigger('change.select2');
                     }
                 }
             }
@@ -1048,7 +1009,6 @@ window.pokeHubFriendCodesLoaded = true;
                                 optTextLower === detectedNameLower || optValLower === detectedNameLower ||
                                 optTextNorm === detectedNameNorm || optValNorm === detectedNameNorm) {
                                 detectedCountryName = optionValue || optionText;
-                                console.log('[PokeHub Friend Codes] Found detected country in select:', detectedCountryName);
                                 return false; // break
                             }
                         }
@@ -1057,7 +1017,6 @@ window.pokeHubFriendCodesLoaded = true;
                     // If not found by exact match, use the name directly (will be matched when updating)
                     if (!detectedCountryName && countryData.name) {
                         detectedCountryName = countryData.name;
-                        console.log('[PokeHub Friend Codes] Using detected country name directly:', detectedCountryName);
                     }
                 }
                 
@@ -1071,11 +1030,9 @@ window.pokeHubFriendCodesLoaded = true;
                     
                     if (savedCountryNorm !== detectedCountryNorm && savedCountry !== detectedCountryName) {
                         // Show warning message
-                        console.log('[PokeHub Friend Codes] Country mismatch detected:', savedCountry, 'vs', detectedCountryName);
                         showCountryMismatchWarning($countrySelect, savedCountry, detectedCountryName);
                     } else {
                         // Countries match - lock the field and show indicator to protect it
-                        console.log('[PokeHub Friend Codes] Countries match - locking field:', savedCountry, '=', detectedCountryName);
                         
                         // Only lock if not already locked
                         var isAlreadyLocked = $countrySelect.attr('data-auto-detected') === '1' && $countrySelect.prop('disabled');
@@ -1096,7 +1053,6 @@ window.pokeHubFriendCodesLoaded = true;
                             
                             // Lock field and show indicator (using shared function)
                             if (typeof window.pokeHubLockCountryField === 'function') {
-                                console.log('[PokeHub Friend Codes] Locking field based on location match');
                                 window.pokeHubLockCountryField($countrySelect, countryValueToLock);
                                 
                                 // Apply pattern filtering after locking
@@ -1109,17 +1065,13 @@ window.pokeHubFriendCodesLoaded = true;
                                         }, 300);
                                     }
                                 }
-                            } else {
-                                console.error('[PokeHub Friend Codes] pokeHubLockCountryField function not found');
                             }
                         }
                     }
-                } else {
-                    console.log('[PokeHub Friend Codes] No detected country name to compare');
                 }
             })
             .catch(function(error) {
-                console.error('[PokeHub Friend Codes] Error checking country mismatch:', error);
+                // Silently fail
             });
     }
     
@@ -1168,8 +1120,6 @@ window.pokeHubFriendCodesLoaded = true;
             var $button = $(this);
             var countryToSet = $button.data('detected-country');
             
-            console.log('[PokeHub Friend Codes] Update button clicked, country to set:', countryToSet);
-            
             // First, restore all original country options if they were filtered
             var originalCountryOptions = $countrySelect.data('original-options') || [];
             if (originalCountryOptions.length > 0) {
@@ -1177,7 +1127,6 @@ window.pokeHubFriendCodesLoaded = true;
                 var currentOptionsCount = $countrySelect.find('option').length;
                 if (currentOptionsCount < originalCountryOptions.length) {
                     // Restore all original options
-                    console.log('[PokeHub Friend Codes] Restoring all original country options before update');
                     var currentCountryValue = $countrySelect.val();
                     
                     $countrySelect.find('option').remove();
@@ -1227,7 +1176,6 @@ window.pokeHubFriendCodesLoaded = true;
                     if (optValNorm === countryNorm || optTextNorm === countryNorm || 
                         optVal.toLowerCase() === countryToSetLower || optText.toLowerCase() === countryToSetLower) {
                         foundOption = optVal;
-                        console.log('[PokeHub Friend Codes] Found matching option:', optVal, 'for detected country:', countryToSet);
                         return false; // break
                     }
                 }
@@ -1236,29 +1184,18 @@ window.pokeHubFriendCodesLoaded = true;
             if (foundOption) {
                 // Direct match found, use it
                 var actualSelectedValue = foundOption;
+                
+                // Set the value first
                 $countrySelect.val(actualSelectedValue);
                 
-                // Ensure Select2 is updated immediately
+                // Update Select2 display without destroying/reinitializing (to avoid breaking other selects)
                 var isCountrySelect2 = $countrySelect.hasClass('select2-hidden-accessible') || $countrySelect.data('select2');
                 if (isCountrySelect2) {
-                    // Reinitialize Select2 to ensure the value is properly displayed
-                    var isCountryOpen = $countrySelect.data('select2') && $countrySelect.data('select2').isOpen();
-                    $countrySelect.select2('destroy');
-                    $countrySelect.select2();
-                    $countrySelect.val(actualSelectedValue);
+                    // Just trigger change to update Select2 display without destroying
                     $countrySelect.trigger('change.select2');
-                    
-                    // If dropdown was open, reopen it
-                    if (isCountryOpen) {
-                        setTimeout(function() {
-                            $countrySelect.select2('open');
-                        }, 10);
-                    }
                 } else {
                     $countrySelect.trigger('change');
                 }
-                
-                console.log('[PokeHub Friend Codes] Selected country directly:', actualSelectedValue, 'Select value after set:', $countrySelect.val());
                 
                 // Update hidden input if exists
                 var $hiddenInput = $countrySelect.siblings('input[name="country"][type="hidden"]');
@@ -1281,15 +1218,36 @@ window.pokeHubFriendCodesLoaded = true;
                 $countrySelect.data('updating-from-mismatch', true);
                 
                 // Then trigger pattern filtering to update patterns based on new country
+                // Use a longer delay to ensure the country value is properly set before filtering
                 if ($patternSelect.length > 0 && typeof filterVivillonOptions === 'function') {
-                    // Use setTimeout to ensure Select2 has finished updating
                     setTimeout(function() {
-                        filterVivillonOptions($countrySelect, $patternSelect);
+                        // Double-check that country value is set before filtering
+                        var currentCountryValue = $countrySelect.val();
+                        if (!currentCountryValue && $countrySelect.prop('disabled')) {
+                            var $hiddenCountry = $countrySelect.siblings('input[name="country"][type="hidden"]');
+                            if ($hiddenCountry.length > 0) {
+                                currentCountryValue = $hiddenCountry.val();
+                            }
+                        }
+                        
+                        // Only filter if we have a country value
+                        if (currentCountryValue) {
+                            // Ensure country select has the value before filtering
+                            if ($countrySelect.val() !== currentCountryValue) {
+                                $countrySelect.val(currentCountryValue);
+                                if (isCountrySelect2) {
+                                    $countrySelect.trigger('change.select2');
+                                }
+                            }
+                            
+                            filterVivillonOptions($countrySelect, $patternSelect);
+                        }
+                        
                         // Remove the flag after filtering
                         setTimeout(function() {
                             $countrySelect.removeData('updating-from-mismatch');
                         }, 100);
-                    }, 100);
+                    }, 200);
                 } else {
                     // Remove the flag if no pattern select
                     setTimeout(function() {
@@ -1318,7 +1276,6 @@ window.pokeHubFriendCodesLoaded = true;
                 }, 3000);
             } else {
                 // No direct match, try using detection function
-                console.log('[PokeHub Friend Codes] No direct match found, trying detection function');
                 if (typeof window.pokeHubDetectCountry === 'function') {
                     window.pokeHubDetectCountry()
                         .then(function(countryData) {
@@ -1329,8 +1286,6 @@ window.pokeHubFriendCodesLoaded = true;
                                     if (selected) {
                                         var actualSelectedValue = $countrySelect.val();
                                         
-                                        console.log('[PokeHub Friend Codes] Selected country via detection function:', actualSelectedValue);
-                                        
                                         // Update hidden input if exists
                                         var $hiddenInput = $countrySelect.siblings('input[name="country"][type="hidden"]');
                                         if ($hiddenInput.length > 0) {
@@ -1339,10 +1294,40 @@ window.pokeHubFriendCodesLoaded = true;
                                             $countrySelect.after('<input type="hidden" name="country" value="' + $('<div>').text(actualSelectedValue).html() + '">');
                                         }
                                         
-                                        // Trigger pattern filtering
+                                        // Clear pattern selection first (since country changed)
                                         var $patternSelect = $form.find('#scatterbug_pattern');
-                                        if ($patternSelect.length > 0 && typeof filterVivillonOptions === 'function') {
-                                            filterVivillonOptions($countrySelect, $patternSelect);
+                                        if ($patternSelect.length > 0) {
+                                            $patternSelect.val('');
+                                            if ($patternSelect.hasClass('select2-hidden-accessible') || $patternSelect.data('select2')) {
+                                                $patternSelect.trigger('change.select2');
+                                            }
+                                            
+                                            // Trigger pattern filtering with proper delay
+                                            if (typeof filterVivillonOptions === 'function') {
+                                                setTimeout(function() {
+                                                    // Double-check that country value is set before filtering
+                                                    var currentCountryValue = $countrySelect.val();
+                                                    if (!currentCountryValue && $countrySelect.prop('disabled')) {
+                                                        var $hiddenCountry = $countrySelect.siblings('input[name="country"][type="hidden"]');
+                                                        if ($hiddenCountry.length > 0) {
+                                                            currentCountryValue = $hiddenCountry.val();
+                                                        }
+                                                    }
+                                                    
+                                                    // Only filter if we have a country value
+                                                    if (currentCountryValue) {
+                                                        // Ensure country select has the value before filtering
+                                                        if ($countrySelect.val() !== currentCountryValue) {
+                                                            $countrySelect.val(currentCountryValue);
+                                                            if ($countrySelect.hasClass('select2-hidden-accessible') || $countrySelect.data('select2')) {
+                                                                $countrySelect.trigger('change.select2');
+                                                            }
+                                                        }
+                                                        
+                                                        filterVivillonOptions($countrySelect, $patternSelect);
+                                                    }
+                                                }, 200);
+                                            }
                                         }
                                         
                                         // Remove warning message
@@ -1363,19 +1348,16 @@ window.pokeHubFriendCodesLoaded = true;
                                             $form.find('.poke-hub-country-updated-success').fadeOut(300, function() {
                                                 $(this).remove();
                                             });
-                                        }, 3000);
-                                    } else {
-                                        console.error('[PokeHub Friend Codes] Failed to select detected country via detection function');
+                                            }, 3000);
                                     }
                                 }
                             }
                         })
                         .catch(function(error) {
-                            console.error('[PokeHub Friend Codes] Error updating country:', error);
+                            // Silently fail
                         });
                 } else {
                     // Fallback: try direct value setting if detection function not available
-                    console.log('[PokeHub Friend Codes] Detection function not available, trying direct value');
                     var optionExists = false;
                     $countrySelect.find('option').each(function() {
                         if ($(this).val() === countryToSet || $(this).text() === countryToSet) {
@@ -1425,8 +1407,6 @@ window.pokeHubFriendCodesLoaded = true;
                                 $(this).remove();
                             });
                         }, 3000);
-                    } else {
-                        console.error('[PokeHub Friend Codes] Country option not found:', countryToSet);
                     }
                 }
             }
