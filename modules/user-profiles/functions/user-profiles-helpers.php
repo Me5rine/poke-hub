@@ -621,8 +621,8 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
 
     // If friend_code was updated, purge Nginx Helper cache so the change appears immediately
     if (isset($profile['friend_code'])) {
-        if (function_exists('poke_hub_purge_friend_codes_cache')) {
-            poke_hub_purge_friend_codes_cache();
+        if (function_exists('poke_hub_purge_module_cache')) {
+            poke_hub_purge_module_cache(['poke_hub_friend_codes', 'poke_hub_vivillon']);
         }
     }
 
@@ -854,24 +854,24 @@ function poke_hub_get_scatterbug_patterns() {
     // Fallback: default list if Pokemon module is not active or no patterns found
     error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - retourne liste par défaut');
     return [
-        'archipelago' => __('Archipelago', 'poke-hub'),
+        'archipelago' => __('Archipel', 'poke-hub'),
         'continental' => __('Continental', 'poke-hub'),
-        'elegant'     => __('Elegant', 'poke-hub'),
-        'garden'      => __('Garden', 'poke-hub'),
-        'high-plains' => __('High Plains', 'poke-hub'),
-        'icy-snow'    => __('Icy Snow', 'poke-hub'),
+        'elegant'     => __('Élégant', 'poke-hub'),
+        'garden'      => __('Jardin', 'poke-hub'),
+        'high-plains' => __('Hautes Plaines', 'poke-hub'),
+        'icy-snow'    => __('Neige Glacée', 'poke-hub'),
         'jungle'      => __('Jungle', 'poke-hub'),
-        'marine'      => __('Marine', 'poke-hub'),
-        'meadow'      => __('Meadow', 'poke-hub'),
-        'modern'      => __('Modern', 'poke-hub'),
-        'monsoon'     => __('Monsoon', 'poke-hub'),
-        'ocean'       => __('Ocean', 'poke-hub'),
-        'polar'       => __('Polar', 'poke-hub'),
-        'river'       => __('River', 'poke-hub'),
-        'sandstorm'   => __('Sandstorm', 'poke-hub'),
-        'savanna'     => __('Savanna', 'poke-hub'),
-        'sun'         => __('Sun', 'poke-hub'),
-        'tundra'      => __('Tundra', 'poke-hub'),
+        'marine'      => __('Marin', 'poke-hub'),
+        'meadow'      => __('Prairie', 'poke-hub'),
+        'modern'      => __('Moderne', 'poke-hub'),
+        'monsoon'     => __('Mousson', 'poke-hub'),
+        'ocean'       => __('Océan', 'poke-hub'),
+        'polar'       => __('Polaire', 'poke-hub'),
+        'river'       => __('Rivière', 'poke-hub'),
+        'sandstorm'   => __('Tempête de Sable', 'poke-hub'),
+        'savanna'     => __('Savane', 'poke-hub'),
+        'sun'         => __('Soleil', 'poke-hub'),
+        'tundra'      => __('Toundra', 'poke-hub'),
     ];
 }
 

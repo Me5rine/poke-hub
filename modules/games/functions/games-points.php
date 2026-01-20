@@ -12,11 +12,33 @@ if (!defined('ABSPATH')) {
  * @param bool $is_success Si le joueur a réussi
  * @param int $attempts Nombre de tentatives
  * @param int $completion_time Temps de complétion en secondes
+ * @param array $score_data Données supplémentaires (ex: hints_used, hints_enabled)
  * @return int Points attribués
  */
-function poke_hub_games_calculate_points(string $game_type, bool $is_success, int $attempts = 0, int $completion_time = 0): int {
+function poke_hub_games_calculate_points(string $game_type, bool $is_success, int $attempts = 0, int $completion_time = 0, array $score_data = []): int {
     $points = 0;
     
+    // Pour le Pokedle, utiliser le nouveau système de points basé sur les indices
+    if ($game_type === 'pokedle' && $is_success) {
+        $hints_used = isset($score_data['hints_used']) ? (int) $score_data['hints_used'] : 0;
+        $hints_enabled = isset($score_data['hints_enabled']) ? filter_var($score_data['hints_enabled'], FILTER_VALIDATE_BOOLEAN) : true;
+        
+        // Si les indices sont désactivés ou aucun indice utilisé : 50 points
+        if (!$hints_enabled || $hints_used === 0) {
+            $points = 50;
+        } elseif ($hints_used === 1) {
+            $points = 30;
+        } elseif ($hints_used === 2) {
+            $points = 20;
+        } elseif ($hints_used >= 3) {
+            $points = 10;
+        }
+        
+        // Permettre aux autres jeux de modifier les points
+        return apply_filters('poke_hub_games_calculate_points', $points, $game_type, $is_success, $attempts, $completion_time, $score_data);
+    }
+    
+    // Ancien système pour les autres jeux (rétrocompatibilité)
     // Points de base pour avoir terminé le jeu
     $points += 10; // 10 points pour avoir terminé
     
@@ -38,7 +60,7 @@ function poke_hub_games_calculate_points(string $game_type, bool $is_success, in
     }
     
     // Permettre aux autres jeux de modifier les points
-    return apply_filters('poke_hub_games_calculate_points', $points, $game_type, $is_success, $attempts, $completion_time);
+    return apply_filters('poke_hub_games_calculate_points', $points, $game_type, $is_success, $attempts, $completion_time, $score_data);
 }
 
 /**
@@ -146,13 +168,13 @@ function poke_hub_games_update_points(int $user_id, string $period_type, string 
  * @param int $completion_time Temps de complétion en secondes
  * @return bool
  */
-function poke_hub_games_add_points(int $user_id, string $game_date, string $game_type, bool $is_success, int $attempts = 0, int $completion_time = 0): bool {
+function poke_hub_games_add_points(int $user_id, string $game_date, string $game_type, bool $is_success, int $attempts = 0, int $completion_time = 0, array $score_data = []): bool {
     if ($user_id <= 0) {
         return false;
     }
     
     // Calculer les points
-    $points = poke_hub_games_calculate_points($game_type, $is_success, $attempts, $completion_time);
+    $points = poke_hub_games_calculate_points($game_type, $is_success, $attempts, $completion_time, $score_data);
     
     if ($points <= 0) {
         return false;

@@ -82,6 +82,7 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
     $sql = "SELECT DISTINCT 
                 fv.form_slug,
                 fv.label,
+                fv.extra AS form_variant_extra,
                 COALESCE(p.name_fr, p.name_en, '') AS pokemon_name
             FROM `{$pokemon_table_escaped}` AS p
             INNER JOIN `{$form_variants_table_escaped}` AS fv ON p.form_variant_id = fv.id
@@ -122,7 +123,47 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
             $label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
         }
 
-        $result[$form_slug] = $label;
+        // Vérifier si une traduction française existe dans extra->names->fr
+        $translated_label = $label;
+        if (!empty($pattern->form_variant_extra)) {
+            $extra = json_decode($pattern->form_variant_extra, true);
+            if (is_array($extra) && !empty($extra['names']['fr'])) {
+                $translated_label = trim((string) $extra['names']['fr']);
+            }
+        }
+
+        // Si pas de traduction dans extra, essayer d'utiliser la traduction WordPress
+        // (seulement si le label est identique à celui du fallback)
+        if ($translated_label === $label) {
+            // Mapping des traductions françaises pour les patterns courants
+            $pattern_translations = [
+                'archipelago' => __('Archipel', 'poke-hub'),
+                'continental' => __('Continental', 'poke-hub'),
+                'elegant' => __('Élégant', 'poke-hub'),
+                'garden' => __('Jardin', 'poke-hub'),
+                'high-plains' => __('Hautes Plaines', 'poke-hub'),
+                'icy-snow' => __('Neige Glacée', 'poke-hub'),
+                'jungle' => __('Jungle', 'poke-hub'),
+                'marine' => __('Marin', 'poke-hub'),
+                'meadow' => __('Prairie', 'poke-hub'),
+                'modern' => __('Moderne', 'poke-hub'),
+                'monsoon' => __('Mousson', 'poke-hub'),
+                'ocean' => __('Océan', 'poke-hub'),
+                'polar' => __('Polaire', 'poke-hub'),
+                'river' => __('Rivière', 'poke-hub'),
+                'sandstorm' => __('Tempête de Sable', 'poke-hub'),
+                'savanna' => __('Savane', 'poke-hub'),
+                'sun' => __('Soleil', 'poke-hub'),
+                'tundra' => __('Toundra', 'poke-hub'),
+            ];
+
+            // Si on a une traduction pour ce pattern, l'utiliser
+            if (isset($pattern_translations[$form_slug])) {
+                $translated_label = $pattern_translations[$form_slug];
+            }
+        }
+
+        $result[$form_slug] = $translated_label;
     }
 
     // Cache pour 12 heures (43200 secondes)

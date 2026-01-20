@@ -333,7 +333,25 @@ function poke_hub_pokedle_save_score(
             // Pour un update, on doit recalculer tous les points depuis le début de la période
             // Pour simplifier, on met à jour seulement si c'est un nouveau score
             if (!$existing) {
-                poke_hub_games_add_points($user_id, $game_date, 'pokedle', (bool) $is_success, $attempts, $completion_time);
+                // Extraire les données des indices depuis score_data
+                $hints_used = 0;
+                $hints_enabled = true;
+                if (!empty($score_data)) {
+                    if (is_string($score_data)) {
+                        $score_data = json_decode($score_data, true);
+                    }
+                    if (is_array($score_data)) {
+                        $hints_used = isset($score_data['hints_used']) ? (int) $score_data['hints_used'] : 0;
+                        $hints_enabled = isset($score_data['hints_enabled']) ? filter_var($score_data['hints_enabled'], FILTER_VALIDATE_BOOLEAN) : true;
+                    }
+                }
+                
+                $score_data_array = [
+                    'hints_used' => $hints_used,
+                    'hints_enabled' => $hints_enabled
+                ];
+                
+                poke_hub_games_add_points($user_id, $game_date, 'pokedle', (bool) $is_success, $attempts, $completion_time, $score_data_array);
             }
         }
     }
@@ -359,6 +377,7 @@ function poke_hub_pokedle_get_leaderboard(string $game_date, int $limit = 10): a
     $game_date = sanitize_text_field($game_date);
     $limit = (int) $limit;
 
+    // Récupérer les scores avec calcul des points basés sur les indices
     $results = $wpdb->get_results(
         $wpdb->prepare(
             "SELECT s.*, u.user_login, u.display_name
@@ -374,6 +393,30 @@ function poke_hub_pokedle_get_leaderboard(string $game_date, int $limit = 10): a
         ),
         ARRAY_A
     );
+    
+    // Calculer les points pour chaque entrée
+    foreach ($results as &$entry) {
+        $score_data = !empty($entry['score_data']) ? json_decode($entry['score_data'], true) : [];
+        $points = poke_hub_games_calculate_points('pokedle', true, (int) $entry['attempts'], (int) $entry['completion_time'], $score_data);
+        $entry['points'] = $points;
+    }
+    unset($entry);
+    
+    // Trier par points décroissants
+    usort($results, function($a, $b) {
+        $points_a = isset($a['points']) ? (int) $a['points'] : 0;
+        $points_b = isset($b['points']) ? (int) $b['points'] : 0;
+        if ($points_a !== $points_b) {
+            return $points_b <=> $points_a;
+        }
+        // En cas d'égalité, trier par tentatives puis temps
+        $attempts_a = (int) $a['attempts'];
+        $attempts_b = (int) $b['attempts'];
+        if ($attempts_a !== $attempts_b) {
+            return $attempts_a <=> $attempts_b;
+        }
+        return ((int) $a['completion_time']) <=> ((int) $b['completion_time']);
+    });
 
     return $results ?: [];
 }
@@ -600,5 +643,41 @@ function poke_hub_pokedle_get_user_score(?int $user_id, string $game_date): ?arr
     }
 
     return $score ?: null;
+}
+
+/**
+ * Compte le nombre de joueurs ayant réussi un pokedle pour une date et génération données
+ * 
+ * @param string $game_date Date du jeu (Y-m-d)
+ * @param int|null $generation_id ID de la génération (NULL pour toutes générations)
+ * @return int Nombre de joueurs ayant réussi
+ */
+function poke_hub_pokedle_count_successful_players(string $game_date, ?int $generation_id = null): int {
+    global $wpdb;
+
+    $scores_table = pokehub_get_table('games_scores');
+    if (!$scores_table) {
+        return 0;
+    }
+
+    $game_date = sanitize_text_field($game_date);
+    
+    // Pour l'instant, on compte tous les scores réussis pour cette date
+    // On pourrait filtrer par génération si on stocke cette info dans games_scores
+    // Pour l'instant, on compte simplement tous les scores réussis pour cette date
+    $count = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(DISTINCT user_id)
+             FROM {$scores_table}
+             WHERE game_type = 'pokedle'
+             AND game_date = %s
+             AND is_success = 1
+             AND user_id IS NOT NULL
+             AND user_id > 0",
+            $game_date
+        )
+    );
+
+    return (int) $count;
 }
 

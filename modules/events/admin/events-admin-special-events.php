@@ -597,6 +597,15 @@ add_action('admin_post_pokehub_save_special_event', function () {
         }
     }
 
+    // Purge Nginx Helper cache and WordPress cache so the updated event appears immediately
+    if (function_exists('poke_hub_purge_module_cache')) {
+        poke_hub_purge_module_cache(
+            ['poke_hub_events'],
+            'poke_hub_events',
+            'poke_hub_events_all'
+        );
+    }
+
     // Déterminer si c'est un ajout ou une mise à jour
     // Si event_id existe dans POST et est > 0, c'est une mise à jour
     $is_new = ($event_id <= 0);

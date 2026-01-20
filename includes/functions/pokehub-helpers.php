@@ -590,6 +590,66 @@ function poke_hub_get_pages_with_shortcodes(array $shortcodes) {
     return array_unique(array_filter($urls));
 }
 
+/**
+ * Purge cache for a module (Nginx Helper + WordPress object cache)
+ * Generic function usable by all modules
+ * 
+ * @param array $shortcodes Array of shortcode names to find pages (e.g., ['poke_hub_events', 'poke_hub_friend_codes'])
+ * @param string|null $cache_group WordPress cache group (e.g., 'poke_hub_events')
+ * @param string|null $cache_key WordPress cache key (e.g., 'poke_hub_events_all')
+ * @return bool True on success, false on failure
+ */
+function poke_hub_purge_module_cache(array $shortcodes, ?string $cache_group = null, ?string $cache_key = null): bool {
+    if (empty($shortcodes)) {
+        return false;
+    }
+    
+    // Find all pages with these shortcodes
+    $urls = [];
+    if (function_exists('poke_hub_get_pages_with_shortcodes')) {
+        $urls = poke_hub_get_pages_with_shortcodes($shortcodes);
+    } else {
+        // Fallback if helper not available yet
+        $pages = get_pages(['post_status' => 'publish', 'number' => 50]);
+        foreach ($pages as $page) {
+            foreach ($shortcodes as $shortcode) {
+                if (has_shortcode($page->post_content, $shortcode)) {
+                    $urls[] = get_permalink($page->ID);
+                    break; // Only add once per page
+                }
+            }
+        }
+    }
+    
+    // Also include current page if we're on a page with one of these shortcodes
+    if (isset($_SERVER['REQUEST_URI'])) {
+        $current_url = home_url($_SERVER['REQUEST_URI']);
+        if (!in_array($current_url, $urls, true)) {
+            $urls[] = $current_url;
+        }
+    }
+    
+    // Purge Nginx Helper cache for these specific URLs only (not the entire site)
+    if (function_exists('poke_hub_purge_nginx_cache')) {
+        poke_hub_purge_nginx_cache($urls, false);
+    }
+    
+    // Purge WordPress object cache if cache group/key provided
+    if (!empty($cache_group)) {
+        if (!empty($cache_key)) {
+            // Delete specific cache key
+            wp_cache_delete($cache_key, $cache_group);
+        }
+        
+        // Also clear the entire cache group if available (WordPress 6.1+)
+        if (function_exists('wp_cache_flush_group')) {
+            wp_cache_flush_group($cache_group);
+        }
+    }
+    
+    return true;
+}
+
 function poke_hub_render_pagination(array $args = []): string {
     $args = wp_parse_args($args, [
         'total_items' => 0,

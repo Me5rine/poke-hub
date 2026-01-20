@@ -8,38 +8,18 @@ if (!defined('ABSPATH')) {
 /**
  * Purge Nginx Helper cache for friend codes pages
  * This ensures that new/updated codes appear immediately on the front-end
- * Uses the global poke_hub_purge_nginx_cache() function to purge only relevant pages
+ * Uses the global poke_hub_purge_module_cache() function
+ * 
+ * @deprecated Use poke_hub_purge_module_cache() directly instead
  */
 function poke_hub_purge_friend_codes_cache() {
-    // Find all pages with friend codes shortcodes
-    $shortcodes = ['poke_hub_friend_codes', 'poke_hub_vivillon'];
-    
-    // Use global helper function to find pages with these shortcodes
-    if (function_exists('poke_hub_get_pages_with_shortcodes')) {
-        $urls = poke_hub_get_pages_with_shortcodes($shortcodes);
-    } else {
-        // Fallback if helper not available yet
-        $urls = [];
-        $pages = get_pages(['post_status' => 'publish', 'number' => 50]);
-        foreach ($pages as $page) {
-            if (has_shortcode($page->post_content, 'poke_hub_friend_codes') || 
-                has_shortcode($page->post_content, 'poke_hub_vivillon')) {
-                $urls[] = get_permalink($page->ID);
-            }
-        }
-    }
-    
-    // Also include current page if we're on a friend codes page
-    if (isset($_SERVER['REQUEST_URI'])) {
-        $current_url = home_url($_SERVER['REQUEST_URI']);
-        if (!in_array($current_url, $urls, true)) {
-            $urls[] = $current_url;
-        }
-    }
-    
-    // Purge cache for these specific URLs only (not the entire site)
-    if (function_exists('poke_hub_purge_nginx_cache')) {
-        return poke_hub_purge_nginx_cache($urls, false);
+    // Use global helper function
+    if (function_exists('poke_hub_purge_module_cache')) {
+        return poke_hub_purge_module_cache(
+            ['poke_hub_friend_codes', 'poke_hub_vivillon'],
+            null, // No WordPress cache group for friend codes
+            null  // No WordPress cache key for friend codes
+        );
     }
     
     // Fallback if global function not available
@@ -598,7 +578,9 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 }
                 
                 // Purge Nginx Helper cache so the updated code appears immediately
-                poke_hub_purge_friend_codes_cache();
+                if (function_exists('poke_hub_purge_module_cache')) {
+                    poke_hub_purge_module_cache(['poke_hub_friend_codes', 'poke_hub_vivillon']);
+                }
                 
                 return [
                     'success' => true,

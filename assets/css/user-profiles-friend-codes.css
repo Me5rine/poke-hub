@@ -205,6 +205,11 @@
     /* Styles supplémentaires si besoin */
 }
 
+/* Country auto-detected indicator - surcharge uniquement la taille du texte */
+.country-auto-detected-indicator {
+    font-size: 0.85em !important;
+}
+
 /* Responsive pour les cartes */
 @media (max-width: 768px) {
     .friend-codes-dashboard .user-profiles-friend-code-card,

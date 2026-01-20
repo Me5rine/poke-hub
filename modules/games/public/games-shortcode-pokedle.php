@@ -83,6 +83,10 @@ function poke_hub_shortcode_pokedle($atts) {
         }
     }
 
+    // Compter le nombre de joueurs ayant réussi ce pokedle
+    $normalized_generation_id_for_count = $selected_generation_id > 0 ? $selected_generation_id : null;
+    $successful_players_count = poke_hub_pokedle_count_successful_players($selected_date, $normalized_generation_id_for_count);
+    
     // Préparer les données pour le JavaScript
     $pokedle_data = [
         'dailyPokemonId' => (int) $daily_pokemon['id'],
@@ -90,6 +94,7 @@ function poke_hub_shortcode_pokedle($atts) {
         'currentGameDate' => $selected_date,
         'currentGenerationId' => $selected_generation_id > 0 ? $selected_generation_id : null,
         'isAllGenerationsMode' => $selected_generation_id === 0,
+        'successfulPlayersCount' => $successful_players_count,
         'allPokemon' => array_map(function($p) {
             // Récupérer l'URL de l'image du Pokémon
             $pokemon_obj = (object) $p;
@@ -165,6 +170,13 @@ function poke_hub_shortcode_pokedle($atts) {
             'tooBad' => __('Too bad!', 'poke-hub'),
             'theMysteryPokemonWas' => __('The mystery Pokémon was', 'poke-hub'),
             'youMade' => __('You made', 'poke-hub'),
+            'enableHints' => __('Enable hints', 'poke-hub'),
+            'nextHintIn' => __('Next hint in', 'poke-hub'),
+            'hintsDisabled' => __('Hints are disabled', 'poke-hub'),
+            'allHintsRevealed' => __('All hints revealed', 'poke-hub'),
+            'points' => __('points', 'poke-hub'),
+            'onePlayerFound' => __('1 player found it', 'poke-hub'),
+            'playersFound' => __('%d players found it', 'poke-hub'),
         ],
     ];
 
@@ -198,6 +210,14 @@ function poke_hub_shortcode_pokedle($atts) {
                 <div class="pokedle-game-info">
                     <span id="pokedle-current-mode" class="me5rine-lab-status me5rine-lab-status-info"><?php echo esc_html__('All Generations', 'poke-hub'); ?></span>
                     <span id="pokedle-attempts-count" class="me5rine-lab-status me5rine-lab-status-info"></span>
+                    <span id="pokedle-successful-count" class="me5rine-lab-status me5rine-lab-status-info">
+                        <?php 
+                        printf(
+                            esc_html__('%d player(s) found it', 'poke-hub'),
+                            $successful_players_count
+                        );
+                        ?>
+                    </span>
                 </div>
             </div>
             
@@ -249,6 +269,17 @@ function poke_hub_shortcode_pokedle($atts) {
             <?php endif; ?>
 
             <div class="pokedle-game" <?php echo $user_score && $user_score['is_success'] ? 'style="display:none;"' : ''; ?>>
+            <!-- Option avec/sans indice -->
+            <div class="pokedle-hints-option" id="pokedle-hints-option" style="display:none;">
+                <label class="me5rine-lab-form-label">
+                    <input type="checkbox" id="pokedle-enable-hints" checked />
+                    <?php echo esc_html__('Enable hints', 'poke-hub'); ?>
+                </label>
+                <p class="pokedle-hints-info" id="pokedle-hints-info">
+                    <?php echo esc_html__('Next hint in', 'poke-hub'); ?> <span id="pokedle-hints-remaining">5</span> <?php echo esc_html__('attempts', 'poke-hub'); ?>
+                </p>
+            </div>
+            
             <div class="pokedle-input-container">
                 <input 
                     type="text" 
@@ -308,6 +339,7 @@ function poke_hub_pokedle_ajax_submit_guess() {
     $daily_pokemon_id = isset($_POST['daily_pokemon_id']) ? (int) $_POST['daily_pokemon_id'] : 0;
     $wrong_attempts_count = isset($_POST['wrong_attempts_count']) ? (int) $_POST['wrong_attempts_count'] : 0;
     $is_all_generations_mode = isset($_POST['is_all_generations_mode']) ? filter_var($_POST['is_all_generations_mode'], FILTER_VALIDATE_BOOLEAN) : true;
+    $hints_enabled = isset($_POST['hints_enabled']) ? filter_var($_POST['hints_enabled'], FILTER_VALIDATE_BOOLEAN) : true;
 
     if ($pokemon_id <= 0 || $daily_pokemon_id <= 0) {
         wp_send_json_error(['message' => __('Invalid data.', 'poke-hub')]);
@@ -317,7 +349,8 @@ function poke_hub_pokedle_ajax_submit_guess() {
     
     // Ajouter les indices progressifs révélés selon le nombre de mauvaises réponses
     // Indices aléatoires (mais déterministes) à 5, 10 et 15 tentatives
-    if (!$comparison['is_correct']) {
+    // Seulement si les indices sont activés
+    if (!$comparison['is_correct'] && $hints_enabled) {
         $comparison['revealed_hints'] = [];
         
         // Récupérer les informations du Pokémon mystère pour les indices
@@ -410,7 +443,17 @@ function poke_hub_pokedle_ajax_save_score() {
     $attempts = isset($_POST['attempts']) ? (int) $_POST['attempts'] : 0;
     $is_success = isset($_POST['is_success']) ? (bool) $_POST['is_success'] : false;
     $completion_time = isset($_POST['completion_time']) ? (int) $_POST['completion_time'] : 0;
+    $hints_used = isset($_POST['hints_used']) ? (int) $_POST['hints_used'] : 0;
+    $hints_enabled = isset($_POST['hints_enabled']) ? filter_var($_POST['hints_enabled'], FILTER_VALIDATE_BOOLEAN) : true;
     $score_data = isset($_POST['score_data']) ? (array) $_POST['score_data'] : [];
+    
+    // Ajouter les informations sur les indices dans score_data
+    if (!isset($score_data['hints_used'])) {
+        $score_data['hints_used'] = $hints_used;
+    }
+    if (!isset($score_data['hints_enabled'])) {
+        $score_data['hints_enabled'] = $hints_enabled;
+    }
 
     if ($pokemon_id <= 0 || $attempts <= 0) {
         wp_send_json_error(['message' => __('Invalid data.', 'poke-hub')]);
@@ -498,4 +541,22 @@ function poke_hub_games_ajax_get_general_leaderboard() {
 }
 add_action('wp_ajax_poke_hub_games_get_general_leaderboard', 'poke_hub_games_ajax_get_general_leaderboard');
 add_action('wp_ajax_nopriv_poke_hub_games_get_general_leaderboard', 'poke_hub_games_ajax_get_general_leaderboard');
+
+/**
+ * Endpoint AJAX pour compter le nombre de joueurs ayant réussi
+ */
+function poke_hub_pokedle_ajax_count_successful() {
+    check_ajax_referer('poke_hub_pokedle_nonce', 'nonce');
+    
+    $game_date = isset($_POST['game_date']) ? sanitize_text_field($_POST['game_date']) : current_time('Y-m-d');
+    $generation_id = isset($_POST['generation_id']) && $_POST['generation_id'] !== 'null' && $_POST['generation_id'] !== '' 
+        ? (int) $_POST['generation_id'] 
+        : null;
+    
+    $count = poke_hub_pokedle_count_successful_players($game_date, $generation_id);
+    
+    wp_send_json_success(['count' => $count]);
+}
+add_action('wp_ajax_poke_hub_pokedle_count_successful', 'poke_hub_pokedle_ajax_count_successful');
+add_action('wp_ajax_nopriv_poke_hub_pokedle_count_successful', 'poke_hub_pokedle_ajax_count_successful');
 

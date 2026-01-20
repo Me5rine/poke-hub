@@ -11,6 +11,8 @@
     let startTime = null;
     let isGameComplete = false;
     let wrongAttemptsCount = 0; // Compteur de mauvaises réponses
+    let hintsEnabled = true; // Indices activés par défaut
+    let hintsUsed = 0; // Nombre d'indices utilisés
     let gameConfig = {
         mode: 'all', // 'all' ou ID de génération
         selectedGeneration: null,
@@ -156,6 +158,10 @@
         startTime = Date.now();
         wrongAttemptsCount = 0; // Réinitialiser le compteur de mauvaises réponses
         attempts = []; // Réinitialiser la liste des tentatives
+        hintsUsed = 0; // Réinitialiser le nombre d'indices utilisés
+        
+        // Initialiser l'option avec/sans indice
+        initHintsOption();
         
         // Initialiser l'autocomplétion
         initAutocomplete();
@@ -188,6 +194,73 @@
         
         // Mettre à jour les infos
         updateGameInfo();
+    }
+    
+    /**
+     * Initialise l'option avec/sans indice
+     */
+    function initHintsOption() {
+        const $hintsOption = $('#pokedle-hints-option');
+        const $enableHints = $('#pokedle-enable-hints');
+        const $hintsInfo = $('#pokedle-hints-info');
+        
+        if ($hintsOption.length === 0) {
+            return;
+        }
+        
+        // Afficher l'option seulement si le jeu n'est pas terminé
+        if (!isGameComplete) {
+            $hintsOption.show();
+        }
+        
+        // Gérer le changement d'état
+        $enableHints.on('change', function() {
+            hintsEnabled = $(this).is(':checked');
+            updateHintsInfo();
+        });
+        
+        // Initialiser l'affichage
+        updateHintsInfo();
+    }
+    
+    /**
+     * Met à jour l'affichage des informations sur les indices
+     */
+    function updateHintsInfo() {
+        const $hintsInfo = $('#pokedle-hints-info');
+        const $hintsRemaining = $('#pokedle-hints-remaining');
+        
+        if ($hintsInfo.length === 0) {
+            return;
+        }
+        
+        if (!hintsEnabled) {
+            $hintsInfo.text(gameData.i18n.hintsDisabled || 'Hints are disabled');
+            return;
+        }
+        
+        // Calculer le nombre d'essais restants avant le prochain indice
+        // Les indices sont révélés à 5, 10, 15 tentatives
+        let nextHintThreshold = null;
+        if (wrongAttemptsCount < 5) {
+            nextHintThreshold = 5;
+        } else if (wrongAttemptsCount < 10) {
+            nextHintThreshold = 10;
+        } else if (wrongAttemptsCount < 15) {
+            nextHintThreshold = 15;
+        } else {
+            // Tous les indices ont été révélés
+            $hintsInfo.text(gameData.i18n.allHintsRevealed || 'All hints revealed');
+            return;
+        }
+        
+        const remaining = nextHintThreshold - wrongAttemptsCount;
+        if (remaining > 0) {
+            $hintsRemaining.text(remaining);
+            $hintsInfo.show();
+        } else {
+            $hintsInfo.hide();
+        }
     }
 
     /**
@@ -369,7 +442,8 @@
                 pokemon_id: pokemonId,
                 daily_pokemon_id: gameData.dailyPokemonId,
                 wrong_attempts_count: wrongAttemptsCount,
-                is_all_generations_mode: gameConfig.mode === 'all'
+                is_all_generations_mode: gameConfig.mode === 'all',
+                hints_enabled: hintsEnabled
             },
             success: function(response) {
                 if (response.success) {
@@ -387,10 +461,19 @@
                         // Incrémenter le compteur de mauvaises réponses
                         wrongAttemptsCount++;
                         
-                        // Afficher les indices révélés si disponibles
-                        if (response.data.revealed_hints) {
+                        // Afficher les indices révélés si disponibles et si les indices sont activés
+                        if (hintsEnabled && response.data.revealed_hints) {
+                            const previousHintsCount = hintsUsed;
                             showRevealedHints(response.data.revealed_hints);
+                            // Compter le nombre d'indices différents révélés
+                            const currentHintsCount = Object.keys(response.data.revealed_hints || {}).length;
+                            if (currentHintsCount > previousHintsCount) {
+                                hintsUsed = currentHintsCount;
+                            }
                         }
+                        
+                        // Mettre à jour l'affichage des indices
+                        updateHintsInfo();
                     }
                     
                     // Afficher la tentative
@@ -658,11 +741,12 @@
         console.log('Setting result HTML and showing');
         $result.html(resultHtml).show();
 
-        // Sauvegarder le score
-        saveScore(attemptsCount, true, completionTime);
+        // Sauvegarder le score avec le nombre d'indices utilisés
+        saveScore(attemptsCount, true, completionTime, hintsUsed);
 
-        // Recharger le classement
+        // Recharger le classement et mettre à jour le compteur
         loadLeaderboard();
+        updateSuccessfulCount();
 
         // Désactiver les contrôles
         $('#pokedle-pokemon-input').prop('disabled', true);
@@ -748,15 +832,16 @@
         $result.html(resultHtml).show();
 
         // Sauvegarder le score (échec)
-        saveScore(attempts.length, false, Math.floor((Date.now() - startTime) / 1000));
+        saveScore(attempts.length, false, Math.floor((Date.now() - startTime) / 1000), hintsUsed);
 
         // Désactiver les contrôles
         $('#pokedle-pokemon-input').prop('disabled', true);
         $('#pokedle-submit').prop('disabled', true);
         $('#pokedle-show-answer').prop('disabled', true).hide();
         
-        // Recharger le classement
+        // Recharger le classement et mettre à jour le compteur
         loadLeaderboard();
+        updateSuccessfulCount();
         
         // Scroller vers le résultat
         setTimeout(function() {
@@ -768,11 +853,39 @@
             }
         }, 100);
     }
+    
+    /**
+     * Met à jour le compteur de joueurs ayant réussi
+     */
+    function updateSuccessfulCount() {
+        $.ajax({
+            url: gameData.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'poke_hub_pokedle_count_successful',
+                nonce: gameData.nonce,
+                game_date: gameData.currentGameDate || gameData.today,
+                generation_id: gameConfig.selectedGeneration || null
+            },
+            success: function(response) {
+                if (response.success && response.data && response.data.count !== undefined) {
+                    const $countEl = $('#pokedle-successful-count');
+                    if ($countEl.length) {
+                        const count = response.data.count;
+                        const countText = count === 1 
+                            ? (gameData.i18n.onePlayerFound || '1 player found it')
+                            : (gameData.i18n.playersFound || `${count} players found it`).replace('%d', count);
+                        $countEl.text(countText);
+                    }
+                }
+            }
+        });
+    }
 
     /**
      * Sauvegarde le score
      */
-    function saveScore(attemptsCount, isSuccess, completionTime) {
+    function saveScore(attemptsCount, isSuccess, completionTime, hintsUsedCount = 0) {
         if (!gameData.isLoggedIn) {
             // Pour les utilisateurs anonymes, on peut quand même sauvegarder si nécessaire
             // Pour l'instant, on ne sauvegarde que pour les utilisateurs connectés
@@ -790,7 +903,12 @@
                 attempts: attemptsCount,
                 is_success: isSuccess ? 1 : 0,
                 completion_time: completionTime,
-                score_data: {}
+                hints_used: hintsUsedCount,
+                hints_enabled: hintsEnabled,
+                score_data: {
+                    hints_used: hintsUsedCount,
+                    hints_enabled: hintsEnabled
+                }
             },
             success: function(response) {
                 if (response.success) {
@@ -874,12 +992,10 @@
                 html += `<div class="pokedle-card-avatar">${getInitials(entry.display_name || (gameData.i18n.anonymous || 'Anonymous'))}</div>`;
                 html += `<div class="pokedle-card-username">${entry.display_name || (gameData.i18n.anonymous || 'Anonymous')}</div>`;
                 html += `<div class="pokedle-card-score">`;
-                html += `<span class="pokedle-card-score-value">${entry.attempts}</span>`;
-                const attemptsText = entry.attempts === 1 ? (gameData.i18n.attempt || 'attempt') : (gameData.i18n.attempts || 'attempts');
-                html += `<span class="pokedle-card-score-label"> ${attemptsText}</span>`;
+                html += `<span class="pokedle-card-score-value">${entry.points || 0}</span>`;
+                html += `<span class="pokedle-card-score-label"> ${gameData.i18n.points || 'points'}</span>`;
                 html += `<div class="pokedle-card-trophy">🏆</div>`;
                 html += `</div>`;
-                html += `<div class="pokedle-card-time">${formatTime(entry.completion_time)}</div>`;
                 html += `<div class="pokedle-card-progress"><div class="pokedle-card-progress-bar" style="width: 100%"></div></div>`;
                 html += `</div>`;
             });
@@ -895,9 +1011,8 @@
                 html += `<div class="pokedle-item-rank">${rank}</div>`;
                 html += `<div class="pokedle-item-avatar">${getInitials(entry.display_name || gameData.i18n.anonymous)}</div>`;
                 html += `<div class="pokedle-item-username">${entry.display_name || gameData.i18n.anonymous}</div>`;
-                html += `<div class="pokedle-item-score">${entry.attempts}</div>`;
+                html += `<div class="pokedle-item-score">${entry.points || 0}</div>`;
                 html += `<div class="pokedle-item-trophy">🏆</div>`;
-                html += `<div class="pokedle-item-time">${formatTime(entry.completion_time)}</div>`;
                 html += `</div>`;
             });
             html += '</div>';

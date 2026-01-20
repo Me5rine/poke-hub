@@ -28,6 +28,7 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
     $category         = 'normal';
     $group_key        = '';
     $parent_form_slug = '';
+    $names            = ['fr' => '', 'en' => ''];
 
     if ($is_edit) {
         $form_slug        = isset($edit_row->form_slug) ? (string) $edit_row->form_slug : '';
@@ -35,6 +36,23 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
         $category         = isset($edit_row->category) ? (string) $edit_row->category : 'normal';
         $group_key        = isset($edit_row->group_key) ? (string) $edit_row->group_key : '';
         $parent_form_slug = isset($edit_row->parent_form_slug) ? (string) $edit_row->parent_form_slug : '';
+        
+        // Récupérer les traductions depuis extra
+        if (!empty($edit_row->extra)) {
+            $extra = json_decode($edit_row->extra, true);
+            if (is_array($extra) && !empty($extra['names']) && is_array($extra['names'])) {
+                $names['fr'] = isset($extra['names']['fr']) ? trim((string) $extra['names']['fr']) : '';
+                $names['en'] = isset($extra['names']['en']) ? trim((string) $extra['names']['en']) : '';
+            }
+        }
+        
+        // Si pas de traduction FR dans extra, utiliser le label comme fallback
+        if (empty($names['fr']) && !empty($label)) {
+            $names['fr'] = $label;
+        }
+        if (empty($names['en']) && !empty($label)) {
+            $names['en'] = $label;
+        }
     }
 
     global $wpdb;
@@ -147,6 +165,29 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                         ?>
                     </select>
                     <p class="description"><?php esc_html_e('Optional parent form to build hierarchies.', 'poke-hub'); ?></p>
+                </div>
+            </div>
+
+            <!-- Section: Translations -->
+            <div class="admin-lab-form-section">
+                <h3><?php esc_html_e('Translations', 'poke-hub'); ?></h3>
+                <p class="description"><?php esc_html_e('These translations will be used in the front-end (selects, profiles, etc.). If not provided, the label will be used as fallback.', 'poke-hub'); ?></p>
+                
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
+                            <label for="name_fr"><?php esc_html_e('French Name', 'poke-hub'); ?></label>
+                            <input type="text" id="name_fr" name="name_fr" value="<?php echo esc_attr($names['fr']); ?>" />
+                            <p class="description"><?php esc_html_e('French translation (e.g., "Archipel", "Continental")', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
+                            <label for="name_en"><?php esc_html_e('English Name', 'poke-hub'); ?></label>
+                            <input type="text" id="name_en" name="name_en" value="<?php echo esc_attr($names['en']); ?>" />
+                            <p class="description"><?php esc_html_e('English translation (e.g., "Archipelago", "Continental")', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

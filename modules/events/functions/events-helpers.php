@@ -204,3 +204,25 @@ if (!function_exists('poke_hub_special_event_format_datetime')) {
         }
     }
 }
+
+/**
+ * Purge Nginx Helper cache for events pages
+ * This ensures that new/updated/deleted events appear immediately on the front-end
+ * Uses the global poke_hub_purge_module_cache() function
+ * Also purges WordPress object cache for events
+ * 
+ * @deprecated Use poke_hub_purge_module_cache() directly instead
+ */
+function poke_hub_purge_events_cache() {
+    // Use global helper function with WordPress cache group and key
+    if (function_exists('poke_hub_purge_module_cache')) {
+        return poke_hub_purge_module_cache(
+            ['poke_hub_events'],
+            'poke_hub_events',      // WordPress cache group
+            'poke_hub_events_all'    // WordPress cache key
+        );
+    }
+    
+    // Fallback if global function not available
+    return false;
+}

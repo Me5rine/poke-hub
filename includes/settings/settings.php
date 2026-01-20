@@ -69,6 +69,17 @@ function poke_hub_register_settings() {
             'default'           => false,
         ]
     );
+    
+    // Games: activation du Pokedle
+    register_setting(
+        'poke_hub_games_settings',
+        'poke_hub_games_pokedle_enabled',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => true,
+        ]
+    );
 
 }
 add_action('admin_init', 'poke_hub_register_settings');

@@ -106,12 +106,14 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
     }
 
     public function column_group_key($item) {
-        return esc_html($item->group_key ?: '—');
+        // La colonne s'appelle 'group' dans la table (mot réservé MySQL)
+        return esc_html(isset($item->group) ? $item->group : ($item->group_key ?? '—'));
     }
 
     public function column_parent_form_slug($item) {
-        return $item->parent_form_slug !== ''
-            ? '<code>' . esc_html($item->parent_form_slug) . '</code>'
+        $parent_form_slug = isset($item->parent_form_slug) ? $item->parent_form_slug : '';
+        return $parent_form_slug !== ''
+            ? '<code>' . esc_html($parent_form_slug) . '</code>'
             : '—';
     }
 
@@ -200,7 +202,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'form_slug',
             'label',
             'category',
-            'group_key',
+            '`group`',
             'parent_form_slug',
         ];
         if (!in_array($orderby, $allowed_orderby, true)) {
@@ -213,12 +215,22 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
         $params = [];
 
         if ($search !== '') {
-            $where   .= ' AND (form_slug LIKE %s OR label LIKE %s OR category LIKE %s OR group_key LIKE %s)';
-            $like     = '%' . $wpdb->esc_like($search) . '%';
+            // Recherche dans les champs principaux
+            // MySQL LIKE est généralement insensible à la casse selon la collation
+            // Note: la colonne s'appelle `group` (avec backticks car mot réservé MySQL), pas group_key
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where   .= ' AND (form_slug LIKE %s OR label LIKE %s OR category LIKE %s OR `group` LIKE %s';
             $params[] = $like;
             $params[] = $like;
             $params[] = $like;
             $params[] = $like;
+            
+            // Recherche aussi dans le champ extra (JSON) - recherche simple dans tout le JSON
+            // Cela permettra de trouver les traductions dans extra->names->fr et extra->names->en
+            $where   .= ' OR extra LIKE %s';
+            $params[] = $like;
+            
+            $where .= ')';
         }
 
         // Total items
@@ -227,8 +239,9 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             ? (int) $wpdb->get_var($wpdb->prepare($sql_count, $params))
             : (int) $wpdb->get_var($sql_count);
 
-        // Items
-        $sql_items = "SELECT * FROM {$table} {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+        // Items - sélectionner explicitement toutes les colonnes disponibles
+        // Note: parent_form_slug peut ne pas exister dans toutes les installations
+        $sql_items = "SELECT id, form_slug, label, category, `group`, extra FROM {$table} {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
         $params_items   = $params;
         $params_items[] = $per_page;
         $params_items[] = $offset;
@@ -306,6 +319,8 @@ function poke_hub_pokemon_handle_forms_form() {
     $category_raw     = isset($_POST['category']) ? wp_unslash($_POST['category']) : '';
     $group_key_raw    = isset($_POST['group_key']) ? wp_unslash($_POST['group_key']) : '';
     $parent_slug_raw  = isset($_POST['parent_form_slug']) ? wp_unslash($_POST['parent_form_slug']) : '';
+    $name_fr_raw      = isset($_POST['name_fr']) ? wp_unslash($_POST['name_fr']) : '';
+    $name_en_raw      = isset($_POST['name_en']) ? wp_unslash($_POST['name_en']) : '';
 
     $form_slug = sanitize_title($form_slug_raw);
     $label     = sanitize_text_field($label_raw);
@@ -331,10 +346,41 @@ function poke_hub_pokemon_handle_forms_form() {
         exit;
     }
 
-    // Extra minimal : on marque que ça vient du form admin.
+    // Construire le champ extra avec les traductions
     $extra = [
         'source' => 'manual-admin',
     ];
+    
+    // Ajouter les traductions si fournies
+    $names = [];
+    if (!empty($name_fr_raw)) {
+        $names['fr'] = sanitize_text_field($name_fr_raw);
+    }
+    if (!empty($name_en_raw)) {
+        $names['en'] = sanitize_text_field($name_en_raw);
+    }
+    
+    if (!empty($names)) {
+        $extra['names'] = $names;
+    }
+    
+    // Si on est en mode édition, préserver les autres données de extra existantes
+    if ($action === 'update_form' && $id > 0) {
+        $existing_row = $wpdb->get_row(
+            $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $id)
+        );
+        if ($existing_row && !empty($existing_row->extra)) {
+            $existing_extra = json_decode($existing_row->extra, true);
+            if (is_array($existing_extra)) {
+                // Fusionner avec les données existantes (préserver les autres champs)
+                $extra = array_merge($existing_extra, $extra);
+                // Si des traductions existaient déjà, les fusionner aussi
+                if (!empty($existing_extra['names']) && is_array($existing_extra['names'])) {
+                    $extra['names'] = array_merge($existing_extra['names'], $names);
+                }
+            }
+        }
+    }
 
     // On laisse l'upsert s'occuper de :
     // - INSERT si form_slug inexistant
@@ -390,7 +436,7 @@ function poke_hub_pokemon_handle_forms_form() {
     }
 
     if ($variant_id > 0) {
-        // On applique ensuite le parent_form_slug (l’upsert ne le touche jamais)
+        // On applique ensuite le parent_form_slug (l'upsert ne le touche jamais)
         $wpdb->update(
             $table,
             [
@@ -400,6 +446,9 @@ function poke_hub_pokemon_handle_forms_form() {
             ['%s'],
             ['%d']
         );
+        
+        // Purger le cache des patterns Scatterbug/Vivillon si on a modifié les traductions
+        delete_transient('poke_hub_scatterbug_patterns');
     }
 
     $msg = ($action === 'add_form') ? 'saved' : 'updated';
@@ -503,3 +552,4 @@ function poke_hub_pokemon_admin_forms_screen() {
     </form>
     <?php
 }
+

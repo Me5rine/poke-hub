@@ -575,6 +575,15 @@ class PokeHub_Events_List_Table extends WP_List_Table {
             $wpdb->delete($events_table, ['id' => $id], ['%d']);
         }
         
+        // Purge Nginx Helper cache and WordPress cache so the deleted events disappear immediately
+        if (function_exists('poke_hub_purge_module_cache')) {
+            poke_hub_purge_module_cache(
+                ['poke_hub_events'],
+                'poke_hub_events',
+                'poke_hub_events_all'
+            );
+        }
+        
         // Redirection avec préservation des filtres
         $redirect_args = [
             'page' => 'poke-hub-events',

@@ -265,7 +265,7 @@
                 }
                 var $field = $countrySelect.closest('.me5rine-lab-form-field');
                 if ($field.length > 0 && $field.find('.country-auto-detected-indicator').length === 0) {
-                    var $indicatorDiv = $('<div class="country-auto-detected-indicator" style="font-size: 0.85em; color: #666; margin-top: 5px;"><i class="um-icon-location-on" style="font-size: 14px;"></i> Automatically detected from your location <a href="#" class="country-unlock-link" style="margin-left: 8px; color: #0073aa; text-decoration: underline;">Modify</a></div>');
+                    var $indicatorDiv = $('<div class="country-auto-detected-indicator me5rine-lab-form-description"><i class="um-icon-location-on"></i> Automatically detected from your location <a href="#" class="country-unlock-link">Modify</a></div>');
                     $field.append($indicatorDiv);
                     
                     // Trigger pattern filtering after country is locked
