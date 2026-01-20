@@ -269,16 +269,6 @@ function poke_hub_user_profiles_shortcode_assets() {
     if (function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
         $mapping = poke_hub_get_vivillon_pattern_country_mapping();
         
-        // Debug: log mapping info
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub UM] Mapping patterns count: ' . count($mapping));
-            if (!empty($mapping)) {
-                $sample_pattern = array_key_first($mapping);
-                $sample_countries = is_array($mapping[$sample_pattern]) ? array_slice($mapping[$sample_pattern], 0, 5) : [];
-                error_log('[PokeHub UM] Sample pattern "' . $sample_pattern . '" has ' . count($mapping[$sample_pattern] ?? []) . ' countries, sample: ' . implode(', ', $sample_countries));
-            }
-        }
-        
         // Create both mappings: country => patterns and pattern => countries
         foreach ($mapping as $pattern => $countries) {
             if (is_array($countries)) {
@@ -300,37 +290,6 @@ function poke_hub_user_profiles_shortcode_assets() {
             }
         }
         
-        // Debug: check if États-Unis and Hawaï are in mapping
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            $total_countries = count($vivillon_mapping);
-            error_log('[PokeHub UM] Total unique countries in mapping: ' . $total_countries);
-            if (isset($vivillon_mapping["États-Unis d'Amérique"])) {
-                error_log('[PokeHub UM] ✓ États-Unis d\'Amérique found with patterns: ' . implode(', ', $vivillon_mapping["États-Unis d'Amérique"]));
-            } else {
-                error_log('[PokeHub UM] ✗ États-Unis d\'Amérique NOT found!');
-            }
-            if (isset($vivillon_mapping['Hawaï'])) {
-                error_log('[PokeHub UM] ✓ Hawaï found with patterns: ' . implode(', ', $vivillon_mapping['Hawaï']));
-            } else {
-                error_log('[PokeHub UM] ✗ Hawaï NOT found in JavaScript mapping!');
-                // Check if Hawaï is in the source mapping (pattern => countries)
-                $hawaii_found = false;
-                foreach ($mapping as $pattern => $countries) {
-                    if (is_array($countries) && in_array('Hawaï', $countries, true)) {
-                        error_log('[PokeHub UM] Hawaï is in source mapping for pattern "' . $pattern . '"');
-                        $hawaii_found = true;
-                    }
-                }
-                if (!$hawaii_found) {
-                    error_log('[PokeHub UM] ✗ Hawaï NOT found in source mapping either!');
-                }
-            }
-            if (isset($vivillon_mapping['Açores'])) {
-                error_log('[PokeHub UM] ✓ Açores found with patterns: ' . implode(', ', $vivillon_mapping['Açores']));
-            } else {
-                error_log('[PokeHub UM] ✗ Açores NOT found!');
-            }
-        }
     }
     
     // Localize script for validation and filtering
@@ -454,16 +413,6 @@ function poke_hub_friend_codes_shortcode_assets() {
     if (function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
         $mapping = poke_hub_get_vivillon_pattern_country_mapping();
         
-        // Debug: log mapping info
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub Friend Codes] Mapping patterns count: ' . count($mapping));
-            if (!empty($mapping)) {
-                $sample_pattern = array_key_first($mapping);
-                $sample_countries = is_array($mapping[$sample_pattern]) ? array_slice($mapping[$sample_pattern], 0, 5) : [];
-                error_log('[PokeHub Friend Codes] Sample pattern "' . $sample_pattern . '" has ' . count($mapping[$sample_pattern] ?? []) . ' countries, sample: ' . implode(', ', $sample_countries));
-            }
-        }
-        
         // Create both mappings: country => patterns and pattern => countries
         foreach ($mapping as $pattern => $countries) {
             if (is_array($countries)) {
@@ -485,28 +434,6 @@ function poke_hub_friend_codes_shortcode_assets() {
             }
         }
         
-        // Debug: check if États-Unis is in mapping
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            $total_countries = count($vivillon_mapping);
-            error_log('[PokeHub Friend Codes] Total unique countries in mapping: ' . $total_countries);
-            if (isset($vivillon_mapping["États-Unis d'Amérique"])) {
-                error_log('[PokeHub Friend Codes] ✓ États-Unis d\'Amérique found with patterns: ' . implode(', ', $vivillon_mapping["États-Unis d'Amérique"]));
-            } else {
-                error_log('[PokeHub Friend Codes] ✗ États-Unis d\'Amérique NOT found! Searching for similar...');
-                $similar = [];
-                foreach (array_keys($vivillon_mapping) as $country_key) {
-                    if (stripos($country_key, 'états') !== false || stripos($country_key, 'united') !== false || stripos($country_key, 'usa') !== false || stripos($country_key, 'amérique') !== false) {
-                        $similar[] = $country_key;
-                    }
-                }
-                if (!empty($similar)) {
-                    error_log('[PokeHub Friend Codes] Similar countries found: ' . implode(', ', $similar));
-                }
-                // List all countries to see what we have
-                $all_countries = array_keys($vivillon_mapping);
-                error_log('[PokeHub Friend Codes] All countries (first 20): ' . implode(', ', array_slice($all_countries, 0, 20)));
-            }
-        }
     }
     
     // Localize script for translations, validation and filtering

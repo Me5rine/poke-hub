@@ -38,17 +38,10 @@ function poke_hub_detect_country_from_ip($ip_address) {
     
     // For private IPs in development, use a test IP or return default country
     if ($is_private) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] Country detection: Private IP detected: ' . $ip_address);
-        }
-        
         // In development, try to use a test IP (8.8.8.8 - Google DNS, should return US)
         // Or you can set a default country for development
         $test_ip = '8.8.8.8'; // Google DNS - will return US
         $ip_address = $test_ip;
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] Country detection: Using test IP for development: ' . $ip_address);
-        }
     }
     
     // Check cache first (1 day per IP)
@@ -72,23 +65,12 @@ function poke_hub_detect_country_from_ip($ip_address) {
         ]
     ]);
     
-    if (is_wp_error($response)) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] IPinfo /country error: ' . $response->get_error_message());
-        }
-    } elseif (wp_remote_retrieve_response_code($response) === 200) {
+    if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
         $country_code = trim(wp_remote_retrieve_body($response));
         if (empty($country_code)) {
             $country_code = null;
         } else {
             $country_code = strtoupper($country_code);
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub] IPinfo /country returned: ' . $country_code);
-            }
-        }
-    } else {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] IPinfo /country HTTP code: ' . wp_remote_retrieve_response_code($response));
         }
     }
     
@@ -100,39 +82,17 @@ function poke_hub_detect_country_from_ip($ip_address) {
             'sslverify' => true
         ]);
         
-        if (is_wp_error($response_json)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub] IPinfo /json error: ' . $response_json->get_error_message());
-            }
-        } elseif (wp_remote_retrieve_response_code($response_json) === 200) {
+        if (!is_wp_error($response_json) && wp_remote_retrieve_response_code($response_json) === 200) {
             $body = wp_remote_retrieve_body($response_json);
             $data = json_decode($body, true);
             if ($data) {
                 // Check if IPinfo returned "bogon" (private/invalid IP)
                 if (isset($data['bogon']) && $data['bogon'] === true) {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('[PokeHub] IPinfo returned bogon=true for IP: ' . $ip_address);
-                    }
                     // For bogons, we can't geolocate, return null
                     $country_code = null;
                 } elseif (isset($data['country'])) {
                     $country_code = strtoupper(trim($data['country']));
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('[PokeHub] IPinfo /json returned country: ' . $country_code);
-                    }
-                } else {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('[PokeHub] IPinfo /json response (no country): ' . $body);
-                    }
                 }
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[PokeHub] IPinfo /json invalid JSON: ' . $body);
-                }
-            }
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub] IPinfo /json HTTP code: ' . wp_remote_retrieve_response_code($response_json));
             }
         }
     }
@@ -169,25 +129,13 @@ function poke_hub_ajax_detect_country() {
     // Get client IP
     $ip = poke_hub_get_client_ip();
     
-    // For debugging: log the IP
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[PokeHub] Country detection AJAX: IP = ' . $ip);
-    }
-    
     // If IP is 0.0.0.0 or invalid, try fallback
     if ($ip === '0.0.0.0' || !filter_var($ip, FILTER_VALIDATE_IP)) {
         $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1';
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] Country detection AJAX: Using fallback IP = ' . $ip);
-        }
     }
     
     // Detect country
     $country_data = poke_hub_detect_country_from_ip($ip);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[PokeHub] Country detection AJAX: Result = ' . print_r($country_data, true));
-    }
     
     if ($country_data) {
         wp_send_json_success($country_data);

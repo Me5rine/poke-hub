@@ -211,4 +211,12 @@ add_action('admin_init', function () {
             Pokehub_DB::getInstance()->migrateEventsRecurringColumns();
         }
     }
+    
+    // Migration des colonnes user_profiles (même si la table existe déjà)
+    if (in_array('user-profiles', $active_modules, true)) {
+        $user_profiles_table = pokehub_get_table('user_profiles');
+        if ($user_profiles_table && ($wpdb->get_var("SHOW TABLES LIKE '{$user_profiles_table}'") === $user_profiles_table)) {
+            Pokehub_DB::getInstance()->migrateUserProfilesColumns();
+        }
+    }
 });

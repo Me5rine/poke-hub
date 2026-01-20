@@ -413,20 +413,9 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
     // Only fetch from Ultimate Member if country is NOT provided in profile array
     $country_provided = array_key_exists('country', $profile);
     
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[PokeHub Save Profile] poke_hub_save_user_profile called: user_id=' . ($wp_user_id ?? 'NULL') . ', country_provided=' . ($country_provided ? 'YES' : 'NO'));
-        if ($country_provided) {
-            error_log('[PokeHub Save Profile] Country in profile: "' . (isset($profile['country']) ? $profile['country'] : 'NOT SET') . '"');
-        }
-    }
-    
     if ($country_provided) {
         // Country was explicitly provided in form, use it (even if empty to allow deletion)
         $country = isset($profile['country']) ? sanitize_text_field($profile['country']) : '';
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub Save Profile] Country from form: "' . $country . '"');
-        }
     } else {
         // Country was NOT provided in form, fetch from Ultimate Member if available
         $country = '';
@@ -444,23 +433,10 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
     if (!empty($country)) {
         $custom_to_um = poke_hub_get_custom_country_to_um_mapping();
         
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub Save Profile] Custom to UM mapping keys: ' . implode(', ', array_keys($custom_to_um)));
-            error_log('[PokeHub Save Profile] Checking if "' . $country . '" is in custom mapping...');
-        }
-        
         if (isset($custom_to_um[$country])) {
             // Country is a custom country (e.g., "Hawaï")
             $country_custom_value = $country; // Store custom country name
             $country = $custom_to_um[$country]; // Replace with UM country for validation and storage
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub Save Profile] ✓ "' . $country_custom_value . '" is a custom country, mapping to UM country: "' . $country . '"');
-            }
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub Save Profile] "' . $country . '" is NOT a custom country (not found in mapping)');
-            }
         }
     }
     
@@ -479,20 +455,8 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
             
             if (!in_array($country, $country_labels, true)) {
                 // Invalid country label, reset to empty
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[PokeHub Save Profile] Country "' . $country . '" NOT found in UM countries list, clearing');
-                }
                 $country = '';
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[PokeHub Save Profile] ✓ Country "' . $country . '" found in UM countries list');
-                }
             }
-        }
-    } elseif (!empty($country) && $is_from_custom_mapping) {
-        // Country from custom mapping - trust the mapping, but log for debugging
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub Save Profile] Country "' . $country . '" from custom mapping (trusted, skipping strict validation)');
         }
     }
     
@@ -685,12 +649,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
             }
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub Save Profile] UPDATE: About to update with data: ' . print_r($data, true));
-            error_log('[PokeHub Save Profile] UPDATE: country_provided=' . ($country_provided ? 'YES' : 'NO') . ', country_custom_to_set=' . ($country_custom_to_set ?? 'NULL'));
-            error_log('[PokeHub Save Profile] UPDATE: country_custom_value=' . ($country_custom_value ?? 'NULL') . ', country=' . $country);
-        }
-        
         $result = $wpdb->update(
             $table_name,
             $data,
@@ -699,51 +657,19 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
             ['%d']
         );
         
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            if ($result !== false) {
-                error_log('[PokeHub Save Profile] UPDATE: Success, rows affected: ' . $result);
-                // Verify what was actually saved
-                $saved_row = $wpdb->get_row($wpdb->prepare(
-                    "SELECT id, country, country_custom, scatterbug_pattern FROM {$table_name} WHERE id = %d",
-                    $existing_row['id']
-                ), ARRAY_A);
-                if ($saved_row) {
-                    error_log('[PokeHub Save Profile] UPDATE: Saved data - country="' . ($saved_row['country'] ?? 'NULL') . '", country_custom="' . ($saved_row['country_custom'] ?? 'NULL') . '", scatterbug_pattern="' . ($saved_row['scatterbug_pattern'] ?? 'NULL') . '"');
-                }
-            } else {
-                error_log('[PokeHub Save Profile] UPDATE ERROR: ' . $wpdb->last_error);
-            }
-        }
-        
         // Handle country_custom separately if it needs to be set to NULL
         // $wpdb->update() doesn't update fields to NULL, so we need a direct query
         if ($country_provided && $country_custom_to_set === null) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub Save Profile] UPDATE: Clearing country_custom for profile ID ' . $existing_row['id']);
-            }
             $wpdb->query($wpdb->prepare(
                 "UPDATE {$table_name} SET country_custom = NULL WHERE id = %d",
                 $existing_row['id']
             ));
-            if (defined('WP_DEBUG') && WP_DEBUG && $wpdb->last_error) {
-                error_log('[PokeHub Save Profile] UPDATE ERROR clearing country_custom: ' . $wpdb->last_error);
-            }
         } elseif ($country_provided && $country_custom_to_set !== null) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[PokeHub Save Profile] UPDATE: Setting country_custom="' . $country_custom_to_set . '" for profile ID ' . $existing_row['id']);
-            }
             $wpdb->query($wpdb->prepare(
                 "UPDATE {$table_name} SET country_custom = %s WHERE id = %d",
                 $country_custom_to_set,
                 $existing_row['id']
             ));
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                if ($wpdb->last_error) {
-                    error_log('[PokeHub Save Profile] UPDATE ERROR setting country_custom: ' . $wpdb->last_error);
-                } else {
-                    error_log('[PokeHub Save Profile] UPDATE: ✓ country_custom set successfully');
-                }
-            }
         }
     } else {
         // Insert new row
@@ -786,20 +712,10 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         if ($country_provided) {
             if (empty($country)) {
                 // Delete country usermeta to remove it (Ultimate Member uses delete to clear)
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[PokeHub Save Profile] Logged-in user: Deleting country from UM usermeta');
-                }
                 delete_user_meta($wp_user_id, 'country');
             } else {
                 // $country already contains the UM country (mapped from custom if needed above)
                 // Update Ultimate Member's country (primary and only source)
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[PokeHub Save Profile] Logged-in user: Saving country="' . $country . '" to UM usermeta (user_id=' . $wp_user_id . ')');
-                    error_log('[PokeHub Save Profile] country_custom_value=' . ($country_custom_value ?? 'NULL'));
-                    // Verify what was actually saved
-                    $saved_um_country = get_user_meta($wp_user_id, 'country', true);
-                    error_log('[PokeHub Save Profile] UM usermeta country after save: "' . ($saved_um_country ?: 'NULL') . '"');
-                }
                 update_user_meta($wp_user_id, 'country', $country);
             }
             

@@ -820,6 +820,7 @@ class Pokehub_DB {
             pokemon_go_username VARCHAR(191) NOT NULL DEFAULT '',
             scatterbug_pattern VARCHAR(50) NOT NULL DEFAULT '',
             country VARCHAR(191) NULL DEFAULT NULL,
+            country_custom VARCHAR(191) NULL DEFAULT NULL,
             reasons LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -917,6 +918,21 @@ class Pokehub_DB {
             $wpdb->query("UPDATE {$table_name} SET profile_type = 'discord' WHERE user_id IS NULL AND discord_id IS NOT NULL");
             $wpdb->query("UPDATE {$table_name} SET profile_type = 'anonymous' WHERE user_id IS NULL AND discord_id IS NULL");
         }
+    }
+    
+    /**
+     * Public method to migrate all user_profiles columns (called from admin_init).
+     * This ensures migrations run even if the table already exists.
+     */
+    public function migrateUserProfilesColumns() {
+        $table_name = pokehub_get_table('user_profiles');
+        if (empty($table_name)) {
+            return;
+        }
+        
+        $this->migrateUserProfilesAddCountryColumn($table_name);
+        $this->migrateUserProfilesAddProfileTypeColumn($table_name);
+        $this->migrateUserProfilesAddCountryCustomColumn($table_name);
     }
     
     /**
