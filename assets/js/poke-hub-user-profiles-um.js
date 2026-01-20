@@ -152,6 +152,28 @@
         $(document).on('change', '.me5rine-lab-form-checkbox-item input[type="checkbox"]', function() {
             updateCheckboxStyle($(this));
         });
+        
+        // Ensure checkbox clicks work correctly when clicking on label
+        // Prevent event bubbling issues that might interfere with checkbox clicks
+        $(document).on('click', '.me5rine-lab-form-checkbox-item', function(e) {
+            var $item = $(this);
+            var $checkbox = $item.find('input[type="checkbox"]');
+            
+            // If clicking directly on the checkbox, let it handle normally
+            if ($(e.target).is('input[type="checkbox"]')) {
+                return;
+            }
+            
+            // If clicking on the label (but not on the checkbox itself), toggle the checkbox
+            if ($checkbox.length > 0) {
+                // Prevent default to avoid double-toggle if the label is already associated
+                e.preventDefault();
+                // Toggle the checkbox state
+                $checkbox.prop('checked', !$checkbox.prop('checked'));
+                // Trigger change event to update styling
+                $checkbox.trigger('change');
+            }
+        });
 
         // Format friend code while typing (add spaces every 4 digits)
         function formatFriendCode(value) {

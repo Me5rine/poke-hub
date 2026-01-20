@@ -149,6 +149,7 @@
     setTimeout(initAllSelect2, 100);
 
     // Observer les mutations DOM pour détecter les nouveaux éléments ajoutés dynamiquement
+    // IMPORTANT: Ne pas réinitialiser les selects déjà initialisés pour éviter la perte des valeurs du formulaire
     if (typeof MutationObserver !== 'undefined') {
         var observer = new MutationObserver(function(mutations) {
             var shouldInit = false;
@@ -159,10 +160,31 @@
                         var node = mutation.addedNodes[i];
                         if (node.nodeType === 1) { // Element node
                             // Vérifier si le nœud lui-même a la classe ou contient des éléments avec la classe
-                            if ($(node).hasClass('me5rine-lab-form-select') || 
-                                $(node).find('.me5rine-lab-form-select').length > 0) {
-                                shouldInit = true;
-                                break;
+                            var $node = $(node);
+                            
+                            // Vérifier si c'est un nouveau select qui n'est pas encore initialisé
+                            if ($node.hasClass('me5rine-lab-form-select')) {
+                                // Ne l'initialiser que s'il n'est pas déjà initialisé
+                                if (!$node.data('select2')) {
+                                    shouldInit = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Vérifier les selects enfants
+                            var $childSelects = $node.find('.me5rine-lab-form-select');
+                            if ($childSelects.length > 0) {
+                                // Ne considérer que ceux qui ne sont pas encore initialisés
+                                $childSelects.each(function() {
+                                    var $select = $(this);
+                                    if (!$select.data('select2')) {
+                                        shouldInit = true;
+                                        return false; // break
+                                    }
+                                });
+                                if (shouldInit) {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -170,16 +192,28 @@
             });
 
             if (shouldInit) {
-                setTimeout(initAllSelect2, 50);
+                // Utiliser un délai pour éviter les réinitialisations multiples
+                clearTimeout(window.pokeHubSelect2InitTimeout);
+                window.pokeHubSelect2InitTimeout = setTimeout(function() {
+                    // Ne réinitialiser que les selects non initialisés
+                    $('.me5rine-lab-form-select').each(function() {
+                        var $select = $(this);
+                        if (!$select.data('select2')) {
+                            initSelect2($select);
+                        }
+                    });
+                }, 100);
             }
         });
 
         // Observer les changements dans le body
+        // Ne pas observer les changements d'attributs pour éviter les réinitialisations intempestives
         $(document).ready(function() {
             if (document.body) {
                 observer.observe(document.body, {
                     childList: true,
                     subtree: true
+                    // Ne pas observer attributesChanged pour éviter les réinitialisations lors des changements de valeur
                 });
             }
         });
