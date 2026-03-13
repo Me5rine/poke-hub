@@ -74,6 +74,12 @@ function poke_hub_user_profiles_admin_assets($hook) {
         true
     );
 
+    // Localize script for translations
+    wp_localize_script('pokehub-user-profiles-admin-script', 'pokeHubUserProfiles', [
+        'friendCodeError' => __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'),
+        'selectPlaceholder' => __('Select...', 'poke-hub'),
+    ]);
+
     // Initialize Select2 for profile form selects (admin)
     wp_add_inline_script('select2', "
     jQuery(document).ready(function($) {
@@ -90,12 +96,50 @@ function poke_hub_user_profiles_admin_assets($hook) {
                     if (!\$parent.length) {
                         \$parent = \$select.parent();
                     }
-                    \$select.select2({
+                    // Check if this select has icons (team or scatterbug_pattern)
+                    var selectId = \$select.attr('id') || '';
+                    var hasIcons = selectId === 'team' || 
+                                  selectId === 'scatterbug_pattern' || 
+                                  selectId === 'filter_team' || 
+                                  selectId === 'filter_pattern' ||
+                                  selectId === 'filter-by-team' ||
+                                  selectId === 'filter-by-scatterbug-pattern' ||
+                                  \$select.find('option[data-icon]').length > 0;
+                    
+                    var select2Config = {
                         width: '100%',
                         allowClear: true,
-                        placeholder: \$select.find('option[value=\"\"]').text() || 'Select...',
+                        placeholder: \$select.find('option[value=\"\"]').text() || (typeof pokeHubUserProfiles !== 'undefined' ? pokeHubUserProfiles.selectPlaceholder : 'Select...'),
                         dropdownParent: \$parent.length ? \$parent : $('body')
-                    });
+                    };
+                    
+                    // Add icon templates if this select has icons
+                    if (hasIcons) {
+                        select2Config.templateResult = function(data) {
+                            if (!data.id) {
+                                return data.text;
+                            }
+                            var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            var iconUrl = \$option.attr('data-icon');
+                            if (iconUrl) {
+                                return $('<span><img src=\"' + iconUrl + '\" style=\"width: 20px; height: 20px; margin-right: 8px; vertical-align: middle;\" />' + data.text + '</span>');
+                            }
+                            return data.text;
+                        };
+                        select2Config.templateSelection = function(data) {
+                            if (!data.id) {
+                                return data.text;
+                            }
+                            var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            var iconUrl = \$option.attr('data-icon');
+                            if (iconUrl) {
+                                return $('<span><img src=\"' + iconUrl + '\" style=\"width: 20px; height: 20px; margin-right: 8px; vertical-align: middle;\" />' + data.text + '</span>');
+                            }
+                            return data.text;
+                        };
+                    }
+                    
+                    \$select.select2(select2Config);
                 }
             });
         }
@@ -200,6 +244,48 @@ function poke_hub_user_profiles_frontend_assets() {
         true
     );
 
+    // Prepare vivillon pattern/country mapping for JavaScript validation and filtering
+    $vivillon_mapping = []; // country => patterns array
+    $pattern_to_countries_mapping = []; // pattern => countries array
+    if (function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
+        $mapping = poke_hub_get_vivillon_pattern_country_mapping();
+        
+        // Create both mappings: country => patterns and pattern => countries
+        foreach ($mapping as $pattern => $countries) {
+            if (is_array($countries)) {
+                // Store pattern => countries mapping
+                $pattern_to_countries_mapping[$pattern] = $countries;
+                
+                // Invert mapping: country => patterns array
+                foreach ($countries as $country) {
+                    // Normalize country name (trim whitespace)
+                    $country = trim($country);
+                    if (empty($country)) {
+                        continue;
+                    }
+                    if (!isset($vivillon_mapping[$country])) {
+                        $vivillon_mapping[$country] = [];
+                    }
+                    $vivillon_mapping[$country][] = $pattern;
+                }
+            }
+        }
+    }
+
+    // Localize script for translations, validation and filtering
+    wp_localize_script('pokehub-user-profiles-um-script', 'pokeHubFriendCodes', [
+        'friendCodeError' => __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'),
+        'selectPlaceholder' => __('Select...', 'poke-hub'),
+        'selectDefault' => __('-- Select --', 'poke-hub'),
+        'vivillonMapping' => $vivillon_mapping, // country => patterns
+        'patternToCountriesMapping' => $pattern_to_countries_mapping, // pattern => countries
+        'validationError' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),
+        'countryMismatchMessage' => __('Your saved country does not match your detected location.', 'poke-hub'),
+        'countryMismatchSuggestion' => __('Would you like to update your country to match your current location?', 'poke-hub'),
+        'updateCountryButtonText' => __('Update to detected country', 'poke-hub'),
+        'countryUpdatedMessage' => __('Country updated successfully!', 'poke-hub'),
+    ]);
+
     // Initialisation centralisée de Select2 pour le front-end
     wp_enqueue_script(
         'pokehub-front-select2',
@@ -294,6 +380,9 @@ function poke_hub_user_profiles_shortcode_assets() {
     
     // Localize script for validation and filtering
     wp_localize_script('pokehub-user-profiles-um-script', 'pokeHubFriendCodes', [
+        'friendCodeError' => __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'),
+        'selectPlaceholder' => __('Select...', 'poke-hub'),
+        'selectDefault' => __('-- Select --', 'poke-hub'),
         'vivillonMapping' => $vivillon_mapping, // country => patterns
         'patternToCountriesMapping' => $pattern_to_countries_mapping, // pattern => countries
         'validationError' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),
@@ -440,6 +529,10 @@ function poke_hub_friend_codes_shortcode_assets() {
     wp_localize_script('poke-hub-friend-codes', 'pokeHubFriendCodes', [
         'copySuccess' => __('✓ Copied!', 'poke-hub'),
         'copyError' => __('Error copying to clipboard', 'poke-hub'),
+        'friendCodeNotFound' => __('Unable to find friend code to copy.', 'poke-hub'),
+        'friendCodeInvalidLength' => __('Friend code must contain exactly 12 digits.', 'poke-hub'),
+        'selectPlaceholder' => __('Select...', 'poke-hub'),
+        'selectDefault' => __('-- Select --', 'poke-hub'),
         'vivillonMapping' => $vivillon_mapping, // country => patterns
         'patternToCountriesMapping' => $pattern_to_countries_mapping, // pattern => countries
         'validationError' => __('The selected country and Vivillon pattern do not match. Please select a valid combination.', 'poke-hub'),

@@ -29,6 +29,8 @@ function poke_hub_pokemon_get_section_label($section) {
             return __('Form mappings', 'poke-hub');
         case 'weathers':
             return __('Weathers', 'poke-hub');
+        case 'egg_types':
+            return __('Egg types', 'poke-hub');
         case 'items':
             return __('Items', 'poke-hub');
         case 'backgrounds':
@@ -52,6 +54,7 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/moves.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/forms.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/form-mappings.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/weathers.php';
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/egg-types.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/backgrounds.php'; // 🔹 NOUVEAU
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regional-regions.php'; // Geographic Regions
@@ -133,6 +136,11 @@ function poke_hub_pokemon_manage_columns($columns) {
 
     if ($current_section === 'weathers' && class_exists('Poke_Hub_Pokemon_Weathers_List_Table')) {
         $table   = new Poke_Hub_Pokemon_Weathers_List_Table();
+        $columns = $table->get_columns();
+    }
+
+    if ($current_section === 'egg_types' && class_exists('Poke_Hub_Pokemon_Egg_Types_List_Table')) {
+        $table   = new Poke_Hub_Pokemon_Egg_Types_List_Table();
         $columns = $table->get_columns();
     }
 
@@ -498,6 +506,23 @@ function poke_hub_pokemon_admin_ui() {
                 }
                 break;
 
+            case 'egg_types':
+                global $wpdb;
+                $edit_row = null;
+                if ($action === 'edit' && !empty($_GET['id'])) {
+                    $id = (int) $_GET['id'];
+                    $table = pokehub_get_table('pokemon_egg_types');
+                    $edit_row = $wpdb->get_row(
+                        $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $id)
+                    );
+                }
+                if (function_exists('poke_hub_pokemon_egg_types_edit_form')) {
+                    poke_hub_pokemon_egg_types_edit_form($edit_row);
+                } else {
+                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_egg_types_edit_form()</h1></div>';
+                }
+                break;
+
             case 'items': // 🔹 NOUVEAU : ADD/EDIT Item
                 global $wpdb;
                 $edit_row = null;
@@ -697,6 +722,20 @@ function poke_hub_pokemon_admin_ui() {
             ];
             break;
 
+        case 'egg_types':
+            $add_button = [
+                'label' => __('Add egg type', 'poke-hub'),
+                'url'   => add_query_arg(
+                    [
+                        'page'       => 'poke-hub-pokemon',
+                        'ph_section' => 'egg_types',
+                        'action'     => 'add',
+                    ],
+                    admin_url('admin.php')
+                ),
+            ];
+            break;
+
         case 'items':
             $add_button = [
                 'label' => __('Add item', 'poke-hub'),
@@ -755,6 +794,7 @@ function poke_hub_pokemon_admin_ui() {
         'forms'         => __('Form variants', 'poke-hub'),
         'form_mappings' => __('Form mappings', 'poke-hub'),
         'weathers'      => __('Weathers', 'poke-hub'),
+        'egg_types'     => __('Egg types', 'poke-hub'),
         'items'         => __('Items', 'poke-hub'),
         'backgrounds'   => __('Backgrounds', 'poke-hub'),
         'regional_regions' => __('Geographic Regions', 'poke-hub'),
@@ -865,6 +905,14 @@ function poke_hub_pokemon_admin_ui() {
                         poke_hub_pokemon_admin_weathers_screen();
                     } else {
                         echo '<p>Weathers screen not implemented yet.</p>';
+                    }
+                    break;
+
+                case 'egg_types':
+                    if (function_exists('poke_hub_pokemon_admin_egg_types_screen')) {
+                        poke_hub_pokemon_admin_egg_types_screen();
+                    } else {
+                        echo '<p>Egg types screen not implemented yet.</p>';
                     }
                     break;
 

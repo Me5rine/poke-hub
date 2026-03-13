@@ -73,7 +73,14 @@ function poke_hub_render_friend_codes_filters($args = []) {
                             <select name="pattern" id="filter_pattern" class="me5rine-lab-form-select">
                                 <option value=""><?php esc_html_e('-- All patterns --', 'poke-hub'); ?></option>
                                 <?php foreach ($args['scatterbug_patterns'] as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($args['filter_pattern'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
+                                        ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($args['filter_pattern'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -105,7 +112,14 @@ function poke_hub_render_friend_codes_filters($args = []) {
                             <select name="team" id="filter_team" class="me5rine-lab-form-select">
                                 <option value=""><?php esc_html_e('-- All teams --', 'poke-hub'); ?></option>
                                 <?php foreach ($args['teams'] as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($args['filter_team'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_team_icon_url') 
+                                        ? poke_hub_get_team_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($args['filter_team'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

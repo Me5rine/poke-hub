@@ -162,7 +162,10 @@
             // Only validate if something was entered
             if (value.trim() !== '') {
                 if (!validateFriendCode(value)) {
-                    showFriendCodeError('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)');
+                    var errorMsg = (typeof pokeHubUserProfiles !== 'undefined' && pokeHubUserProfiles.friendCodeError) 
+                        ? pokeHubUserProfiles.friendCodeError 
+                        : 'The friend code must be exactly 12 digits (e.g., 1234 5678 9012)';
+                    showFriendCodeError(errorMsg);
                 }
             }
         });
@@ -179,7 +182,10 @@
                     e.stopPropagation();
                     
                     removeFriendCodeError();
-                    showFriendCodeError('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)');
+                    var errorMsg = (typeof pokeHubUserProfiles !== 'undefined' && pokeHubUserProfiles.friendCodeError) 
+                        ? pokeHubUserProfiles.friendCodeError 
+                        : 'The friend code must be exactly 12 digits (e.g., 1234 5678 9012)';
+                    showFriendCodeError(errorMsg);
                     
                     // Scroll to error
                     $('html, body').animate({

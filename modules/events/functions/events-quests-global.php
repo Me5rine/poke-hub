@@ -6,7 +6,153 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Rendu de toutes les quêtes actives (saison + événements)
+ * Récupère toutes les quêtes actives à l'instant donné (saison + événements).
+ * Chaque élément : task, rewards, source ('season'|'event'), event_id, event_title, content_quest_id.
+ *
+ * @param int|null $timestamp Si null, utilise time().
+ * @return array
+ */
+function pokehub_get_all_active_quests($timestamp = null) {
+    if ($timestamp === null) {
+        $timestamp = time();
+    }
+    $timestamp = (int) $timestamp;
+    if (!function_exists('pokehub_content_get_quests_active_at') || !function_exists('pokehub_content_get_quests')) {
+        return [];
+    }
+    $rows = pokehub_content_get_quests_active_at($timestamp);
+    $out = [];
+
+    // Quêtes de saison (options) : si la date est dans la période, les ajouter
+    $season_start = get_option('pokehub_season_start', '');
+    $season_end = get_option('pokehub_season_end', '');
+    $season_quests_option = get_option('pokehub_season_quests', []);
+    if (is_array($season_quests_option) && !empty($season_quests_option)) {
+        $in_season = true;
+        if ($season_start !== '' || $season_end !== '') {
+            $start_ts = $season_start ? strtotime($season_start) : 0;
+            $end_ts = $season_end ? strtotime($season_end . ' 23:59:59') : PHP_INT_MAX;
+            $in_season = ($start_ts === 0 || $timestamp >= $start_ts) && ($end_ts === PHP_INT_MAX || $timestamp <= $end_ts);
+        }
+        if ($in_season) {
+            foreach ($season_quests_option as $q) {
+                if (empty($q['task']) && empty($q['rewards'])) {
+                    continue;
+                }
+                $out[] = [
+                    'task'             => $q['task'] ?? '',
+                    'rewards'          => $q['rewards'] ?? [],
+                    'quest_group_id'   => isset($q['quest_group_id']) ? (int) $q['quest_group_id'] : 0,
+                    'source'           => 'season',
+                    'event_id'         => 0,
+                    'event_title'      => __('Season', 'poke-hub'),
+                    'content_quest_id' => 0,
+                ];
+            }
+        }
+    }
+
+    foreach ($rows as $row) {
+        $source_type = (string) $row->source_type;
+        $source_id   = (int) $row->source_id;
+        $quests      = pokehub_content_get_quests($source_type, $source_id);
+        $event_title = '';
+        $source      = 'season';
+        if ($source_type === 'global_pool') {
+            $event_title = __('Season', 'poke-hub');
+        } elseif ($source_type === 'post' && $source_id > 0 && function_exists('poke_hub_events_get_event_title')) {
+            $source      = 'event';
+            $event_title = poke_hub_events_get_event_title($source_id);
+        } elseif ($source_type === 'special_event' && $source_id > 0 && function_exists('pokehub_get_table')) {
+            global $wpdb;
+            $table = pokehub_get_table('special_events');
+            if ($table) {
+                $ev = $wpdb->get_row($wpdb->prepare(
+                    "SELECT title, title_fr FROM {$table} WHERE id = %d LIMIT 1",
+                    $source_id
+                ));
+                if ($ev) {
+                    $source      = 'event';
+                    $event_title = !empty($ev->title_fr) ? $ev->title_fr : $ev->title;
+                }
+            }
+        }
+        foreach ($quests as $q) {
+            if (empty($q['task']) && empty($q['rewards'])) {
+                continue;
+            }
+            $out[] = [
+                'task'             => $q['task'] ?? '',
+                'rewards'          => $q['rewards'] ?? [],
+                'quest_group_id'   => isset($q['quest_group_id']) ? (int) $q['quest_group_id'] : 0,
+                'source'           => $source,
+                'event_id'         => $source_type !== 'global_pool' ? $source_id : 0,
+                'event_title'      => $event_title,
+                'content_quest_id' => (int) $row->id,
+            ];
+        }
+    }
+    return $out;
+}
+
+/**
+ * Rendu d'une liste de quêtes groupées par catégorie (quest_group).
+ * Chaque groupe a un en-tête avec titre (FR/EN) et couleur.
+ *
+ * @param array $quests Liste de quêtes (avec quest_group_id)
+ * @return string HTML
+ */
+function pokehub_render_quests_by_groups(array $quests) {
+    if (empty($quests)) {
+        return '';
+    }
+    $groups_index = [];
+    $no_group = [];
+    foreach ($quests as $q) {
+        $gid = isset($q['quest_group_id']) ? (int) $q['quest_group_id'] : 0;
+        if ($gid > 0) {
+            if (!isset($groups_index[$gid])) {
+                $groups_index[$gid] = [];
+            }
+            $groups_index[$gid][] = $q;
+        } else {
+            $no_group[] = $q;
+        }
+    }
+    $group_objects = function_exists('pokehub_get_quest_groups') ? pokehub_get_quest_groups() : [];
+    $group_by_id = [];
+    foreach ($group_objects as $g) {
+        $group_by_id[(int) $g->id] = $g;
+    }
+    ob_start();
+    foreach ($group_objects as $g) {
+        $gid = (int) $g->id;
+        if (empty($groups_index[$gid])) {
+            continue;
+        }
+        $title = !empty($g->title_fr) ? $g->title_fr : $g->title_en;
+        $color_style = !empty($g->color) ? ' style="--pokehub-quest-group-color:' . esc_attr($g->color) . ';"' : '';
+        ?>
+        <div class="pokehub-quest-group"<?php echo $color_style; ?>>
+            <h3 class="pokehub-quest-group-title"><?php echo esc_html($title); ?></h3>
+            <?php echo pokehub_render_event_quests($groups_index[$gid]); ?>
+        </div>
+        <?php
+    }
+    if (!empty($no_group)) {
+        ?>
+        <div class="pokehub-quest-group pokehub-quest-group-uncategorized">
+            <?php echo pokehub_render_event_quests($no_group); ?>
+        </div>
+        <?php
+    }
+    return ob_get_clean();
+}
+
+/**
+ * Rendu de toutes les quêtes actives (saison + événements).
+ * Deux colonnes : quêtes d'événement(s) à gauche, autres (saison) à droite. Une seule colonne sur mobile.
+ * En-têtes par catégorie (groupes de quêtes) comme Leek Duck.
  *
  * @return string HTML
  */
@@ -17,7 +163,6 @@ function pokehub_render_all_active_quests() {
         return '<p>' . __('No active quests available.', 'poke-hub') . '</p>';
     }
     
-    // Grouper par source
     $season_quests = [];
     $event_quests = [];
     
@@ -31,49 +176,48 @@ function pokehub_render_all_active_quests() {
     
     ob_start();
     ?>
-    <div class="pokehub-all-quests">
-        <?php if (!empty($season_quests)) : ?>
-            <section class="pokehub-quests-section pokehub-quests-season">
-                <h2 class="pokehub-quests-section-title">
-                    <?php _e('Quests', 'poke-hub'); ?>
-                </h2>
-                <?php echo pokehub_render_event_quests($season_quests); ?>
-            </section>
-        <?php endif; ?>
-        
-        <?php if (!empty($event_quests)) : ?>
-            <section class="pokehub-quests-section pokehub-quests-events">
-                <h2 class="pokehub-quests-section-title">
-                    <?php _e('Event Quests', 'poke-hub'); ?>
-                </h2>
-                
-                <?php
-                // Grouper par événement
-                $quests_by_event = [];
-                foreach ($event_quests as $quest) {
-                    $event_id = $quest['event_id'] ?? 0;
-                    if (!isset($quests_by_event[$event_id])) {
-                        $quests_by_event[$event_id] = [
-                            'event_title' => $quest['event_title'] ?? '',
-                            'quests' => [],
-                        ];
+    <div class="pokehub-all-quests pokehub-research-page">
+        <h1 class="pokehub-page-title pokehub-research-page-title"><?php esc_html_e('Current Field Research', 'poke-hub'); ?></h1>
+        <div class="pokehub-research-cols">
+            <div class="pokehub-research-col pokehub-research-col-events">
+                <section class="pokehub-quests-section pokehub-quests-events">
+                    <h2 class="pokehub-quests-section-title"><?php esc_html_e('Event Quests', 'poke-hub'); ?></h2>
+                    <?php
+                    $quests_by_event = [];
+                    foreach ($event_quests as $quest) {
+                        $event_id = $quest['event_id'] ?? 0;
+                        if (!isset($quests_by_event[$event_id])) {
+                            $quests_by_event[$event_id] = [
+                                'event_title' => $quest['event_title'] ?? '',
+                                'quests' => [],
+                            ];
+                        }
+                        $quests_by_event[$event_id]['quests'][] = $quest;
                     }
-                    $quests_by_event[$event_id]['quests'][] = $quest;
-                }
-                
-                foreach ($quests_by_event as $event_id => $event_data) :
-                ?>
-                    <div class="pokehub-quests-event-group">
-                        <?php if (!empty($event_data['event_title'])) : ?>
-                            <h3 class="pokehub-quests-event-title">
-                                <?php echo esc_html($event_data['event_title']); ?>
-                            </h3>
-                        <?php endif; ?>
-                        <?php echo pokehub_render_event_quests($event_data['quests']); ?>
-                    </div>
-                <?php endforeach; ?>
-            </section>
-        <?php endif; ?>
+                    foreach ($quests_by_event as $event_data) :
+                        if (!empty($event_data['event_title'])) {
+                            echo '<h3 class="pokehub-quests-event-title">' . esc_html($event_data['event_title']) . '</h3>';
+                        }
+                        echo pokehub_render_quests_by_groups($event_data['quests']);
+                    endforeach;
+                    if (empty($event_quests)) {
+                        echo '<p class="pokehub-quests-empty">' . esc_html__('No event quests at the moment.', 'poke-hub') . '</p>';
+                    }
+                    ?>
+                </section>
+            </div>
+            <div class="pokehub-research-col pokehub-research-col-other">
+                <section class="pokehub-quests-section pokehub-quests-season">
+                    <h2 class="pokehub-quests-section-title"><?php esc_html_e('Quests', 'poke-hub'); ?></h2>
+                    <?php
+                    echo pokehub_render_quests_by_groups($season_quests);
+                    if (empty($season_quests)) {
+                        echo '<p class="pokehub-quests-empty">' . esc_html__('No season quests at the moment.', 'poke-hub') . '</p>';
+                    }
+                    ?>
+                </section>
+            </div>
+        </div>
     </div>
     <?php
     return ob_get_clean();

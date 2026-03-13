@@ -177,6 +177,7 @@ add_shortcode('poke_hub_vivillon', function ($atts) {
                 'friend_codes' => $friend_codes,
                 'paged' => $paged,
                 'teams' => $teams,
+                'scatterbug_patterns' => $scatterbug_patterns,
                 'context' => 'vivillon',
                 'empty_message' => __('No friend code found for these criteria. Be the first to add one!', 'poke-hub'),
             ]);

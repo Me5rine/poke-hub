@@ -44,6 +44,11 @@ class Pokehub_DB {
             $this->createEventsTables();
         }
 
+        // Tables de contenu communes (post, special_event, global_pool) — œufs, quêtes, raids, etc.
+        if (in_array('events', $active_modules, true) || in_array('eggs', $active_modules, true)) {
+            $this->createContentTables();
+        }
+
         if (in_array('user-profiles', $active_modules, true)) {
             $this->createUserProfilesTables();
         }
@@ -51,6 +56,13 @@ class Pokehub_DB {
         if (in_array('games', $active_modules, true)) {
             $this->createGamesTables();
         }
+
+        if (in_array('collections', $active_modules, true)) {
+            $this->createCollectionsTables();
+        }
+
+        // Plus de global_egg_pools : les œufs (y compris pools globaux) sont dans content_eggs.
+        // if (in_array('eggs', $active_modules, true)) { $this->createEggsTables(); }
     }
 
     /**
@@ -87,6 +99,7 @@ class Pokehub_DB {
         $pokemon_type_links    = pokehub_get_table('pokemon_type_links');
         $pokemon_attack_links  = pokehub_get_table('pokemon_attack_links');
         $weathers_table        = pokehub_get_table('pokemon_weathers');
+        $egg_types_table       = pokehub_get_table('pokemon_egg_types');
         $type_weather_links    = pokehub_get_table('pokemon_type_weather_links');
         $type_weakness_links   = pokehub_get_table('pokemon_type_weakness_links');
         $type_resistance_links = pokehub_get_table('pokemon_type_resistance_links');
@@ -307,6 +320,20 @@ class Pokehub_DB {
             UNIQUE KEY slug (slug)
         ) {$charset_collate};";
 
+        // 9bis) Types d'œufs (2 km, 7 km, etc.)
+        $sql_egg_types = "CREATE TABLE {$egg_types_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(50) NOT NULL,
+            name_en VARCHAR(100) NOT NULL DEFAULT '',
+            name_fr VARCHAR(100) NOT NULL DEFAULT '',
+            hatch_distance_km SMALLINT UNSIGNED NOT NULL DEFAULT 2,
+            extra LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug)
+        ) {$charset_collate};";
+
         // 10) Lien Type ↔ Météos (boosts)
         $sql_type_weather_links = "CREATE TABLE {$type_weather_links} (
             type_id BIGINT UNSIGNED NOT NULL,
@@ -476,6 +503,7 @@ class Pokehub_DB {
         dbDelta($sql_attack_type_links);
         dbDelta($sql_pokemon_attack_links);
         dbDelta($sql_weathers);
+        dbDelta($sql_egg_types);
         dbDelta($sql_type_weather_links);
         dbDelta($sql_type_weakness_links);
         dbDelta($sql_type_resistance_links);
@@ -686,6 +714,7 @@ class Pokehub_DB {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             event_id BIGINT UNSIGNED NOT NULL,
             pokemon_id BIGINT UNSIGNED NOT NULL,
+            gender VARCHAR(10) NULL DEFAULT NULL COMMENT 'male, female, or NULL for default',
 
             PRIMARY KEY (id),
             KEY event_id (event_id),
@@ -724,6 +753,9 @@ class Pokehub_DB {
         
         // Migration : ajouter les colonnes recurring si elles n'existent pas
         $this->migrateSpecialEventsRecurringColumns($events_table);
+        
+        // Migration : ajouter la colonne gender si elle n'existe pas
+        $this->migrateSpecialEventPokemonGenderColumn($event_pokemon_table);
     }
     
     /**
@@ -789,6 +821,417 @@ class Pokehub_DB {
         $events_table = pokehub_get_table('special_events');
         if ($events_table) {
             $this->migrateSpecialEventsRecurringColumns($events_table);
+        }
+    }
+    
+    /**
+     * Migration : ajoute la colonne gender à special_event_pokemon si elle n'existe pas.
+     * 
+     * @param string $table_name Nom de la table special_event_pokemon
+     */
+    private function migrateSpecialEventPokemonGenderColumn($table_name) {
+        global $wpdb;
+        
+        // Vérifier si la table existe
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Vérifier si la colonne gender existe
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'gender'",
+                DB_NAME,
+                $table_name
+            )
+        );
+        
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            // Ajouter la colonne gender
+            $wpdb->query(
+                "ALTER TABLE {$table_name} 
+                 ADD COLUMN gender VARCHAR(10) NULL DEFAULT NULL COMMENT 'male, female, or NULL for default' 
+                 AFTER pokemon_id"
+            );
+        }
+    }
+    
+    /**
+     * Migration publique : ajoute la colonne gender à special_event_pokemon si elle n'existe pas.
+     */
+    public function migrateEventPokemonGenderColumn() {
+        $event_pokemon_table = pokehub_get_table('special_event_pokemon');
+        if ($event_pokemon_table) {
+            $this->migrateSpecialEventPokemonGenderColumn($event_pokemon_table);
+        }
+    }
+
+    /**
+     * Migration unique : renommer les tables de contenu qui avaient un double préfixe "pokehub"
+     * (ex. actu_pokehub_pokehub_content_special_research_steps -> actu_pokehub_content_special_research_steps).
+     * Si la table au bon nom existe déjà (vide), on la supprime puis on renomme l'ancienne.
+     */
+    public function migrateContentTablesDoublePrefix() {
+        $option_key = 'pokehub_content_tables_double_prefix_migrated';
+        if (get_option($option_key, false)) {
+            return;
+        }
+
+        global $wpdb;
+        $prefix = $wpdb->prefix;
+        $content_keys = [
+            'content_eggs', 'content_egg_pokemon', 'content_quests', 'content_quest_lines', 'quest_groups',
+            'content_habitats', 'content_habitat_entries', 'content_special_research', 'content_special_research_steps',
+            'content_collection_challenges', 'content_collection_challenge_items', 'content_bonus', 'content_bonus_entries',
+            'content_wild_pokemon', 'content_wild_pokemon_entries', 'content_new_pokemon', 'content_new_pokemon_entries',
+            'content_raids', 'content_raid_bosses',
+        ];
+
+        foreach ($content_keys as $key) {
+            if (!function_exists('pokehub_get_table')) {
+                continue;
+            }
+            $new_table = pokehub_get_table($key);
+            if (empty($new_table) || strpos($new_table, $prefix . 'pokehub_') !== 0) {
+                continue;
+            }
+            $new_suffix = preg_replace('#^' . preg_quote($prefix . 'pokehub_', '#') . '#', '', $new_table);
+            $old_table = $prefix . 'pokehub_pokehub_' . $new_suffix;
+
+            $old_exists = ($wpdb->get_var("SHOW TABLES LIKE " . $wpdb->prepare('%s', $old_table)) === $old_table);
+            $new_exists = ($wpdb->get_var("SHOW TABLES LIKE " . $wpdb->prepare('%s', $new_table)) === $new_table);
+
+            if (!$old_exists) {
+                continue;
+            }
+            if ($new_exists) {
+                $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `" . esc_sql($new_table) . "`");
+                if ($count === 0) {
+                    $wpdb->query("DROP TABLE `" . esc_sql($new_table) . "`");
+                    $new_exists = false;
+                } else {
+                    continue;
+                }
+            }
+            if (!$new_exists) {
+                $wpdb->query("RENAME TABLE `" . esc_sql($old_table) . "` TO `" . esc_sql($new_table) . "`");
+            }
+        }
+
+        update_option($option_key, true);
+    }
+
+    /**
+     * Création des tables de contenu communes (source_type: post, special_event, global_pool).
+     * Une source de vérité par type : œufs, quêtes, raids, habitats, bonus, etc.
+     * Les dates (start_ts, end_ts) sont dupliquées ; la mise à jour des dates d’un event/post
+     * doit mettre à jour ces tables (sync via helpers).
+     */
+    private function createContentTables() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $eggs_tbl           = pokehub_get_table('content_eggs');
+        $egg_pokemon_tbl    = pokehub_get_table('content_egg_pokemon');
+        $quests_tbl         = pokehub_get_table('content_quests');
+        $quest_lines_tbl    = pokehub_get_table('content_quest_lines');
+        $quest_groups_tbl   = pokehub_get_table('quest_groups');
+        $habitats_tbl       = pokehub_get_table('content_habitats');
+        $habitat_entries_tbl = pokehub_get_table('content_habitat_entries');
+        $research_tbl      = pokehub_get_table('content_special_research');
+        $research_steps_tbl = pokehub_get_table('content_special_research_steps');
+        $challenges_tbl    = pokehub_get_table('content_collection_challenges');
+        $challenge_items_tbl = pokehub_get_table('content_collection_challenge_items');
+        $bonus_tbl         = pokehub_get_table('content_bonus');
+        $bonus_entries_tbl = pokehub_get_table('content_bonus_entries');
+        $wild_tbl          = pokehub_get_table('content_wild_pokemon');
+        $wild_entries_tbl  = pokehub_get_table('content_wild_pokemon_entries');
+        $new_pokemon_tbl   = pokehub_get_table('content_new_pokemon');
+        $new_pokemon_entries_tbl = pokehub_get_table('content_new_pokemon_entries');
+        $raids_tbl         = pokehub_get_table('content_raids');
+        $raid_bosses_tbl   = pokehub_get_table('content_raid_bosses');
+
+        $sql_eggs = "CREATE TABLE {$eggs_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            name VARCHAR(255) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        // Seuls les overrides sont stockés ; is_shiny, is_regional, cp_min/cp_max sont calculés à l'affichage.
+        $sql_egg_pokemon = "CREATE TABLE {$egg_pokemon_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_egg_id BIGINT UNSIGNED NOT NULL,
+            egg_type_id BIGINT UNSIGNED NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            rarity TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            is_worldwide_override TINYINT(1) NOT NULL DEFAULT 0,
+            is_forced_shiny TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_egg_id (content_egg_id),
+            KEY egg_type_id (egg_type_id),
+            KEY pokemon_id (pokemon_id)
+        ) {$charset_collate};";
+
+        $sql_quests = "CREATE TABLE {$quests_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_quest_groups = "CREATE TABLE {$quest_groups_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            title_en VARCHAR(255) NOT NULL DEFAULT '',
+            title_fr VARCHAR(255) NOT NULL DEFAULT '',
+            color VARCHAR(20) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY sort_order (sort_order)
+        ) {$charset_collate};";
+
+        $sql_quest_lines = "CREATE TABLE {$quest_lines_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_quest_id BIGINT UNSIGNED NOT NULL,
+            quest_group_id BIGINT UNSIGNED NULL DEFAULT NULL,
+            task TEXT NULL,
+            rewards LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_quest_id (content_quest_id),
+            KEY quest_group_id (quest_group_id)
+        ) {$charset_collate};";
+
+        $sql_habitats = "CREATE TABLE {$habitats_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_habitat_entries = "CREATE TABLE {$habitat_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_habitat_id BIGINT UNSIGNED NOT NULL,
+            name VARCHAR(255) NOT NULL DEFAULT '',
+            slug VARCHAR(255) NOT NULL DEFAULT '',
+            pokemon_data LONGTEXT NULL,
+            schedule_data LONGTEXT NULL,
+            all_pokemon_available TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_habitat_id (content_habitat_id)
+        ) {$charset_collate};";
+
+        $sql_research = "CREATE TABLE {$research_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            research_type VARCHAR(30) NOT NULL DEFAULT 'special',
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_research_steps = "CREATE TABLE {$research_steps_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_research_id BIGINT UNSIGNED NOT NULL,
+            step_data LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_research_id (content_research_id)
+        ) {$charset_collate};";
+
+        $sql_challenges = "CREATE TABLE {$challenges_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_challenge_items = "CREATE TABLE {$challenge_items_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_challenge_id BIGINT UNSIGNED NOT NULL,
+            item_data LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_challenge_id (content_challenge_id)
+        ) {$charset_collate};";
+
+        $sql_bonus = "CREATE TABLE {$bonus_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_bonus_entries = "CREATE TABLE {$bonus_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_bonus_id BIGINT UNSIGNED NOT NULL,
+            bonus_id BIGINT UNSIGNED NOT NULL,
+            description LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_bonus_id (content_bonus_id),
+            KEY bonus_id (bonus_id)
+        ) {$charset_collate};";
+
+        $sql_wild = "CREATE TABLE {$wild_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_wild_entries = "CREATE TABLE {$wild_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_wild_pokemon_id BIGINT UNSIGNED NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            is_rare TINYINT(1) NOT NULL DEFAULT 0,
+            is_forced_shiny TINYINT(1) NOT NULL DEFAULT 0,
+            gender VARCHAR(10) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_wild_pokemon_id (content_wild_pokemon_id),
+            KEY pokemon_id (pokemon_id)
+        ) {$charset_collate};";
+
+        $sql_new_pokemon = "CREATE TABLE {$new_pokemon_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_new_pokemon_entries = "CREATE TABLE {$new_pokemon_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_new_pokemon_id BIGINT UNSIGNED NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            gender VARCHAR(10) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_new_pokemon_id (content_new_pokemon_id),
+            KEY pokemon_id (pokemon_id)
+        ) {$charset_collate};";
+
+        $sql_raids = "CREATE TABLE {$raids_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            name VARCHAR(255) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_raid_bosses = "CREATE TABLE {$raid_bosses_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_raid_id BIGINT UNSIGNED NOT NULL,
+            tier TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            is_mega TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_raid_id (content_raid_id),
+            KEY pokemon_id (pokemon_id)
+        ) {$charset_collate};";
+
+        dbDelta($sql_eggs);
+        dbDelta($sql_egg_pokemon);
+        dbDelta($sql_quest_groups);
+        dbDelta($sql_quests);
+        dbDelta($sql_quest_lines);
+        dbDelta($sql_habitats);
+        dbDelta($sql_habitat_entries);
+        dbDelta($sql_research);
+        dbDelta($sql_research_steps);
+        dbDelta($sql_challenges);
+        dbDelta($sql_challenge_items);
+        dbDelta($sql_bonus);
+        dbDelta($sql_bonus_entries);
+        dbDelta($sql_wild);
+        dbDelta($sql_wild_entries);
+        dbDelta($sql_new_pokemon);
+        dbDelta($sql_new_pokemon_entries);
+        dbDelta($sql_raids);
+        dbDelta($sql_raid_bosses);
+
+        // Migration : ajouter quest_group_id à content_quest_lines si absent (installations existantes)
+        $col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'quest_group_id'",
+            $wpdb->dbname,
+            $quest_lines_tbl
+        ));
+        if (empty($col)) {
+            $wpdb->query("ALTER TABLE {$quest_lines_tbl} ADD COLUMN quest_group_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER content_quest_id, ADD KEY quest_group_id (quest_group_id)");
         }
     }
 
@@ -1044,5 +1487,110 @@ class Pokehub_DB {
         dbDelta($sql_scores);
         dbDelta($sql_pokedle_daily);
         dbDelta($sql_points);
+    }
+
+    /**
+     * Création des tables du module Collections Pokémon GO.
+     * - collections : définitions des collections (nom, catégorie, options)
+     * - collection_items : Pokémon possédés / à l'échange / manquants par collection
+     */
+    private function createCollectionsTables() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $collections_table = pokehub_get_table('collections');
+        $items_table       = pokehub_get_table('collection_items');
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $sql_collections = "CREATE TABLE {$collections_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            name VARCHAR(191) NOT NULL DEFAULT '',
+            slug VARCHAR(191) NOT NULL DEFAULT '',
+            share_token VARCHAR(20) NULL DEFAULT NULL,
+            anonymous_ip VARCHAR(45) NULL DEFAULT NULL,
+            category VARCHAR(64) NOT NULL DEFAULT 'custom',
+            options LONGTEXT NULL,
+            is_public TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id (user_id),
+            KEY slug (slug),
+            KEY anonymous_ip (anonymous_ip),
+            UNIQUE KEY share_token (share_token),
+            KEY category (category),
+            KEY is_public (is_public),
+            UNIQUE KEY unique_user_slug (user_id, slug)
+        ) {$charset_collate};";
+
+        $sql_items = "CREATE TABLE {$items_table} (
+            collection_id BIGINT UNSIGNED NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'missing',
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (collection_id, pokemon_id),
+            KEY pokemon_id (pokemon_id),
+            KEY status (status)
+        ) {$charset_collate};";
+
+        dbDelta($sql_collections);
+        dbDelta($sql_items);
+    }
+
+    /**
+     * Création des tables du module Eggs (pools globaux par période).
+     * - global_egg_pools : pools par mois/saison avec dates
+     * - global_egg_pool_pokemon : Pokémon par pool et type d'œuf (rareté 1-5, shiny, régional, CP)
+     */
+    private function createEggsTables() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $pools_table   = pokehub_get_table('global_egg_pools');
+        $pokemon_table = pokehub_get_table('global_egg_pool_pokemon');
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $sql_pools = "CREATE TABLE {$pools_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(255) NOT NULL,
+            period_type VARCHAR(20) NOT NULL DEFAULT 'month',
+            period_value VARCHAR(50) NOT NULL DEFAULT '',
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY period_type (period_type),
+            KEY start_ts (start_ts),
+            KEY end_ts (end_ts)
+        ) {$charset_collate};";
+
+        $sql_pokemon = "CREATE TABLE {$pokemon_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            pool_id BIGINT UNSIGNED NOT NULL,
+            egg_type_id BIGINT UNSIGNED NOT NULL,
+            pokemon_id BIGINT UNSIGNED NOT NULL,
+            rarity TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            is_shiny TINYINT(1) NOT NULL DEFAULT 0,
+            is_regional TINYINT(1) NOT NULL DEFAULT 0,
+            is_worldwide_override TINYINT(1) NOT NULL DEFAULT 0,
+            is_forced_shiny TINYINT(1) NOT NULL DEFAULT 0,
+            cp_min SMALLINT UNSIGNED NULL DEFAULT NULL,
+            cp_max SMALLINT UNSIGNED NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY pool_id (pool_id),
+            KEY egg_type_id (egg_type_id),
+            KEY pokemon_id (pokemon_id),
+            KEY rarity (rarity)
+        ) {$charset_collate};";
+
+        dbDelta($sql_pools);
+        dbDelta($sql_pokemon);
     }
 }

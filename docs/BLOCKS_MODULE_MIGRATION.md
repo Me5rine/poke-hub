@@ -68,3 +68,10 @@ L'enregistrement des blocs Gutenberg est maintenant géré par le module `blocks
 
 
 
+
+
+
+
+
+
+

@@ -680,4 +680,3 @@ function poke_hub_pokedle_count_successful_players(string $game_date, ?int $gene
 
     return (int) $count;
 }
-

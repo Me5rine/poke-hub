@@ -6,11 +6,13 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Récupère les quêtes d'un événement depuis les post meta
+ * Récupère les quêtes d'un événement (depuis les tables de contenu).
  */
 function pokehub_get_event_quests(int $post_id): array {
-    $quests = get_post_meta($post_id, '_pokehub_event_quests', true);
-    return is_array($quests) ? $quests : [];
+    if (function_exists('pokehub_content_get_quests')) {
+        return pokehub_content_get_quests('post', $post_id);
+    }
+    return [];
 }
 
 /**
@@ -30,8 +32,9 @@ function pokehub_save_event_quests(int $post_id, array $quests): void {
         }
         
         $cleaned_quest = [
-            'task' => $has_task ? sanitize_text_field($quest['task']) : '',
-            'rewards' => [],
+            'task'           => $has_task ? sanitize_text_field($quest['task']) : '',
+            'rewards'        => [],
+            'quest_group_id' => isset($quest['quest_group_id']) ? max(0, (int) $quest['quest_group_id']) : 0,
         ];
         
         if (isset($quest['rewards']) && is_array($quest['rewards'])) {
@@ -54,6 +57,18 @@ function pokehub_save_event_quests(int $post_id, array $quests): void {
                         $cleaned_reward['pokemon_ids'] = [];
                     }
                     $cleaned_reward['force_shiny'] = !empty($reward['force_shiny']);
+                    
+                    // Genres des pokémon
+                    $pokemon_genders = [];
+                    if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {
+                        foreach ($reward['pokemon_genders'] as $pokemon_id => $gender) {
+                            $pokemon_id = (int) $pokemon_id;
+                            if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
+                                $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);
+                            }
+                        }
+                    }
+                    $cleaned_reward['pokemon_genders'] = $pokemon_genders;
                 } elseif ($cleaned_reward['type'] === 'candy' || $cleaned_reward['type'] === 'mega_energy') {
                     $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
                     $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
@@ -81,8 +96,10 @@ function pokehub_save_event_quests(int $post_id, array $quests): void {
         
         $cleaned_quests[] = $cleaned_quest;
     }
-    
-    update_post_meta($post_id, '_pokehub_event_quests', $cleaned_quests);
+
+    if (function_exists('pokehub_content_save_quests')) {
+        pokehub_content_save_quests('post', $post_id, $cleaned_quests);
+    }
 }
 
 /**

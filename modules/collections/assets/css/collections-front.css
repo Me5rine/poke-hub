@@ -1,0 +1,599 @@
+/* Collections Pokémon GO - Front */
+
+.poke-hub-collections-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.poke-hub-collections-header {
+    margin-bottom: 1.5rem;
+}
+
+.poke-hub-collections-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.75rem;
+}
+
+.poke-hub-collections-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.poke-hub-collections-subtitle {
+    margin: 0;
+    color: #555;
+    font-size: 0.95rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.poke-hub-collections-header-row .poke-hub-collections-btn-create {
+    flex-shrink: 0;
+}
+
+.poke-hub-collections-anonymous-banner {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: #f0f6fc;
+    border: 1px solid #c5d9ed;
+    border-radius: 8px;
+}
+
+.poke-hub-collections-anonymous-banner-text {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+}
+
+.poke-hub-collections-anonymous-list {
+    margin: 0.5rem 0 0.75rem 0;
+    padding-left: 1.25rem;
+}
+
+.poke-hub-collections-anonymous-actions {
+    margin: 0.75rem 0 0 0;
+}
+
+.poke-hub-collections-anonymous-actions .button {
+    margin-right: 0.5rem;
+}
+
+.poke-hub-collections-list {
+    margin-top: 1rem;
+}
+
+.poke-hub-collections-empty {
+    color: #666;
+    font-style: italic;
+}
+
+/* Grille de tuiles gestion (ratio 16:9, 3 par ligne) */
+.poke-hub-collections-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+    .poke-hub-collections-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .poke-hub-collections-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.poke-hub-collections-card {
+    margin: 0;
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.poke-hub-collections-card-link {
+    display: block;
+    position: absolute;
+    inset: 0;
+    text-decoration: none;
+    color: #fff;
+    padding: 0.75rem 1rem;
+}
+
+.poke-hub-collections-card-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #2c5282 0%, #2b6cb0 50%, #3182ce 100%);
+    z-index: 0;
+}
+
+.poke-hub-collections-card-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+    z-index: 1;
+}
+
+.poke-hub-collections-card-name,
+.poke-hub-collections-card-meta {
+    position: relative;
+    z-index: 2;
+    display: block;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.poke-hub-collections-card-name {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.15rem;
+}
+
+.poke-hub-collections-card-meta {
+    font-size: 0.8rem;
+    opacity: 0.95;
+}
+
+.poke-hub-collections-card-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 3;
+    display: flex;
+    gap: 0.35rem;
+}
+
+.poke-hub-collections-card-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1d2327;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.poke-hub-collections-card-btn:hover {
+    background: #fff;
+    color: #0073aa;
+}
+
+.poke-hub-collections-card-btn-delete:hover {
+    background: #b32d2e;
+    color: #fff;
+}
+
+.poke-hub-collections-card-btn .screen-reader-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+/* Icônes (texte fallback si pas de police icône) */
+.poke-hub-collections-card-btn-settings::before {
+    content: '⚙';
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.poke-hub-collections-card-btn-delete::before {
+    content: '×';
+    font-size: 1.25rem;
+    line-height: 1;
+    font-weight: 700;
+}
+
+/* Ancienne liste (fallback si pas de grille) */
+.poke-hub-collections-item {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.poke-hub-collections-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+    background: #f5f5f5;
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid #e0e0e0;
+}
+
+.poke-hub-collections-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.poke-hub-collections-btn-delete-list {
+    color: #b32d2e;
+    border-color: #b32d2e;
+}
+
+.poke-hub-collections-btn-delete-list:hover {
+    background: #b32d2e;
+    color: #fff;
+}
+
+.poke-hub-collections-meta {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* Modal */
+.poke-hub-collections-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0.2s, opacity 0.2s;
+}
+
+.poke-hub-collections-modal[aria-hidden="false"] {
+    visibility: visible;
+    opacity: 1;
+}
+
+.poke-hub-collections-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.poke-hub-collections-modal-content {
+    position: relative;
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.poke-hub-collections-modal-content h3 {
+    margin-top: 0;
+}
+
+.poke-hub-collections-modal-desc {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.poke-hub-collections-form .form-field {
+    margin-bottom: 1rem;
+}
+
+.poke-hub-collections-form .form-field label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.poke-hub-collections-form input[type="text"],
+.poke-hub-collections-form select {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5rem;
+}
+
+.poke-hub-collections-options {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+.poke-hub-collections-options legend {
+    font-weight: 600;
+}
+
+.poke-hub-collections-options label {
+    display: block;
+    margin: 0.5rem 0;
+    cursor: pointer;
+}
+
+.poke-hub-collections-warning {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.poke-hub-collections-modal-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.poke-hub-collections-modal-actions-danger {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+    justify-content: flex-start;
+}
+
+.poke-hub-collections-btn-delete-collection {
+    color: #b32d2e;
+    border-color: #b32d2e;
+}
+
+.poke-hub-collections-btn-delete-collection:hover {
+    background: #b32d2e;
+    color: #fff;
+}
+
+/* View collection */
+.poke-hub-collection-view-wrap {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.poke-hub-collection-view-header {
+    margin-bottom: 1rem;
+}
+
+.poke-hub-collection-view-header .poke-hub-collection-view-title,
+.poke-hub-collection-view-header .poke-hub-collection-view-actions {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 0.5rem 0 0;
+}
+
+.poke-hub-collection-view-header .poke-hub-collection-view-actions {
+    margin-left: 0.5rem;
+}
+
+.poke-hub-collection-back {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    text-decoration: none;
+    color: #0073aa;
+}
+
+.poke-hub-collection-back:hover {
+    text-decoration: underline;
+}
+
+.poke-hub-collection-view-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+}
+
+.poke-hub-collection-stats {
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.poke-hub-collection-empty-pool {
+    margin: 0 0 1rem 0;
+    padding: 0.75rem 1rem;
+    background: #f0f0f1;
+    border-left: 4px solid #dba617;
+    color: #1d2327;
+}
+
+.poke-hub-collection-tiles {
+    display: block;
+}
+
+.poke-hub-collection-generation-block {
+    margin-bottom: 2.5rem;
+}
+
+.poke-hub-collection-generation-block:last-child {
+    margin-bottom: 0;
+}
+
+.poke-hub-collection-generation-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    background: #e8eef5;
+    border-left: 4px solid #0073aa;
+    border-radius: 0 6px 6px 0;
+    color: #1d2327;
+}
+
+.poke-hub-collection-generation-tiles,
+.poke-hub-collection-tiles:not(:has(.poke-hub-collection-generation-block)) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+
+.poke-hub-collection-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    background: #f9f9f9;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.poke-hub-collection-tile:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+}
+
+.poke-hub-collection-tile:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+.poke-hub-collection-tile[data-status="owned"] {
+    border-color: #46b450;
+    background: #f0f8f0;
+}
+
+.poke-hub-collection-tile[data-status="for_trade"] {
+    border-color: #ffb900;
+    background: #fffcf0;
+}
+
+.poke-hub-collection-tile img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.poke-hub-collection-tile-name {
+    font-size: 0.7rem;
+    text-align: center;
+    margin-top: 0.25rem;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.poke-hub-collection-tile-status {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.poke-hub-collection-tile[data-status="owned"] .poke-hub-collection-tile-status {
+    background: #46b450;
+}
+
+.poke-hub-collection-tile[data-status="for_trade"] .poke-hub-collection-tile-status {
+    background: #ffb900;
+}
+
+.poke-hub-collection-select-mode {
+    margin-bottom: 1rem;
+}
+
+.poke-hub-collection-multiselect-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 420px;
+}
+
+.poke-hub-collection-multiselect-wrap label[for="poke-hub-collection-missing-search"] {
+    font-weight: 600;
+}
+
+.poke-hub-collection-search {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.poke-hub-collection-search:focus {
+    border-color: #2271b1;
+    outline: none;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.poke-hub-collection-multiselect-list-wrap {
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.poke-hub-collection-multiselect-list {
+    padding: 0.25rem 0;
+    margin: 0;
+    list-style: none;
+}
+
+.poke-hub-collection-multiselect-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    margin: 0;
+    cursor: pointer;
+}
+
+.poke-hub-collection-multiselect-item:hover {
+    background: #f0f0f1;
+}
+
+.poke-hub-collection-multiselect-item input.poke-hub-collection-multiselect-cb {
+    flex-shrink: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.poke-hub-collection-multiselect-item label {
+    margin: 0;
+    cursor: pointer;
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.poke-hub-collection-multiselect-empty {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    color: #646970;
+    font-size: 0.9rem;
+}
+
+.poke-hub-collection-multiselect-add {
+    align-self: flex-start;
+}
+
+.poke-hub-collection-select {
+    max-width: 320px;
+    width: 100%;
+    padding: 0.5rem;
+}
+
+.poke-hub-collections-not-found {
+    color: #666;
+}

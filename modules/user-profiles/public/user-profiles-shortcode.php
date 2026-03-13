@@ -158,7 +158,14 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="team" id="team" class="me5rine-lab-form-select<?php echo empty($profile['team']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['team']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($teams as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'] ?? '', $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_team_icon_url') 
+                                        ? poke_hub_get_team_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['team'] ?? '', $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -212,7 +219,14 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="scatterbug_pattern" id="scatterbug_pattern" class="me5rine-lab-form-select<?php echo empty($profile['scatterbug_pattern']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['scatterbug_pattern']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'] ?? '', $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
+                                        ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['scatterbug_pattern'] ?? '', $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -301,7 +315,19 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                     </div>
                     <div class="me5rine-lab-form-view-item me5rine-lab-form-col">
                         <span class="me5rine-lab-form-view-label"><?php esc_html_e('Scatterbug Pattern', 'poke-hub'); ?></span>
-                        <span class="me5rine-lab-form-view-value"><?php echo esc_html(!empty($profile['scatterbug_pattern']) ? $profile['scatterbug_pattern'] : '—'); ?></span>
+                        <span class="me5rine-lab-form-view-value">
+                            <?php 
+                            if (!empty($profile['scatterbug_pattern'])) {
+                                $pattern_slug = $profile['scatterbug_pattern'];
+                                $pattern_label = isset($scatterbug_patterns[$pattern_slug]) 
+                                    ? $scatterbug_patterns[$pattern_slug] 
+                                    : $pattern_slug;
+                                echo esc_html($pattern_label);
+                            } else {
+                                echo '—';
+                            }
+                            ?>
+                        </span>
                     </div>
                 </div>
 

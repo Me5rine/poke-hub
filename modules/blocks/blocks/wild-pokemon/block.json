@@ -1,0 +1,43 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/wild-pokemon",
+	"title": "Pokémon Sauvages",
+	"category": "pokehub",
+	"icon": "pets",
+	"description": "Affiche la liste des Pokémon disponibles dans la nature avec leurs images, statut shiny et régional.",
+	"keywords": ["pokemon", "wild", "sauvage", "nature", "shiny", "régional", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		},
+		"pokemonIds": {
+			"type": "array",
+			"default": []
+		},
+		"rarePokemonIds": {
+			"type": "array",
+			"default": []
+		},
+		"forcedShinyIds": {
+			"type": "array",
+			"default": []
+		},
+		"showRareSection": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+
+
+
+

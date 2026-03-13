@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 2,
+  "name": "pokehub/eggs",
+  "title": "Oeufs Pokémon",
+  "category": "pokehub",
+  "icon": "admin-page",
+  "description": "Affiche les œufs (types, icônes) et la liste des Pokémon par type avec rareté, shiny, régional et PC min/max.",
+  "keywords": ["egg", "oeuf", "hatch", "pokehub", "pokemon"],
+  "textdomain": "poke-hub",
+  "supports": { "html": false, "align": false },
+  "attributes": {
+    "source": { "type": "string", "default": "post" },
+    "poolId": { "type": "number", "default": 0 },
+    "title": { "type": "string", "default": "" }
+  },
+  "editorScript": "file:./index.js",
+  "render": "file:./render.php"
+}

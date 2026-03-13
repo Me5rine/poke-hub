@@ -46,7 +46,7 @@ add_filter('pokehub_bonus_auto_post_types', function($types) {
 
 ### Blocs Gutenberg
 
-Vous pouvez également insérer manuellement les dates et bonus via les blocs Gutenberg :
+Vous pouvez insérer les blocs manuellement via la catégorie **Poké HUB** dans l’éditeur.
 
 #### Bloc "Dates d'événement" (`pokehub/event-dates`)
 
@@ -55,10 +55,13 @@ Vous pouvez également insérer manuellement les dates et bonus via les blocs Gu
 - `startDate` (string) : Date de début (format: "YYYY-MM-DD HH:MM")
 - `endDate` (string) : Date de fin (format: "YYYY-MM-DD HH:MM")
 
-**Exemple d'utilisation :**
-```
-<!--wp:pokehub/event-dates {"autoDetect":true} /-->
-```
+**Exemple :** `<!--wp:pokehub/event-dates {"autoDetect":true} /-->`
+
+#### Bloc "Quêtes d'événement" (`pokehub/event-quests`)
+
+Affiche les quêtes et récompenses de l’événement (données depuis les meta du post).
+
+**Attributs :** selon le bloc (souvent `autoDetect`). Voir l’éditeur ou le `block.json` du bloc.
 
 #### Bloc "Bonus" (`pokehub/bonus`)
 
@@ -67,16 +70,62 @@ Vous pouvez également insérer manuellement les dates et bonus via les blocs Gu
 - `bonusIds` (array) : Liste des IDs de bonus à afficher
 - `layout` (string, défaut: `cards`) : Layout d'affichage (`cards` ou `list`)
 
-**Exemple d'utilisation :**
-```
-<!--wp:pokehub/bonus {"autoDetect":true,"layout":"cards"} /-->
-```
+**Exemple :** `<!--wp:pokehub/bonus {"autoDetect":true,"layout":"cards"} /-->`
+
+#### Bloc "Pokémon Sauvages" (`pokehub/wild-pokemon`)
+
+Affiche la liste des Pokémon disponibles dans la nature (images, shiny, régional).
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta de l’événement
+- `pokemonIds` (array) : IDs de Pokémon à afficher
+- `rarePokemonIds` (array) : IDs de Pokémon rares (section dédiée)
+- `forcedShinyIds` (array) : IDs de Pokémon à afficher en shiny
+- `showRareSection` (boolean, défaut: `true`) : Afficher la section « Pokémon rares »
+
+#### Bloc "Habitats" (`pokehub/habitats`)
+
+Affiche les habitats avec leurs Pokémon et horaires (données événement).
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
+
+#### Bloc "Nouveaux Pokémon - Lignées d'évolution" (`pokehub/new-pokemon-evolutions`)
+
+Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons, objets, etc.).
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
+- `pokemonIds` (array) : IDs de Pokémon à afficher (si pas en auto)
+
+**Styles :** `assets/css/poke-hub-new-pokemon-evolutions-front.css`
+
+#### Bloc "Défis de Collection" (`pokehub/collection-challenges`)
+
+Affiche les défis de collection (capturer, éclore, évoluer, etc.). Données saisies dans la meta box « Défis de collection » sur le post.
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
+
+**Styles :** `assets/css/poke-hub-collection-challenges-front.css`
+
+#### Bloc "Études Spéciales" (`pokehub/special-research`)
+
+Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, quêtes). Données saisies dans la meta box « Études spéciales » sur le post.
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
+
+**Styles :** `assets/css/poke-hub-special-research-front.css`
 
 ## 🎨 Styles CSS
 
-Les styles sont automatiquement chargés :
-- **Dates** : `assets/css/poke-hub-events-front.css`
+Les styles sont chargés par le module Blocks (ou par les modules concernés) :
+- **Dates / Quêtes / Habitats / Wild** : `assets/css/poke-hub-events-front.css` (et assets liés aux événements)
 - **Bonus** : `assets/css/poke-hub-bonus-front.css`
+- **Nouveaux Pokémon - Lignées d'évolution** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
+- **Défis de Collection** : `assets/css/poke-hub-collection-challenges-front.css`
+- **Études Spéciales** : `assets/css/poke-hub-special-research-front.css`
 
 ### Classes CSS disponibles
 
@@ -141,16 +190,19 @@ Le système détecte automatiquement les ratios (ex: "1/2", "1/4") dans :
 
 Ces ratios sont affichés dans un badge circulaire rouge sur l'icône du bonus.
 
-## 🎯 Prochaines étapes
+## 📖 Voir aussi
 
-Ce système peut être étendu pour gérer :
-- Nouveaux Pokémon
-- Nouveaux shiny
-- Pokémon dans la nature
-- Pokémon dans les quêtes
-- Etc.
+- **Liste complète des blocs** et dépendances : [docs/blocks/README.md](blocks/README.md)
+- **Architecture du module Blocs** : [docs/blocks/ARCHITECTURE.md](blocks/ARCHITECTURE.md)
+- **Créer un nouveau bloc** : [docs/blocks/QUICK_START.md](blocks/QUICK_START.md)
+- **Dépannage** : [docs/BLOCKS_TROUBLESHOOTING.md](BLOCKS_TROUBLESHOOTING.md)
 
-Les blocs Gutenberg peuvent être étendus pour inclure des sélecteurs de Pokémon et d'autres éléments.
+
+
+
+
+
+
 
 
 

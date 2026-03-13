@@ -1,0 +1,371 @@
+/**
+ * PokeHub – Styles des metaboxes (éditeur d’article / événement)
+ * Alignés sur l’apparence native de l’admin WordPress pour une UX cohérente.
+ */
+
+/* ============================================
+   CONTENEURS PRINCIPAUX DES METABOXES
+   ============================================ */
+
+.pokehub-quests-metabox,
+.pokehub-special-research-metabox,
+.pokehub-collection-challenges-metabox,
+.pokehub-habitats-metabox,
+.pokehub-wild-pokemon-metabox,
+.pokehub-new-pokemon-metabox,
+.pokehub-eggs-metabox {
+    margin: 0 -12px -12px -12px;
+    padding: 0 12px 12px;
+}
+
+.pokehub-quests-metabox > p.description,
+.pokehub-special-research-metabox > p,
+.pokehub-collection-challenges-metabox > p,
+.pokehub-habitats-metabox > p.description,
+.pokehub-wild-pokemon-metabox > p.description,
+.pokehub-new-pokemon-metabox > p.description,
+.pokehub-eggs-metabox > p.description {
+    margin: 0 0 12px;
+    color: #50575e;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Bouton "Ajouter" en bas de metabox */
+.pokehub-quests-metabox .button.button-secondary,
+.pokehub-special-research-metabox .button.button-secondary,
+.pokehub-collection-challenges-metabox .button.button-secondary,
+.pokehub-habitats-metabox .button.button-secondary,
+.pokehub-eggs-metabox .button.button-secondary {
+    margin-top: 8px;
+}
+
+/* ============================================
+   CARTES / ITEMS ÉDITABLES (style postbox)
+   ============================================ */
+
+.pokehub-quest-item-editor,
+.pokehub-special-research-item-editor,
+.pokehub-collection-challenge-item-editor,
+.pokehub-habitat-item-editor,
+.pokehub-eggs-block-item,
+.pokehub-eggs-metabox .pokehub-eggs-block-item {
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.pokehub-quest-item-editor h4,
+.pokehub-special-research-item-editor h4,
+.pokehub-collection-challenge-item-editor h4,
+.pokehub-habitat-item-editor h4,
+.pokehub-eggs-block-header {
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dcdcde;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    line-height: 1.4;
+}
+
+.pokehub-quest-item-editor h4 .button-link,
+.pokehub-special-research-item-editor h4 .button-link,
+.pokehub-collection-challenge-item-editor h4 .button-link,
+.pokehub-habitat-item-editor h4 .button-link {
+    float: right;
+    margin: -2px 0 0;
+    font-weight: 400;
+}
+
+/* ============================================
+   SOUS-SECTIONS (étapes, récompenses, catégories)
+   ============================================ */
+
+.pokehub-quest-reward-editor,
+.pokehub-special-research-step-editor,
+.pokehub-collection-challenge-category,
+.pokehub-habitat-day-editor {
+    margin: 10px 0;
+    padding: 10px 12px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+}
+
+.pokehub-special-research-step-editor h5,
+.pokehub-collection-challenge-categories h5 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+/* Liste des récompenses / étapes */
+.pokehub-quest-rewards-editor,
+.pokehub-collection-challenge-rewards-editor {
+    margin-top: 12px;
+}
+
+.pokehub-quest-rewards-editor > strong,
+.pokehub-collection-challenge-rewards-editor > strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #50575e;
+}
+
+/* ============================================
+   LIENS SUPPRIMER (style WP danger)
+   ============================================ */
+
+.pokehub-remove-quest,
+.pokehub-remove-reward,
+.pokehub-remove-challenge,
+.pokehub-remove-research,
+.pokehub-remove-step,
+.pokehub-remove-quest,
+.pokehub-remove-habitat,
+.pokehub-remove-day,
+.pokehub-eggs-remove-block,
+.pokehub-eggs-remove-row {
+    color: #d63638;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.pokehub-remove-quest:hover,
+.pokehub-remove-reward:hover,
+.pokehub-remove-challenge:hover,
+.pokehub-remove-research:hover,
+.pokehub-remove-step:hover,
+.pokehub-remove-habitat:hover,
+.pokehub-remove-day:hover,
+.pokehub-eggs-remove-block:hover,
+.pokehub-eggs-remove-row:hover {
+    color: #b32d2e;
+}
+
+/* ============================================
+   FORMULAIRES DANS LES METABOXES
+   ============================================ */
+
+.pokehub-quest-item-editor label,
+.pokehub-special-research-item-editor label,
+.pokehub-collection-challenge-item-editor label,
+.pokehub-habitat-item-editor label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #1d2327;
+}
+
+.pokehub-quest-item-editor label strong,
+.pokehub-collection-challenge-item-editor label strong,
+.pokehub-habitat-item-editor label strong {
+    font-weight: 600;
+}
+
+.pokehub-quest-item-editor input[type="text"],
+.pokehub-quest-item-editor input[type="number"],
+.pokehub-quest-item-editor input[type="date"],
+.pokehub-quest-item-editor input[type="time"],
+.pokehub-collection-challenge-item-editor input[type="text"],
+.pokehub-collection-challenge-item-editor input[type="number"],
+.pokehub-collection-challenge-item-editor input[type="date"],
+.pokehub-collection-challenge-item-editor input[type="time"],
+.pokehub-habitat-item-editor input[type="text"],
+.pokehub-habitat-item-editor input[type="date"],
+.pokehub-habitat-item-editor input[type="time"] {
+    margin-top: 4px;
+    padding: 6px 10px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.pokehub-quest-item-editor input:focus,
+.pokehub-collection-challenge-item-editor input:focus,
+.pokehub-habitat-item-editor input:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.pokehub-quest-item-editor .widefat,
+.pokehub-collection-challenge-item-editor .widefat,
+.pokehub-habitat-item-editor .widefat {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Labels inline (plusieurs champs sur une ligne) */
+.pokehub-collection-challenge-item-editor label[style*="margin-left"],
+.pokehub-habitat-day-editor label {
+    display: inline-block;
+    margin-right: 12px;
+    margin-bottom: 6px;
+}
+
+/* ============================================
+   HABITATS – Sélecteurs Pokémon
+   ============================================ */
+
+.pokehub-habitats-pokemon-selects {
+    transition: opacity 0.2s ease;
+}
+
+.pokehub-habitats-pokemon-selects.pokehub-habitats-hidden {
+    display: none;
+}
+
+/* ============================================
+   EGGS METABOX (lignes de pool)
+   ============================================ */
+
+.pokehub-eggs-metabox .pokehub-eggs-block-item,
+.pokehub-eggs-pool-block-item {
+    border: 1px solid #c3c4c7;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: #fff;
+    border-radius: 4px;
+}
+
+.pokehub-eggs-block-header,
+.pokehub-eggs-pool-block-header {
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.pokehub-eggs-row-item,
+.pokehub-eggs-pool-row-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.pokehub-eggs-row-item:last-of-type,
+.pokehub-eggs-pool-row-item:last-of-type {
+    border-bottom: none;
+}
+
+.pokehub-eggs-row-fields,
+.pokehub-eggs-pool-row-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+}
+
+.pokehub-eggs-row-rarity,
+.pokehub-eggs-pool-row-rarity {
+    min-width: 140px;
+}
+
+.pokehub-eggs-row-pokemon,
+.pokehub-eggs-pool-row-pokemon {
+    flex: 1;
+    min-width: 200px;
+}
+
+.pokehub-eggs-row-forced,
+.pokehub-eggs-pool-row-forced,
+.pokehub-eggs-row-ww,
+.pokehub-eggs-pool-row-ww {
+    min-width: 160px;
+}
+
+.pokehub-eggs-row-label,
+.pokehub-eggs-pool-row-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #50575e;
+}
+
+/* ============================================
+   SPECIAL RESEARCH – Type d’étude
+   ============================================ */
+
+.pokehub-special-research-metabox > div:first-of-type {
+    margin-bottom: 12px;
+}
+
+.pokehub-special-research-metabox select[name="pokehub_special_research_type"] {
+    margin-left: 6px;
+    padding: 4px 8px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+/* ============================================
+   WILD POKEMON / NEW POKEMON – form-table
+   ============================================ */
+
+.pokehub-wild-pokemon-metabox .form-table,
+.pokehub-new-pokemon-metabox .form-table {
+    margin-top: 0;
+}
+
+.pokehub-wild-pokemon-metabox .form-table th,
+.pokehub-new-pokemon-metabox .form-table th {
+    padding: 12px 10px 12px 0;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.pokehub-wild-pokemon-metabox .form-table td,
+.pokehub-new-pokemon-metabox .form-table td {
+    padding: 12px 0;
+}
+
+.pokehub-wild-pokemon-metabox .form-table .description,
+.pokehub-new-pokemon-metabox .form-table .description {
+    margin-top: 6px;
+    color: #50575e;
+    font-size: 13px;
+}
+
+/* ============================================
+   ESPACEMENTS ET DÉTAILS
+   ============================================ */
+
+.pokehub-collection-challenge-categories {
+    margin-top: 12px;
+}
+
+.pokehub-challenge-dates-fields {
+    margin-top: 10px;
+}
+
+.pokehub-quest-item-editor .pokehub-quest-group-select,
+.pokehub-collection-challenge-item-editor select.pokehub-select-pokemon,
+.pokehub-collection-challenge-item-editor select.pokehub-select-item {
+    margin-top: 4px;
+    max-width: 100%;
+}
+
+/* Select2 dans les metaboxes : cohérence de largeur */
+.pokehub-quests-metabox .select2-container,
+.pokehub-special-research-metabox .select2-container,
+.pokehub-collection-challenges-metabox .select2-container,
+.pokehub-habitats-metabox .select2-container,
+.pokehub-wild-pokemon-metabox .select2-container {
+    min-width: 0;
+    max-width: 100%;
+}

@@ -514,7 +514,6 @@ function pokehub_events_append_dates_to_content($content) {
 
     // Post types sur lesquels on active l'injection auto
     $allowed_post_types = apply_filters('pokehub_events_dates_auto_post_types', [
-        'post',
         'pokehub_event',
     ]);
 

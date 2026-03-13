@@ -117,53 +117,56 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
             continue;
         }
 
-        // Use variant label, otherwise use pokemon name + form_slug
-        $label = (string) ($pattern->label ?? '');
-        if (empty($label)) {
-            $label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
+        // Mapping des traductions WordPress pour les patterns courants
+        $pattern_translations = [
+            'archipelago' => __('Archipel', 'poke-hub'),
+            'continental' => __('Continental', 'poke-hub'),
+            'elegant' => __('Élégant', 'poke-hub'),
+            'garden' => __('Jardin', 'poke-hub'),
+            'high-plains' => __('Hautes Plaines', 'poke-hub'),
+            'icy-snow' => __('Neige Glacée', 'poke-hub'),
+            'jungle' => __('Jungle', 'poke-hub'),
+            'marine' => __('Marin', 'poke-hub'),
+            'meadow' => __('Prairie', 'poke-hub'),
+            'modern' => __('Moderne', 'poke-hub'),
+            'monsoon' => __('Mousson', 'poke-hub'),
+            'ocean' => __('Océan', 'poke-hub'),
+            'polar' => __('Polaire', 'poke-hub'),
+            'river' => __('Rivière', 'poke-hub'),
+            'sandstorm' => __('Tempête de Sable', 'poke-hub'),
+            'savanna' => __('Savane', 'poke-hub'),
+            'sun' => __('Soleil', 'poke-hub'),
+            'tundra' => __('Toundra', 'poke-hub'),
+        ];
+
+        $final_label = null;
+
+        // Priorité 1: Vérifier si une traduction WordPress existe (via __())
+        if (isset($pattern_translations[$form_slug])) {
+            $final_label = $pattern_translations[$form_slug];
         }
 
-        // Vérifier si une traduction française existe dans extra->names->fr
-        $translated_label = $label;
-        if (!empty($pattern->form_variant_extra)) {
+        // Priorité 2: Si pas de traduction WordPress, vérifier si extra->names->fr existe
+        if (empty($final_label) && !empty($pattern->form_variant_extra)) {
             $extra = json_decode($pattern->form_variant_extra, true);
             if (is_array($extra) && !empty($extra['names']['fr'])) {
-                $translated_label = trim((string) $extra['names']['fr']);
+                $final_label = trim((string) $extra['names']['fr']);
             }
         }
 
-        // Si pas de traduction dans extra, essayer d'utiliser la traduction WordPress
-        // (seulement si le label est identique à celui du fallback)
-        if ($translated_label === $label) {
-            // Mapping des traductions françaises pour les patterns courants
-            $pattern_translations = [
-                'archipelago' => __('Archipel', 'poke-hub'),
-                'continental' => __('Continental', 'poke-hub'),
-                'elegant' => __('Élégant', 'poke-hub'),
-                'garden' => __('Jardin', 'poke-hub'),
-                'high-plains' => __('Hautes Plaines', 'poke-hub'),
-                'icy-snow' => __('Neige Glacée', 'poke-hub'),
-                'jungle' => __('Jungle', 'poke-hub'),
-                'marine' => __('Marin', 'poke-hub'),
-                'meadow' => __('Prairie', 'poke-hub'),
-                'modern' => __('Moderne', 'poke-hub'),
-                'monsoon' => __('Mousson', 'poke-hub'),
-                'ocean' => __('Océan', 'poke-hub'),
-                'polar' => __('Polaire', 'poke-hub'),
-                'river' => __('Rivière', 'poke-hub'),
-                'sandstorm' => __('Tempête de Sable', 'poke-hub'),
-                'savanna' => __('Savane', 'poke-hub'),
-                'sun' => __('Soleil', 'poke-hub'),
-                'tundra' => __('Toundra', 'poke-hub'),
-            ];
-
-            // Si on a une traduction pour ce pattern, l'utiliser
-            if (isset($pattern_translations[$form_slug])) {
-                $translated_label = $pattern_translations[$form_slug];
+        // Priorité 3: Sinon, laisser en anglais (utiliser le label de la DB ou form_slug formaté)
+        if (empty($final_label)) {
+            $label = (string) ($pattern->label ?? '');
+            if (empty($label)) {
+                // Fallback: générer un label à partir du form_slug (en anglais)
+                $final_label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
+            } else {
+                // Utiliser le label de la DB (probablement en anglais)
+                $final_label = $label;
             }
         }
 
-        $result[$form_slug] = $translated_label;
+        $result[$form_slug] = $final_label;
     }
 
     // Cache pour 12 heures (43200 secondes)
@@ -546,8 +549,63 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
     
     // Vérifier si une date de sortie shiny existe (extra->release->shiny)
     $release_shiny = $extra['release']['shiny'] ?? '';
-    
+
     return !empty($release_shiny);
+}
+
+/**
+ * Indique si un Pokémon a une date de sortie dans Pokémon GO pour le contexte donné.
+ * Utilise extra->release (normal, shiny, shadow, mega, dynamax, gigantamax).
+ *
+ * @param int    $pokemon_id ID du Pokémon
+ * @param string $context    Clé de sortie : 'normal', 'shiny', 'shadow', 'mega', 'dynamax', 'gigantamax'
+ * @return bool
+ */
+function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = 'normal'): bool {
+    $context = in_array($context, ['normal', 'shiny', 'shadow', 'mega', 'dynamax', 'gigantamax'], true) ? $context : 'normal';
+
+    if (!function_exists('pokehub_get_table')) {
+        return false;
+    }
+
+    global $wpdb;
+
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0) {
+        return false;
+    }
+
+    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+    $use_remote           = false;
+    if (!empty(trim($pokemon_remote_prefix)) && trim($pokemon_remote_prefix) !== $wpdb->prefix
+        && function_exists('poke_hub_pokemon_get_table_prefix')) {
+        $actual = poke_hub_pokemon_get_table_prefix();
+        if (!empty($actual) && $actual !== $wpdb->prefix) {
+            $use_remote = true;
+        }
+    }
+
+    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    if (!$pokemon_table) {
+        return false;
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $pokemon_id)
+    );
+
+    if (!$row || empty($row->extra)) {
+        return false;
+    }
+
+    $extra = json_decode($row->extra, true);
+    if (!is_array($extra)) {
+        return false;
+    }
+
+    $release = $extra['release'][$context] ?? '';
+
+    return trim((string) $release) !== '';
 }
 
 /**
@@ -685,6 +743,268 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
 
 /**
  * ============================================================================
+ * HELPERS POUR LE GENRE (GENDER)
+ * ============================================================================
+ */
+
+/**
+ * Détermine le genre à utiliser pour l'affichage d'un Pokémon
+ * 
+ * @param int $pokemon_id ID du Pokémon
+ * @param string|null $forced_gender Genre forcé (male, female, ou null)
+ * @return string|null 'male', 'female', ou null
+ */
+function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0) {
+        return null;
+    }
+    
+    // Si un genre est forcé, l'utiliser
+    if (!empty($forced_gender) && in_array($forced_gender, ['male', 'female'], true)) {
+        return $forced_gender;
+    }
+    
+    // Vérifier si le pokémon a un dysmorphisme de genre
+    global $wpdb;
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        return null;
+    }
+    
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
+    );
+    
+    if ($row && !empty($row->extra)) {
+        $extra = json_decode($row->extra, true);
+        if (is_array($extra) && !empty($extra['has_gender_dimorphism'])) {
+            // Par défaut, utiliser 'male' si le pokémon a un dysmorphisme de genre
+            return 'male';
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * ============================================================================
+ * HELPERS POUR LE SHINY
+ * Ces fonctions sont disponibles même si le module Pokémon n'est pas actif,
+ * car elles sont utilisées par d'autres modules (ex: events, blocks).
+ * ============================================================================
+ */
+
+/**
+ * Récupère toutes les informations liées au shiny d'un Pokémon
+ * 
+ * Cette fonction centralise la logique du shiny pour éviter de la dupliquer
+ * dans chaque bloc/module. Elle retourne toutes les informations nécessaires
+ * pour l'affichage : disponibilité shiny, shiny forcé, image à utiliser, etc.
+ * 
+ * @param int|array|object $pokemon ID du Pokémon, ou données du Pokémon (array/object)
+ * @param array $args {
+ *     Arguments optionnels
+ *     @type array $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
+ *     @type bool  $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ * }
+ * @return array {
+ *     Informations sur le shiny
+ *     @type bool   $is_shiny_available True si le Pokémon peut être shiny
+ *     @type bool   $is_shiny_forced    True si le shiny est forcé pour ce Pokémon
+ *     @type bool   $should_show_shiny  True si l'icône shiny doit être affichée
+ *     @type string $image_url          URL de l'image normale à utiliser (toujours normale, même si shiny forcé)
+ *                                      L'icône shiny sert d'indicateur visuel, pas de garantie
+ * }
+ */
+function poke_hub_pokemon_get_shiny_info($pokemon, array $args = []) {
+    $args = wp_parse_args($args, [
+        'forced_shiny_ids' => [],
+        'force_shiny'      => false,
+    ]);
+    
+    // Récupérer l'ID du Pokémon
+    $pokemon_id = 0;
+    if (is_int($pokemon) || is_numeric($pokemon)) {
+        $pokemon_id = (int) $pokemon;
+    } elseif (is_array($pokemon)) {
+        $pokemon_id = isset($pokemon['id']) ? (int) $pokemon['id'] : 0;
+    } elseif (is_object($pokemon)) {
+        $pokemon_id = isset($pokemon->id) ? (int) $pokemon->id : 0;
+    }
+    
+    if ($pokemon_id <= 0) {
+        return [
+            'is_shiny_available' => false,
+            'is_shiny_forced'    => false,
+            'should_show_shiny'  => false,
+            'image_url'          => '',
+        ];
+    }
+    
+    // Vérifier si shiny est disponible
+    $is_shiny_available = function_exists('pokehub_pokemon_can_be_shiny') 
+        ? pokehub_pokemon_can_be_shiny($pokemon_id) 
+        : false;
+    
+    // Vérifier si shiny est forcé (soit dans la liste, soit explicitement forcé)
+    $forced_shiny_ids = is_array($args['forced_shiny_ids']) ? $args['forced_shiny_ids'] : [];
+    $is_shiny_forced = $args['force_shiny'] || in_array($pokemon_id, $forced_shiny_ids, true);
+    
+    // Déterminer si l'icône shiny doit être affichée
+    $should_show_shiny = $is_shiny_forced || $is_shiny_available;
+    
+    // Déterminer le genre à utiliser
+    $gender = $args['gender'] ?? null;
+    if ($gender === null) {
+        // Si aucun genre n'est spécifié, déterminer automatiquement
+        $gender = poke_hub_pokemon_determine_gender($pokemon_id);
+    }
+    
+    // Récupérer l'image (TOUJOURS normale, même si shiny forcé)
+    // L'icône shiny sert juste d'indicateur visuel, pas de garantie
+    $image_url = '';
+    if (function_exists('pokehub_get_pokemon_data_by_id')) {
+        $pokemon_data = pokehub_get_pokemon_data_by_id($pokemon_id);
+        if ($pokemon_data) {
+            $pokemon_obj = is_object($pokemon_data) ? $pokemon_data : (object) $pokemon_data;
+            // Toujours utiliser l'image normale (shiny = false), mais avec le genre si nécessaire
+            $image_sources = poke_hub_pokemon_get_image_sources($pokemon_obj, [
+                'shiny' => false,
+                'gender' => $gender,
+            ]);
+            $image_url = !empty($image_sources['primary']) ? $image_sources['primary'] : $image_sources['fallback'];
+        }
+    }
+    
+    return [
+        'is_shiny_available' => $is_shiny_available,
+        'is_shiny_forced'    => $is_shiny_forced,
+        'should_show_shiny'  => $should_show_shiny,
+        'image_url'          => $image_url,
+    ];
+}
+
+/**
+ * Récupère toutes les informations liées au statut régional d'un Pokémon
+ * 
+ * Cette fonction centralise la logique du régional pour éviter de la dupliquer
+ * dans chaque bloc/module. Elle retourne toutes les informations nécessaires
+ * pour l'affichage : statut régional, régions associées, etc.
+ * 
+ * @param int|array|object $pokemon ID du Pokémon, ou données du Pokémon (array/object)
+ * @return array {
+ *     Informations sur le régional
+ *     @type bool   $is_regional      True si le Pokémon est régional
+ *     @type bool   $should_show_icon True si l'icône régional doit être affichée
+ *     @type array  $regions          Liste des régions où le Pokémon est disponible (optionnel)
+ * }
+ */
+function poke_hub_pokemon_get_regional_info($pokemon) {
+    // Récupérer l'ID du Pokémon
+    $pokemon_id = 0;
+    if (is_int($pokemon) || is_numeric($pokemon)) {
+        $pokemon_id = (int) $pokemon;
+    } elseif (is_array($pokemon)) {
+        $pokemon_id = isset($pokemon['id']) ? (int) $pokemon['id'] : 0;
+    } elseif (is_object($pokemon)) {
+        $pokemon_id = isset($pokemon->id) ? (int) $pokemon->id : 0;
+    }
+    
+    if ($pokemon_id <= 0) {
+        return [
+            'is_regional'      => false,
+            'should_show_icon' => false,
+            'regions'          => [],
+        ];
+    }
+    
+    // Vérifier si le Pokémon est régional
+    $is_regional = false;
+    $regions = [];
+    
+    if (function_exists('pokehub_get_table')) {
+        global $wpdb;
+        
+        // Vérifier si un préfixe Pokémon distant est configuré
+        $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+        $pokemon_remote_prefix = trim($pokemon_remote_prefix);
+        
+        $use_remote = false;
+        if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
+            if (function_exists('poke_hub_pokemon_get_table_prefix')) {
+                $actual_prefix = poke_hub_pokemon_get_table_prefix();
+                if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
+                    $use_remote = true;
+                }
+            }
+        }
+        
+        $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+        
+        if ($pokemon_table) {
+            $row = $wpdb->get_row(
+                $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $pokemon_id)
+            );
+            
+            if ($row && !empty($row->extra)) {
+                $extra = json_decode($row->extra, true);
+                if (is_array($extra) && !empty($extra['regional']['is_regional'])) {
+                    $is_regional = true;
+                    
+                    // Optionnel : récupérer les régions associées
+                    if (!empty($extra['regional']['regions']) && is_array($extra['regional']['regions'])) {
+                        $regions = $extra['regional']['regions'];
+                    }
+                }
+            }
+        }
+    }
+    
+    return [
+        'is_regional'      => $is_regional,
+        'should_show_icon' => $is_regional, // Afficher l'icône si régional
+        'regions'          => $regions,
+    ];
+}
+
+/**
+ * Récupère toutes les informations d'affichage d'un Pokémon (shiny + régional + image)
+ * 
+ * Cette fonction combine les informations shiny et régional pour simplifier
+ * l'utilisation dans les blocs/modules. Elle retourne toutes les informations
+ * nécessaires pour l'affichage complet d'un Pokémon.
+ * 
+ * @param int|array|object $pokemon ID du Pokémon, ou données du Pokémon (array/object)
+ * @param array $args {
+ *     Arguments optionnels
+ *     @type array $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
+ *     @type bool  $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ * }
+ * @return array {
+ *     Informations complètes pour l'affichage
+ *     @type bool   $is_shiny_available       True si le Pokémon peut être shiny
+ *     @type bool   $is_shiny_forced          True si le shiny est forcé pour ce Pokémon
+ *     @type bool   $should_show_shiny        True si l'icône shiny doit être affichée
+ *     @type bool   $is_regional              True si le Pokémon est régional
+ *     @type bool   $should_show_regional_icon True si l'icône régional doit être affichée
+ *     @type string $image_url               URL de l'image normale à utiliser
+ *     @type array  $regions                 Liste des régions où le Pokémon est disponible (optionnel)
+ * }
+ */
+function poke_hub_pokemon_get_display_info($pokemon, array $args = []) {
+    $shiny_info = poke_hub_pokemon_get_shiny_info($pokemon, $args);
+    $regional_info = poke_hub_pokemon_get_regional_info($pokemon);
+    
+    return array_merge($shiny_info, [
+        'is_regional'              => $regional_info['is_regional'],
+        'should_show_regional_icon' => $regional_info['should_show_icon'],
+        'regions'                   => $regional_info['regions'],
+    ]);
+}
+
+/**
+ * ============================================================================
  * HELPERS POUR SELECT2 (Pokémon, Items, etc.)
  * Ces fonctions sont disponibles même si le module Pokémon n'est pas actif.
  * ============================================================================
@@ -696,13 +1016,22 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
  * @return array Format: [['id' => 1, 'text' => 'Pikachu (#025)', 'name_fr' => 'Pikachu', 'name_en' => 'Pikachu', 'dex_number' => 25], ...]
  */
 function pokehub_get_pokemon_for_select(): array {
+    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select called, is_admin=' . (is_admin() ? '1' : '0'));
+    }
     if (!function_exists('pokehub_get_table')) {
+        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: pokehub_get_table not found, return []');
+        }
         return [];
     }
 
     global $wpdb;
     
     if (!isset($wpdb) || !is_object($wpdb)) {
+        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: wpdb not available, return []');
+        }
         return [];
     }
 
@@ -711,6 +1040,7 @@ function pokehub_get_pokemon_for_select(): array {
     $pokemon_remote_prefix = trim($pokemon_remote_prefix);
     
     $use_remote = false;
+    $actual_prefix = '';
     if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
         if (function_exists('poke_hub_pokemon_get_table_prefix')) {
             $actual_prefix = poke_hub_pokemon_get_table_prefix();
@@ -728,12 +1058,18 @@ function pokehub_get_pokemon_for_select(): array {
         $form_variants_table = pokehub_get_table('pokemon_form_variants');
     }
     
+    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: use_remote=' . ($use_remote ? '1' : '0') . ' wpdb_prefix=' . $wpdb->prefix . ' actual_prefix=' . $actual_prefix . ' pokemon_table=' . ($pokemon_table ?: 'NULL') . ' form_variants_table=' . ($form_variants_table ?: 'NULL'));
+    }
+    
     if (!$pokemon_table || !$form_variants_table) {
+        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: tables missing, return []');
+        }
         return [];
     }
     
-    $rows = $wpdb->get_results(
-        "SELECT p.id, 
+    $sql = "SELECT p.id, 
                 p.dex_number, 
                 p.name_fr,
                 p.name_en,
@@ -741,9 +1077,20 @@ function pokehub_get_pokemon_for_select(): array {
                 COALESCE(fv.label, fv.form_slug, '') AS form
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
-         ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
-        ARRAY_A
-    );
+         ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+        $count = is_array($rows) ? count($rows) : 0;
+        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: query returned rows=' . $count . ' last_error=' . ($wpdb->last_error ?: 'none'));
+        if ($count === 0 && $wpdb->last_error) {
+            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: sql=' . $sql);
+        }
+        if ($count > 0) {
+            $first = $rows[0];
+            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: first row id=' . ($first['id'] ?? '') . ' text_sample=' . (isset($first['name_fr']) ? substr($first['name_fr'], 0, 30) : ''));
+        }
+    }
     
     if (empty($rows)) {
         return [];
@@ -777,6 +1124,90 @@ function pokehub_get_pokemon_for_select(): array {
         ];
     }
     
+    return $result;
+}
+
+/**
+ * Récupère des Pokémon pour Select2 avec filtre optionnel par IDs et/ou recherche texte.
+ * Utilisé par l’API REST (recherche) et pour n’afficher que les options présélectionnées en PHP.
+ *
+ * @param int[] $ids   IDs à retourner (si non vide, ignore $search).
+ * @param string $search Terme de recherche (name_fr, name_en, dex_number).
+ * @return array Format: [['id' => 1, 'text' => '...', 'name_fr' => '...', 'name_en' => '...', 'dex_number' => 25], ...]
+ */
+function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search = ''): array {
+    if (!function_exists('pokehub_get_table')) {
+        return [];
+    }
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return [];
+    }
+    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+    $use_remote = false;
+    if (!empty(trim($pokemon_remote_prefix)) && function_exists('poke_hub_pokemon_get_table_prefix')) {
+        $actual = poke_hub_pokemon_get_table_prefix();
+        if (!empty($actual) && $actual !== $wpdb->prefix) {
+            $use_remote = true;
+        }
+    }
+    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
+    if (!$pokemon_table || !$form_variants_table) {
+        return [];
+    }
+    if (empty($ids) && $search === '') {
+        return [];
+    }
+    $where = ['1=1'];
+    $prepare_args = [];
+    if (!empty($ids)) {
+        $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+        $where[] = "p.id IN ($placeholders)";
+        $prepare_args = array_merge($prepare_args, $ids);
+    }
+    if ($search !== '') {
+        $term = '%' . $wpdb->esc_like($search) . '%';
+        $where[] = '(p.name_fr LIKE %s OR p.name_en LIKE %s OR p.dex_number LIKE %s)';
+        $prepare_args = array_merge($prepare_args, [$term, $term, $term]);
+    }
+    $where_sql = implode(' AND ', $where);
+    $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
+            COALESCE(fv.label, fv.form_slug, '') AS form
+            FROM {$pokemon_table} p
+            LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+            WHERE {$where_sql}
+            ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
+    if (!empty($prepare_args)) {
+        $sql = $wpdb->prepare($sql, $prepare_args);
+    }
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+    if (empty($rows)) {
+        return [];
+    }
+    $result = [];
+    foreach ($rows as $pokemon) {
+        $dex_number = isset($pokemon['dex_number']) ? (int) $pokemon['dex_number'] : 0;
+        $name_fr = $pokemon['name_fr'] ?? '';
+        $name_en = $pokemon['name_en'] ?? '';
+        $name = $name_fr;
+        if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+            $name = $name_fr . ' (' . $name_en . ')';
+        } elseif ($name_fr === '' && $name_en !== '') {
+            $name = $name_en;
+        }
+        $text = $name;
+        if ($dex_number > 0) {
+            $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
+        }
+        $result[] = [
+            'id' => (int) $pokemon['id'],
+            'text' => $text,
+            'name_fr' => $name_fr,
+            'name_en' => $name_en,
+            'dex_number' => $dex_number,
+        ];
+    }
     return $result;
 }
 
@@ -1689,3 +2120,114 @@ function poke_hub_validate_vivillon_country_pattern($country_name, $pattern_slug
     return in_array($pattern_slug, $valid_patterns, true);
 }
 
+/**
+ * Récupère l'URL de base du bucket d'assets
+ *
+ * @return string URL de base du bucket
+ */
+function poke_hub_get_assets_bucket_base_url(): string {
+    return get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
+}
+
+/**
+ * Récupère le chemin spécifique pour un type d'asset
+ *
+ * @param string $asset_type Type d'asset ('icons', 'habitats', 'bonus', 'types', 'vivillon', 'fallback')
+ * @return string Chemin spécifique
+ */
+function poke_hub_get_assets_path(string $asset_type): string {
+    $paths = [
+        'icons' => get_option('poke_hub_assets_path_icons', '/pokemon-go/icons/'),
+        'habitats' => get_option('poke_hub_assets_path_habitats', '/pokemon-go/habitats/'),
+        'bonus' => get_option('poke_hub_assets_path_bonus', '/pokemon-go/bonus/'),
+        'types' => get_option('poke_hub_assets_path_types', '/pokemon-go/types/'),
+        'vivillon' => get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/'),
+        'teams' => get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/'),
+        'fallback' => get_option('poke_hub_assets_path_fallback', '/pokemon-go/icons/home/'),
+    ];
+    
+    return $paths[$asset_type] ?? '';
+}
+
+/**
+ * Construit l'URL complète pour un asset
+ *
+ * @param string $asset_type Type d'asset
+ * @param string $slug Slug de l'asset
+ * @param string $extension Extension du fichier (par défaut: 'png')
+ * @return string URL complète
+ */
+function poke_hub_get_asset_url(string $asset_type, string $slug, string $extension = 'png'): string {
+    $base_url = poke_hub_get_assets_bucket_base_url();
+    $path = poke_hub_get_assets_path($asset_type);
+    
+    if (empty($base_url) || empty($path) || empty($slug)) {
+        return '';
+    }
+    
+    $base_url = rtrim($base_url, '/');
+    $path = '/' . ltrim($path, '/');
+    $slug = sanitize_file_name($slug);
+    
+    return $base_url . $path . $slug . '.' . $extension;
+}
+
+/**
+ * Récupère l'URL de l'icône d'un habitat
+ *
+ * @param string $slug Slug de l'habitat
+ * @return string URL de l'icône
+ */
+function poke_hub_get_habitat_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('habitats', $slug);
+}
+
+/**
+ * Récupère l'URL de l'icône d'un bonus
+ *
+ * @param string $slug Slug du bonus
+ * @return string URL de l'icône
+ */
+function poke_hub_get_bonus_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('bonus', $slug);
+}
+
+/**
+ * Récupère l'URL de l'icône d'un type
+ *
+ * @param string $slug Slug du type
+ * @return string URL de l'icône
+ */
+function poke_hub_get_type_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('types', $slug);
+}
+
+/**
+ * Récupère l'URL de l'icône d'un pattern Vivillon
+ *
+ * @param string $slug Slug du pattern
+ * @return string URL de l'icône
+ */
+function poke_hub_get_vivillon_pattern_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('vivillon', $slug);
+}
+
+/**
+ * Récupère l'URL de l'icône d'une team
+ *
+ * @param string $slug Slug de la team
+ * @return string URL de l'icône
+ */
+function poke_hub_get_team_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('teams', $slug);
+}
+
+/**
+ * Récupère l'URL de fallback pour un asset
+ *
+ * @param string $slug Slug de l'asset
+ * @return string URL de fallback
+ */
+function poke_hub_get_fallback_asset_url(string $slug): string {
+    return poke_hub_get_asset_url('fallback', $slug);
+}

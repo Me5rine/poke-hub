@@ -12,17 +12,22 @@ if (!poke_hub_is_module_active('events')) {
 define('POKE_HUB_EVENTS_PATH', __DIR__);
 define('POKE_HUB_EVENTS_URL', POKE_HUB_URL . 'modules/events/');
 
+require_once __DIR__ . '/functions/events-pages.php';
 require_once __DIR__ . '/functions/events-admin-helpers.php';
 require_once __DIR__ . '/admin/forms/events-admin-special-events-form.php';
 require_once __DIR__ . '/admin/events-admin-special-events.php';
-require_once __DIR__ . '/admin/events-quests-metabox.php';
-require_once __DIR__ . '/admin/events-quests-admin.php';
 require_once __DIR__ . '/functions/events-helpers.php';
 require_once __DIR__ . '/functions/events-queries.php';
 require_once __DIR__ . '/functions/events-render.php';
 require_once __DIR__ . '/functions/events-quests-helpers.php';
 require_once __DIR__ . '/functions/events-quests-render.php';
 require_once __DIR__ . '/functions/events-quests-global.php';
+require_once __DIR__ . '/admin/events-quests-metabox.php';
+require_once __DIR__ . '/admin/events-quests-admin.php';
+require_once __DIR__ . '/admin/events-quest-groups-admin.php';
+require_once __DIR__ . '/admin/events-wild-pokemon-metabox.php';
+require_once __DIR__ . '/admin/events-habitats-metabox.php';
+require_once __DIR__ . '/admin/events-new-pokemon-metabox.php';
 require_once __DIR__ . '/public/shortcode-events.php';
 require_once __DIR__ . '/public/events-front-routing.php';
 
@@ -51,6 +56,15 @@ function poke_hub_events_assets() {
         true
     );
 
+    // Script pour le toggle des quêtes
+    wp_enqueue_script(
+        'pokehub-events-quests',
+        POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
+        ['jquery'],
+        POKE_HUB_VERSION,
+        true
+    );
+
     // Soumission automatique du formulaire lors du changement (spécifique aux événements)
     wp_add_inline_script('pokehub-front-select2', "
         jQuery(function($){
@@ -59,15 +73,6 @@ function poke_hub_events_assets() {
             });
         });
     ");
-    
-    // JavaScript pour gérer l'état actif et le collapse/expand des quêtes
-    wp_enqueue_script(
-        'pokehub-events-quests',
-        POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
-        ['jquery'],
-        POKE_HUB_VERSION,
-        true
-    );
 }
 add_action('wp_enqueue_scripts', 'poke_hub_events_assets');
 

@@ -230,20 +230,52 @@ function poke_hub_games_get_leaderboard(string $period_type, string $period_star
     $period_start = sanitize_text_field($period_start);
     $limit = (int) $limit;
     
-    $results = $wpdb->get_results(
-        $wpdb->prepare(
-            "SELECT p.*, u.user_login, u.display_name
-             FROM {$points_table} p
-             LEFT JOIN {$wpdb->users} u ON p.user_id = u.ID
-             WHERE p.period_type = %s AND p.period_start = %s
-             ORDER BY p.points DESC, p.games_succeeded DESC, p.games_completed DESC
-             LIMIT %d",
-            $period_type,
-            $period_start,
-            $limit
-        ),
-        ARRAY_A
+    // Requête avec LEFT JOIN pour récupérer toutes les données, même si l'utilisateur n'existe plus
+    $sql = $wpdb->prepare(
+        "SELECT p.*, u.user_login, u.display_name
+         FROM {$points_table} p
+         LEFT JOIN {$wpdb->users} u ON p.user_id = u.ID
+         WHERE p.period_type = %s AND p.period_start = %s
+         ORDER BY p.points DESC, p.games_succeeded DESC, p.games_completed DESC
+         LIMIT %d",
+        $period_type,
+        $period_start,
+        $limit
     );
+    
+    $results = $wpdb->get_results($sql, ARRAY_A);
+    
+    // Si aucun résultat, vérifier s'il y a des données pour cette période (débogage)
+    if (empty($results) && defined('WP_DEBUG') && WP_DEBUG) {
+        $debug_count = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$points_table} WHERE period_type = %s AND period_start = %s",
+                $period_type,
+                $period_start
+            )
+        );
+        if ($debug_count > 0) {
+            error_log(sprintf(
+                'PokeHub Games: Leaderboard query returned no results but %d rows exist for period_type=%s, period_start=%s',
+                $debug_count,
+                $period_type,
+                $period_start
+            ));
+        }
+    }
+    
+    // Nettoyer les résultats : s'assurer que display_name est toujours défini
+    foreach ($results as &$result) {
+        if (empty($result['display_name']) || $result['display_name'] === '') {
+            $user = get_user_by('id', $result['user_id']);
+            if ($user) {
+                $result['display_name'] = $user->display_name ?: $user->user_login;
+            } else {
+                $result['display_name'] = sprintf(__('Utilisateur #%d', 'poke-hub'), $result['user_id']);
+            }
+        }
+    }
+    unset($result);
     
     return $results ?: [];
 }

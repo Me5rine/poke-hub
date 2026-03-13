@@ -306,6 +306,54 @@ add_action('wp_ajax_pokehub_get_pokemon_special_attacks', function () {
     wp_send_json_success($attacks);
 });
 
+add_action('wp_ajax_pokehub_check_pokemon_gender_dimorphism', function () {
+    // Accepter plusieurs nonces possibles
+    $valid_nonce = false;
+    $nonce_actions = [
+        'pokehub_special_events_nonce',
+        'pokehub_wild_pokemon_ajax',
+        'pokehub_new_pokemon_ajax',
+        'pokehub_habitats_ajax',
+        'pokehub_quests_ajax',
+    ];
+    
+    foreach ($nonce_actions as $action) {
+        if (isset($_POST['nonce']) && wp_verify_nonce($_POST['nonce'], $action)) {
+            $valid_nonce = true;
+            break;
+        }
+    }
+    
+    if (!$valid_nonce) {
+        wp_send_json_error(['message' => 'Invalid nonce']);
+    }
+
+    $pokemon_id = isset($_POST['pokemon_id']) ? (int) $_POST['pokemon_id'] : 0;
+    if (!$pokemon_id) {
+        wp_send_json_error(['message' => 'Invalid pokemon_id']);
+    }
+
+    global $wpdb;
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        wp_send_json_success(['has_gender_dimorphism' => false]);
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
+    );
+
+    $has_gender_dimorphism = false;
+    if ($row && !empty($row->extra)) {
+        $extra = json_decode($row->extra, true);
+        if (is_array($extra) && !empty($extra['has_gender_dimorphism'])) {
+            $has_gender_dimorphism = true;
+        }
+    }
+
+    wp_send_json_success(['has_gender_dimorphism' => $has_gender_dimorphism]);
+});
+
 
 /**
  * Traitement du formulaire d’ajout / édition d’événement spécial
@@ -545,13 +593,20 @@ add_action('admin_post_pokehub_save_special_event', function () {
                 continue;
             }
 
+            // Récupérer le genre (male, female, ou null)
+            $gender = null;
+            if (!empty($p['gender']) && in_array($p['gender'], ['male', 'female'], true)) {
+                $gender = sanitize_text_field($p['gender']);
+            }
+
             $wpdb->insert(
                 $event_pokemon_table,
                 [
                     'event_id'   => $event_id,
                     'pokemon_id' => $pokemon_id,
+                    'gender'     => $gender,
                 ],
-                ['%d', '%d']
+                ['%d', '%d', '%s']
             );
 
             if (!empty($p['attacks']) && is_array($p['attacks'])) {

@@ -146,18 +146,34 @@ jQuery(function ($) {
         $wrapper.append($row);
     }
 
-    // Délégation : changement de Pokémon → charger les attaques spéciales
+    // Délégation : changement de Pokémon → charger les attaques spéciales et afficher/masquer le champ gender
     $('#pokehub-event-pokemon-wrapper').on('change', '.pokehub-pokemon-select', function () {
         const $select = $(this);
         const pokemonId = $select.val();
         const $row = $select.closest('.pokehub-event-pokemon-row');
         const $attacksContainer = $row.find('.pokehub-pokemon-attacks');
+        const $genderContainer = $row.find('.pokehub-pokemon-gender');
 
         $attacksContainer.empty();
 
         if (!pokemonId) {
+            $genderContainer.hide();
             return;
         }
+        
+        // Vérifier si le pokémon a un dysmorphisme de genre
+        // On va faire une requête AJAX pour récupérer cette info
+        $.post(PokeHubSpecialEvents.ajax_url, {
+            action: 'pokehub_check_pokemon_gender_dimorphism',
+            nonce: PokeHubSpecialEvents.nonce,
+            pokemon_id: pokemonId
+        }, function (resp) {
+            if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
+                $genderContainer.show();
+            } else {
+                $genderContainer.hide();
+            }
+        });
 
         $.post(PokeHubSpecialEvents.ajax_url, {
             action: 'pokehub_get_pokemon_special_attacks',
@@ -252,8 +268,11 @@ jQuery(function ($) {
                 });
             });
 
+            const gender = $row.find('.pokehub-pokemon-gender-select').val() || null;
+            
             pokemons.push({
                 pokemon_id: pokemonId,
+                gender: gender,
                 attacks: attacks
             });
         });

@@ -78,6 +78,24 @@ function pokehub_quests_metabox_assets($hook) {
         ? pokehub_get_items_for_select() 
         : [];
     
+    // Récupérer les genres sauvegardés
+    global $post;
+    $saved_genders = [];
+    if ($post && $post->ID) {
+        $quests = pokehub_get_event_quests($post->ID);
+        if (is_array($quests)) {
+            foreach ($quests as $quest_index => $quest) {
+                if (isset($quest['rewards']) && is_array($quest['rewards'])) {
+                    foreach ($quest['rewards'] as $reward_index => $reward) {
+                        if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {
+                            $saved_genders[$quest_index][$reward_index] = $reward['pokemon_genders'];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     wp_localize_script('pokehub-admin-select2', 'pokehubQuestsData', [
         'pokemon' => $pokemon_list,
         'mega_pokemon' => $mega_pokemon_list,
@@ -85,6 +103,13 @@ function pokehub_quests_metabox_assets($hook) {
         'items' => $items_list,
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('pokehub_quests_ajax'),
+    ]);
+    
+    // Localiser les données pour la gestion des genres
+    wp_localize_script('pokehub-admin-select2', 'pokehubQuestsGender', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('pokehub_quests_ajax'),
+        'saved_genders' => $saved_genders,
     ]);
 }
 add_action('admin_enqueue_scripts', 'pokehub_quests_metabox_assets');
@@ -121,33 +146,6 @@ function pokehub_render_event_quests_metabox($post) {
     <script type="text/template" id="pokehub-quest-template">
         <?php pokehub_render_quest_editor_item('{{INDEX}}', ['task' => '', 'rewards' => []]); ?>
     </script>
-    
-    <style>
-        .pokehub-quest-item-editor {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 15px;
-            background: #fff;
-        }
-        .pokehub-quest-item-editor h4 {
-            margin-top: 0;
-        }
-        .pokehub-quest-reward-editor {
-            border: 1px solid #eee;
-            padding: 10px;
-            margin: 5px 0;
-            background: #f9f9f9;
-        }
-        .pokehub-remove-quest,
-        .pokehub-remove-reward {
-            color: #a00;
-            cursor: pointer;
-        }
-        .pokehub-remove-quest:hover,
-        .pokehub-remove-reward:hover {
-            color: #dc3232;
-        }
-    </style>
     
     <script>
     jQuery(document).ready(function($) {
@@ -203,7 +201,7 @@ function pokehub_render_event_quests_metabox($post) {
                 '</select></label>' +
                 '<div class="pokehub-reward-pokemon-fields" style="display:block;">' +
                 '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
-                '<select name="' + prefix + '[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon" style="width: 100%; min-width: 250px;" multiple data-reward-index="' + rewardIndex + '">' +
+                '<select name="' + prefix + '[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon pokehub-quest-pokemon-select" style="width: 100%; min-width: 250px;" multiple data-quest-index="' + questIndex + '" data-reward-index="' + rewardIndex + '">' +
                 '</select>' +
                 '</label> ' +
                 '<label title="<?php echo esc_js(__('Forcer le shiny uniquement si le Pokémon est shiny-lock. Sinon, le statut shiny sera récupéré depuis la base de données.', 'poke-hub')); ?>">' +
@@ -211,6 +209,11 @@ function pokehub_render_event_quests_metabox($post) {
                 '<?php echo esc_js(__('Force Shiny (si shiny-lock)', 'poke-hub')); ?>' +
                 '<small style="display: block; color: #666; margin-top: 3px;"><?php echo esc_js(__('Uniquement pour les Pokémon shiny-lock. Sinon, le statut est récupéré depuis la base de données.', 'poke-hub')); ?></small>' +
                 '</label>' +
+                '<div class="pokehub-quest-pokemon-genders" data-quest-index="' + questIndex + '" data-reward-index="' + rewardIndex + '" style="margin-top: 10px; display: none;">' +
+                '<strong><?php echo esc_js(__('Genres (optionnel)', 'poke-hub')); ?></strong>' +
+                '<p class="description" style="margin: 5px 0; font-size: 12px;"><?php echo esc_js(__('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub')); ?></p>' +
+                '<div class="pokehub-quest-pokemon-genders-list" data-quest-index="' + questIndex + '" data-reward-index="' + rewardIndex + '"></div>' +
+                '</div>' +
                 '</div>' +
                 '<div class="pokehub-reward-pokemon-resource-fields" style="display:none;">' +
                 '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
@@ -244,6 +247,14 @@ function pokehub_render_event_quests_metabox($post) {
                 }
                 // Trigger change to set initial visibility of fields
                 $newReward.find('.pokehub-reward-type').trigger('change');
+                
+                // Initialiser les champs genre si c'est une récompense pokémon
+                setTimeout(function() {
+                    var $pokemonSelect = $newReward.find('.pokehub-quest-pokemon-select');
+                    if ($pokemonSelect.length) {
+                        updateQuestGenderFields($pokemonSelect);
+                    }
+                }, 200);
             }, 100);
         });
         
@@ -251,6 +262,79 @@ function pokehub_render_event_quests_metabox($post) {
         $(document).on('click', '.pokehub-remove-reward', function() {
             $(this).closest('.pokehub-quest-reward-editor').remove();
         });
+        
+        // Fonction pour mettre à jour les champs genre pour un select de pokémon dans une quête
+        function updateQuestGenderFields($select) {
+            var questIndex = $select.data('quest-index');
+            var rewardIndex = $select.data('reward-index');
+            var $container = $select.closest('.pokehub-reward-pokemon-fields').find('.pokehub-quest-pokemon-genders[data-quest-index="' + questIndex + '"][data-reward-index="' + rewardIndex + '"]');
+            var $list = $container.find('.pokehub-quest-pokemon-genders-list');
+            var selectedIds = $select.val() || [];
+            
+            if (selectedIds.length === 0) {
+                $container.hide();
+                $list.empty();
+                return;
+            }
+            
+            $list.empty();
+            var promises = [];
+            var hasAnyDimorphic = false;
+            
+            selectedIds.forEach(function(pokemonId) {
+                var promise = $.post(pokehubQuestsGender.ajax_url, {
+                    action: 'pokehub_check_pokemon_gender_dimorphism',
+                    nonce: pokehubQuestsGender.nonce,
+                    pokemon_id: pokemonId
+                });
+                
+                promise.done(function(resp) {
+                    if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
+                        hasAnyDimorphic = true;
+                        var savedGender = '';
+                        if (pokehubQuestsGender.saved_genders && pokehubQuestsGender.saved_genders[questIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId]) {
+                            savedGender = pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId];
+                        }
+                        
+                        var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
+                        var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
+                        $label.text('Pokémon #' + pokemonId + ':');
+                        var $selectGender = $('<select name="pokehub_quests[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_genders][' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
+                        $selectGender.append('<option value=""><?php echo esc_js(__('Default (Male)', 'poke-hub')); ?></option>');
+                        $selectGender.append('<option value="male"' + (savedGender === 'male' ? ' selected' : '') + '><?php echo esc_js(__('Male', 'poke-hub')); ?></option>');
+                        $selectGender.append('<option value="female"' + (savedGender === 'female' ? ' selected' : '') + '><?php echo esc_js(__('Female', 'poke-hub')); ?></option>');
+                        
+                        $genderRow.append($label);
+                        $genderRow.append($selectGender);
+                        $list.append($genderRow);
+                    }
+                });
+                
+                promises.push(promise);
+            });
+            
+            $.when.apply($, promises).done(function() {
+                if (hasAnyDimorphic) {
+                    $container.show();
+                } else {
+                    $container.hide();
+                }
+            });
+        }
+        
+        // Écouter les changements sur les selects de pokémon dans les quêtes
+        $(document).on('change', '.pokehub-quest-pokemon-select', function() {
+            setTimeout(function() {
+                updateQuestGenderFields($(this));
+            }.bind(this), 100);
+        });
+        
+        // Initialiser les champs genre au chargement
+        setTimeout(function() {
+            $('.pokehub-quest-pokemon-select').each(function() {
+                updateQuestGenderFields($(this));
+            });
+        }, 500);
         
         // Changer le type de récompense
         $(document).on('change', '.pokehub-reward-type', function() {
@@ -303,6 +387,21 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                 placeholder="<?php esc_attr_e('e.g., Catch 5 Pokémon', 'poke-hub'); ?>"
             />
         </label>
+        <?php
+        $quest_group_id = isset($quest['quest_group_id']) ? (int) $quest['quest_group_id'] : 0;
+        $groups = function_exists('pokehub_get_quest_groups') ? pokehub_get_quest_groups() : [];
+        ?>
+        <label style="display: block; margin-top: 10px;">
+            <strong><?php _e('Category', 'poke-hub'); ?>:</strong><br>
+            <select name="<?php echo esc_attr($name_prefix); ?>[<?php echo esc_attr($index); ?>][quest_group_id]" class="pokehub-quest-group-select">
+                <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
+                <?php foreach ($groups as $g) : ?>
+                    <option value="<?php echo (int) $g->id; ?>" <?php selected($quest_group_id, (int) $g->id); ?>>
+                        <?php echo esc_html(!empty($g->title_fr) ? $g->title_fr : $g->title_en); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         
         <div class="pokehub-quest-rewards-editor" style="margin-top: 15px;">
             <strong><?php _e('Rewards', 'poke-hub'); ?>:</strong>
@@ -334,9 +433,10 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                             <label><?php _e('Pokémon', 'poke-hub'); ?>: 
                                 <select 
                                     name="pokehub_quests[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][pokemon_ids][]" 
-                                    class="pokehub-select-pokemon" 
+                                    class="pokehub-select-pokemon pokehub-quest-pokemon-select" 
                                     style="width: 100%; min-width: 250px;"
                                     multiple
+                                    data-quest-index="<?php echo esc_attr($index); ?>"
                                     data-reward-index="<?php echo esc_attr($reward_index); ?>"
                                 >
                                     <?php
@@ -357,6 +457,14 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                     <?php _e('Uniquement pour les Pokémon shiny-lock. Sinon, le statut est récupéré depuis la base de données.', 'poke-hub'); ?>
                                 </small>
                             </label>
+                            
+                            <div class="pokehub-quest-pokemon-genders" data-quest-index="<?php echo esc_attr($index); ?>" data-reward-index="<?php echo esc_attr($reward_index); ?>" style="margin-top: 10px; display: none;">
+                                <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                                <p class="description" style="margin: 5px 0; font-size: 12px;">
+                                    <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                                </p>
+                                <div class="pokehub-quest-pokemon-genders-list" data-quest-index="<?php echo esc_attr($index); ?>" data-reward-index="<?php echo esc_attr($reward_index); ?>"></div>
+                            </div>
                         </div>
                         
                         <div class="pokehub-reward-pokemon-resource-fields" style="display:<?php echo ($is_candy || $is_mega_energy) ? 'block' : 'none'; ?>;">

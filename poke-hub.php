@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 1.9.9
+Version: 2.0.0
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -43,6 +43,8 @@ require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-modules.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-module-hooks.php';
 require_once POKE_HUB_INCLUDES_DIR . 'admin-ui.php';
 require_once POKE_HUB_INCLUDES_DIR . 'pokehub-db.php';
+require_once POKE_HUB_INCLUDES_DIR . 'content/content-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'content/pokemon-go-page.php';
 
 /**
  * Déclaration du menu d'admin Poké HUB.
@@ -179,27 +181,11 @@ function poke_hub_admin_menu_raids() {
 add_action('admin_menu', 'poke_hub_admin_menu_raids', 14);
 
 /**
- * 6. Sous-menu Eggs (priorité 15) - À venir
+ * 6. Sous-menu Eggs (priorité 15) – enregistré par le module eggs
  */
 function poke_hub_admin_menu_eggs() {
-    // TODO: À implémenter quand le module Eggs sera créé
-    /*
-    $active_modules = get_option('poke_hub_active_modules', []);
-    if (!is_array($active_modules)) {
-        $active_modules = [];
-    }
-    
-    if (in_array('eggs', $active_modules, true)) {
-        add_submenu_page(
-            'poke-hub',
-            __('Eggs', 'poke-hub'),
-            __('Eggs', 'poke-hub'),
-            'manage_options',
-            'poke-hub-eggs',
-            'poke_hub_eggs_admin_ui'
-        );
-    }
-    */
+    // Le sous-menu Eggs est enregistré dans modules/eggs/admin/eggs-admin.php
+    // lorsque le module eggs est actif.
 }
 add_action('admin_menu', 'poke_hub_admin_menu_eggs', 15);
 
@@ -493,3 +479,18 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
 }
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_admin_unified_styles');
 
+/**
+ * Charger le CSS des metaboxes PokeHub sur l’écran d’édition d’article / événement
+ */
+function poke_hub_enqueue_metaboxes_admin_styles($hook) {
+    if (!in_array($hook, ['post.php', 'post-new.php'], true)) {
+        return;
+    }
+    wp_enqueue_style(
+        'pokehub-metaboxes-admin',
+        POKE_HUB_URL . 'assets/css/pokehub-metaboxes-admin.css',
+        [],
+        POKE_HUB_VERSION
+    );
+}
+add_action('admin_enqueue_scripts', 'poke_hub_enqueue_metaboxes_admin_styles');

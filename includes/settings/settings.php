@@ -81,8 +81,41 @@ function poke_hub_register_settings() {
         ]
     );
 
+    // Collections: création automatique de la page
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_collections_auto_create_pages',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => true,
+        ]
+    );
+
 }
 add_action('admin_init', 'poke_hub_register_settings');
+
+/**
+ * Liste des modules disponibles pour l'affichage dans l'onglet General (Réglages).
+ * Doit être synchronisée avec poke_hub_get_modules_registry() et poke_hub_get_modules_labels() dans settings-modules.php.
+ *
+ * @return array<string,string> slug => libellé
+ */
+function poke_hub_available_modules_for_display(): array {
+    if (function_exists('poke_hub_get_modules_labels')) {
+        return poke_hub_get_modules_labels();
+    }
+    return [
+        'events'        => __('Events', 'poke-hub'),
+        'bonus'         => __('Bonus', 'poke-hub'),
+        'pokemon'       => __('Pokémon', 'poke-hub'),
+        'user-profiles' => __('User Profiles', 'poke-hub'),
+        'games'         => __('Games', 'poke-hub'),
+        'eggs'          => __('Eggs', 'poke-hub'),
+        'blocks'        => __('Blocks', 'poke-hub'),
+        'collections'   => __('Collections Pokémon GO', 'poke-hub'),
+    ];
+}
 
 /**
  * Sanitize de la liste des modules actifs.

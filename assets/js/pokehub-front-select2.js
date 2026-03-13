@@ -119,6 +119,41 @@
             config.closeOnSelect = false;
         }
 
+        // Vérifier si ce select a des icônes (team ou scatterbug_pattern)
+        var selectId = $select.attr('id') || '';
+        var hasIcons = selectId === 'team' || 
+                      selectId === 'scatterbug_pattern' || 
+                      selectId === 'filter_team' || 
+                      selectId === 'filter_pattern' ||
+                      $select.find('option[data-icon]').length > 0;
+        
+        // Ajouter les templates pour afficher les icônes
+        if (hasIcons) {
+            config.templateResult = function(data) {
+                if (!data.id) {
+                    return data.text;
+                }
+                var $option = $select.find('option[value="' + data.id + '"]');
+                var iconUrl = $option.attr('data-icon');
+                if (iconUrl) {
+                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                }
+                return data.text;
+            };
+            
+            config.templateSelection = function(data) {
+                if (!data.id) {
+                    return data.text;
+                }
+                var $option = $select.find('option[value="' + data.id + '"]');
+                var iconUrl = $option.attr('data-icon');
+                if (iconUrl) {
+                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                }
+                return data.text;
+            };
+        }
+
         // Initialiser Select2
         $select.select2(config);
 

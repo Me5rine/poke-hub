@@ -1,0 +1,557 @@
+/* CSS pour le bloc Défis de Collection - Front-end */
+
+.pokehub-collection-challenges-block-wrapper {
+    margin: 20px 0;
+}
+
+.pokehub-collection-challenges-block-wrapper .pokehub-block-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.pokehub-collection-challenges-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Carte de défi */
+.pokehub-collection-challenge-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* En-tête avec fond coloré */
+.pokehub-collection-challenge-header {
+    padding: 15px 20px;
+    color: #fff;
+    position: relative;
+}
+
+.pokehub-collection-challenge-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.pokehub-collection-challenge-dates {
+    margin-top: 8px;
+    font-size: 14px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pokehub-collection-challenge-date {
+    display: inline-block;
+}
+
+.pokehub-collection-challenge-date-separator {
+    display: inline-block;
+    margin: 0 4px;
+}
+
+/* Liste des Pokémon - Style uniformisé avec wild-pokemon */
+.pokehub-collection-challenge-pokemon {
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.pokehub-collection-challenge-pokemon-item {
+    position: relative;
+    background: var(--admin-lab-color-white, #ffffff);
+    border: 1px solid var(--admin-lab-color-block-border, var(--admin-lab-color-borders, #e6e6e6));
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+    aspect-ratio: 1;
+}
+
+.pokehub-collection-challenge-pokemon-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pokehub-collection-challenge-pokemon-card-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    background: linear-gradient(
+        to bottom,
+        rgba(240, 240, 240, 0.3) 0%,
+        var(--admin-lab-color-white, #ffffff) 50%
+    );
+    height: 100%;
+    border-radius: 12px;
+    padding: 0.5rem;
+    overflow: hidden;
+    justify-content: center;
+}
+
+/* Wrapper pour l'image */
+.pokehub-collection-challenge-pokemon-image-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Image du Pokémon */
+.pokehub-collection-challenge-pokemon-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Nom du Pokémon */
+.pokehub-collection-challenge-pokemon-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+    text-align: center;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+/* Icône pour les types spéciaux - positionnée en haut à droite (comme shiny dans wild-pokemon) */
+.pokehub-collection-challenge-pokemon-icon {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 1rem;
+    z-index: 2;
+    background: var(--admin-lab-color-white, #ffffff);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    line-height: 1;
+    border: 2px solid var(--admin-lab-color-white, #ffffff);
+}
+
+.pokehub-collection-challenge-pokemon-icon img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+}
+
+/* Contenu principal */
+.pokehub-collection-challenge-content {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.pokehub-collection-challenge-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Récompenses */
+.pokehub-collection-challenge-rewards {
+    padding: 1rem;
+    background: #f9f9f9;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Récompenses en dessous (mobile) */
+.pokehub-collection-challenge-rewards-below {
+    display: block;
+    margin: 0;
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+    background: #f9f9f9;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Récompenses à droite (desktop) */
+.pokehub-collection-challenge-rewards-side {
+    display: none;
+    flex: 0 0 200px;
+    padding: 1rem;
+    border-left: 1px solid #e0e0e0;
+    background: #f9f9f9;
+    border-radius: 0 8px 8px 0;
+    border-top: none;
+}
+
+/* Sur desktop full size, afficher les récompenses à droite */
+@media (min-width: 1024px) {
+    .pokehub-collection-challenge-rewards-side {
+        display: block;
+    }
+    
+    .pokehub-collection-challenge-rewards-below {
+        display: none;
+    }
+}
+
+/* Sur mobile, toujours en dessous */
+@media (max-width: 1023px) {
+    .pokehub-collection-challenge-rewards-side {
+        display: none;
+    }
+    
+    .pokehub-collection-challenge-rewards-below {
+        display: block;
+    }
+}
+
+.pokehub-collection-challenge-rewards-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5D697D));
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+/* Liste des récompenses en dessous (mobile) */
+.pokehub-collection-challenge-rewards-below .pokehub-collection-challenge-rewards-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-start;
+}
+
+.pokehub-collection-challenge-rewards-below .pokehub-collection-challenge-reward-item {
+    min-width: 70px;
+    max-width: 90px;
+}
+
+.pokehub-collection-challenge-rewards-below .pokehub-collection-challenge-reward-image {
+    width: 45px;
+    height: 45px;
+}
+
+.pokehub-collection-challenge-rewards-below .pokehub-collection-challenge-reward-name {
+    font-size: 0.65rem;
+    line-height: 1.2;
+}
+
+/* Liste des récompenses à droite (desktop) */
+.pokehub-collection-challenge-rewards-side .pokehub-collection-challenge-rewards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.pokehub-collection-challenge-rewards-side .pokehub-collection-challenge-reward-item {
+    aspect-ratio: auto;
+    padding: 0.5rem;
+    min-height: auto;
+    height: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    border-radius: 6px;
+}
+
+.pokehub-collection-challenge-rewards-side .pokehub-collection-challenge-reward-image {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.pokehub-collection-challenge-rewards-side .pokehub-collection-challenge-reward-info {
+    flex: 1;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+}
+
+.pokehub-collection-challenge-rewards-side .pokehub-collection-challenge-reward-name {
+    font-size: 0.7rem;
+    text-align: left;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+/* Item de récompense - Tuile carrée uniformisée avec les Pokémon */
+.pokehub-collection-challenge-reward-item {
+    position: relative;
+    background: var(--admin-lab-color-white, #ffffff);
+    border: 1px solid var(--admin-lab-color-block-border, var(--admin-lab-color-borders, #e6e6e6));
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.pokehub-collection-challenge-reward-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pokehub-collection-challenge-reward-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(240, 240, 240, 0.3) 0%,
+        var(--admin-lab-color-white, #ffffff) 50%
+    );
+    border-radius: 12px;
+    z-index: 0;
+}
+
+.pokehub-collection-challenge-reward-image {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.pokehub-collection-challenge-reward-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+.pokehub-collection-challenge-reward-info {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0 0.5rem;
+    flex: 1;
+    justify-content: flex-start;
+}
+
+.pokehub-collection-challenge-reward-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+    text-align: center;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+/* CP pour les Pokémon récompenses - ajustements pour tenir dans la tuile */
+.pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-image {
+    width: 60px;
+    height: 60px;
+}
+
+.pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-info {
+    gap: 0.3rem;
+    padding: 0 0.4rem 0.4rem;
+}
+
+.pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-name {
+    font-size: 0.7rem;
+    line-height: 1.1;
+}
+
+.pokehub-collection-challenge-reward-cp {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+}
+
+.pokehub-collection-challenge-cp-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.25rem 0.4rem;
+    background: var(--admin-lab-color-block-background, #f7f9fa);
+    border: 1px solid var(--admin-lab-color-block-border, var(--admin-lab-color-borders, #e6e6e6));
+    border-radius: 4px;
+    min-width: 50px;
+}
+
+.pokehub-collection-challenge-cp-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5D697D));
+    text-transform: uppercase;
+    margin-bottom: 0.1rem;
+    letter-spacing: 0.05em;
+    line-height: 1;
+}
+
+.pokehub-collection-challenge-cp-value {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+    line-height: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pokehub-collection-challenge-pokemon {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    .pokehub-collection-challenge-pokemon-item {
+        min-height: auto;
+    }
+    
+    .pokehub-collection-challenge-pokemon-image-wrapper {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .pokehub-collection-challenge-pokemon-icon {
+        width: 20px;
+        height: 20px;
+        top: -4px;
+        right: -4px;
+    }
+    
+    .pokehub-collection-challenge-pokemon-icon img {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .pokehub-collection-challenge-pokemon-name {
+        font-size: 0.7rem;
+    }
+    
+    .pokehub-collection-challenge-header {
+        padding: 12px 15px;
+    }
+    
+    .pokehub-collection-challenge-title {
+        font-size: 18px;
+    }
+    
+    .pokehub-collection-challenge-rewards {
+        padding: 12px 15px;
+    }
+    
+    .pokehub-collection-challenge-rewards-list {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .pokehub-collection-challenge-reward-image {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .pokehub-collection-challenge-reward-name {
+        font-size: 0.7rem;
+    }
+    
+    .pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-image {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-name {
+        font-size: 0.65rem;
+    }
+    
+    .pokehub-collection-challenge-cp-box {
+        padding: 0.2rem 0.3rem;
+        min-width: 45px;
+    }
+    
+    .pokehub-collection-challenge-cp-label {
+        font-size: 0.5rem;
+    }
+    
+    .pokehub-collection-challenge-cp-value {
+        font-size: 0.65rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .pokehub-collection-challenge-pokemon {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    .pokehub-collection-challenge-pokemon-image-wrapper {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .pokehub-collection-challenge-pokemon-item {
+        min-height: 120px;
+        padding: 0.5rem;
+    }
+    
+    .pokehub-collection-challenge-pokemon-name {
+        font-size: 0.75rem;
+    }
+    
+    .pokehub-collection-challenge-rewards-list {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    .pokehub-collection-challenge-reward-image {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-image {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .pokehub-collection-challenge-reward-pokemon .pokehub-collection-challenge-reward-name {
+        font-size: 0.65rem;
+    }
+    
+    .pokehub-collection-challenge-cp-box {
+        padding: 0.2rem 0.3rem;
+        min-width: 40px;
+    }
+    
+    .pokehub-collection-challenge-cp-label {
+        font-size: 0.5rem;
+    }
+    
+    .pokehub-collection-challenge-cp-value {
+        font-size: 0.6rem;
+    }
+}

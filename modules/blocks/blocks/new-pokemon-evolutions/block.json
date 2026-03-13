@@ -1,0 +1,28 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/new-pokemon-evolutions",
+	"title": "Nouveaux Pokémon - Lignées d'évolution",
+	"category": "pokehub",
+	"icon": "update",
+	"description": "Affiche les nouveaux Pokémon avec leur lignée d'évolution complète, incluant les conditions d'évolution (bonbons, objets, sexe, météo, leurre, quête).",
+	"keywords": ["pokemon", "evolution", "lignee", "nouveau", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		},
+		"pokemonIds": {
+			"type": "array",
+			"default": []
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+

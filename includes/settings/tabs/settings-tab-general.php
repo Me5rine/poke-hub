@@ -18,17 +18,18 @@ if (!is_array($active_modules)) {
     $active_modules = [];
 }
 
-/**
- * Liste des modules disponibles dans Poké HUB
- */
-$available_modules = array(
+// Liste des modules affichés dans l'onglet General (source unique pour les checkboxes).
+// Doit être synchronisée avec poke_hub_get_modules_registry() dans settings-modules.php.
+$available_modules = [
     'events'        => __('Events', 'poke-hub'),
     'bonus'         => __('Bonus', 'poke-hub'),
     'pokemon'       => __('Pokémon', 'poke-hub'),
     'user-profiles' => __('User Profiles', 'poke-hub'),
     'games'         => __('Games', 'poke-hub'),
+    'eggs'          => __('Eggs', 'poke-hub'),
     'blocks'        => __('Blocks', 'poke-hub'),
-);
+    'collections'   => __('Collections Pokémon GO', 'poke-hub'),
+];
 
 // Option : suppression des données à la désinstallation
 $delete_data = get_option('poke_hub_delete_data_on_uninstall', false);
@@ -69,6 +70,18 @@ $can_manage_cleanup = true;
 
                     // Dépendance : Games → Pokémon
                     if ($module_key === 'games' && !in_array('pokemon', $active_modules, true)) {
+                        $disabled = 'disabled';
+                        $message  = ' <em>(' . __('Requires Pokémon module', 'poke-hub') . ')</em>';
+                    }
+
+                    // Dépendance : Eggs → Pokémon (types d'œufs dans l'admin Pokémon)
+                    if ($module_key === 'eggs' && !in_array('pokemon', $active_modules, true)) {
+                        $disabled = 'disabled';
+                        $message  = ' <em>(' . __('Requires Pokémon module (egg types)', 'poke-hub') . ')</em>';
+                    }
+
+                    // Dépendance : Collections → Pokémon (pool de Pokémon)
+                    if ($module_key === 'collections' && !in_array('pokemon', $active_modules, true)) {
                         $disabled = 'disabled';
                         $message  = ' <em>(' . __('Requires Pokémon module', 'poke-hub') . ')</em>';
                     }
@@ -181,6 +194,29 @@ $can_manage_cleanup = true;
                     <?php _e('⚠️ Development mode: The daily Pokémon will change on every page refresh and previous scores will be ignored. Use this only for testing!', 'poke-hub'); ?>
                     <?php if (!in_array('games', $active_modules, true)): ?>
                         <br><em><?php _e('Note: The Games module is not currently activated.', 'poke-hub'); ?></em>
+                    <?php endif; ?>
+                </p>
+            </td>
+        </tr>
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_collections_auto_create_pages">
+                    <?php _e('Collections: Auto-create page', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <label>
+                    <input type="checkbox"
+                           name="poke_hub_collections_auto_create_pages"
+                           id="poke_hub_collections_auto_create_pages"
+                           value="1"
+                        <?php checked((bool) get_option('poke_hub_collections_auto_create_pages', true), true); ?> />
+                    <?php _e('Automatically create the "Collections Pokémon GO" page when the Collections module is activated.', 'poke-hub'); ?>
+                </label>
+                <p class="description">
+                    <?php _e('If disabled, create a page with the shortcode [poke_hub_collections_page].', 'poke-hub'); ?>
+                    <?php if (!in_array('collections', $active_modules, true)): ?>
+                        <br><em><?php _e('Note: The Collections module is not currently activated.', 'poke-hub'); ?></em>
                     <?php endif; ?>
                 </p>
             </td>

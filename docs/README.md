@@ -25,9 +25,11 @@ La documentation générale se trouve à la racine du dossier `docs/` :
 La documentation spécifique à chaque module se trouve dans des sous-dossiers :
 
 - **[blocks/](./blocks/)** - Documentation du module Blocks
+  - [README.md](./blocks/README.md) - Index des blocs et liste des blocs disponibles
   - [ARCHITECTURE.md](./blocks/ARCHITECTURE.md) - Architecture et organisation des blocs Gutenberg
   - [BLOCK_TYPES.md](./blocks/BLOCK_TYPES.md) - Types de blocs (PHP-only vs JS/React)
   - [QUICK_START.md](./blocks/QUICK_START.md) - Guide de création rapide de blocs
+  - Voir aussi [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md) - Utilisation des blocs (attributs, exemples, CSS)
 
 - **[events/](./events/)** - Documentation du module Events
   - [README-ROUTING.md](./events/README-ROUTING.md) - Documentation du système de routing

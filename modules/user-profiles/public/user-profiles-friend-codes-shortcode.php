@@ -171,6 +171,7 @@ add_shortcode('poke_hub_friend_codes', function ($atts) {
                 'friend_codes' => $friend_codes,
                 'paged' => $paged,
                 'teams' => $teams,
+                'scatterbug_patterns' => $scatterbug_patterns,
                 'context' => 'friend_codes',
                 'empty_message' => __('No friend code found. Be the first to add one!', 'poke-hub'),
             ]);

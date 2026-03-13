@@ -1495,6 +1495,42 @@ function poke_hub_special_event_get_pokemon(int $event_id): array {
 }
 
 /**
+ * Récupère le genre d'un pokémon dans un événement spécial
+ * 
+ * @param int $event_id ID de l'événement
+ * @param int $pokemon_id ID du pokémon
+ * @return string|null 'male', 'female', ou null
+ */
+function poke_hub_special_event_get_pokemon_gender(int $event_id, int $pokemon_id): ?string {
+    global $wpdb;
+    
+    $event_id = (int) $event_id;
+    $pokemon_id = (int) $pokemon_id;
+    if ($event_id <= 0 || $pokemon_id <= 0) {
+        return null;
+    }
+    
+    $table = pokehub_get_table('special_event_pokemon');
+    if (!$table) {
+        return null;
+    }
+    
+    $gender = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT gender FROM {$table} WHERE event_id = %d AND pokemon_id = %d LIMIT 1",
+            $event_id,
+            $pokemon_id
+        )
+    );
+    
+    if (!empty($gender) && in_array($gender, ['male', 'female'], true)) {
+        return $gender;
+    }
+    
+    return null;
+}
+
+/**
  * Récupère les bonus liés à un special event.
  *
  * @param int $event_id
@@ -1527,6 +1563,19 @@ function poke_hub_special_event_get_bonuses(int $event_id): array {
 }
 
 /**
+ * Récupère les habitats liés à un événement depuis les post meta
+ *
+ * @param int $event_id ID de l'événement (post ID)
+ * @return array Liste des habitats avec leurs données
+ */
+function poke_hub_special_event_get_habitats(int $event_id): array {
+    if (function_exists('pokehub_content_get_habitats')) {
+        return pokehub_content_get_habitats('post', $event_id);
+    }
+    return [];
+}
+
+/**
  * Retourne les lignes Pokémon pour un special event
  * (structure adaptée au formulaire admin).
  *
@@ -1534,17 +1583,39 @@ function poke_hub_special_event_get_bonuses(int $event_id): array {
  * @return array[] [['pokemon_id' => int, 'attacks' => []], ...]
  */
 function poke_hub_special_event_get_pokemon_rows(int $event_id): array {
-    $ids = poke_hub_special_event_get_pokemon($event_id);
-    $rows = [];
-
-    foreach ($ids as $pid) {
-        $rows[] = [
-            'pokemon_id' => (int) $pid,
+    global $wpdb;
+    
+    $event_id = (int) $event_id;
+    if ($event_id <= 0) {
+        return [];
+    }
+    
+    $table = pokehub_get_table('special_event_pokemon');
+    
+    $rows = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT pokemon_id, gender
+             FROM {$table}
+             WHERE event_id = %d",
+            $event_id
+        ),
+        ARRAY_A
+    );
+    
+    if (!$rows) {
+        return [];
+    }
+    
+    $out = [];
+    foreach ($rows as $row) {
+        $out[] = [
+            'pokemon_id' => (int) $row['pokemon_id'],
+            'gender'     => !empty($row['gender']) ? sanitize_text_field($row['gender']) : null,
             'attacks'    => [], // Pour plus tard si tu veux pré-cocher les attaques
         ];
     }
-
-    return $rows;
+    
+    return $out;
 }
 
 /**

@@ -161,32 +161,124 @@ jQuery(function($) {
 
     // Initialisation Select2 pour les quêtes (Pokémon et Items)
     function pokehubInitQuestPokemonSelect2(context) {
+        var pokemonList = [];
+        if (typeof window.pokehubSpecialResearchQuestsData !== 'undefined' && window.pokehubSpecialResearchQuestsData && Array.isArray(window.pokehubSpecialResearchQuestsData.pokemon)) {
+            pokemonList = window.pokehubSpecialResearchQuestsData.pokemon;
+        } else if (typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData && Array.isArray(pokehubQuestsData.pokemon)) {
+            pokemonList = pokehubQuestsData.pokemon;
+        }
+        pokehubInitQuestPokemonSelect2WithList(context, pokemonList);
+    }
+
+    function pokehubInitQuestPokemonSelect2WithList(context, pokemonList) {
         var $ctx = context ? $(context) : $(document);
-        var pokemonList = typeof pokehubQuestsData !== 'undefined' ? pokehubQuestsData.pokemon : [];
-        
-        // Multiselect pour les Pokémon (récompenses Pokémon)
-        $ctx.find('select.pokehub-select-pokemon').each(function() {
-            var $select = $(this);
-            if ($select.data('select2')) {
-                return;
-            }
-            
-            var placeholder = $select.attr('data-placeholder') || 'Select Pokémon';
-            var isMultiple = $select.attr('multiple') !== undefined;
-            
-            $select.select2({
-                data: pokemonList,
-                placeholder: placeholder,
-                allowClear: true,
-                multiple: isMultiple,
-                width: '100%',
-                language: {
-                    noResults: function() { return 'No Pokémon found'; },
-                    searching: function() { return 'Searching...'; }
-                }
-            });
+        var restUrl = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData && window.pokehubQuestsData.rest_pokemon_url) ? window.pokehubQuestsData.rest_pokemon_url : '';
+        var useAjax = (restUrl && restUrl.indexOf('pokemon-for-select') !== -1);
+
+        // Map id -> label pour hydrater les options à partir de data-selected-ids
+        var pokemonMap = {};
+        var list = (pokemonList && pokemonList.length) ? pokemonList : [];
+        list.forEach(function(p) {
+            var id = p && (p.id != null) ? String(p.id) : '';
+            var text = (p && (p.text != null)) ? p.text : (p && p.name ? p.name : (id ? '#' + id : ''));
+            if (id) pokemonMap[id] = text;
         });
-        
+
+        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon').each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) return;
+
+            // 1) Lire les ids pré-sélectionnés (data-selected-ids, ou fallback : .val() / option:selected déjà présents)
+            var raw = ($select.attr('data-selected-ids') || '').trim();
+            var ids = raw
+                ? raw.split(',').map(function(v) { return String(parseInt(v, 10)); })
+                    .filter(function(v) { return v !== 'NaN' && v !== '0'; })
+                : [];
+            if (ids.length === 0) {
+                var currentVal = $select.val();
+                var fromOptions = $select.find('option:selected').map(function() { return $(this).val(); }).get();
+                if (Array.isArray(currentVal) && currentVal.length) {
+                    ids = currentVal.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                } else if (fromOptions && fromOptions.length) {
+                    ids = fromOptions.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                }
+                if (ids.length) {
+                    $select.attr('data-selected-ids', ids.join(','));
+                }
+            }
+
+            // 2) Hydrater les options selected AVANT Select2 (ne jamais vider le select)
+            if (ids.length) {
+                ids.forEach(function(id) {
+                    var $opt = $select.find('option[value="' + id + '"]');
+                    if (!$opt.length) {
+                        $select.append(new Option(pokemonMap[id] || ('#' + id), id, true, true));
+                    } else {
+                        $opt.prop('selected', true);
+                    }
+                });
+            }
+
+            var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
+            var isMultiple = $select.attr('multiple') !== undefined;
+            var opts = {
+                placeholder: placeholder,
+                multiple: isMultiple,
+                allowClear: !isMultiple,
+                width: '100%',
+                language: { noResults: function() { return 'Aucun Pokémon trouvé'; }, searching: function() { return 'Recherche…'; } }
+            };
+
+            // 3) Init Select2 sans vider le select (pas de .empty(), pas de data: qui remplace)
+            if (useAjax) {
+                opts.minimumInputLength = 1;
+                var restNonce = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData.rest_nonce) ? window.pokehubQuestsData.rest_nonce : '';
+                opts.ajax = {
+                    url: restUrl,
+                    dataType: 'json',
+                    delay: 250,
+                    headers: restNonce ? { 'X-WP-Nonce': restNonce } : {},
+                    data: function(params) {
+                        var t = params.term || '';
+                        return { search: t, q: t, term: t };
+                    },
+                    processResults: function(data) {
+                        if (Array.isArray(data)) {
+                            return { results: data };
+                        }
+                        return { results: [] };
+                    },
+                    cache: true
+                };
+            }
+            $select.select2(opts);
+
+            // 4) Reforcer la valeur après init
+            if (ids.length) {
+                $select.val(ids).trigger('change.select2');
+            }
+        });
+
+        // Réappliquer les valeurs sur les selects déjà initialisés par Select2 (au cas où une autre init aurait vidé la sélection)
+        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon').each(function() {
+            var $select = $(this);
+            if (!$select.data('select2')) return;
+            var raw = ($select.attr('data-selected-ids') || '').trim();
+            var ids = raw ? raw.split(',').map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; }) : [];
+            if (ids.length === 0) {
+                var currentVal = $select.val();
+                var fromOptions = $select.find('option:selected').map(function() { return $(this).val(); }).get();
+                if (Array.isArray(currentVal) && currentVal.length) {
+                    ids = currentVal.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                } else if (fromOptions && fromOptions.length) {
+                    ids = fromOptions.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                }
+            }
+            if (ids.length) {
+                $select.val(ids).trigger('change.select2');
+            }
+        });
+
         // Select simple pour les Pokémon resources (candy, mega energy)
         $ctx.find('select.pokehub-select-pokemon-resource').each(function() {
             var $select = $(this);
@@ -210,7 +302,9 @@ jQuery(function($) {
             }
             
             var placeholder = $select.attr('data-placeholder') || 'Select a Pokémon';
-            
+            var currentVal = $select.val();
+            var selectedId = (currentVal != null && currentVal !== '') ? Number(currentVal) : null;
+
             $select.select2({
                 data: resourceList,
                 placeholder: placeholder,
@@ -221,6 +315,10 @@ jQuery(function($) {
                     searching: function() { return 'Searching...'; }
                 }
             });
+
+            if (selectedId != null && selectedId > 0) {
+                $select.val(selectedId).trigger('change');
+            }
             
             // Re-initialiser quand le type de récompense change
             $rewardEditor.find('.pokehub-reward-type').on('change', function() {
@@ -290,6 +388,91 @@ jQuery(function($) {
         });
     }
 
+    /**
+     * Init Select2 pour les grandes listes Pokémon (sauvages, nouveaux, œufs, habitats, défis de collection).
+     * Utilise la recherche AJAX + hydratation depuis les options déjà sélectionnées (sans charger 1000+ options en DOM).
+     */
+    function pokehubInitLargePokemonSelect2(context) {
+        var $ctx = context ? $(context) : $(document);
+        var restUrl = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData && window.pokehubQuestsData.rest_pokemon_url) ? window.pokehubQuestsData.rest_pokemon_url : '';
+        var useAjax = (restUrl && restUrl.indexOf('pokemon-for-select') !== -1);
+        var list = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData && window.pokehubQuestsData.pokemon && Array.isArray(window.pokehubQuestsData.pokemon)) ? window.pokehubQuestsData.pokemon : [];
+        var pokemonMap = {};
+        list.forEach(function(p) {
+            var id = p && (p.id != null) ? String(p.id) : '';
+            var text = (p && (p.text != null)) ? p.text : (p && p.name ? p.name : (id ? '#' + id : ''));
+            if (id) pokemonMap[id] = text;
+        });
+
+        var largeListSelector = '#pokehub-wild-pokemon-select, #pokehub-forced-shiny-select, #pokehub-rare-pokemon-select, #pokehub-new-pokemon-select, select.pokehub-eggs-pokemon-select, select.pokehub-eggs-pool-select, .pokehub-habitats-metabox select.pokehub-select-pokemon, .pokehub-collection-challenges-metabox select.pokehub-select-pokemon';
+        $ctx.find(largeListSelector).each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) return;
+
+            var raw = ($select.attr('data-selected-ids') || '').trim();
+            var ids = raw ? raw.split(',').map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; }) : [];
+            if (ids.length === 0) {
+                var currentVal = $select.val();
+                var fromOptions = $select.find('option:selected').map(function() { return $(this).val(); }).get();
+                if (Array.isArray(currentVal) && currentVal.length) {
+                    ids = currentVal.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                } else if (fromOptions && fromOptions.length) {
+                    ids = fromOptions.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                }
+                if (ids.length) $select.attr('data-selected-ids', ids.join(','));
+            }
+
+            if (useAjax && ids.length) {
+                var labelMap = {};
+                ids.forEach(function(id) {
+                    var $o = $select.find('option[value="' + id + '"]');
+                    labelMap[id] = ($o.length ? $o.text() : null) || pokemonMap[id] || ('#' + id);
+                });
+                $select.empty();
+                ids.forEach(function(id) {
+                    $select.append(new Option(labelMap[id], id, true, true));
+                });
+            } else if (ids.length) {
+                ids.forEach(function(id) {
+                    var $opt = $select.find('option[value="' + id + '"]');
+                    if (!$opt.length) $select.append(new Option(pokemonMap[id] || ('#' + id), id, true, true));
+                    else $opt.prop('selected', true);
+                });
+            }
+
+            var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
+            var isMultiple = $select.attr('multiple') !== undefined;
+            var opts = {
+                placeholder: placeholder,
+                multiple: isMultiple,
+                allowClear: !isMultiple,
+                width: '100%',
+                language: { noResults: function() { return 'Aucun Pokémon trouvé'; }, searching: function() { return 'Recherche…'; } }
+            };
+            if (useAjax) {
+                opts.minimumInputLength = 1;
+                var restNonce = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData.rest_nonce) ? window.pokehubQuestsData.rest_nonce : '';
+                opts.ajax = {
+                    url: restUrl,
+                    dataType: 'json',
+                    delay: 250,
+                    headers: restNonce ? { 'X-WP-Nonce': restNonce } : {},
+                    data: function(params) {
+                        var t = params.term || '';
+                        return { search: t, q: t, term: t };
+                    },
+                    processResults: function(data) {
+                        if (Array.isArray(data)) return { results: data };
+                        return { results: [] };
+                    },
+                    cache: true
+                };
+            }
+            $select.select2(opts);
+            if (ids.length) $select.val(ids).trigger('change.select2');
+        });
+    }
+
     // Exposer les fonctions globalement
     window.pokehubInitAttackSelect2 = pokehubInitAttackSelect2;
     window.pokehubInitWeatherSelect2 = pokehubInitWeatherSelect2;
@@ -298,15 +481,19 @@ jQuery(function($) {
     window.pokehubInitPokemonSelect2 = pokehubInitPokemonSelect2;
     window.pokehubInitQuestPokemonSelect2 = pokehubInitQuestPokemonSelect2;
     window.pokehubInitQuestItemSelect2 = pokehubInitQuestItemSelect2;
-    
-    // Initialiser sur le document
+    window.pokehubInitLargePokemonSelect2 = pokehubInitLargePokemonSelect2;
+
     pokehubInitAttackSelect2(document);
     pokehubInitWeatherSelect2(document);
     pokehubInitItemSelect2(document);
     pokehubInitLureSelect2(document);
     pokehubInitPokemonSelect2(document);
-    pokehubInitQuestPokemonSelect2(document);
-    pokehubInitQuestItemSelect2(document);
+    pokehubInitLargePokemonSelect2(document);
+    // Études spéciales : n'init que dans la metabox si présente
+    var $srMetabox = $('#pokehub-special-research-metabox, .pokehub-special-research-metabox');
+    var questCtx = ($srMetabox.length) ? $srMetabox[0] : document;
+    pokehubInitQuestPokemonSelect2(questCtx);
+    pokehubInitQuestItemSelect2(questCtx);
     
     // Initialiser Select2 pour le champ multiselect des pays régionaux
     $('#regional_countries').each(function() {

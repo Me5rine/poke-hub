@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/special-research",
+	"title": "Études Spéciales",
+	"category": "pokehub",
+	"icon": "book-alt",
+	"description": "Affiche les études ponctuelles, spéciales ou magistrales avec étapes, chemins et quêtes.",
+	"keywords": ["research", "étude", "spéciale", "magistrale", "ponctuelle", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+

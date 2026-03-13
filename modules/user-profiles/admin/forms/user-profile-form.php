@@ -70,7 +70,14 @@ function poke_hub_render_user_profile_form($user_id) {
                             <select name="team" id="team" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($teams as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_team_icon_url') 
+                                        ? poke_hub_get_team_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['team'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -160,7 +167,14 @@ function poke_hub_render_user_profile_form($user_id) {
                             <select name="scatterbug_pattern" id="scatterbug_pattern" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
+                                        ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['scatterbug_pattern'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -262,7 +276,14 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                             <select name="team" id="team" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($teams as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['team'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_team_icon_url') 
+                                        ? poke_hub_get_team_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['team'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -352,7 +373,14 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                             <select name="scatterbug_pattern" id="scatterbug_pattern" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                    <option value="<?php echo esc_attr($value); ?>" <?php selected($profile['scatterbug_pattern'], $value); ?>>
+                                    <?php 
+                                    $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
+                                        ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($value); ?>" 
+                                            <?php selected($profile['scatterbug_pattern'], $value); ?>
+                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

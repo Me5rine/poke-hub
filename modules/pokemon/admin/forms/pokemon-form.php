@@ -78,6 +78,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     $gender_male   = $gender['male']   ?? 0;
     $gender_female = $gender['female'] ?? 0;
 
+    // Dysmorphisme de genre (si le pokémon a des images différentes mâle/femelle)
+    $has_gender_dimorphism = isset($extra['has_gender_dimorphism']) ? (bool) $extra['has_gender_dimorphism'] : false;
+
     // Noms localisés depuis extra
     $names = $extra['names'] ?? [];
 
@@ -547,6 +550,20 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                     <div class="admin-lab-form-group">
                         <label for="gender_female"><?php esc_html_e('Female %', 'poke-hub'); ?></label>
                         <input type="number" step="0.1" min="0" max="100" name="gender_female" id="gender_female" value="<?php echo esc_attr($gender_female); ?>" /> %
+                    </div>
+                </div>
+            </div>
+            
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="has_gender_dimorphism" value="1" <?php checked($has_gender_dimorphism, true); ?> />
+                            <span><?php esc_html_e('Has gender dimorphism', 'poke-hub'); ?></span>
+                        </label>
+                        <p class="description">
+                            <?php esc_html_e('Check this if the Pokémon has different images for male and female forms (e.g., Pikachu, Meowstic). When this is enabled, the male image will be used by default in events and wild encounters unless a specific gender is forced.', 'poke-hub'); ?>
+                        </p>
                     </div>
                 </div>
             </div>

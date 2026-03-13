@@ -315,13 +315,6 @@ function poke_hub_shortcode_pokedle($atts) {
                 <!-- Le résultat sera affiché ici -->
             </div>
         </div>
-
-            <div class="pokedle-leaderboard">
-                <h3 class="me5rine-lab-title-medium"><?php echo esc_html__('Today\'s Leaderboard', 'poke-hub'); ?></h3>
-                <div id="pokedle-leaderboard-content">
-                    <!-- Le classement sera chargé via AJAX -->
-                </div>
-            </div>
         </div>
     </div>
     <?php
@@ -559,4 +552,3 @@ function poke_hub_pokedle_ajax_count_successful() {
 }
 add_action('wp_ajax_poke_hub_pokedle_count_successful', 'poke_hub_pokedle_ajax_count_successful');
 add_action('wp_ajax_nopriv_poke_hub_pokedle_count_successful', 'poke_hub_pokedle_ajax_count_successful');
-

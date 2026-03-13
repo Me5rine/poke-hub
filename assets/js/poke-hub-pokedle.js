@@ -37,7 +37,6 @@
         // Si l'utilisateur a déjà joué, afficher le message de complétion
         if (gameData.hasPlayed && gameData.userScore && gameData.userScore.is_success) {
             showCompletedMessage();
-            loadLeaderboard();
             
             // Gérer le bouton "Voir le résultat"
             $('.pokedle-show-result').on('click', function() {
@@ -47,7 +46,6 @@
         } else {
             // Initialiser le jeu directement
             startGame();
-            loadLeaderboard();
         }
         
         // Gérer le bouton pour changer de Pokedle
@@ -188,9 +186,6 @@
                 handleSubmit();
             }
         });
-
-        // Charger le classement
-        loadLeaderboard();
         
         // Mettre à jour les infos
         updateGameInfo();
@@ -744,8 +739,7 @@
         // Sauvegarder le score avec le nombre d'indices utilisés
         saveScore(attemptsCount, true, completionTime, hintsUsed);
 
-        // Recharger le classement et mettre à jour le compteur
-        loadLeaderboard();
+        // Mettre à jour le compteur
         updateSuccessfulCount();
 
         // Désactiver les contrôles
@@ -839,8 +833,7 @@
         $('#pokedle-submit').prop('disabled', true);
         $('#pokedle-show-answer').prop('disabled', true).hide();
         
-        // Recharger le classement et mettre à jour le compteur
-        loadLeaderboard();
+        // Mettre à jour le compteur
         updateSuccessfulCount();
         
         // Scroller vers le résultat
@@ -918,130 +911,6 @@
         });
     }
 
-    /**
-     * Charge le classement
-     */
-    function loadLeaderboard(type = 'today') {
-        $.ajax({
-            url: gameData.ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'poke_hub_pokedle_get_leaderboard',
-                nonce: gameData.nonce,
-                game_date: gameData.today,
-                limit: 10,
-                type: type
-            },
-            success: function(response) {
-                if (response.success) {
-                    let leaderboardData = null;
-                    if (response.data && response.data.leaderboard) {
-                        leaderboardData = response.data.leaderboard;
-                    } else if (Array.isArray(response.data)) {
-                        leaderboardData = response.data;
-                    }
-                    if (leaderboardData) {
-                        displayLeaderboard(leaderboardData, type);
-                    }
-                }
-            }
-        });
-    }
-
-    /**
-     * Affiche le classement (style lolix.gg)
-     */
-    function displayLeaderboard(leaderboard, currentType = 'today') {
-        const $content = $('#pokedle-leaderboard-content');
-        
-        // Créer les onglets
-        let html = '<div class="pokedle-leaderboard-tabs">';
-        html += `<button class="pokedle-leaderboard-tab ${currentType === 'today' ? 'active' : ''}" data-tab="today">${gameData.i18n.today}</button>`;
-        html += `<button class="pokedle-leaderboard-tab ${currentType === 'global' ? 'active' : ''}" data-tab="global">${gameData.i18n.allTime}</button>`;
-        html += '</div>';
-
-        // Gestion des clics sur les onglets
-        setTimeout(function() {
-            $('.pokedle-leaderboard-tab').off('click').on('click', function() {
-                const tabType = $(this).data('tab');
-                $('.pokedle-leaderboard-tab').removeClass('active');
-                $(this).addClass('active');
-                loadLeaderboard(tabType === 'all' || tabType === 'global' ? 'global' : 'today');
-            });
-        }, 100);
-        
-        if (leaderboard.length === 0) {
-            html += '<p class="pokedle-leaderboard-empty">' + (gameData.i18n.noScoresYet || 'No scores yet.') + '</p>';
-            $content.html(html);
-            return;
-        }
-
-        // Top 3 en cards
-        const top3 = leaderboard.slice(0, 3);
-        const rest = leaderboard.slice(3);
-
-        if (top3.length > 0) {
-            html += '<div class="pokedle-leaderboard-top3">';
-            top3.forEach((entry, index) => {
-                const rank = index + 1;
-                const rankText = rank === 1 ? (gameData.i18n.first || '1st') : rank === 2 ? (gameData.i18n.second || '2nd') : (gameData.i18n.third || '3rd');
-                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : 'rank-3';
-                
-                html += `<div class="me5rine-lab-card pokedle-leaderboard-card ${rankClass}">`;
-                html += `<div class="pokedle-card-rank">${rankText}</div>`;
-                html += `<div class="pokedle-card-avatar">${getInitials(entry.display_name || (gameData.i18n.anonymous || 'Anonymous'))}</div>`;
-                html += `<div class="pokedle-card-username">${entry.display_name || (gameData.i18n.anonymous || 'Anonymous')}</div>`;
-                html += `<div class="pokedle-card-score">`;
-                html += `<span class="pokedle-card-score-value">${entry.points || 0}</span>`;
-                html += `<span class="pokedle-card-score-label"> ${gameData.i18n.points || 'points'}</span>`;
-                html += `<div class="pokedle-card-trophy">🏆</div>`;
-                html += `</div>`;
-                html += `<div class="pokedle-card-progress"><div class="pokedle-card-progress-bar" style="width: 100%"></div></div>`;
-                html += `</div>`;
-            });
-            html += '</div>';
-        }
-
-        // Reste de la liste
-        if (rest.length > 0) {
-            html += '<div class="pokedle-leaderboard-list">';
-            rest.forEach((entry, index) => {
-                const rank = index + 4;
-                html += `<div class="pokedle-leaderboard-item">`;
-                html += `<div class="pokedle-item-rank">${rank}</div>`;
-                html += `<div class="pokedle-item-avatar">${getInitials(entry.display_name || gameData.i18n.anonymous)}</div>`;
-                html += `<div class="pokedle-item-username">${entry.display_name || gameData.i18n.anonymous}</div>`;
-                html += `<div class="pokedle-item-score">${entry.points || 0}</div>`;
-                html += `<div class="pokedle-item-trophy">🏆</div>`;
-                html += `</div>`;
-            });
-            html += '</div>';
-        }
-
-        $content.html(html);
-        
-        // Réattacher les événements des onglets après l'insertion du HTML
-        $('.pokedle-leaderboard-tab').off('click').on('click', function() {
-            const tabType = $(this).data('tab');
-            $('.pokedle-leaderboard-tab').removeClass('active');
-            $(this).addClass('active');
-            loadLeaderboard(tabType === 'all' || tabType === 'global' ? 'global' : 'today');
-        });
-    }
-
-    /**
-     * Obtient les initiales d'un nom
-     */
-    function getInitials(name) {
-        if (!name || name === gameData.i18n.anonymous) {
-            return '?';
-        }
-        const parts = name.trim().split(' ');
-        if (parts.length >= 2) {
-            return (parts[0][0] + parts[1][0]).toUpperCase();
-        }
-        return name.substring(0, 2).toUpperCase();
-    }
 
     /**
      * Affiche un message de complétion si l'utilisateur a déjà joué

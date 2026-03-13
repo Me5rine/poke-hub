@@ -1425,6 +1425,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     $gender_male   = isset($_POST['gender_male']) ? (float) str_replace(',', '.', $_POST['gender_male']) : 0;
     $gender_female = isset($_POST['gender_female']) ? (float) str_replace(',', '.', $_POST['gender_female']) : 0;
+    $has_gender_dimorphism = !empty($_POST['has_gender_dimorphism']) ? 1 : 0;
 
     // Noms localisés (on garde la structure extra->names pour les autres langues)
     $names = [
@@ -1555,6 +1556,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'male'   => $gender_male,
         'female' => $gender_female,
     ];
+    $extra['has_gender_dimorphism'] = (bool) $has_gender_dimorphism;
     $extra['names']    = $names;
 
     // Release / régional

@@ -82,6 +82,13 @@ function pokehub_quests_admin_page_assets($hook) {
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('pokehub_quests_ajax'),
     ]);
+
+    wp_enqueue_style(
+        'pokehub-metaboxes-admin',
+        POKE_HUB_URL . 'assets/css/pokehub-metaboxes-admin.css',
+        [],
+        POKE_HUB_VERSION
+    );
 }
 add_action('admin_enqueue_scripts', 'pokehub_quests_admin_page_assets');
 
@@ -113,8 +120,9 @@ function pokehub_render_quests_admin_page() {
                 }
                 
                 $cleaned_quest = [
-                    'task' => $has_task ? sanitize_text_field($quest['task']) : '',
-                    'rewards' => [],
+                    'task'           => $has_task ? sanitize_text_field($quest['task']) : '',
+                    'rewards'        => [],
+                    'quest_group_id' => isset($quest['quest_group_id']) ? max(0, (int) $quest['quest_group_id']) : 0,
                 ];
                 
                 if (isset($quest['rewards']) && is_array($quest['rewards'])) {
@@ -361,33 +369,6 @@ function pokehub_render_quests_admin_page() {
         });
     });
     </script>
-    
-    <style>
-        .pokehub-quest-item-editor {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 15px;
-            background: #fff;
-        }
-        .pokehub-quest-item-editor h4 {
-            margin-top: 0;
-        }
-        .pokehub-quest-reward-editor {
-            border: 1px solid #eee;
-            padding: 10px;
-            margin: 5px 0;
-            background: #f9f9f9;
-        }
-        .pokehub-remove-quest,
-        .pokehub-remove-reward {
-            color: #a00;
-            cursor: pointer;
-        }
-        .pokehub-remove-quest:hover,
-        .pokehub-remove-reward:hover {
-            color: #dc3232;
-        }
-    </style>
     <?php
 }
 

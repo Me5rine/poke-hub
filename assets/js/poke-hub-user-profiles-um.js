@@ -673,7 +673,10 @@
                 // Always add placeholder first
                 var $placeholder = $patternSelect.find('option[value=""]');
                 if ($placeholder.length === 0) {
-                    $patternSelect.prepend('<option value="">' + ($patternSelect.find('option').first().text() || '-- Select --') + '</option>');
+                    var placeholderText = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectDefault) 
+                        ? pokeHubFriendCodes.selectDefault 
+                        : ($patternSelect.find('option').first().text() || '-- Select --');
+                    $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                 }
                 
                 // Add valid patterns
@@ -722,7 +725,10 @@
                             $parent = $patternSelect.parent();
                         }
                         // Get placeholder text from empty option
-                        var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
+                        var placeholderText = $patternSelect.find('option[value=""]').first().text() || 
+                            (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectPlaceholder 
+                                ? pokeHubFriendCodes.selectPlaceholder 
+                                : 'Select...');
                         // Ensure empty option exists for placeholder
                         var $emptyOption = $patternSelect.find('option[value=""]').first();
                         if ($emptyOption.length === 0) {
@@ -786,7 +792,10 @@
                                 $parent = $patternSelect.parent();
                             }
                             // Get placeholder text from empty option
-                            var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
+                            var placeholderText = $patternSelect.find('option[value=""]').first().text() || 
+                                (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectPlaceholder 
+                                    ? pokeHubFriendCodes.selectPlaceholder 
+                                    : 'Select...');
                             // Ensure empty option exists for placeholder
                             var $emptyOption = $patternSelect.find('option[value=""]').first();
                             if ($emptyOption.length === 0) {
@@ -1094,7 +1103,7 @@
             // Create warning message
             var mismatchMessage = typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.countryMismatchMessage 
                 ? pokeHubFriendCodes.countryMismatchMessage 
-                : 'Your saved country ("' + savedCountry + '") does not match your detected location ("' + detectedCountry + '").';
+                : 'Your saved country does not match your detected location.';
             var mismatchSuggestion = typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.countryMismatchSuggestion
                 ? pokeHubFriendCodes.countryMismatchSuggestion
                 : 'Would you like to update your country to match your current location?';
@@ -1442,7 +1451,10 @@
                     if (!validateFriendCode(friendCodeValue)) {
                         e.preventDefault();
                         e.stopImmediatePropagation();
-                        showFormWarningMessage('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)');
+                        var errorMsg = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.friendCodeError) 
+                            ? pokeHubFriendCodes.friendCodeError 
+                            : 'The friend code must be exactly 12 digits (e.g., 1234 5678 9012)';
+                        showFormWarningMessage(errorMsg);
                         $friendCodeInput.addClass('error');
                         setTimeout(function() {
                             $friendCodeInput.focus();
@@ -1468,7 +1480,7 @@
                         
                         var errorMessage = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.validationError) 
                             ? pokeHubFriendCodes.validationError 
-                            : 'Le pays et le motif de lépidonille sélectionnés ne correspondent pas. Veuillez sélectionner une combinaison valide.';
+                            : 'The selected country and Vivillon pattern do not match. Please select a valid combination.';
                         showCountryPatternError($form, errorMessage);
                         
                         return false;

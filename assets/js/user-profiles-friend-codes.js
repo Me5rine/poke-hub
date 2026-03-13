@@ -234,7 +234,10 @@ window.pokeHubFriendCodesLoaded = true;
             if (typeof console !== 'undefined' && console.error) {
                 console.error('Friend code not found. Button:', $button);
             }
-            alert('Unable to find friend code to copy.');
+            var errorMsg = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.friendCodeNotFound) 
+                ? pokeHubFriendCodes.friendCodeNotFound 
+                : 'Unable to find friend code to copy.';
+            alert(errorMsg);
             return false;
         }
         
@@ -562,7 +565,10 @@ window.pokeHubFriendCodesLoaded = true;
             // Always add placeholder first
             var $placeholder = $patternSelect.find('option[value=""]');
             if ($placeholder.length === 0) {
-                $patternSelect.prepend('<option value="">' + ($patternSelect.find('option').first().text() || '-- Select --') + '</option>');
+                var placeholderText = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectDefault) 
+                    ? pokeHubFriendCodes.selectDefault 
+                    : ($patternSelect.find('option').first().text() || '-- Select --');
+                $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
             }
             
             // Add valid patterns
@@ -611,13 +617,18 @@ window.pokeHubFriendCodesLoaded = true;
                         $parent = $patternSelect.parent();
                     }
                     // Get placeholder text from empty option
-                    var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
+                    var placeholderText = $patternSelect.find('option[value=""]').first().text() || 
+                        (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectPlaceholder 
+                            ? pokeHubFriendCodes.selectPlaceholder 
+                            : 'Select...');
                     // Ensure empty option exists for placeholder
                     var $emptyOption = $patternSelect.find('option[value=""]').first();
                     if ($emptyOption.length === 0) {
                         $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                     }
-                    $patternSelect.select2({
+                    // Check if this select has icons
+                    var hasIcons = $patternSelect.find('option[data-icon]').length > 0;
+                    var select2Config = {
                         width: '100%',
                         allowClear: true,
                         placeholder: {
@@ -625,7 +636,35 @@ window.pokeHubFriendCodesLoaded = true;
                             text: placeholderText
                         },
                         dropdownParent: $parent.length ? $parent : $('body')
-                    });
+                    };
+                    
+                    // Add icon templates if this select has icons
+                    if (hasIcons) {
+                        select2Config.templateResult = function(data) {
+                            if (!data.id) {
+                                return data.text;
+                            }
+                            var $option = $patternSelect.find('option[value="' + data.id + '"]');
+                            var iconUrl = $option.attr('data-icon');
+                            if (iconUrl) {
+                                return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                            }
+                            return data.text;
+                        };
+                        select2Config.templateSelection = function(data) {
+                            if (!data.id) {
+                                return data.text;
+                            }
+                            var $option = $patternSelect.find('option[value="' + data.id + '"]');
+                            var iconUrl = $option.attr('data-icon');
+                            if (iconUrl) {
+                                return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                            }
+                            return data.text;
+                        };
+                    }
+                    
+                    $patternSelect.select2(select2Config);
                     if (selectedPatternValue) {
                         $patternSelect.val(selectedPatternValue);
                     } else {
@@ -675,7 +714,10 @@ window.pokeHubFriendCodesLoaded = true;
                             $parent = $patternSelect.parent();
                         }
                         // Get placeholder text from empty option
-                        var placeholderText = $patternSelect.find('option[value=""]').first().text() || 'Select...';
+                        var placeholderText = $patternSelect.find('option[value=""]').first().text() || 
+                            (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.selectPlaceholder 
+                                ? pokeHubFriendCodes.selectPlaceholder 
+                                : 'Select...');
                         // Ensure empty option exists for placeholder
                         var $emptyOption = $patternSelect.find('option[value=""]').first();
                         if ($emptyOption.length === 0) {
@@ -914,7 +956,10 @@ window.pokeHubFriendCodesLoaded = true;
             // Show error in notification system (same format as server-side)
             var $formBlock = $form.closest('.me5rine-lab-form-block');
             if ($formBlock.length > 0) {
-                var $error = $('<div class="me5rine-lab-form-message me5rine-lab-form-message-error"><p>Friend code must contain exactly 12 digits.</p></div>');
+                var errorMsg = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.friendCodeInvalidLength) 
+                    ? pokeHubFriendCodes.friendCodeInvalidLength 
+                    : 'Friend code must contain exactly 12 digits.';
+                var $error = $('<div class="me5rine-lab-form-message me5rine-lab-form-message-error"><p>' + errorMsg + '</p></div>');
                 $formBlock.find('h3').first().after($error);
                 
                 // Scroll to error
@@ -1099,7 +1144,7 @@ window.pokeHubFriendCodesLoaded = true;
         // Create warning message
         var mismatchMessage = typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.countryMismatchMessage 
             ? pokeHubFriendCodes.countryMismatchMessage 
-            : 'Your saved country ("' + savedCountry + '") does not match your detected location ("' + detectedCountry + '").';
+            : 'Your saved country does not match your detected location.';
         var mismatchSuggestion = typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.countryMismatchSuggestion
             ? pokeHubFriendCodes.countryMismatchSuggestion
             : 'Would you like to update your country to match your current location?';
@@ -1152,8 +1197,43 @@ window.pokeHubFriendCodesLoaded = true;
                     var isCountrySelect2 = $countrySelect.hasClass('select2-hidden-accessible') || $countrySelect.data('select2');
                     if (isCountrySelect2) {
                         var isCountryOpen = $countrySelect.data('select2') && $countrySelect.data('select2').isOpen();
+                        // Check if this select has icons
+                        var hasCountryIcons = $countrySelect.find('option[data-icon]').length > 0;
+                        var countrySelect2Config = {
+                            width: '100%',
+                            allowClear: true,
+                            placeholder: $countrySelect.find('option[value=""]').first().text() || 'Select...',
+                            dropdownParent: $countrySelect.closest('.me5rine-lab-form-field').length ? $countrySelect.closest('.me5rine-lab-form-field') : $('body')
+                        };
+                        
+                        // Add icon templates if this select has icons
+                        if (hasCountryIcons) {
+                            countrySelect2Config.templateResult = function(data) {
+                                if (!data.id) {
+                                    return data.text;
+                                }
+                                var $option = $countrySelect.find('option[value="' + data.id + '"]');
+                                var iconUrl = $option.attr('data-icon');
+                                if (iconUrl) {
+                                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                                }
+                                return data.text;
+                            };
+                            countrySelect2Config.templateSelection = function(data) {
+                                if (!data.id) {
+                                    return data.text;
+                                }
+                                var $option = $countrySelect.find('option[value="' + data.id + '"]');
+                                var iconUrl = $option.attr('data-icon');
+                                if (iconUrl) {
+                                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
+                                }
+                                return data.text;
+                            };
+                        }
+                        
                         $countrySelect.select2('destroy');
-                        $countrySelect.select2();
+                        $countrySelect.select2(countrySelect2Config);
                         if (currentCountryValue) {
                             $countrySelect.val(currentCountryValue);
                             $countrySelect.trigger('change.select2');

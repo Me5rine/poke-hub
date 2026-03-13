@@ -324,6 +324,20 @@ function pokehub_render_special_event_form(
                         <?php endif; ?>
                     </select>
 
+                    <div class="pokehub-pokemon-gender" style="margin-top: 8px; display: none;">
+                        <label style="display: block; margin-bottom: 4px;">
+                            <?php esc_html_e('Gender (optional)', 'poke-hub'); ?>
+                        </label>
+                        <select class="pokehub-pokemon-gender-select" style="width: 100%;">
+                            <option value=""><?php esc_html_e('Default (Male if dimorphic)', 'poke-hub'); ?></option>
+                            <option value="male"><?php esc_html_e('Male', 'poke-hub'); ?></option>
+                            <option value="female"><?php esc_html_e('Female', 'poke-hub'); ?></option>
+                        </select>
+                        <p class="description" style="margin-top: 4px;">
+                            <?php esc_html_e('Force a specific gender for this Pokémon. Only relevant for Pokémon with gender dimorphism.', 'poke-hub'); ?>
+                        </p>
+                    </div>
+
                     <div class="pokehub-pokemon-attacks">
                         <p class="description">
                             <?php esc_html_e('Select special moves for this Pokémon (if any).', 'poke-hub'); ?>
@@ -364,6 +378,20 @@ function pokehub_render_special_event_form(
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </select>
+
+                            <div class="pokehub-pokemon-gender" style="margin-top: 8px; display: none;">
+                                <label style="display: block; margin-bottom: 4px;">
+                                    <?php esc_html_e('Gender (optional)', 'poke-hub'); ?>
+                                </label>
+                                <select class="pokehub-pokemon-gender-select" style="width: 100%;">
+                                    <option value=""><?php esc_html_e('Default (Male if dimorphic)', 'poke-hub'); ?></option>
+                                    <option value="male" <?php selected(($prow['gender'] ?? ''), 'male'); ?>><?php esc_html_e('Male', 'poke-hub'); ?></option>
+                                    <option value="female" <?php selected(($prow['gender'] ?? ''), 'female'); ?>><?php esc_html_e('Female', 'poke-hub'); ?></option>
+                                </select>
+                                <p class="description" style="margin-top: 4px;">
+                                    <?php esc_html_e('Force a specific gender for this Pokémon. Only relevant for Pokémon with gender dimorphism.', 'poke-hub'); ?>
+                                </p>
+                            </div>
 
                             <div class="pokehub-pokemon-attacks">
                                 <p class="description">

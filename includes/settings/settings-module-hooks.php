@@ -73,9 +73,13 @@ add_action('update_option_poke_hub_active_modules', function ($old_value, $new_v
         $old_value = [];
     }
 
-    // Modules activés
+    // Modules activés : charger le fichier *-pages.php du module (s'il existe) pour enregistrer le hook, puis déclencher l'action
     $activated = array_diff($new_value, $old_value);
     foreach ($activated as $module) {
+        $pages_file = defined('POKE_HUB_MODULES_DIR') ? POKE_HUB_MODULES_DIR . $module . '/functions/' . $module . '-pages.php' : '';
+        if ($pages_file && file_exists($pages_file)) {
+            require_once $pages_file;
+        }
         do_action("poke_hub_{$module}_module_activated");
     }
 
@@ -130,6 +134,11 @@ add_action('admin_init', function () {
         return;
     }
 
+    // Migration unique : tables de contenu avec double préfixe pokehub -> un seul préfixe
+    if (in_array('events', $active_modules, true) && class_exists('Pokehub_DB')) {
+        Pokehub_DB::getInstance()->migrateContentTablesDoublePrefix();
+    }
+
     // Liste des modules Poké HUB qui nécessitent des tables SQL,
     // avec la/les table(s) attendue(s) pour chacun.
     $modules_needing_tables = [
@@ -144,6 +153,7 @@ add_action('admin_init', function () {
             pokehub_get_table('pokemon_type_links'),
             pokehub_get_table('pokemon_attack_links'),
             pokehub_get_table('pokemon_weathers'),
+            pokehub_get_table('pokemon_egg_types'),
             pokehub_get_table('pokemon_type_weather_links'),
             pokehub_get_table('pokemon_type_weakness_links'),
             pokehub_get_table('pokemon_type_resistance_links'),
@@ -161,12 +171,35 @@ add_action('admin_init', function () {
             pokehub_get_table('pokemon_regional_mappings'),
         ],
 
-        'events' => [
-            pokehub_get_table('special_events'),
-            pokehub_get_table('special_event_pokemon'),
-            pokehub_get_table('special_event_bonus'),
-            pokehub_get_table('special_event_pokemon_attacks'),
-        ],
+        'events' => array_merge(
+            [
+                pokehub_get_table('special_events'),
+                pokehub_get_table('special_event_pokemon'),
+                pokehub_get_table('special_event_bonus'),
+                pokehub_get_table('special_event_pokemon_attacks'),
+            ],
+            [
+                pokehub_get_table('content_eggs'),
+                pokehub_get_table('content_egg_pokemon'),
+                pokehub_get_table('content_quests'),
+                pokehub_get_table('content_quest_lines'),
+                pokehub_get_table('quest_groups'),
+                pokehub_get_table('content_habitats'),
+                pokehub_get_table('content_habitat_entries'),
+                pokehub_get_table('content_special_research'),
+                pokehub_get_table('content_special_research_steps'),
+                pokehub_get_table('content_collection_challenges'),
+                pokehub_get_table('content_collection_challenge_items'),
+                pokehub_get_table('content_bonus'),
+                pokehub_get_table('content_bonus_entries'),
+                pokehub_get_table('content_wild_pokemon'),
+                pokehub_get_table('content_wild_pokemon_entries'),
+                pokehub_get_table('content_new_pokemon'),
+                pokehub_get_table('content_new_pokemon_entries'),
+                pokehub_get_table('content_raids'),
+                pokehub_get_table('content_raid_bosses'),
+            ]
+        ),
 
         'user-profiles' => [
             pokehub_get_table('user_profiles'),
@@ -176,6 +209,16 @@ add_action('admin_init', function () {
             pokehub_get_table('games_scores'),
             pokehub_get_table('pokedle_daily'),
             pokehub_get_table('games_points'),
+        ],
+
+        'eggs' => [
+            pokehub_get_table('content_eggs'),
+            pokehub_get_table('content_egg_pokemon'),
+        ],
+
+        'collections' => [
+            pokehub_get_table('collections'),
+            pokehub_get_table('collection_items'),
         ],
     ];
 
@@ -209,6 +252,12 @@ add_action('admin_init', function () {
         $events_table = pokehub_get_table('special_events');
         if ($events_table && ($wpdb->get_var("SHOW TABLES LIKE '{$events_table}'") === $events_table)) {
             Pokehub_DB::getInstance()->migrateEventsRecurringColumns();
+        }
+        
+        // Migration de la colonne gender pour special_event_pokemon
+        $event_pokemon_table = pokehub_get_table('special_event_pokemon');
+        if ($event_pokemon_table && ($wpdb->get_var("SHOW TABLES LIKE '{$event_pokemon_table}'") === $event_pokemon_table)) {
+            Pokehub_DB::getInstance()->migrateEventPokemonGenderColumn();
         }
     }
     

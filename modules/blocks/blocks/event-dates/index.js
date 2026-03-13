@@ -14,15 +14,19 @@
 
     var registerBlockType = wp.blocks.registerBlockType;
     var __ = wp.i18n.__;
+    var el = wp.element.createElement;
+    var useBlockProps = wp.blockEditor && wp.blockEditor.useBlockProps;
 
     // Enregistrer le bloc (le rendu est géré par render.php)
     registerBlockType('pokehub/event-dates', {
         edit: function() {
-            return wp.element.createElement(
+            var props = useBlockProps ? useBlockProps({ className: 'pokehub-block-placeholder' }) : { className: 'pokehub-block-placeholder' };
+
+            return el(
                 'div',
-                { className: 'pokehub-block-placeholder' },
-                wp.element.createElement('p', {}, __('Dates d\'événement', 'poke-hub')),
-                wp.element.createElement('small', {}, __('Ce bloc affiche automatiquement les dates de l\'événement.', 'poke-hub'))
+                props,
+                el('p', {}, __('Event Dates', 'poke-hub')),
+                el('small', {}, __('This block automatically displays the event dates.', 'poke-hub'))
             );
         },
         save: function() {
@@ -31,6 +35,8 @@
         }
     });
 })();
+
+
 
 
 

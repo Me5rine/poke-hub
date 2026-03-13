@@ -235,6 +235,8 @@ function pokehub_get_table(string $key): string {
         'pokemon_attack_links'       => ['scope' => 'local',  'suffix' => 'pokemon_attack_links'],
         'pokemon_weathers'           => ['scope' => 'local',  'suffix' => 'pokemon_weathers'],
         'weathers'                   => ['scope' => 'local',  'suffix' => 'pokemon_weathers'],
+        'pokemon_egg_types'          => ['scope' => 'local',  'suffix' => 'pokemon_egg_types'],
+        'egg_types'                  => ['scope' => 'local',  'suffix' => 'pokemon_egg_types'],
         'pokemon_type_weather_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_weather_links'],
         'pokemon_type_weakness_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_weakness_links'],
         'pokemon_type_resistance_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_resistance_links'],
@@ -259,10 +261,60 @@ function pokehub_get_table(string $key): string {
         'special_event_pokemon_attacks' => ['scope' => 'local', 'suffix' => 'special_event_pokemon_attacks'],
         'special_event_bonus'           => ['scope' => 'local', 'suffix' => 'special_event_bonus'],
 
+        // ==== Tables de contenu communes (post, special_event, global_pool) ====
+        // suffix sans "pokehub_" : le préfixe local est déjà {$wpdb->prefix}pokehub_
+        'content_eggs'                   => ['scope' => 'local', 'suffix' => 'content_eggs'],
+        'content_egg_pokemon'             => ['scope' => 'local', 'suffix' => 'content_egg_pokemon'],
+        'content_quests'                  => ['scope' => 'local', 'suffix' => 'content_quests'],
+        'content_quest_lines'             => ['scope' => 'local', 'suffix' => 'content_quest_lines'],
+        'quest_groups'                    => ['scope' => 'local', 'suffix' => 'quest_groups'],
+        'content_habitats'                => ['scope' => 'local', 'suffix' => 'content_habitats'],
+        'content_habitat_entries'         => ['scope' => 'local', 'suffix' => 'content_habitat_entries'],
+        'content_special_research'        => ['scope' => 'local', 'suffix' => 'content_special_research'],
+        'content_special_research_steps'  => ['scope' => 'local', 'suffix' => 'content_special_research_steps'],
+        'content_collection_challenges'   => ['scope' => 'local', 'suffix' => 'content_collection_challenges'],
+        'content_collection_challenge_items' => ['scope' => 'local', 'suffix' => 'content_collection_challenge_items'],
+        'content_bonus'                  => ['scope' => 'local', 'suffix' => 'content_bonus'],
+        'content_bonus_entries'           => ['scope' => 'local', 'suffix' => 'content_bonus_entries'],
+        'content_wild_pokemon'            => ['scope' => 'local', 'suffix' => 'content_wild_pokemon'],
+        'content_wild_pokemon_entries'   => ['scope' => 'local', 'suffix' => 'content_wild_pokemon_entries'],
+        'content_new_pokemon'             => ['scope' => 'local', 'suffix' => 'content_new_pokemon'],
+        'content_new_pokemon_entries'     => ['scope' => 'local', 'suffix' => 'content_new_pokemon_entries'],
+        'content_raids'                   => ['scope' => 'local', 'suffix' => 'content_raids'],
+        'content_raid_bosses'             => ['scope' => 'local', 'suffix' => 'content_raid_bosses'],
+        // Alias ancien format (évite double préfixe si du code appelle get_table('pokehub_content_*'))
+        'pokehub_content_eggs' => ['scope' => 'local', 'suffix' => 'content_eggs'],
+        'pokehub_content_egg_pokemon' => ['scope' => 'local', 'suffix' => 'content_egg_pokemon'],
+        'pokehub_content_quests' => ['scope' => 'local', 'suffix' => 'content_quests'],
+        'pokehub_content_quest_lines' => ['scope' => 'local', 'suffix' => 'content_quest_lines'],
+        'pokehub_quest_groups' => ['scope' => 'local', 'suffix' => 'quest_groups'],
+        'pokehub_content_habitats' => ['scope' => 'local', 'suffix' => 'content_habitats'],
+        'pokehub_content_habitat_entries' => ['scope' => 'local', 'suffix' => 'content_habitat_entries'],
+        'pokehub_content_special_research' => ['scope' => 'local', 'suffix' => 'content_special_research'],
+        'pokehub_content_special_research_steps' => ['scope' => 'local', 'suffix' => 'content_special_research_steps'],
+        'pokehub_content_collection_challenges' => ['scope' => 'local', 'suffix' => 'content_collection_challenges'],
+        'pokehub_content_collection_challenge_items' => ['scope' => 'local', 'suffix' => 'content_collection_challenge_items'],
+        'pokehub_content_bonus' => ['scope' => 'local', 'suffix' => 'content_bonus'],
+        'pokehub_content_bonus_entries' => ['scope' => 'local', 'suffix' => 'content_bonus_entries'],
+        'pokehub_content_wild_pokemon' => ['scope' => 'local', 'suffix' => 'content_wild_pokemon'],
+        'pokehub_content_wild_pokemon_entries' => ['scope' => 'local', 'suffix' => 'content_wild_pokemon_entries'],
+        'pokehub_content_new_pokemon' => ['scope' => 'local', 'suffix' => 'content_new_pokemon'],
+        'pokehub_content_new_pokemon_entries' => ['scope' => 'local', 'suffix' => 'content_new_pokemon_entries'],
+        'pokehub_content_raids' => ['scope' => 'local', 'suffix' => 'content_raids'],
+        'pokehub_content_raid_bosses' => ['scope' => 'local', 'suffix' => 'content_raid_bosses'],
+
         // ==== Tables locales Games ====
         'games_scores'                  => ['scope' => 'local', 'suffix' => 'games_scores'],
         'pokedle_daily'                 => ['scope' => 'local', 'suffix' => 'pokedle_daily'],
         'games_points'                  => ['scope' => 'local', 'suffix' => 'games_points'],
+
+        // ==== Tables locales Collections Pokémon GO ====
+        'collections'                   => ['scope' => 'local', 'suffix' => 'collections'],
+        'collection_items'              => ['scope' => 'local', 'suffix' => 'collection_items'],
+
+        // ==== Module Eggs (pools globaux) ====
+        'global_egg_pools'              => ['scope' => 'local', 'suffix' => 'global_egg_pools'],
+        'global_egg_pool_pokemon'       => ['scope' => 'local', 'suffix' => 'global_egg_pool_pokemon'],
 
         // ==== Tables distantes (JV Actu / remote WP) ====
         'remote_posts'              => ['scope' => 'remote', 'suffix' => 'posts'],

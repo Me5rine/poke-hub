@@ -23,6 +23,14 @@ require_once __DIR__ . '/pokemon-regional-data.php';
 function poke_hub_seed_regional_data($force = false) {
     global $wpdb;
     
+    // Si le seed a déjà été fait et qu'on ne force pas, on sort immédiatement
+    if (!$force) {
+        $seed_done = get_option('poke_hub_regional_data_seeded', false);
+        if ($seed_done) {
+            return false;
+        }
+    }
+    
     // Check if tables exist and are empty
     $regions_table = pokehub_get_table('pokemon_regional_regions');
     $mappings_table = pokehub_get_table('pokemon_regional_mappings');
@@ -46,8 +54,9 @@ function poke_hub_seed_regional_data($force = false) {
     // Only seed if both tables are empty (or if forced)
     // But we allow seeding regions even if mappings exist, and vice versa
     if (!$force) {
-        // If both tables have data, skip seeding
+        // If both tables have data, mark as seeded and skip
         if ($regions_count > 0 && $mappings_count > 0) {
+            update_option('poke_hub_regional_data_seeded', true);
             return false;
         }
         // If only one table has data, we still seed the empty one
@@ -84,6 +93,9 @@ function poke_hub_seed_regional_data($force = false) {
     }
     
     // Note: No need to sync mappings to Pokémon anymore - Pokémon read directly from pokemon_regional_mappings (single source of truth)
+    
+    // Marquer que le seed a été fait
+    update_option('poke_hub_regional_data_seeded', true);
     
     return true;
 }
@@ -159,8 +171,6 @@ function poke_hub_seed_vivillon_patterns($force = false) {
     $static_mapping = $data['mappings'];
     $vivillon_pokemon = $data['pokemon'];
     
-    error_log('[POKE-HUB] seed_vivillon_patterns: Starting insertion of 3x18 = 54 Vivillon pattern mappings');
-    
     $total_inserted = 0;
     $total_skipped = 0;
     
@@ -221,19 +231,15 @@ function poke_hub_seed_vivillon_patterns($force = false) {
                     $result = poke_hub_pokemon_save_regional_mapping($mapping_data, $existing_mapping_id);
                     if ($result !== false) {
                         $total_inserted++;
-                        error_log('[POKE-HUB] seed_vivillon_patterns: ✓ Inserted/updated mapping: ' . $mapping_pattern_slug);
-                    } else {
-                        error_log('[POKE-HUB] seed_vivillon_patterns: ✗ FAILED to insert mapping: ' . $mapping_pattern_slug);
                     }
                 }
             } else {
                 $total_skipped++;
-                error_log('[POKE-HUB] seed_vivillon_patterns: ⊘ Skipped existing mapping: ' . $mapping_pattern_slug);
+                // Ne pas logger chaque skip pour éviter la pollution des logs
             }
         }
     }
     
-    error_log('[POKE-HUB] seed_vivillon_patterns: Complete - Inserted: ' . $total_inserted . ', Skipped: ' . $total_skipped . ', Total: ' . ($total_inserted + $total_skipped));
 }
 
 /**
@@ -273,8 +279,6 @@ function poke_hub_seed_flabebe_forms($force = false) {
     if (empty($flabebe_forms) || empty($flabebe_pokemon)) {
         return;
     }
-
-    error_log('[POKE-HUB] seed_flabebe_forms: Starting insertion of 3x3 = 9 Flabébé evolution line mappings');
 
     $total_inserted = 0;
     $total_skipped = 0;
@@ -331,19 +335,15 @@ function poke_hub_seed_flabebe_forms($force = false) {
                     $result = poke_hub_pokemon_save_regional_mapping($mapping_data, $existing_mapping_id);
                     if ($result !== false) {
                         $total_inserted++;
-                        error_log('[POKE-HUB] seed_flabebe_forms: ✓ Inserted/updated mapping: ' . $mapping_pattern_slug);
-                    } else {
-                        error_log('[POKE-HUB] seed_flabebe_forms: ✗ FAILED to insert mapping: ' . $mapping_pattern_slug);
                     }
                 }
             } else {
                 $total_skipped++;
-                error_log('[POKE-HUB] seed_flabebe_forms: ⊘ Skipped existing mapping: ' . $mapping_pattern_slug);
+                // Ne pas logger chaque skip pour éviter la pollution des logs
             }
         }
     }
 
-    error_log('[POKE-HUB] seed_flabebe_forms: Complete - Inserted: ' . $total_inserted . ', Skipped: ' . $total_skipped . ', Total: ' . ($total_inserted + $total_skipped));
 }
 
 /**
@@ -366,8 +366,6 @@ function poke_hub_seed_shellos_forms($force = false) {
     if (empty($shellos_forms) || empty($shellos_pokemon)) {
         return;
     }
-
-    error_log('[POKE-HUB] seed_shellos_forms: Starting insertion of 2x2 = 4 Shellos evolution line mappings');
 
     $total_inserted = 0;
     $total_skipped = 0;
@@ -423,19 +421,15 @@ function poke_hub_seed_shellos_forms($force = false) {
                     $result = poke_hub_pokemon_save_regional_mapping($mapping_data, $existing_mapping_id);
                     if ($result !== false) {
                         $total_inserted++;
-                        error_log('[POKE-HUB] seed_shellos_forms: ✓ Inserted/updated mapping: ' . $mapping_pattern_slug);
-                    } else {
-                        error_log('[POKE-HUB] seed_shellos_forms: ✗ FAILED to insert mapping: ' . $mapping_pattern_slug);
                     }
                 }
             } else {
                 $total_skipped++;
-                error_log('[POKE-HUB] seed_shellos_forms: ⊘ Skipped existing mapping: ' . $mapping_pattern_slug);
+                // Ne pas logger chaque skip pour éviter la pollution des logs
             }
         }
     }
 
-    error_log('[POKE-HUB] seed_shellos_forms: Complete - Inserted: ' . $total_inserted . ', Skipped: ' . $total_skipped . ', Total: ' . ($total_inserted + $total_skipped));
 }
 
 /**
@@ -456,8 +450,6 @@ function poke_hub_seed_form_based_regional_mappings($force = false) {
     if (empty($form_based_mappings) || !is_array($form_based_mappings)) {
         return;
     }
-
-    error_log('[POKE-HUB] seed_form_based_regional_mappings: Starting insertion of form-based regional Pokémon mappings');
 
     $total_inserted = 0;
     $total_skipped = 0;
@@ -506,18 +498,14 @@ function poke_hub_seed_form_based_regional_mappings($force = false) {
                 $result = poke_hub_pokemon_save_regional_mapping($mapping_data, $existing_mapping_id);
                 if ($result !== false) {
                     $total_inserted++;
-                    error_log('[POKE-HUB] seed_form_based_regional_mappings: ✓ Inserted/updated mapping: ' . $pattern_slug);
-                } else {
-                    error_log('[POKE-HUB] seed_form_based_regional_mappings: ✗ FAILED to insert mapping: ' . $pattern_slug);
                 }
             }
         } else {
             $total_skipped++;
-            error_log('[POKE-HUB] seed_form_based_regional_mappings: ⊘ Skipped existing mapping: ' . $pattern_slug);
+            // Ne pas logger chaque skip pour éviter la pollution des logs
         }
     }
 
-    error_log('[POKE-HUB] seed_form_based_regional_mappings: Complete - Inserted: ' . $total_inserted . ', Skipped: ' . $total_skipped . ', Total: ' . ($total_inserted + $total_skipped));
 }
 
 /**

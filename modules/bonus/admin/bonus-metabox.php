@@ -33,7 +33,7 @@ add_action('add_meta_boxes', 'pokehub_add_bonus_metabox');
 function pokehub_render_event_bonuses_metabox($post) {
     wp_nonce_field('pokehub_save_event_bonuses', 'pokehub_event_bonuses_nonce');
 
-    $value = get_post_meta($post->ID, '_pokehub_event_bonuses', true);
+    $value = function_exists('pokehub_content_get_bonus') ? pokehub_content_get_bonus('post', (int) $post->ID) : [];
     if (!is_array($value)) {
         $value = [];
     }
@@ -157,10 +157,8 @@ function pokehub_save_event_bonuses($post_id) {
         }
     }
 
-    if (!empty($clean)) {
-        update_post_meta($post_id, '_pokehub_event_bonuses', $clean);
-    } else {
-        delete_post_meta($post_id, '_pokehub_event_bonuses');
+    if (function_exists('pokehub_content_save_bonus')) {
+        pokehub_content_save_bonus('post', $post_id, $clean);
     }
 }
 add_action('save_post', 'pokehub_save_event_bonuses');

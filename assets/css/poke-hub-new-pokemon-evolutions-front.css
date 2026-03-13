@@ -1,0 +1,281 @@
+/**
+ * Styles pour le bloc "Nouveaux Pokémon - Lignées d'évolution"
+ */
+
+.pokehub-new-pokemon-evolutions-block-wrapper {
+    margin: 2rem 0;
+}
+
+.pokehub-new-pokemon-evolutions-block-wrapper .pokehub-block-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+    color: #333;
+}
+
+.pokehub-evolution-line {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    position: relative;
+}
+
+.pokehub-evolution-pokemon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+
+.pokehub-evolution-pokemon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pokehub-evolution-pokemon-image {
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.pokehub-evolution-pokemon-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.pokehub-evolution-pokemon-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+    color: #333;
+    word-break: break-word;
+}
+
+.pokehub-evolution-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    color: #666;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.pokehub-evolution-arrow svg {
+    width: 40px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.pokehub-evolution-conditions {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    text-align: center;
+    color: #555;
+    max-width: 150px;
+    line-height: 1.3;
+    padding: 0.25rem 0.5rem;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pokehub-evolution-line {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .pokehub-evolution-arrow {
+        transform: rotate(90deg);
+        margin: 0.5rem 0;
+    }
+    
+    .pokehub-evolution-arrow svg {
+        width: 20px;
+        height: 40px;
+    }
+    
+    .pokehub-evolution-conditions {
+        transform: rotate(-90deg);
+        max-width: 200px;
+    }
+}
+
+/* Style pour les nœuds d'évolution */
+.pokehub-evolution-node {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* Si le nœud a des branches, on garde la ligne horizontale mais on prépare l'espace pour les branches */
+.pokehub-evolution-node.has-branches {
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    flex-wrap: nowrap;
+    width: 100%;
+}
+
+/* Style pour les branches d'évolution (si plusieurs évolutions depuis un même Pokémon) */
+.pokehub-evolution-branches {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2rem;
+    position: relative;
+    margin-left: 0;
+    margin-top: 0;
+    padding-top: 3rem;
+    padding-left: 0;
+    width: 100%;
+    min-height: 250px;
+}
+
+/* Ligne verticale qui descend depuis le Pokémon de base (centrée) */
+.pokehub-evolution-branches::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 2.5rem;
+    background: #ddd;
+    z-index: 0;
+    transform: translateX(-50%);
+}
+
+.pokehub-evolution-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    position: relative;
+    flex: 0 0 auto;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
+    padding-top: 4rem;
+}
+
+/* Ligne diagonale depuis le point central vers la condition d'évolution */
+.pokehub-evolution-branch::before {
+    content: '';
+    position: absolute;
+    width: 2px;
+    background: #ddd;
+    z-index: 0;
+}
+
+/* Ligne verticale depuis la condition vers le Pokémon évolué */
+.pokehub-evolution-branch::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 2rem;
+    background: #ddd;
+    z-index: 0;
+    transform: translateX(-50%);
+}
+
+/* Flèche diagonale vers la gauche pour la première branche - part depuis le centre du conteneur */
+.pokehub-evolution-branch.branch-first::before {
+    left: calc(50% - 70px);
+    top: -4rem;
+    height: 4rem;
+    transform: rotate(-45deg);
+    transform-origin: top left;
+}
+
+/* Flèche diagonale vers la droite pour la dernière branche - part depuis le centre du conteneur */
+.pokehub-evolution-branch.branch-last::before {
+    left: calc(50% + 70px);
+    top: -4rem;
+    height: 4rem;
+    transform: rotate(45deg);
+    transform-origin: top right;
+}
+
+/* Flèche horizontale pour les branches du milieu */
+.pokehub-evolution-branch.branch-middle::before {
+    left: 50%;
+    top: -3.5rem;
+    height: 3.5rem;
+    transform: translateX(-50%);
+}
+
+/* Conditions d'évolution pour les branches - positionnées au bout de la ligne diagonale */
+.pokehub-evolution-branch-conditions {
+    position: absolute;
+    left: 50%;
+    top: -1.5rem;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 100px;
+    font-size: 0.75rem;
+    text-align: center;
+    color: #555;
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    z-index: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Ajuster la position des conditions selon la branche - au bout de la ligne diagonale */
+.pokehub-evolution-branch.branch-first .pokehub-evolution-branch-conditions {
+    left: 0;
+    top: -1.5rem;
+    transform: translateX(-50%);
+}
+
+.pokehub-evolution-branch.branch-last .pokehub-evolution-branch-conditions {
+    left: 100%;
+    top: -1.5rem;
+    transform: translateX(-50%);
+}
+
+/* Flèche SVG pour les branches (remplace les lignes CSS) */
+.pokehub-evolution-branch .pokehub-evolution-arrow {
+    position: relative;
+    margin-top: 0.5rem;
+}
+
+.pokehub-evolution-branch .pokehub-evolution-arrow svg {
+    transform: rotate(0deg);
+}
+

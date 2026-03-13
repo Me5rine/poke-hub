@@ -25,11 +25,17 @@ function poke_hub_render_friend_codes_list($args = []) {
         ],
         'paged' => 1,
         'teams' => [],
+        'scatterbug_patterns' => [],
         'context' => 'friend_codes',
         'empty_message' => __('No friend code found. Be the first to add one!', 'poke-hub'),
     ];
     
     $args = wp_parse_args($args, $defaults);
+    
+    // Get scatterbug patterns if not provided
+    if (empty($args['scatterbug_patterns']) && function_exists('poke_hub_get_scatterbug_patterns')) {
+        $args['scatterbug_patterns'] = poke_hub_get_scatterbug_patterns();
+    }
     
     $dashboard_class = $args['context'] === 'vivillon' ? 'vivillon-dashboard' : 'friend-codes-dashboard';
     $list_class = $args['context'] === 'vivillon' ? 'user-profiles-vivillon-codes-list' : 'user-profiles-friend-codes-list';
@@ -90,7 +96,13 @@ function poke_hub_render_friend_codes_list($args = []) {
                                 <?php if (!empty($code['scatterbug_pattern'])) : ?>
                                     <span class="user-profiles-friend-code-meta-item">
                                         <strong><?php echo $args['context'] === 'vivillon' ? esc_html__('Pattern:', 'poke-hub') : esc_html__('Scatterbug Pattern:', 'poke-hub'); ?></strong>
-                                        <?php echo esc_html($code['scatterbug_pattern']); ?>
+                                        <?php 
+                                        $pattern_slug = $code['scatterbug_pattern'];
+                                        $pattern_label = isset($args['scatterbug_patterns'][$pattern_slug]) 
+                                            ? $args['scatterbug_patterns'][$pattern_slug] 
+                                            : $pattern_slug;
+                                        echo esc_html($pattern_label); 
+                                        ?>
                                     </span>
                                 <?php endif; ?>
                                 

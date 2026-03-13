@@ -3,6 +3,19 @@
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Liste des slugs de modules enregistrés (synchro avec settings-modules.php).
+ * Utilisé pour l’admin et la cohérence avec les réglages (General).
+ *
+ * @return array<int,string>
+ */
+function poke_hub_registered_module_slugs(): array {
+    if (!function_exists('poke_hub_get_modules_registry')) {
+        return ['events', 'bonus', 'pokemon', 'user-profiles', 'games', 'eggs', 'blocks', 'collections'];
+    }
+    return array_keys(poke_hub_get_modules_registry());
+}
+
 function poke_hub_dashboard_page() {
     if (!current_user_can('manage_options')) {
         return;

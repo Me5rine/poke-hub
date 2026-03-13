@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/collection-challenges",
+	"title": "Défis de Collection",
+	"category": "pokehub",
+	"icon": "awards",
+	"description": "Affiche les défis de collection avec liste de Pokémon à capturer, éclore, évoluer, etc.",
+	"keywords": ["collection", "challenge", "défi", "collection", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
+

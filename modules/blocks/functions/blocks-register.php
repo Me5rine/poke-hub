@@ -6,103 +6,110 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Enregistre tous les blocs Gutenberg du module Blocks
+ * Enregistre tous les blocs Poké HUB
  */
 function pokehub_blocks_register_all() {
-    // Vérifier que Gutenberg est disponible
-    if (!function_exists('register_block_type')) {
-        return;
-    }
-
-    // Liste des blocs à enregistrer
     $blocks = [
         'event-dates' => [
-            'path' => POKE_HUB_BLOCKS_PATH . '/blocks/event-dates',
-            'requires' => ['events'], // Nécessite le module events
-            'has_js' => false, // Bloc PHP dynamique uniquement
+            'requires' => ['events'],
         ],
-        'bonus' => [
-            'path' => POKE_HUB_BLOCKS_PATH . '/blocks/bonus',
-            'requires' => ['bonus'], // Nécessite le module bonus
-            'has_js' => false, // Bloc PHP dynamique uniquement
+        'wild-pokemon' => [
+            'requires' => ['pokemon', 'events'],
         ],
         'event-quests' => [
-            'path' => POKE_HUB_BLOCKS_PATH . '/blocks/event-quests',
-            'requires' => ['events'], // Nécessite le module events
-            'has_js' => false, // Bloc PHP dynamique uniquement
+            'requires' => ['events'],
         ],
-        // Exemples de futurs blocs :
-        // 'pokemon' => [
-        //     'path' => POKE_HUB_BLOCKS_PATH . '/blocks/pokemon',
-        //     'requires' => ['pokemon'],
-        //     'has_js' => true, // Bloc avec JavaScript/React
-        // ],
-        // 'shiny' => [
-        //     'path' => POKE_HUB_BLOCKS_PATH . '/blocks/shiny',
-        //     'requires' => ['pokemon'],
-        //     'has_js' => true,
-        // ],
+        'bonus' => [
+            'requires' => ['bonus'],
+        ],
+        'habitats' => [
+            'requires' => ['events', 'pokemon'],
+        ],
+        'new-pokemon-evolutions' => [
+            'requires' => ['pokemon'],
+        ],
+        'collection-challenges' => [
+            'requires' => ['pokemon', 'events'],
+        ],
+        'special-research' => [
+            'requires' => ['pokemon', 'events'],
+        ],
+        'eggs' => [
+            'requires' => ['pokemon', 'eggs'],
+        ],
     ];
-
-    foreach ($blocks as $block_slug => $block_config) {
-        // Vérifier les dépendances
-        $can_register = true;
-        if (!empty($block_config['requires'])) {
-            foreach ($block_config['requires'] as $required_module) {
-                if (!poke_hub_is_module_active($required_module)) {
-                    $can_register = false;
-                    break;
-                }
+    
+    foreach ($blocks as $block_name => $config) {
+        // Vérifier que les modules requis sont actifs
+        $requires = $config['requires'] ?? [];
+        $all_active = true;
+        
+        foreach ($requires as $module) {
+            if (!poke_hub_is_module_active($module)) {
+                $all_active = false;
+                break;
             }
         }
-
-        if (!$can_register) {
+        
+        if (!$all_active) {
             continue;
         }
-
-        // Enregistrer le bloc depuis block.json
-        $block_path = $block_config['path'];
-        if (file_exists($block_path . '/block.json')) {
-            // Enregistrer le bloc - WordPress charge automatiquement les assets depuis block.json
-            $result = register_block_type($block_path);
+        
+        // Enregistrer le bloc avec protection du callback de rendu
+        $block_path = POKE_HUB_BLOCKS_PATH . '/blocks/' . $block_name;
+        $block_json = $block_path . '/block.json';
+        
+        if (file_exists($block_json)) {
+            $block_json_data = json_decode(file_get_contents($block_json), true);
             
-            // Enregistrer manuellement les scripts JavaScript si nécessaire
-            // WordPress devrait les charger automatiquement, mais on s'assure qu'ils sont bien enregistrés
-            $block_json = json_decode(file_get_contents($block_path . '/block.json'), true);
-            
-            if ($result && isset($block_json['editorScript'])) {
-                $js_file = str_replace('file:./', '', $block_json['editorScript']);
-                $js_path = $block_path . '/' . $js_file;
-                $js_url = POKE_HUB_BLOCKS_URL . 'blocks/' . $block_slug . '/' . $js_file;
-                
-                if (file_exists($js_path)) {
-                    // Enregistrer le script pour l'éditeur
-                    $script_handle = 'pokehub-' . $block_slug . '-block-editor';
-                    wp_register_script(
-                        $script_handle,
-                        $js_url,
-                        ['wp-blocks', 'wp-element', 'wp-i18n'],
-                        POKE_HUB_VERSION,
-                        true
-                    );
-                    
-                    // S'assurer que le script est chargé dans l'éditeur
-                    add_action('enqueue_block_editor_assets', function() use ($script_handle) {
-                        wp_enqueue_script($script_handle);
-                    });
+            if (!$block_json_data) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Poké HUB: Erreur de parsing JSON pour le bloc ' . $block_name . ' dans: ' . $block_json);
                 }
+                continue;
             }
             
-            // Debug : vérifier que le bloc est bien enregistré
-            if (WP_DEBUG && !$result) {
-                error_log('Poké HUB: Échec de l\'enregistrement du bloc ' . $block_slug . ' depuis: ' . $block_path);
+            $render_file = $block_path . '/render.php';
+            
+            // Créer un render_callback qui inclut le fichier render.php
+            $render_callback = null;
+            if (file_exists($render_file)) {
+                $render_callback = function($attributes, $content, $block) use ($render_file) {
+                    if (!file_exists($render_file)) {
+                        return '';
+                    }
+                    
+                    // Capturer le output du fichier render.php
+                    ob_start();
+                    $result = include $render_file;
+                    $output = ob_get_clean();
+                    
+                    // Si le fichier retourne une string, l'utiliser. Sinon, utiliser le buffer.
+                    if (is_string($result) && !empty($result)) {
+                        $output = $result;
+                    }
+                    
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('[POKEHUB] render_callback: retour capturé, longueur=' . strlen($output));
+                    }
+                    
+                    return $output;
+                };
             }
-        } else {
-            if (WP_DEBUG) {
-                error_log('Poké HUB: block.json non trouvé pour le bloc ' . $block_slug . ' dans: ' . $block_path);
+            
+            // Préparer les arguments pour register_block_type
+            $args = $block_json_data;
+            if ($render_callback) {
+                $args['render_callback'] = $render_callback;
+                // Retirer 'render' du block.json si présent pour éviter les conflits
+                unset($args['render']);
+            }
+            
+            $result = register_block_type($block_path, $args);
+            
+            if (defined('WP_DEBUG') && WP_DEBUG && !$result) {
+                error_log('Poké HUB: Échec de l\'enregistrement du bloc ' . $block_name . ' depuis: ' . $block_path);
             }
         }
     }
 }
-add_action('init', 'pokehub_blocks_register_all');
-

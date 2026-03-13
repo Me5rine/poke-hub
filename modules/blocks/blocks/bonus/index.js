@@ -14,15 +14,19 @@
 
     var registerBlockType = wp.blocks.registerBlockType;
     var __ = wp.i18n.__;
+    var el = wp.element.createElement;
+    var useBlockProps = wp.blockEditor && wp.blockEditor.useBlockProps;
 
     // Enregistrer le bloc (le rendu est géré par render.php)
     registerBlockType('pokehub/bonus', {
         edit: function() {
-            return wp.element.createElement(
+            var props = useBlockProps ? useBlockProps({ className: 'pokehub-block-placeholder' }) : { className: 'pokehub-block-placeholder' };
+
+            return el(
                 'div',
-                { className: 'pokehub-block-placeholder' },
-                wp.element.createElement('p', {}, __('Bonus', 'poke-hub')),
-                wp.element.createElement('small', {}, __('Ce bloc affiche automatiquement les bonus de l\'événement.', 'poke-hub'))
+                props,
+                el('p', {}, __('Bonus', 'poke-hub')),
+                el('small', {}, __('This block automatically displays the event bonuses.', 'poke-hub'))
             );
         },
         save: function() {
@@ -31,6 +35,8 @@
         }
     });
 })();
+
+
 
 
 
