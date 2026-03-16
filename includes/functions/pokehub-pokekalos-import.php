@@ -9,6 +9,8 @@ if (!defined('ABSPATH')) {
  * Lance l'import des dates de sortie Pokekalos (utilisable en CLI ou depuis l'admin).
  *
  * @param array $options  dry_run (bool), limit (int, 0 = toutes), delay (int), skip_existing (bool).
+ *                        skip_existing = true : ne traiter que les Pokémon sans aucune date de sortie (les X premiers dans l'ordre BDD).
+ *                        skip_existing = false : traiter les X premiers dans l'ordre BDD.
  * @return array  [ 'log' => string[], 'updated' => int, 'skipped' => int, 'errors' => int, 'species_count' => int ]
  */
 function poke_hub_run_pokekalos_import(array $options = []): array {
@@ -21,6 +23,11 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
     if ($delay < 0) {
         $delay = 1;
     }
+
+    // Condition SQL : n'a pas de date de sortie de base (release.normal vide). Méga / shiny / etc. peuvent être renseignés.
+    $no_release_sql = " AND ( p.extra IS NULL OR p.extra = '' OR p.extra = '{}'"
+        . " OR JSON_EXTRACT(p.extra, '$.release') IS NULL"
+        . " OR COALESCE(TRIM(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.normal'))), '') = '' )";
 
     $log     = [];
     $updated = 0;
@@ -47,13 +54,47 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                 WHERE name_fr IS NOT NULL AND TRIM(name_fr) != '' AND is_default = 1
                 GROUP BY dex_number
             ) sub ON p.dex_number = sub.dex_number AND p.id = sub.first_id
-            WHERE p.name_fr IS NOT NULL AND TRIM(p.name_fr) != '' AND p.is_default = 1
-            ORDER BY p.dex_number ASC";
-    if ($limit > 0) {
-        $sql .= $wpdb->prepare(" LIMIT %d", $limit);
+            WHERE p.name_fr IS NOT NULL AND TRIM(p.name_fr) != '' AND p.is_default = 1";
+    if ($skip_existing) {
+        $sql .= $no_release_sql;
     }
+    $sql .= " ORDER BY p.dex_number ASC";
     $species = $wpdb->get_results($sql);
-    if (empty($species)) {
+
+    $variants_table = pokehub_get_table('pokemon_form_variants');
+    $mega_forms = [];
+    if ($variants_table) {
+        $sql_mega = "SELECT p.id, p.dex_number, p.name_fr, p.extra
+                FROM {$pokemon_table} p
+                INNER JOIN {$variants_table} fv ON p.form_variant_id = fv.id
+                WHERE p.is_default = 0 AND fv.category = 'mega'
+                  AND p.name_fr IS NOT NULL AND TRIM(p.name_fr) != ''";
+        if ($skip_existing) {
+            $sql_mega .= $no_release_sql;
+        }
+        $sql_mega .= " ORDER BY p.dex_number ASC";
+        $mega_forms = $wpdb->get_results($sql_mega);
+    }
+
+    // Une seule liste ordonnée : par dex_number, base avant méga pour un même dex. La limite s'applique sur ce total.
+    $tasks = [];
+    foreach ($species as $row) {
+        $tasks[] = ['type' => 'base', 'dex' => (int) $row->dex_number, 'row' => $row];
+    }
+    foreach ($mega_forms as $row) {
+        $tasks[] = ['type' => 'mega', 'dex' => (int) $row->dex_number, 'row' => $row];
+    }
+    usort($tasks, function ($a, $b) {
+        if ($a['dex'] !== $b['dex']) {
+            return $a['dex'] - $b['dex'];
+        }
+        return ($a['type'] === 'base' ? 0 : 1) - ($b['type'] === 'base' ? 0 : 1);
+    });
+    if ($limit > 0) {
+        $tasks = array_slice($tasks, 0, $limit);
+    }
+
+    if (empty($tasks)) {
         $log[] = 'Aucun Pokémon avec nom français trouvé.';
         return ['log' => $log, 'updated' => 0, 'skipped' => 0, 'errors' => 0, 'species_count' => 0];
     }
@@ -72,12 +113,15 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         return trim($s, '-');
     };
 
-    $log[] = 'Import des dates de sortie Pokekalos (uniquement Pokémon avec nom FR) — ' . count($species) . ' espèces'
+    $log[] = 'Import des dates de sortie Pokekalos (uniquement Pokémon avec nom FR) — ' . count($tasks) . ' élément(s) (bases + méga dans l\'ordre dex)'
+        . ($limit > 0 ? ' (limite ' . $limit . ')' : '')
         . ($dry_run ? ' [DRY RUN]' : '')
-        . ($skip_existing ? ' — ne pas écraser les existants' : '');
+        . ($skip_existing ? ' — uniquement ceux sans date de sortie' : '');
     $log[] = '';
 
-    foreach ($species as $row) {
+    foreach ($tasks as $task) {
+        $row = $task['row'];
+        if ($task['type'] === 'base') {
         $dex_number = (int) $row->dex_number;
         $name_fr    = trim($row->name_fr ?? '');
         $url_slug   = $fr_to_slug($name_fr);
@@ -201,26 +245,9 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         if ($delay > 0) {
             sleep($delay);
         }
-    }
-
-    // ----- Formes Méga : fiches dédiées sur Pokekalos (ex. mega-roucarnage-18m.html) -----
-    $variants_table = pokehub_get_table('pokemon_form_variants');
-    if ($variants_table) {
-        $sql_mega = "SELECT p.id, p.dex_number, p.name_fr, p.extra
-                FROM {$pokemon_table} p
-                INNER JOIN {$variants_table} fv ON p.form_variant_id = fv.id
-                WHERE p.is_default = 0 AND fv.category = 'mega'
-                  AND p.name_fr IS NOT NULL AND TRIM(p.name_fr) != ''
-                ORDER BY p.dex_number ASC";
-        if ($limit > 0) {
-            $sql_mega .= $wpdb->prepare(" LIMIT %d", $limit);
-        }
-        $mega_forms = $wpdb->get_results($sql_mega);
-        if (!empty($mega_forms)) {
-            $log[] = '';
-            $log[] = '--- Formes Méga (fiches dédiées Pokekalos, ex. mega-roucarnage-18m) ---';
-            foreach ($mega_forms as $row) {
-                $pokemon_id = (int) $row->id;
+        } else {
+            // Méga : fiche dédiée Pokekalos (ex. mega-roucarnage-18m.html)
+            $pokemon_id = (int) $row->id;
                 $dex_number = (int) $row->dex_number;
                 $name_fr    = trim($row->name_fr ?? '');
                 $url_slug   = $fr_to_slug($name_fr);
@@ -301,16 +328,50 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                     $wpdb->update($pokemon_table, ['extra' => $extra_json], ['id' => $pokemon_id], ['%s'], ['%d']);
                 }
                 $updated++;
+
+                // Reporter la date méga sur le(s) Pokémon de base (même dex_number) dans release.mega
+                $mega_date = trim((string) ($new_release['mega'] ?? ''));
+                if ($mega_date === '' && trim((string) ($new_release['normal'] ?? '')) !== '') {
+                    $mega_date = trim($new_release['normal']);
+                }
+                if ($mega_date !== '') {
+                    $base_forms = $wpdb->get_results($wpdb->prepare(
+                        "SELECT id, extra FROM {$pokemon_table} WHERE dex_number = %d AND is_default = 1",
+                        $dex_number
+                    ), OBJECT_K);
+                    foreach ($base_forms as $base_id => $base_row) {
+                        $base_extra = json_decode($base_row->extra ?? '{}', true);
+                        if (!is_array($base_extra)) {
+                            $base_extra = [];
+                        }
+                        $base_release = isset($base_extra['release']) && is_array($base_extra['release'])
+                            ? $base_extra['release']
+                            : [];
+                        if ($skip_existing && trim((string) ($base_release['mega'] ?? '')) !== '') {
+                            continue;
+                        }
+                        $base_release = array_merge([
+                            'normal' => '', 'shiny' => '', 'shadow' => '', 'mega' => '', 'dynamax' => '', 'gigantamax' => '',
+                        ], $base_release);
+                        $base_release['mega'] = $mega_date;
+                        $base_extra['release'] = $base_release;
+                        $base_extra_json = wp_json_encode($base_extra, JSON_UNESCAPED_UNICODE);
+                        if (!$dry_run) {
+                            $wpdb->update($pokemon_table, ['extra' => $base_extra_json], ['id' => $base_id], ['%s'], ['%d']);
+                        }
+                        $updated++;
+                    }
+                }
+
                 $summary = [];
                 foreach ($release as $k => $v) {
                     if ($v !== '') {
                         $summary[] = $k . '=' . substr($v, 0, 20) . (strlen($v) > 20 ? '…' : '');
                     }
                 }
-                $log[] = "  [OK] méga {$url_slug}-{$dex_number}m : " . implode(', ', $summary);
-                if ($delay > 0) {
-                    sleep($delay);
-                }
+            $log[] = "  [OK] méga {$url_slug}-{$dex_number}m : " . implode(', ', $summary);
+            if ($delay > 0) {
+                sleep($delay);
             }
         }
     }
@@ -326,6 +387,6 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         'updated'       => $updated,
         'skipped'       => $skipped,
         'errors'        => $errors,
-        'species_count' => count($species),
+        'species_count' => count($tasks),
     ];
 }

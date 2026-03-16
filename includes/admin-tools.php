@@ -72,19 +72,20 @@ function poke_hub_admin_tools_page() {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="poke_hub_pokekalos_limit"><?php esc_html_e('Nombre à traiter', 'poke-hub'); ?></label></th>
+                        <td>
+                            <input type="number" name="poke_hub_pokekalos_limit" id="poke_hub_pokekalos_limit" value="0" min="0" step="1" class="small-text" />
+                            <span class="description"><?php esc_html_e('0 = tous. Sinon : les X premiers dans l\'ordre de la base (avec nom français).', 'poke-hub'); ?></span>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><?php esc_html_e('Ignorer les existants', 'poke-hub'); ?></th>
                         <td>
                             <label>
                                 <input type="checkbox" name="poke_hub_pokekalos_skip_existing" value="1" />
-                                <?php esc_html_e('Ne pas écraser les dates déjà renseignées (remplir uniquement les champs vides)', 'poke-hub'); ?>
+                                <?php esc_html_e('Uniquement les Pokémon sans aucune date de sortie', 'poke-hub'); ?>
                             </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="poke_hub_pokekalos_limit"><?php esc_html_e('Limite espèces', 'poke-hub'); ?></label></th>
-                        <td>
-                            <input type="number" name="poke_hub_pokekalos_limit" id="poke_hub_pokekalos_limit" value="0" min="0" step="1" class="small-text" />
-                            <span class="description"><?php esc_html_e('0 = toutes. Si &gt; 0 : traite uniquement les N premières espèces qui n’ont pas encore de dates (par numéro de dex).', 'poke-hub'); ?></span>
+                            <span class="description"><?php esc_html_e('Si coché : ne traiter que les X premiers qui n\'ont pas de date de sortie (ordre BDD). Sinon : les X premiers tous confondus.', 'poke-hub'); ?></span>
                         </td>
                     </tr>
                     <tr>

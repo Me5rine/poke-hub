@@ -5,7 +5,7 @@
  * Non automatique : à lancer manuellement. Ne traite que les Pokémon avec nom français.
  *
  * Usage :
- *   php scripts/import-pokekalos-release-dates.php [--dry-run] [--limit=N] [--delay=N]
+ *   php scripts/import-pokekalos-release-dates.php [--dry-run] [--limit=N] [--delay=N] [--skip-existing]
  */
 
 $script_dir = __DIR__;
