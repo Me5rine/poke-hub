@@ -37,6 +37,13 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`../CSS_SYSTEM.md`** → Documentation du système de classes génériques `me5rine-lab-form-*`
 - **`../PLUGIN_INTEGRATION.md`** → Guide pour utiliser les classes CSS dans d'autres plugins
 
+## Réglages
+
+Les réglages liés au module User Profiles se trouvent dans **Poké HUB > Settings** :
+
+- **General** : option « User Profiles Settings » pour la création automatique des pages (friend-codes, vivillon).
+- **Sources** (onglet Sources) : la section **User Profiles Source** n’apparaît **que si le module User Profiles est actif**. Elle permet de définir l’**URL de base des liens vers les profils** (« Base URL for profile links »). Utile lorsque plusieurs sites partagent la même base de données et les mêmes utilisateurs : on indique l’URL du site où les profils sont affichés (ex. site principal) pour que les liens générés (codes amis, Vivillon, onglet Ultimate Member) pointent vers ce site. Si le champ est vide, l’URL du site actuel est utilisée.
+
 ## 🚀 Démarrage Rapide
 
 1. **CSS** : Copier le contenu de `../CSS_RULES.md` (à la racine de `docs/`) dans votre thème

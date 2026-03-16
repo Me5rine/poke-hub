@@ -1,6 +1,8 @@
 <?php
 /**
  * Rendu du bloc "Bonus"
+ * Fonctionne en local et en remote selon le préfixe des sources Pokémon.
+ * Les helpers sont chargés ici si le module Bonus n'est pas activé.
  *
  * @var array    $attributes Les attributs du bloc.
  * @var string   $content    Le contenu HTML du bloc.
@@ -11,9 +13,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Debug : vérifier si le render est appelé
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] bonus render.php appelé');
+// Charger les helpers bonus si le module Bonus n'est pas actif (bloc utilisable sans le module)
+if (!function_exists('pokehub_render_bonuses_visual')) {
+    $bonus_helpers = defined('POKE_HUB_PATH') ? POKE_HUB_PATH . 'modules/bonus/functions/bonus-helpers.php' : '';
+    if ($bonus_helpers && file_exists($bonus_helpers)) {
+        require_once $bonus_helpers;
+    }
 }
 
 // Récupération robuste du post_id (compatible Elementor et autres contextes)
@@ -47,11 +52,8 @@ $auto_detect = $attributes['autoDetect'] ?? true;
 $layout = $attributes['layout'] ?? 'cards';
 $bonus_ids = $attributes['bonusIds'] ?? [];
 
-// Vérifier que les fonctions sont disponibles
+// Vérifier que les fonctions sont disponibles (table bonus locale ou distante selon préfixe)
 if (!function_exists('pokehub_get_bonuses_for_post') || !function_exists('pokehub_get_bonus_data') || !function_exists('pokehub_render_bonuses_visual')) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] bonus: Fonctions non disponibles - get_bonuses=' . (int) function_exists('pokehub_get_bonuses_for_post') . ', get_data=' . (int) function_exists('pokehub_get_bonus_data') . ', render=' . (int) function_exists('pokehub_render_bonuses_visual'));
-    }
     return '';
 }
 
@@ -74,9 +76,6 @@ if ($auto_detect) {
 }
 
 if (empty($bonuses)) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] bonus: Aucun bonus trouvé pour post_id=' . $post_id . ' (auto_detect=' . ($auto_detect ? '1' : '0') . ')');
-    }
     return '';
 }
 
@@ -84,9 +83,6 @@ if (empty($bonuses)) {
 $bonuses_html = pokehub_render_bonuses_visual($bonuses, $layout);
 
 if (empty($bonuses_html)) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] bonus: HTML vide pour post_id=' . $post_id);
-    }
     return '';
 }
 
@@ -98,10 +94,6 @@ $output = '<div ' . $wrapper_attributes . '>';
 $output .= '<h2 class="pokehub-block-title">' . esc_html__('Bonus', 'poke-hub') . '</h2>';
 $output .= $bonuses_html;
 $output .= '</div>';
-
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] bonus: HTML généré, longueur=' . strlen($output) . ' pour post_id=' . $post_id);
-}
 
 return $output;
 

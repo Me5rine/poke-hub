@@ -25,8 +25,6 @@ function poke_hub_pokemon_get_section_label($section) {
             return __('Attacks', 'poke-hub');
         case 'forms':
             return __('Form variants', 'poke-hub');
-        case 'form_mappings':
-            return __('Form mappings', 'poke-hub');
         case 'weathers':
             return __('Weathers', 'poke-hub');
         case 'egg_types':
@@ -52,7 +50,6 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regions.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/types.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/moves.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/forms.php';
-require_once POKE_HUB_POKEMON_PATH . '/admin/sections/form-mappings.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/weathers.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/egg-types.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
@@ -126,11 +123,6 @@ function poke_hub_pokemon_manage_columns($columns) {
 
     if ($current_section === 'forms' && class_exists('Poke_Hub_Pokemon_Form_Variants_List_Table')) {
         $table   = new Poke_Hub_Pokemon_Form_Variants_List_Table();
-        $columns = $table->get_columns();
-    }
-
-    if ($current_section === 'form_mappings' && class_exists('Poke_Hub_Pokemon_Form_Mappings_List_Table')) {
-        $table   = new Poke_Hub_Pokemon_Form_Mappings_List_Table();
         $columns = $table->get_columns();
     }
 
@@ -466,27 +458,6 @@ function poke_hub_pokemon_admin_ui() {
                 }
                 break;
 
-            case 'form_mappings':
-                global $wpdb;
-                $edit_row = null;
-
-                if ($action === 'edit' && !empty($_GET['id'])) {
-                    $id    = (int) $_GET['id'];
-                    $table = pokehub_get_table('pokemon_form_mappings');
-                    if ($table) {
-                        $edit_row = $wpdb->get_row(
-                            $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $id)
-                        );
-                    }
-                }
-
-                if (function_exists('poke_hub_pokemon_form_mappings_edit_form')) {
-                    poke_hub_pokemon_form_mappings_edit_form($edit_row);
-                } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_form_mappings_edit_form()</h1></div>';
-                }
-                break;
-
             case 'weathers':
                 global $wpdb;
                 $edit_row = null;
@@ -694,20 +665,6 @@ function poke_hub_pokemon_admin_ui() {
             ];
             break;
 
-        case 'form_mappings':
-            $add_button = [
-                'label' => __('Add mapping', 'poke-hub'),
-                'url'   => add_query_arg(
-                    [
-                        'page'       => 'poke-hub-pokemon',
-                        'ph_section' => 'form_mappings',
-                        'action'     => 'add',
-                    ],
-                    admin_url('admin.php')
-                ),
-            ];
-            break;
-
         case 'weathers':
             $add_button = [
                 'label' => __('Add weather', 'poke-hub'),
@@ -792,7 +749,6 @@ function poke_hub_pokemon_admin_ui() {
         'types'         => __('Types', 'poke-hub'),
         'moves'         => __('Attacks', 'poke-hub'),
         'forms'         => __('Form variants', 'poke-hub'),
-        'form_mappings' => __('Form mappings', 'poke-hub'),
         'weathers'      => __('Weathers', 'poke-hub'),
         'egg_types'     => __('Egg types', 'poke-hub'),
         'items'         => __('Items', 'poke-hub'),
@@ -889,14 +845,6 @@ function poke_hub_pokemon_admin_ui() {
                         poke_hub_pokemon_admin_forms_screen();
                     } else {
                         echo '<p>Form variants screen not implemented yet.</p>';
-                    }
-                    break;
-
-                case 'form_mappings':
-                    if (function_exists('poke_hub_pokemon_admin_form_mappings_screen')) {
-                        poke_hub_pokemon_admin_form_mappings_screen();
-                    } else {
-                        echo '<p>Form mappings screen not implemented yet.</p>';
                     }
                     break;
 

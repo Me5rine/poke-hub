@@ -11,34 +11,41 @@ Index de la documentation du module Blocs et liste des blocs disponibles.
 | **[BLOCK_TYPES.md](./BLOCK_TYPES.md)** | Types de blocs (PHP dynamique vs JavaScript/React) |
 | **[QUICK_START.md](./QUICK_START.md)** | Créer un nouveau bloc (PHP ou JS) |
 
-Voir aussi à la racine de `docs/` :
+Voir aussi :
+- **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)** — Bonus : source de vérité (site principal), bloc et metabox (module Blocks uniquement)
+- **[quests/README.md](../quests/README.md)** — Module Quêtes : menu Quêtes, gestion des ensembles et catégories (indépendant d’Events)
+
+À la racine de `docs/` :
 - **[CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md)** — Utilisation des blocs (attributs, exemples, CSS)
 - **[BLOCKS_TROUBLESHOOTING.md](../BLOCKS_TROUBLESHOOTING.md)** — Dépannage
 - **[BLOCKS_MODULE_MIGRATION.md](../BLOCKS_MODULE_MIGRATION.md)** — Migration depuis l’ancien système
 
 ## 📋 Liste des blocs
 
-Tous les blocs sont dans la catégorie **Poké HUB** dans l’éditeur. Ils ne sont enregistrés que si les modules requis sont actifs.
+Tous les blocs sont dans la catégorie **Poké HUB** dans l’éditeur. Ils sont enregistrés dès que les modules indiqués dans `requires` sont actifs. La sauvegarde et la lecture se font dans les tables de contenu (scope `content_source`) : **même préfixe** que les tables Pokémon (Réglages > Sources > Pokémon table prefix (remote)) — une seule base pour les Pokémon et tous les contenus (quêtes, bonus, habitats, œufs, etc.).
 
 | Bloc | Nom (éditeur) | Modules requis | Description |
 |------|----------------|----------------|-------------|
-| `pokehub/event-dates` | Dates d'événement | events | Dates de début/fin avec feux verts/rouges |
-| `pokehub/event-quests` | Quêtes d'événement | events | Quêtes et récompenses de l’événement |
-| `pokehub/bonus` | Bonus | bonus | Cartes de bonus (auto ou liste d’IDs) |
-| `pokehub/wild-pokemon` | Pokémon Sauvages | pokemon, events | Liste des Pokémon dans la nature (shiny, rare, régional) |
-| `pokehub/habitats` | Habitats | events, pokemon | Habitats avec Pokémon et horaires |
-| `pokehub/new-pokemon-evolutions` | Nouveaux Pokémon - Lignées d'évolution | pokemon | Lignées d’évolution et conditions |
-| `pokehub/collection-challenges` | Défis de Collection | pokemon, events | Défis de collection (post meta) |
-| `pokehub/special-research` | Études Spéciales | pokemon, events | Études ponctuelles / spéciales / magistrales |
+| `pokehub/event-dates` | Event Dates | events | Dates de début/fin avec feux verts/rouges |
+| `pokehub/event-quests` | Event Quests | events | Quêtes et récompenses du post. Gestion des données : **Poké HUB → Quêtes** (module Quêtes) ou metabox sur l’article (Events). Le bloc ne dépend pas du module Quêtes. |
+| `pokehub/bonus` | Bonus | **Aucun** | Cartes de bonus (auto ou liste d’IDs). Tout (helpers + metabox) est chargé par le module Blocks ; aucune dépendance au module Bonus. Types de bonus : site principal (local ou distant selon préfixe Pokémon). |
+| `pokehub/wild-pokemon` | Wild Pokémon | events | Liste des Pokémon dans la nature (shiny, rare, régional) |
+| `pokehub/habitats` | Habitats | events | Habitats avec Pokémon et horaires |
+| `pokehub/new-pokemon-evolutions` | New Pokémon - Evolution Lines | events | Lignées d’évolution et conditions |
+| `pokehub/collection-challenges` | Collection Challenges | events | Défis de collection (tables de contenu) |
+| `pokehub/special-research` | Special Research | events | Études ponctuelles / spéciales / magistrales |
+| `pokehub/eggs` | Pokémon Eggs | events | Œufs par type (2 km, 5 km, etc.) et Pokémon ; post ou pool global |
 
 ## 🎯 Dépendances
 
-L’enregistrement est géré dans `modules/blocks/functions/blocks-register.php` : chaque bloc déclare un tableau `requires` (modules qui doivent être actifs). Si un module est désactivé, le bloc n’apparaît pas dans l’éditeur.
+L’enregistrement est géré dans `modules/blocks/functions/blocks-register.php` : chaque bloc déclare un tableau `requires` (souvent uniquement `events`). Si un module requis est désactivé, le bloc n’apparaît pas dans l’éditeur. Les données sont stockées dans les tables de contenu (même préfixe que les tables Pokémon — Réglages > Sources), ce qui permet d’utiliser les blocs en mode remote sans activer le module Pokémon.
 
 ## 🔗 Où est le code ?
 
 - **Définition des blocs** : `modules/blocks/blocks/{nom-du-bloc}/` (block.json, index.js, render.php)
 - **Rendu / données** : selon le bloc — events, bonus, pokemon, ou helpers dans `modules/blocks/functions/`
-- **Meta boxes** (défis de collection, études spéciales) : `modules/blocks/admin/`
+- **Meta boxes** : `modules/blocks/admin/` (Collection Challenges, Études spéciales). La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif.
+
+Pour la source de vérité des types de bonus (site principal, local/distant), voir **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)**.
 
 Pour le détail des attributs et exemples d’utilisation, voir **[CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md)**.

@@ -2,6 +2,8 @@
 
 Ce système permet d'automatiser l'affichage des dates d'événements et des bonus dans les articles Poké HUB avec un rendu visuel moderne.
 
+**Note :** Les titres des blocs dans l'éditeur (et dans cette doc) sont en anglais (langue de base du plugin). Voir [TRANSLATION.md](TRANSLATION.md) pour l'internationalisation.
+
 ## 📋 Fonctionnalités
 
 ### 1. Dates d'événement avec feux verts/rouges
@@ -48,7 +50,7 @@ add_filter('pokehub_bonus_auto_post_types', function($types) {
 
 Vous pouvez insérer les blocs manuellement via la catégorie **Poké HUB** dans l’éditeur.
 
-#### Bloc "Dates d'événement" (`pokehub/event-dates`)
+#### Bloc "Event Dates" (`pokehub/event-dates`)
 
 **Attributs :**
 - `autoDetect` (boolean, défaut: `true`) : Détecte automatiquement les dates depuis les meta
@@ -57,22 +59,27 @@ Vous pouvez insérer les blocs manuellement via la catégorie **Poké HUB** dans
 
 **Exemple :** `<!--wp:pokehub/event-dates {"autoDetect":true} /-->`
 
-#### Bloc "Quêtes d'événement" (`pokehub/event-quests`)
+#### Bloc "Event Quests" (`pokehub/event-quests`)
 
-Affiche les quêtes et récompenses de l’événement (données depuis les meta du post).
+Affiche les quêtes et récompenses du contenu courant (article ou événement). Les données viennent des tables de contenu (`content_quests`, `content_quest_lines`), remplies via **Poké HUB → Quêtes** (ensemble lié à un contenu) ou via la metabox quêtes sur le post (module Events).
+
+- **Dépendance d’enregistrement :** module **Events** (le bloc ne dépend pas du module Quêtes).
+- **Gestion des quêtes :** menu **Poké HUB → Quêtes** (module Quêtes) ; la metabox sur les articles reste fournie par le module Events.
 
 **Attributs :** selon le bloc (souvent `autoDetect`). Voir l’éditeur ou le `block.json` du bloc.
 
 #### Bloc "Bonus" (`pokehub/bonus`)
 
+**Dépendance :** aucun module requis en plus du module **Blocks**. La metabox « Bonus de l’événement » et les helpers sont chargés par le module Blocks ; les types de bonus viennent du site principal (table locale ou distante selon le préfixe Pokémon). Voir [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md).
+
 **Attributs :**
-- `autoDetect` (boolean, défaut: `true`) : Détecte automatiquement les bonus depuis les meta
-- `bonusIds` (array) : Liste des IDs de bonus à afficher
+- `autoDetect` (boolean, défaut: `true`) : Détecte automatiquement les bonus depuis les données de l’article (content_bonus / content_bonus_entries)
+- `bonusIds` (array) : Liste des IDs de bonus à afficher (IDs du catalogue du site principal)
 - `layout` (string, défaut: `cards`) : Layout d'affichage (`cards` ou `list`)
 
 **Exemple :** `<!--wp:pokehub/bonus {"autoDetect":true,"layout":"cards"} /-->`
 
-#### Bloc "Pokémon Sauvages" (`pokehub/wild-pokemon`)
+#### Bloc "Wild Pokémon" (`pokehub/wild-pokemon`)
 
 Affiche la liste des Pokémon disponibles dans la nature (images, shiny, régional).
 
@@ -90,7 +97,7 @@ Affiche les habitats avec leurs Pokémon et horaires (données événement).
 **Attributs :**
 - `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
 
-#### Bloc "Nouveaux Pokémon - Lignées d'évolution" (`pokehub/new-pokemon-evolutions`)
+#### Bloc "New Pokémon - Evolution Lines" (`pokehub/new-pokemon-evolutions`)
 
 Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons, objets, etc.).
 
@@ -100,16 +107,31 @@ Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons
 
 **Styles :** `assets/css/poke-hub-new-pokemon-evolutions-front.css`
 
-#### Bloc "Défis de Collection" (`pokehub/collection-challenges`)
+#### Bloc "Pokémon Eggs" (`pokehub/eggs`)
 
-Affiche les défis de collection (capturer, éclore, évoluer, etc.). Données saisies dans la meta box « Défis de collection » sur le post.
+Affiche les œufs (par type : 2 km, 5 km, 10 km, etc.) et les Pokémon associés. Données saisies dans la metabox « Eggs (event / article) » sur le post, ou depuis un pool global.
 
 **Attributs :**
-- `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
+- `source` (string, défaut: `post`) : `post` = données de l’article, `global` = pool actif à la date du jour
+- `poolId` (number, optionnel) : si `source` = `global` et > 0, utilise ce pool
+- `blockTitle` (string) : titre affiché au-dessus du bloc
+
+**Metabox :** « Eggs (event / article) » — affichée sur les articles/événements. Chargée par le module Blocks même si le module Eggs est inactif (bloc utilisable en mode remote).
+
+**Styles :** `assets/css/poke-hub-eggs-front.css`
+
+#### Bloc "Collection Challenges" (`pokehub/collection-challenges`)
+
+Affiche les défis de collection (capturer, éclore, évoluer, etc.). Données saisies dans la metabox « Collection Challenges » sur le post (tables de contenu, pas les meta).
+
+**Attributs :**
+- `autoDetect` (boolean, défaut: `true`) : Données depuis les tables de contenu liées au post
+
+**Metabox :** « Collection Challenges » — toujours chargée par le module Blocks ; les assets (Select2) sont enregistrés par la metabox si besoin.
 
 **Styles :** `assets/css/poke-hub-collection-challenges-front.css`
 
-#### Bloc "Études Spéciales" (`pokehub/special-research`)
+#### Bloc "Special Research" (`pokehub/special-research`)
 
 Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, quêtes). Données saisies dans la meta box « Études spéciales » sur le post.
 
@@ -120,12 +142,13 @@ Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, qu
 
 ## 🎨 Styles CSS
 
-Les styles sont chargés par le module Blocks (ou par les modules concernés) :
+Les styles sont chargés par le module Blocks :
 - **Dates / Quêtes / Habitats / Wild** : `assets/css/poke-hub-events-front.css` (et assets liés aux événements)
 - **Bonus** : `assets/css/poke-hub-bonus-front.css`
-- **Nouveaux Pokémon - Lignées d'évolution** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
-- **Défis de Collection** : `assets/css/poke-hub-collection-challenges-front.css`
-- **Études Spéciales** : `assets/css/poke-hub-special-research-front.css`
+- **Pokémon Eggs** : `assets/css/poke-hub-eggs-front.css`
+- **New Pokémon - Evolution Lines** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
+- **Collection Challenges** : `assets/css/poke-hub-collection-challenges-front.css`
+- **Special Research** : `assets/css/poke-hub-special-research-front.css`
 
 ### Classes CSS disponibles
 
@@ -189,6 +212,16 @@ Le système détecte automatiquement les ratios (ex: "1/2", "1/4") dans :
 - La description spécifique à l'événement
 
 Ces ratios sont affichés dans un badge circulaire rouge sur l'icône du bonus.
+
+## 🗄️ Tables de contenu et source Pokémon (scope `content_source`)
+
+Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nature, field research, nouveaux Pokémon, special research, collection challenges) est enregistré dans des **tables de contenu** communes (`content_eggs`, `content_quests`, `content_bonus`, etc.), avec `source_type` = `post`, `special_event` ou `global_pool` et `source_id` = ID du post, de l’événement ou 0 pour un pool global.
+
+**Même préfixe que la source Pokémon :** ces tables utilisent le scope **`content_source`** : elles sont lues/écrites avec le **même préfixe** que les tables Pokémon. Le réglage à utiliser est **Réglages > Poké HUB > Sources > Pokémon table prefix (remote)** — il sert explicitement aux Pokémon et à tous les contenus (quêtes, bonus, habitats, œufs, etc.). Une seule base pour tout. Sur un site distant, renseigner ce préfixe avec celui du site principal pour que les blocs sauvegardent et affichent les données depuis le site principal.
+
+**Blocs indépendants du module Pokémon :** les blocs (œufs, quêtes, défis de collection, bonus, etc.) ne dépendent plus du module Pokémon pour être enregistrés ; ils ne requièrent que le module **Events** (ou **Bonus** pour le bloc bonus). Ils restent utilisables en mode remote dès que le module Blocks et Events sont actifs.
+
+**Metaboxes chargées par le module Blocks :** pour que les blocs restent configurables même sans activer tous les modules, le module Blocks charge lui-même les metaboxes nécessaires lorsque les modules dédiés sont inactifs : metabox **Bonus** (si module Bonus inactif), metabox **Eggs** (si module Eggs inactif). La metabox **Collection Challenges** est toujours gérée par le module Blocks et enregistre ses assets (Select2) si besoin.
 
 ## 📖 Voir aussi
 

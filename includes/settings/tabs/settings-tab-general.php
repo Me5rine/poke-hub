@@ -18,18 +18,8 @@ if (!is_array($active_modules)) {
     $active_modules = [];
 }
 
-// Liste des modules affichés dans l'onglet General (source unique pour les checkboxes).
-// Doit être synchronisée avec poke_hub_get_modules_registry() dans settings-modules.php.
-$available_modules = [
-    'events'        => __('Events', 'poke-hub'),
-    'bonus'         => __('Bonus', 'poke-hub'),
-    'pokemon'       => __('Pokémon', 'poke-hub'),
-    'user-profiles' => __('User Profiles', 'poke-hub'),
-    'games'         => __('Games', 'poke-hub'),
-    'eggs'          => __('Eggs', 'poke-hub'),
-    'blocks'        => __('Blocks', 'poke-hub'),
-    'collections'   => __('Collections Pokémon GO', 'poke-hub'),
-];
+// Liste des modules : source unique dans includes/settings/settings-modules.php (poke_hub_get_modules_config).
+$modules_config = function_exists('poke_hub_get_modules_config') ? poke_hub_get_modules_config() : [];
 
 // Option : suppression des données à la désinstallation
 $delete_data = get_option('poke_hub_delete_data_on_uninstall', false);
@@ -52,7 +42,8 @@ $can_manage_cleanup = true;
             <th scope="row"><?php _e('Available Modules', 'poke-hub'); ?>:</th>
             <td>
                 <?php
-                foreach ($available_modules as $module_key => $module_label) {
+                foreach ($modules_config as $module_key => $module_data) {
+                    $module_label = isset($module_data['label']) ? $module_data['label'] : $module_key;
                     $disabled = '';
                     $message  = '';
 

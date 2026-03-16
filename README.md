@@ -873,19 +873,6 @@ Conditions météorologiques.
 - **`{prefix}_pokehub_pokemon_type_weakness_links`** : Liens Types ↔ Faiblesses
 - **`{prefix}_pokehub_pokemon_type_resistance_links`** : Liens Types ↔ Résistances
 
-#### Table : `{prefix}_pokehub_pokemon_form_mappings`
-
-Mappings entre IDs Game Master et formes.
-
-**Colonnes** :
-- `id` : ID unique
-- `pokemon_id_proto` : ID protobuf du Pokémon
-- `form_proto` : Forme protobuf
-- `form_slug` : Slug de la forme
-- `label_suffix` : Suffix du label
-- `sort_order` : Ordre d'affichage
-- `flags` : Flags supplémentaires (JSON)
-
 #### Table : `{prefix}_pokehub_pokemon_form_variants`
 
 Registre global des variantes de formes.
@@ -893,7 +880,7 @@ Registre global des variantes de formes.
 **Colonnes** :
 - `id` : ID unique
 - `form_slug` : Slug unique de la forme
-- `category` : Catégorie (`normal`, `mega`, `costume`, etc.)
+- `category` : Catégorie (menu déroulant en admin : `normal`, `costume`, `clone`, `regional`, `shadow`, `purified`, `mega`, `alola`, `galar`, `hisui`, `paldea`)
 - `group` : Groupe de formes
 - `label` : Label affiché
 - `extra` : Données supplémentaires
@@ -1066,7 +1053,6 @@ La fonction supporte plusieurs alias pour faciliter l'utilisation :
 - `weathers` = `pokemon_weathers`
 - `items` = `pokemon_items`
 - `backgrounds` = `pokemon_backgrounds`
-- `form_mappings` = `pokemon_form_mappings`
 - `evolutions` = `pokemon_evolutions`
 
 #### Tables distantes
@@ -1479,7 +1465,6 @@ poke-hub/
 │   │   │       ├── items.php
 │   │   │       ├── weathers.php
 │   │   │       ├── forms.php
-│   │   │       ├── form-mappings.php
 │   │   │       └── backgrounds.php
 │   │   ├── functions/               # Fonctions d'import
 │   │   │   ├── pokemon-import-game-master.php

@@ -98,6 +98,10 @@ function poke_hub_events_get_table_prefix(string $context = 'events'): string {
  *
  * Si l'option est vide, on retombe sur $wpdb->prefix (préfixe local).
  *
+ * Ce préfixe sert aussi pour toutes les tables de contenu dérivées (content_eggs,
+ * content_quests, content_bonus, content_habitats, etc.) : une seule base pour Pokémon
+ * et tous les contenus des articles / événements.
+ *
  * @return string Préfixe des tables Pokémon
  */
 function poke_hub_pokemon_get_table_prefix(): string {
@@ -117,6 +121,42 @@ function poke_hub_pokemon_get_table_prefix(): string {
     }
 
     return $prefix;
+}
+
+/**
+ * Table catalogue des types de bonus (source de vérité).
+ * Si un préfixe Pokémon distant est défini, on lit depuis le site principal (remote_bonus_types).
+ * Sinon on lit la table locale (bonus_types) sur le site principal.
+ *
+ * @return string Nom de la table (bonus_types ou remote_bonus_types selon le contexte)
+ */
+function pokehub_get_bonus_types_table(): string {
+    $prefix = function_exists('poke_hub_pokemon_get_table_prefix')
+        ? (string) poke_hub_pokemon_get_table_prefix()
+        : '';
+    global $wpdb;
+    $local_prefix = isset($wpdb->prefix) ? trim((string) $wpdb->prefix) : '';
+    $prefix = trim($prefix);
+    // Si le préfixe configuré est vide ou identique au préfixe local → on est sur le site principal
+    if ($prefix === '' || $prefix === $local_prefix) {
+        return function_exists('pokehub_get_table') ? pokehub_get_table('bonus_types') : '';
+    }
+    return function_exists('pokehub_get_table') ? pokehub_get_table('remote_bonus_types') : '';
+}
+
+/**
+ * Indique si les types de bonus sont gérés localement (site principal) ou lus à distance.
+ *
+ * @return bool true si on lit les bonus depuis le site principal (préfixe distant configuré)
+ */
+function pokehub_bonus_use_remote_source(): bool {
+    $prefix = function_exists('poke_hub_pokemon_get_table_prefix')
+        ? (string) poke_hub_pokemon_get_table_prefix()
+        : '';
+    global $wpdb;
+    $local_prefix = isset($wpdb->prefix) ? trim((string) $wpdb->prefix) : '';
+    $prefix = trim($prefix);
+    return $prefix !== '' && $prefix !== $local_prefix;
 }
 
 /**
@@ -241,19 +281,18 @@ function pokehub_get_table(string $key): string {
         'pokemon_type_weakness_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_weakness_links'],
         'pokemon_type_resistance_links' => ['scope' => 'local',  'suffix' => 'pokemon_type_resistance_links'],
         'pokemon_form_variants'      => ['scope' => 'local',  'suffix' => 'pokemon_form_variants'],
-        'evolutions'                 => ['scope' => 'local',  'suffix' => 'pokemon_evolutions'],
+        'pokemon_form_variant_events' => ['scope' => 'local',  'suffix' => 'pokemon_form_variant_events'],
+        'pokemon_pokemon_events'      => ['scope' => 'local',  'suffix' => 'pokemon_pokemon_events'],
+        'evolutions'                  => ['scope' => 'local',  'suffix' => 'pokemon_evolutions'],
         'pokemon_evolutions'         => ['scope' => 'local',  'suffix' => 'pokemon_evolutions'],
         'items'                      => ['scope' => 'local',  'suffix' => 'items'],
         'pokemon_items'                      => ['scope' => 'local',  'suffix' => 'items'],
         'pokemon_backgrounds'        => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
         'backgrounds'               => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
         'pokemon_background_pokemon_links' => ['scope' => 'local',  'suffix' => 'pokemon_background_pokemon_links'],
+        'pokemon_background_events' => ['scope' => 'local',  'suffix' => 'pokemon_background_events'],
         'pokemon_regional_regions'   => ['scope' => 'local',  'suffix' => 'pokemon_regional_regions'],
         'pokemon_regional_mappings'  => ['scope' => 'local',  'suffix' => 'pokemon_regional_mappings'],
-
-        //=== table de mapping des formes / costumes / clones ===
-        'pokemon_form_mappings'      => ['scope' => 'local',  'suffix' => 'pokemon_form_mappings'],
-        'form_mappings'              => ['scope' => 'local',  'suffix' => 'pokemon_form_mappings'],
 
         // ==== Tables locales Events spéciaux ====
         'special_events'                => ['scope' => 'local', 'suffix' => 'special_events'],
@@ -262,46 +301,47 @@ function pokehub_get_table(string $key): string {
         'special_event_bonus'           => ['scope' => 'local', 'suffix' => 'special_event_bonus'],
 
         // ==== Tables de contenu communes (post, special_event, global_pool) ====
-        // suffix sans "pokehub_" : le préfixe local est déjà {$wpdb->prefix}pokehub_
-        'content_eggs'                   => ['scope' => 'local', 'suffix' => 'content_eggs'],
-        'content_egg_pokemon'             => ['scope' => 'local', 'suffix' => 'content_egg_pokemon'],
-        'content_quests'                  => ['scope' => 'local', 'suffix' => 'content_quests'],
-        'content_quest_lines'             => ['scope' => 'local', 'suffix' => 'content_quest_lines'],
-        'quest_groups'                    => ['scope' => 'local', 'suffix' => 'quest_groups'],
-        'content_habitats'                => ['scope' => 'local', 'suffix' => 'content_habitats'],
-        'content_habitat_entries'         => ['scope' => 'local', 'suffix' => 'content_habitat_entries'],
-        'content_special_research'        => ['scope' => 'local', 'suffix' => 'content_special_research'],
-        'content_special_research_steps'  => ['scope' => 'local', 'suffix' => 'content_special_research_steps'],
-        'content_collection_challenges'   => ['scope' => 'local', 'suffix' => 'content_collection_challenges'],
-        'content_collection_challenge_items' => ['scope' => 'local', 'suffix' => 'content_collection_challenge_items'],
-        'content_bonus'                  => ['scope' => 'local', 'suffix' => 'content_bonus'],
-        'content_bonus_entries'           => ['scope' => 'local', 'suffix' => 'content_bonus_entries'],
-        'content_wild_pokemon'            => ['scope' => 'local', 'suffix' => 'content_wild_pokemon'],
-        'content_wild_pokemon_entries'   => ['scope' => 'local', 'suffix' => 'content_wild_pokemon_entries'],
-        'content_new_pokemon'             => ['scope' => 'local', 'suffix' => 'content_new_pokemon'],
-        'content_new_pokemon_entries'     => ['scope' => 'local', 'suffix' => 'content_new_pokemon_entries'],
-        'content_raids'                   => ['scope' => 'local', 'suffix' => 'content_raids'],
-        'content_raid_bosses'             => ['scope' => 'local', 'suffix' => 'content_raid_bosses'],
+        // scope content_source = même préfixe que la "source Pokémon" (Réglages > Sources) pour que
+        // les blocs (œufs, quêtes, bonus, etc.) sauvegardent en mode local ou remote dans la même base.
+        'content_eggs'                   => ['scope' => 'content_source', 'suffix' => 'content_eggs'],
+        'content_egg_pokemon'             => ['scope' => 'content_source', 'suffix' => 'content_egg_pokemon'],
+        'content_quests'                  => ['scope' => 'content_source', 'suffix' => 'content_quests'],
+        'content_quest_lines'             => ['scope' => 'content_source', 'suffix' => 'content_quest_lines'],
+        'quest_groups'                    => ['scope' => 'content_source', 'suffix' => 'quest_groups'],
+        'content_habitats'                => ['scope' => 'content_source', 'suffix' => 'content_habitats'],
+        'content_habitat_entries'         => ['scope' => 'content_source', 'suffix' => 'content_habitat_entries'],
+        'content_special_research'        => ['scope' => 'content_source', 'suffix' => 'content_special_research'],
+        'content_special_research_steps'  => ['scope' => 'content_source', 'suffix' => 'content_special_research_steps'],
+        'content_collection_challenges'   => ['scope' => 'content_source', 'suffix' => 'content_collection_challenges'],
+        'content_collection_challenge_items' => ['scope' => 'content_source', 'suffix' => 'content_collection_challenge_items'],
+        'content_bonus'                  => ['scope' => 'content_source', 'suffix' => 'content_bonus'],
+        'content_bonus_entries'           => ['scope' => 'content_source', 'suffix' => 'content_bonus_entries'],
+        'content_wild_pokemon'            => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon'],
+        'content_wild_pokemon_entries'   => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon_entries'],
+        'content_new_pokemon'             => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon'],
+        'content_new_pokemon_entries'     => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon_entries'],
+        'content_raids'                   => ['scope' => 'content_source', 'suffix' => 'content_raids'],
+        'content_raid_bosses'             => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
         // Alias ancien format (évite double préfixe si du code appelle get_table('pokehub_content_*'))
-        'pokehub_content_eggs' => ['scope' => 'local', 'suffix' => 'content_eggs'],
-        'pokehub_content_egg_pokemon' => ['scope' => 'local', 'suffix' => 'content_egg_pokemon'],
-        'pokehub_content_quests' => ['scope' => 'local', 'suffix' => 'content_quests'],
-        'pokehub_content_quest_lines' => ['scope' => 'local', 'suffix' => 'content_quest_lines'],
-        'pokehub_quest_groups' => ['scope' => 'local', 'suffix' => 'quest_groups'],
-        'pokehub_content_habitats' => ['scope' => 'local', 'suffix' => 'content_habitats'],
-        'pokehub_content_habitat_entries' => ['scope' => 'local', 'suffix' => 'content_habitat_entries'],
-        'pokehub_content_special_research' => ['scope' => 'local', 'suffix' => 'content_special_research'],
-        'pokehub_content_special_research_steps' => ['scope' => 'local', 'suffix' => 'content_special_research_steps'],
-        'pokehub_content_collection_challenges' => ['scope' => 'local', 'suffix' => 'content_collection_challenges'],
-        'pokehub_content_collection_challenge_items' => ['scope' => 'local', 'suffix' => 'content_collection_challenge_items'],
-        'pokehub_content_bonus' => ['scope' => 'local', 'suffix' => 'content_bonus'],
-        'pokehub_content_bonus_entries' => ['scope' => 'local', 'suffix' => 'content_bonus_entries'],
-        'pokehub_content_wild_pokemon' => ['scope' => 'local', 'suffix' => 'content_wild_pokemon'],
-        'pokehub_content_wild_pokemon_entries' => ['scope' => 'local', 'suffix' => 'content_wild_pokemon_entries'],
-        'pokehub_content_new_pokemon' => ['scope' => 'local', 'suffix' => 'content_new_pokemon'],
-        'pokehub_content_new_pokemon_entries' => ['scope' => 'local', 'suffix' => 'content_new_pokemon_entries'],
-        'pokehub_content_raids' => ['scope' => 'local', 'suffix' => 'content_raids'],
-        'pokehub_content_raid_bosses' => ['scope' => 'local', 'suffix' => 'content_raid_bosses'],
+        'pokehub_content_eggs' => ['scope' => 'content_source', 'suffix' => 'content_eggs'],
+        'pokehub_content_egg_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_egg_pokemon'],
+        'pokehub_content_quests' => ['scope' => 'content_source', 'suffix' => 'content_quests'],
+        'pokehub_content_quest_lines' => ['scope' => 'content_source', 'suffix' => 'content_quest_lines'],
+        'pokehub_quest_groups' => ['scope' => 'content_source', 'suffix' => 'quest_groups'],
+        'pokehub_content_habitats' => ['scope' => 'content_source', 'suffix' => 'content_habitats'],
+        'pokehub_content_habitat_entries' => ['scope' => 'content_source', 'suffix' => 'content_habitat_entries'],
+        'pokehub_content_special_research' => ['scope' => 'content_source', 'suffix' => 'content_special_research'],
+        'pokehub_content_special_research_steps' => ['scope' => 'content_source', 'suffix' => 'content_special_research_steps'],
+        'pokehub_content_collection_challenges' => ['scope' => 'content_source', 'suffix' => 'content_collection_challenges'],
+        'pokehub_content_collection_challenge_items' => ['scope' => 'content_source', 'suffix' => 'content_collection_challenge_items'],
+        'pokehub_content_bonus' => ['scope' => 'content_source', 'suffix' => 'content_bonus'],
+        'pokehub_content_bonus_entries' => ['scope' => 'content_source', 'suffix' => 'content_bonus_entries'],
+        'pokehub_content_wild_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon'],
+        'pokehub_content_wild_pokemon_entries' => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon_entries'],
+        'pokehub_content_new_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon'],
+        'pokehub_content_new_pokemon_entries' => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon_entries'],
+        'pokehub_content_raids' => ['scope' => 'content_source', 'suffix' => 'content_raids'],
+        'pokehub_content_raid_bosses' => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
 
         // ==== Tables locales Games ====
         'games_scores'                  => ['scope' => 'local', 'suffix' => 'games_scores'],
@@ -350,9 +390,12 @@ function pokehub_get_table(string $key): string {
         'remote_items'                     => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_items'],
         'remote_pokemon_backgrounds'       => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_backgrounds'],
         'remote_pokemon_background_pokemon_links' => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_background_pokemon_links'],
-        'remote_pokemon_form_mappings'      => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_form_mappings'],
         'remote_pokemon_regional_regions'   => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_regional_regions'],
         'remote_pokemon_regional_mappings'  => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_regional_mappings'],
+        'remote_bonus_types'                => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_bonus_types'],
+
+        // ==== Catalogue des types de bonus (source de vérité sur le site principal) ====
+        'bonus_types'                       => ['scope' => 'local', 'suffix' => 'bonus_types'],
 
         // ==== Tables globales partagées (ME5RINE_LAB_GLOBAL_PREFIX) ====
         'user_profiles'                    => ['scope' => 'global', 'suffix' => 'pokehub_user_profiles'],
@@ -424,9 +467,19 @@ function pokehub_get_table(string $key): string {
         }
 
         $table = $prefix . $suffix;
-        
-        // Debug temporaire pour vérifier la construction de la table
-        error_log('[POKE-HUB] pokehub_get_table - remote_pokemon - key: ' . $key . ', prefix: ' . $prefix . ', suffix: ' . $suffix . ', table finale: ' . $table);
+    } elseif ($scope === 'content_source') {
+        // Tables de contenu : même préfixe que les tables Pokémon (même base).
+        // Centralise : pokémon nature, field research, habitats, bonus, nouveaux pokémon,
+        // special research, collection challenges, œufs (articles + événements).
+        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
+            $prefix = (string) poke_hub_pokemon_get_table_prefix();
+            if (empty($prefix)) {
+                $prefix = $wpdb->prefix;
+            }
+        } else {
+            $prefix = $wpdb->prefix;
+        }
+        $table = $prefix . 'pokehub_' . $suffix;
     } elseif ($scope === 'remote') {
         // Tables distantes Events : utiliser le préfixe events
         // Détermination du contexte : "events" vs "event_types"
@@ -734,7 +787,7 @@ function poke_hub_render_pagination(array $args = []): string {
             <?php
             printf(
                 /* translators: %s: number of items */
-                _n('%s résultat', '%s résultats', $total_items, $text_domain),
+                _n('%s result', '%s results', $total_items, $text_domain),
                 number_format_i18n($total_items)
             );
             ?>
@@ -746,7 +799,7 @@ function poke_hub_render_pagination(array $args = []): string {
                 ?>
                 <a href="<?php echo esc_url(add_query_arg($page_var, 1)); ?>" 
                    class="me5rine-lab-pagination-button" 
-                   aria-label="<?php esc_attr_e('Première page', $text_domain); ?>">
+                   aria-label="<?php esc_attr_e('First page', $text_domain); ?>">
                     <span aria-hidden="true">«</span>
                 </a>
                 <?php
@@ -761,7 +814,7 @@ function poke_hub_render_pagination(array $args = []): string {
                 ?>
                 <a href="<?php echo esc_url(add_query_arg($page_var, $paged - 1)); ?>" 
                    class="me5rine-lab-pagination-button" 
-                   aria-label="<?php esc_attr_e('Page précédente', $text_domain); ?>">
+                   aria-label="<?php esc_attr_e('Previous page', $text_domain); ?>">
                     <span aria-hidden="true">‹</span>
                 </a>
                 <?php
@@ -783,7 +836,7 @@ function poke_hub_render_pagination(array $args = []): string {
                 ?>
                 <a href="<?php echo esc_url(add_query_arg($page_var, $paged + 1)); ?>" 
                    class="me5rine-lab-pagination-button" 
-                   aria-label="<?php esc_attr_e('Page suivante', $text_domain); ?>">
+                   aria-label="<?php esc_attr_e('Next page', $text_domain); ?>">
                     <span aria-hidden="true">›</span>
                 </a>
                 <?php
@@ -798,7 +851,7 @@ function poke_hub_render_pagination(array $args = []): string {
                 ?>
                 <a href="<?php echo esc_url(add_query_arg($page_var, $total_pages)); ?>" 
                    class="me5rine-lab-pagination-button" 
-                   aria-label="<?php esc_attr_e('Dernière page', $text_domain); ?>">
+                   aria-label="<?php esc_attr_e('Last page', $text_domain); ?>">
                     <span aria-hidden="true">»</span>
                 </a>
                 <?php
@@ -812,4 +865,26 @@ function poke_hub_render_pagination(array $args = []): string {
     </div>
     <?php
     return ob_get_clean();
+}
+
+/**
+ * Normalise une date de sortie au format ISO YYYY-MM-DD (format attendu en base).
+ * Accepte en entrée JJ/MM/AAAA ou YYYY-MM-DD.
+ *
+ * @param string $date Chaîne du type "06/07/2016" ou "2016-07-06".
+ * @return string "Y-m-d" ou chaîne vide si invalide.
+ */
+function poke_hub_normalize_release_date(string $date): string {
+    $date = trim($date);
+    if ($date === '') {
+        return '';
+    }
+    if (preg_match('#^(\d{4})-(\d{2})-(\d{2})$#', $date)) {
+        return $date;
+    }
+    $d = DateTime::createFromFormat('d/m/Y', $date);
+    if ($d instanceof DateTime) {
+        return $d->format('Y-m-d');
+    }
+    return '';
 }

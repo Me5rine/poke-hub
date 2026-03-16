@@ -27,38 +27,51 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
     // Valeurs par défaut / édition
     $title = '';
     $slug = '';
+    $background_type = defined('POKE_HUB_BACKGROUND_TYPE_SPECIAL') ? POKE_HUB_BACKGROUND_TYPE_SPECIAL : 'special';
     $image_url = '';
-    $event_id = 0;
-    $event_type = '';
+    $current_events = [];
     $current_pokemon_ids = [];
+    $current_shiny_locked_ids = [];
+    $current_shiny_active_ids = [];
 
     if ($is_edit) {
         $title = isset($edit_row->title) ? (string) $edit_row->title : '';
         $slug = isset($edit_row->slug) ? (string) $edit_row->slug : '';
         $image_url = isset($edit_row->image_url) ? (string) $edit_row->image_url : '';
-        $event_id = isset($edit_row->event_id) ? (int) $edit_row->event_id : 0;
-        $event_type = isset($edit_row->event_type) ? (string) $edit_row->event_type : '';
+        if (isset($edit_row->background_type) && (string) $edit_row->background_type !== '') {
+            $background_type = (string) $edit_row->background_type;
+        }
 
-        // Récupérer les Pokémon liés
+        // Événements associés (plusieurs par fond)
+        if (function_exists('poke_hub_get_background_events')) {
+            $current_events = poke_hub_get_background_events((int) $edit_row->id);
+        }
+        if (empty($current_events) && isset($edit_row->event_id) && (int) $edit_row->event_id > 0 && !empty(trim((string) ($edit_row->event_type ?? '')))) {
+            $current_events = [['event_type' => (string) $edit_row->event_type, 'event_id' => (int) $edit_row->event_id]];
+        }
+
+        // Pokémon liés
         $links_table = pokehub_get_table('pokemon_background_pokemon_links');
         if ($links_table) {
             $pokemon_rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT pokemon_id FROM {$links_table} WHERE background_id = %d",
+                    "SELECT pokemon_id FROM {$links_table} WHERE background_id = %d ORDER BY pokemon_id ASC",
                     (int) $edit_row->id
                 )
             );
-            $current_pokemon_ids = array_map(function($row) {
+            $current_pokemon_ids = array_map(function ($row) {
                 return (int) $row->pokemon_id;
             }, $pokemon_rows);
         }
+        if (function_exists('poke_hub_get_background_shiny_locked_pokemon_ids')) {
+            $current_shiny_locked_ids = poke_hub_get_background_shiny_locked_pokemon_ids((int) $edit_row->id);
+        }
+        // Pokémon shiny actif = liés au fond mais pas shiny lock (shiny disponible)
+        $current_shiny_active_ids = array_values(array_diff($current_pokemon_ids, $current_shiny_locked_ids));
     }
 
-    // Récupérer tous les événements
-    $all_events = [];
-    if (function_exists('poke_hub_events_get_all_sources_by_status')) {
-        $all_events = poke_hub_events_get_all_sources_by_status('all', []);
-    }
+    // Tous les événements pour le picker (recherche par nom, tous types)
+    $all_events = function_exists('poke_hub_get_events_for_picker') ? poke_hub_get_events_for_picker() : [];
 
     // Récupérer tous les Pokémon
     $pokemon_table = pokehub_get_table('pokemon');
@@ -123,20 +136,33 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             <!-- Section: Basic Information -->
             <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Basic Information', 'poke-hub'); ?></h3>
-                
-                <div class="admin-lab-form-row">
-                    <div class="admin-lab-form-col">
+                <div class="admin-lab-form-row" style="display: flex; gap: 1em;">
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
                         <div class="admin-lab-form-group">
                             <label for="title"><?php esc_html_e('Title', 'poke-hub'); ?> *</label>
                             <input type="text" id="title" name="title" value="<?php echo esc_attr($title); ?>" required />
                             <p class="description"><?php esc_html_e('Example: "Halloween Background", "Christmas Background"…', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                    <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
                         <div class="admin-lab-form-group">
                             <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                             <input type="text" id="slug" name="slug" value="<?php echo esc_attr($slug); ?>" />
                             <p class="description"><?php esc_html_e('Leave empty to auto-generate from title.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
+                        <div class="admin-lab-form-group">
+                            <label for="background_type"><?php esc_html_e('Background type', 'poke-hub'); ?></label>
+                            <select id="background_type" name="background_type">
+                                <?php
+                                $background_types = function_exists('poke_hub_get_background_types') ? poke_hub_get_background_types() : ['location' => __('Location background', 'poke-hub'), 'special' => __('Special background', 'poke-hub')];
+                                foreach ($background_types as $type_value => $type_label) :
+                                    ?>
+                                    <option value="<?php echo esc_attr($type_value); ?>" <?php selected($background_type, $type_value); ?>><?php echo esc_html($type_label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Location or special (event/theme).', 'poke-hub'); ?></p>
                         </div>
                     </div>
                 </div>
@@ -175,82 +201,86 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 </div>
             </div>
 
-            <!-- Section: Event Association -->
+            <!-- Section: Event Association (sélecteur unique : recherche par nom, tous types) -->
             <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Event Association', 'poke-hub'); ?></h3>
-                
-                <div class="admin-lab-form-row">
-                    <div class="admin-lab-form-col-50">
-                        <div class="admin-lab-form-group">
-                            <label for="event_type"><?php esc_html_e('Event Type', 'poke-hub'); ?></label>
-                            <select name="event_type" id="event_type">
-                                <option value=""><?php esc_html_e('None', 'poke-hub'); ?></option>
-                                <option value="local_post" <?php selected($event_type, 'local_post'); ?>><?php esc_html_e('Local post', 'poke-hub'); ?></option>
-                                <option value="remote_post" <?php selected($event_type, 'remote_post'); ?>><?php esc_html_e('Remote post', 'poke-hub'); ?></option>
-                                <option value="special_local" <?php selected($event_type, 'special_local'); ?>><?php esc_html_e('Special event (local)', 'poke-hub'); ?></option>
-                                <option value="special_remote" <?php selected($event_type, 'special_remote'); ?>><?php esc_html_e('Special event (remote)', 'poke-hub'); ?></option>
-                            </select>
-                            <p class="description"><?php esc_html_e('Type of event associated with this background.', 'poke-hub'); ?></p>
-                        </div>
-                    </div>
-                    <div class="admin-lab-form-col-50">
-                        <div class="admin-lab-form-group">
-                            <label for="event_id"><?php esc_html_e('Event', 'poke-hub'); ?></label>
-                            <select name="event_id" id="event_id" style="max-width: 100%;">
-                                <option value="0"><?php esc_html_e('None', 'poke-hub'); ?></option>
-                                <?php if (!empty($all_events)) : ?>
-                                    <?php foreach ($all_events as $event) : ?>
-                                        <?php
-                                        $ev_id = isset($event->id) ? (int) $event->id : 0;
-                                        $ev_source = isset($event->source) ? (string) $event->source : '';
-                                        $ev_title = isset($event->title) ? (string) $event->title : '';
-                                        $ev_slug = isset($event->slug) ? (string) $event->slug : '';
+                <p class="description"><?php esc_html_e('Search and select one or more events by name. Event type is detected automatically.', 'poke-hub'); ?></p>
+                <div id="pokehub-background-events-list">
+                    <?php
+                    $event_index = 0;
+                    foreach ($current_events as $ev) :
+                        $ev_type = isset($ev['event_type']) ? (string) $ev['event_type'] : '';
+                        $ev_id = isset($ev['event_id']) ? (int) $ev['event_id'] : 0;
+                        if (function_exists('poke_hub_render_event_picker_row')) {
+                            poke_hub_render_event_picker_row($event_index, $ev_id, $ev_type, $all_events, 'event_links', 'pokehub-background-event-row', null, 'pokehub-remove-event');
+                        }
+                        $event_index++;
+                    endforeach;
+                    ?>
+                </div>
+                <p><button type="button" class="button pokehub-add-event"><?php esc_html_e('Add event', 'poke-hub'); ?></button></p>
+                <?php if (function_exists('poke_hub_render_event_picker_row')) : ?>
+                <template id="pokehub-background-event-row-tpl">
+                    <?php poke_hub_render_event_picker_row('__INDEX__', 0, '', $all_events, 'event_links', 'pokehub-background-event-row', null, 'pokehub-remove-event'); ?>
+                </template>
+                <?php endif; ?>
+            </div>
 
-                                        // NE PAS filtrer côté serveur, laisser le JavaScript gérer
-                                        $label = $ev_title ?: $ev_slug;
-                                        if ($ev_source) {
-                                            $label .= ' (' . esc_html(ucfirst(str_replace('_', ' ', $ev_source))) . ')';
-                                        }
+            <!-- Section: Linked Pokémon (deux listes distinctes : shiny actif / shiny lock) -->
+            <div class="admin-lab-form-section">
+                <h3><?php esc_html_e('Linked Pokémon', 'poke-hub'); ?></h3>
+                <p class="description" style="margin-bottom:12px;"><?php esc_html_e('Two separate lists: Pokémon with shiny available for this background, and Pokémon that are shiny lock (background released before the shiny). A Pokémon can only appear in one of the two lists.', 'poke-hub'); ?></p>
+                <div class="admin-lab-form-row" style="display: flex; gap: 1em; flex-wrap: wrap;">
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0; min-width: 280px;">
+                        <div class="admin-lab-form-group">
+                            <label for="pokemon_ids_shiny_active"><?php esc_html_e('Pokémon (shiny actif)', 'poke-hub'); ?></label>
+                            <select name="pokemon_ids_shiny_active[]" id="pokemon_ids_shiny_active" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                                <?php if (!empty($all_pokemon)) : ?>
+                                    <?php foreach ($all_pokemon as $pokemon) : ?>
+                                        <?php
+                                        $p_id = (int) $pokemon->id;
+                                        $p_dex = (int) $pokemon->dex_number;
+                                        $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                        $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
                                         ?>
-                                        <option value="<?php echo $ev_id; ?>" 
-                                                data-source="<?php echo esc_attr($ev_source); ?>"
-                                                <?php selected($event_id, $ev_id); ?>>
-                                            <?php echo esc_html($label); ?>
+                                        <option value="<?php echo $p_id; ?>"
+                                                data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                                data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                                data-label="<?php echo esc_attr($label); ?>"
+                                                <?php selected(in_array($p_id, $current_shiny_active_ids, true)); ?>>
+                                            <?php echo $label; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </select>
-                            <p class="description"><?php esc_html_e('Filtered by event type. Select a type above to see available events.', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Shiny available for this background.', 'poke-hub'); ?></p>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Section: Linked Pokémon -->
-            <div class="admin-lab-form-section">
-                <h3><?php esc_html_e('Linked Pokémon', 'poke-hub'); ?></h3>
-                
-                <div class="admin-lab-form-group">
-                    <label for="pokemon_ids"><?php esc_html_e('Pokémon', 'poke-hub'); ?></label>
-                    <select name="pokemon_ids[]" id="pokemon_ids" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
-                        <?php if (!empty($all_pokemon)) : ?>
-                            <?php foreach ($all_pokemon as $pokemon) : ?>
-                                <?php
-                                $p_id = (int) $pokemon->id;
-                                $p_dex = (int) $pokemon->dex_number;
-                                $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
-                                $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
-                                ?>
-                                <option value="<?php echo $p_id; ?>" 
-                                        data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
-                                        data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
-                                        <?php selected(in_array($p_id, $current_pokemon_ids, true)); ?>>
-                                    <?php echo $label; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </select>
-                    <p class="description"><?php esc_html_e('Search and select one or more Pokémon that use this background.', 'poke-hub'); ?></p>
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0; min-width: 280px;">
+                        <div class="admin-lab-form-group">
+                            <label for="shiny_locked_ids"><?php esc_html_e('Pokémon (shiny lock)', 'poke-hub'); ?></label>
+                            <select name="shiny_locked_ids[]" id="shiny_locked_ids" class="pokehub-pokemon-select pokehub-shiny-lock-select" multiple="multiple" style="width:100%;">
+                                <?php if (!empty($all_pokemon)) : ?>
+                                    <?php foreach ($all_pokemon as $pokemon) : ?>
+                                        <?php
+                                        $p_id = (int) $pokemon->id;
+                                        $p_dex = (int) $pokemon->dex_number;
+                                        $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                        $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                        ?>
+                                        <option value="<?php echo $p_id; ?>"
+                                                data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                                data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                                data-label="<?php echo esc_attr($label); ?>"
+                                                <?php selected(in_array($p_id, $current_shiny_locked_ids, true)); ?>>
+                                            <?php echo $label; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Shiny lock (background released before the shiny).', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -266,40 +296,91 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
 
     <script type="text/javascript">
     jQuery(function($) {
-            // Initialiser Select2 sur le champ Pokémon (utilise pokehubMultilingualMatcher si disponible)
-            if ($.fn.select2) {
-                // Utiliser la fonction globale ou définir une version locale si elle n'existe pas encore
-                var matcherFn = window.pokehubMultilingualMatcher || function(params, data) {
-                    if (!params.term || params.term.trim() === '') return data;
-                    var term = params.term.toLowerCase().trim();
-                    var text = (data.text || '').toLowerCase();
-                    if (text.indexOf(term) !== -1) return data;
-                    if (data.element) {
-                        var el = data.element;
-                        var nameFr = (el.getAttribute && el.getAttribute('data-name-fr') || '').toLowerCase();
-                        var nameEn = (el.getAttribute && el.getAttribute('data-name-en') || '').toLowerCase();
-                        if (nameFr && nameFr.indexOf(term) !== -1) return data;
-                        if (nameEn && nameEn.indexOf(term) !== -1) return data;
-                    }
-                    return null;
-                };
-                
-                $('#pokemon_ids').select2({
-                    placeholder: '<?php echo esc_js(__('Search Pokémon...', 'poke-hub')); ?>',
-                    allowClear: true,
-                    width: '100%',
-                    matcher: matcherFn
-                });
+        var matcherFn = window.pokehubMultilingualMatcher || function(params, data) {
+            if (!params.term || params.term.trim() === '') return data;
+            var term = params.term.toLowerCase().trim();
+            var text = (data.text || '').toLowerCase();
+            if (text.indexOf(term) !== -1) return data;
+            if (data.element) {
+                var el = data.element;
+                var nameFr = (el.getAttribute && el.getAttribute('data-name-fr') || '').toLowerCase();
+                var nameEn = (el.getAttribute && el.getAttribute('data-name-en') || '').toLowerCase();
+                if (nameFr && nameFr.indexOf(term) !== -1) return data;
+                if (nameEn && nameEn.indexOf(term) !== -1) return data;
+            }
+            return null;
+        };
 
-            // Initialiser Select2 sur le champ Événement
-            $('#event_id').select2({
-                placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>',
+        // Initialiser Select2 sur les deux champs Pokémon
+        if ($.fn.select2) {
+            $('#pokemon_ids_shiny_active').select2({
+                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny actif)...', 'poke-hub')); ?>',
                 allowClear: true,
-                width: '100%'
+                width: '100%',
+                matcher: matcherFn
             });
+            $('#shiny_locked_ids').select2({
+                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny lock)...', 'poke-hub')); ?>',
+                allowClear: true,
+                width: '100%',
+                matcher: matcherFn
+            });
+        }
 
-            // Appliquer le filtre initial après l'initialisation de Select2
-            $('#event_type').trigger('change');
+        // Les deux selects sont exclusifs : un Pokémon ne peut être que dans l'un ou l'autre
+        function removeFromOtherSelect(sourceSelectId, addedId) {
+            var otherId = (sourceSelectId === 'pokemon_ids_shiny_active') ? 'shiny_locked_ids' : 'pokemon_ids_shiny_active';
+            var $other = $('#' + otherId);
+            var val = ($other.val() || []).filter(function(x) { return x != addedId; });
+            if (val.length !== ($other.val() || []).length) {
+                $other.val(val).trigger('change');
+            }
+        }
+        $('#pokemon_ids_shiny_active').on('select2:select', function(e) {
+            removeFromOtherSelect('pokemon_ids_shiny_active', e.params.data.id);
+        });
+        $('#shiny_locked_ids').on('select2:select', function(e) {
+            removeFromOtherSelect('shiny_locked_ids', e.params.data.id);
+        });
+
+        // Sync champ caché event_type depuis l'option sélectionnée (data-source)
+        $(document).on('change', '.pokehub-event-picker-select', function() {
+            var $select = $(this);
+            var $row = $select.closest('.pokehub-event-picker-row');
+            var $hidden = $row.find('.pokehub-event-picker-type');
+            var $opt = $select.find('option:selected');
+            var src = $opt.length ? ($opt.data('source') || '') : '';
+            $hidden.val(src);
+        });
+        $('#pokehub-background-events-list .pokehub-event-picker-select').each(function() {
+            $(this).trigger('change');
+        });
+
+        // Événements : ajouter une ligne
+        var eventRowIndex = <?php echo (int) count($current_events); ?>;
+        $('.pokehub-add-event').on('click', function() {
+            var tpl = document.getElementById('pokehub-background-event-row-tpl');
+            if (!tpl || !tpl.content) return;
+            var html = tpl.innerHTML.replace(/__INDEX__/g, eventRowIndex);
+            $('#pokehub-background-events-list').append(html);
+            eventRowIndex++;
+            reindexEventRows();
+            if ($.fn.select2) {
+                $('#pokehub-background-events-list .pokehub-background-event-row').last().find('.pokehub-event-picker-select').select2({ placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>', allowClear: true, width: '100%' });
+            }
+        });
+        $(document).on('click', '.pokehub-remove-event', function() {
+            $(this).closest('.pokehub-background-event-row').remove();
+            reindexEventRows();
+        });
+        function reindexEventRows() {
+            $('#pokehub-background-events-list .pokehub-background-event-row').each(function(i) {
+                $(this).find('.pokehub-event-picker-type').attr('name', 'event_links[' + i + '][event_type]');
+                $(this).find('.pokehub-event-picker-select').attr('name', 'event_links[' + i + '][event_id]');
+            });
+        }
+        if ($.fn.select2) {
+            $('#pokehub-background-events-list .pokehub-event-picker-select').select2({ placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>', allowClear: true, width: '100%' });
         }
         // Gestion de la médiathèque pour l'image
         $(document).on('click', '.pokehub-select-background-image', function(e) {
@@ -393,45 +474,6 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             $(this).hide();
         });
 
-        // Filtrer les événements selon le type sélectionné
-        $('#event_type').on('change', function() {
-            const selectedType = $(this).val();
-            const $eventSelect = $('#event_id');
-            const currentValue = $eventSelect.val();
-
-            // Avec Select2, on utilise disabled au lieu de show/hide
-            $eventSelect.find('option').each(function() {
-                const $option = $(this);
-                const optionSource = $option.data('source') || '';
-
-                // Toujours activer l'option "None"
-                if ($option.val() === '0') {
-                    $option.prop('disabled', false);
-                    return;
-                }
-
-                // Activer les options qui correspondent au type sélectionné
-                if (!selectedType || optionSource === selectedType) {
-                    $option.prop('disabled', false);
-                } else {
-                    $option.prop('disabled', true);
-                }
-            });
-
-            // Si l'événement actuel ne correspond pas au nouveau type, réinitialiser
-            const $selectedOption = $eventSelect.find('option:selected');
-            if ($selectedOption.length && $selectedOption.val() !== '0') {
-                const optionSource = $selectedOption.data('source') || '';
-                if (selectedType && optionSource !== selectedType) {
-                    $eventSelect.val('0').trigger('change');
-                }
-            }
-
-            // Réinitialiser Select2 pour que les changements soient visibles
-            if ($.fn.select2 && $eventSelect.data('select2')) {
-                $eventSelect.trigger('change.select2');
-            }
-        });
     });
     </script>
     <?php

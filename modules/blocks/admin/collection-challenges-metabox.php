@@ -28,19 +28,31 @@ add_action('add_meta_boxes', 'pokehub_add_collection_challenges_metabox');
  * Charge les assets nécessaires pour la meta box
  */
 function pokehub_collection_challenges_metabox_assets($hook) {
-    global $post;
-    
     $allowed_types = apply_filters('pokehub_collection_challenges_post_types', ['post', 'pokehub_event']);
-    
-    if (!in_array($hook, ['post.php', 'post-new.php']) || !in_array(get_post_type($post), $allowed_types)) {
+    if (!in_array($hook, ['post.php', 'post-new.php'])) {
         return;
     }
-    
-    // Charger Select2
+    $post_type = '';
+    if (isset($GLOBALS['post']) && is_object($GLOBALS['post'])) {
+        $post_type = get_post_type($GLOBALS['post']);
+    }
+    if ($post_type === '' && $hook === 'post-new.php') {
+        $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
+    }
+    if (!in_array($post_type, $allowed_types, true)) {
+        return;
+    }
+    // Enregistrer et charger Select2 si pas déjà fait (bloc utilisable sans module events/pokemon)
+    if (!wp_script_is('select2', 'registered')) {
+        wp_register_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
+        wp_register_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
+    }
+    if (!wp_script_is('pokehub-admin-select2', 'registered')) {
+        wp_register_script('pokehub-admin-select2', POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js', ['jquery', 'select2'], defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0', true);
+    }
+    wp_enqueue_style('select2');
+    wp_enqueue_script('select2');
     wp_enqueue_script('pokehub-admin-select2');
-    wp_enqueue_style('pokehub-admin-select2');
-    
-    // Localiser les données pour Select2
     wp_localize_script('pokehub-admin-select2', 'pokehubQuestsData', [
         'pokemon' => function_exists('pokehub_get_pokemon_for_select') ? pokehub_get_pokemon_for_select() : [],
         'items' => function_exists('pokehub_get_items_for_select') ? pokehub_get_items_for_select() : [],

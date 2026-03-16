@@ -9,33 +9,36 @@ if (!defined('ABSPATH')) {
  * Enregistre tous les blocs Poké HUB
  */
 function pokehub_blocks_register_all() {
+    // Blocs utilisables en mode local ou remote : la sauvegarde va dans les tables
+    // de contenu (scope content_source = même préfixe que la source Pokémon).
+    // On ne dépend pas du module Pokémon pour enregistrer les blocs.
     $blocks = [
         'event-dates' => [
             'requires' => ['events'],
         ],
         'wild-pokemon' => [
-            'requires' => ['pokemon', 'events'],
+            'requires' => ['events'],
         ],
         'event-quests' => [
             'requires' => ['events'],
         ],
         'bonus' => [
-            'requires' => ['bonus'],
+            'requires' => [], // Bloc utilisable même sans le module Bonus (table content_source)
         ],
         'habitats' => [
-            'requires' => ['events', 'pokemon'],
+            'requires' => ['events'],
         ],
         'new-pokemon-evolutions' => [
-            'requires' => ['pokemon'],
+            'requires' => ['events'],
         ],
         'collection-challenges' => [
-            'requires' => ['pokemon', 'events'],
+            'requires' => ['events'],
         ],
         'special-research' => [
-            'requires' => ['pokemon', 'events'],
+            'requires' => ['events'],
         ],
         'eggs' => [
-            'requires' => ['pokemon', 'eggs'],
+            'requires' => ['events'],
         ],
     ];
     

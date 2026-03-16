@@ -17,8 +17,9 @@ if (!is_array($active_modules)) {
     $active_modules = [];
 }
 
-$events_enabled  = in_array('events', $active_modules, true);
-$pokemon_enabled = in_array('pokemon', $active_modules, true);
+$events_enabled      = in_array('events', $active_modules, true);
+$pokemon_enabled     = in_array('pokemon', $active_modules, true);
+$user_profiles_enabled = in_array('user-profiles', $active_modules, true);
 
 $messages = [];
 
@@ -55,6 +56,7 @@ $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base
 // Pokémon tables prefix - toujours disponible
 $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
 
+
 // User Profiles base URL - pour les sites partageant une base de données
 $user_profiles_base_url = get_option('poke_hub_user_profiles_base_url', '');
 
@@ -69,8 +71,9 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
         $active_modules = [];
     }
 
-    $events_enabled  = in_array('events', $active_modules, true);
-    $pokemon_enabled = in_array('pokemon', $active_modules, true);
+    $events_enabled      = in_array('events', $active_modules, true);
+    $pokemon_enabled     = in_array('pokemon', $active_modules, true);
+    $user_profiles_enabled = in_array('user-profiles', $active_modules, true);
 
     // Events
     if ($events_enabled) {
@@ -156,8 +159,8 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
         $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
     }
 
-    // User Profiles base URL
-    if (isset($_POST['poke_hub_user_profiles_base_url'])) {
+    // User Profiles base URL (uniquement si le module user-profiles est actif)
+    if ($user_profiles_enabled && isset($_POST['poke_hub_user_profiles_base_url'])) {
         $user_profiles_base_url = esc_url_raw(wp_unslash($_POST['poke_hub_user_profiles_base_url']));
         update_option('poke_hub_user_profiles_base_url', $user_profiles_base_url);
     }
@@ -239,7 +242,7 @@ foreach ($messages as $msg) {
                        class="regular-text"
                        placeholder="<?php echo esc_attr($wpdb->prefix); ?>">
                 <p class="description">
-                    <?php _e('Used for Pokémon tables when the plugin is in remote mode to fetch Pokémon data from another site. Leave empty to use local prefix.', 'poke-hub'); ?>
+                    <?php _e('Used for Pokémon tables and all content that derives from them: wild Pokémon, field research, habitats, bonus, new Pokémon, special research, collection challenges, eggs. Same database for everything. On remote sites, set this to the main site table prefix so all data is stored there. Leave empty to use local prefix.', 'poke-hub'); ?>
                 </p>
             </td>
         </tr>
@@ -485,6 +488,7 @@ foreach ($messages as $msg) {
         </tbody>
     </table>
 
+    <?php if ($user_profiles_enabled) : ?>
     <h2><?php _e('User Profiles Source', 'poke-hub'); ?></h2>
     <p><?php _e('Configure the base URL for user profile links. Useful when sites share a database.', 'poke-hub'); ?></p>
 
@@ -510,6 +514,7 @@ foreach ($messages as $msg) {
             </td>
         </tr>
     </table>
+    <?php endif; ?>
 
     <?php submit_button(); ?>
 </form>

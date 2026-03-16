@@ -33,6 +33,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'category'         => __('Category', 'poke-hub'),
             'group_key'        => __('Group key', 'poke-hub'),
             'parent_form_slug' => __('Parent form', 'poke-hub'),
+            'events'           => __('Events', 'poke-hub'),
         ];
     }
 
@@ -117,6 +118,39 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             : '—';
     }
 
+    public function column_events($item) {
+        $events = function_exists('poke_hub_get_form_variant_events')
+            ? poke_hub_get_form_variant_events((int) $item->id)
+            : [];
+        if (empty($events)) {
+            return '—';
+        }
+        global $wpdb;
+        $events_table = pokehub_get_table('special_events');
+        $labels = [];
+        foreach ($events as $ev) {
+            $event_id = (int) ($ev['event_id'] ?? 0);
+            $event_type = (string) ($ev['event_type'] ?? '');
+            if ($event_id <= 0) {
+                continue;
+            }
+            $event_title = '';
+            if ($events_table) {
+                $event_row = $wpdb->get_row(
+                    $wpdb->prepare("SELECT title FROM {$events_table} WHERE id = %d", $event_id)
+                );
+                if ($event_row && !empty($event_row->title)) {
+                    $event_title = $event_row->title;
+                }
+            }
+            if ($event_title === '') {
+                $event_title = sprintf('%s #%d', ucfirst(str_replace('_', ' ', $event_type)), $event_id);
+            }
+            $labels[] = esc_html($event_title);
+        }
+        return empty($labels) ? '—' : implode(', ', $labels);
+    }
+
     public function column_default($item, $column_name) {
         return '';
     }
@@ -148,6 +182,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
 
         global $wpdb;
         $table = pokehub_get_table('pokemon_form_variants');
+        $events_table = pokehub_get_table('pokemon_form_variant_events');
         if (!$table) {
             return;
         }
@@ -161,6 +196,15 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
 
         $in = implode(',', array_fill(0, count($ids), '%d'));
 
+        if ($events_table) {
+            $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM {$events_table} WHERE form_variant_id IN ($in)",
+                    $ids
+                )
+            );
+        }
+
         $wpdb->query(
             $wpdb->prepare(
                 "DELETE FROM {$table} WHERE id IN ($in)",
@@ -168,10 +212,6 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             )
         );
 
-        // NOTE :
-        // On ne touche pas à pokemon_form_mappings ici.
-        // Des mappings peuvent pointer vers un form_slug supprimé : ce sera à gérer
-        // plus tard (ex: contrôle dans le mapping ou nettoyage séparé).
     }
 
     public function prepare_items() {
@@ -321,6 +361,7 @@ function poke_hub_pokemon_handle_forms_form() {
     $parent_slug_raw  = isset($_POST['parent_form_slug']) ? wp_unslash($_POST['parent_form_slug']) : '';
     $name_fr_raw      = isset($_POST['name_fr']) ? wp_unslash($_POST['name_fr']) : '';
     $name_en_raw      = isset($_POST['name_en']) ? wp_unslash($_POST['name_en']) : '';
+    $event_links      = isset($_POST['event_links']) && is_array($_POST['event_links']) ? $_POST['event_links'] : [];
 
     $form_slug = sanitize_title($form_slug_raw);
     $label     = sanitize_text_field($label_raw);
@@ -400,10 +441,10 @@ function poke_hub_pokemon_handle_forms_form() {
             $wpdb->update(
                 $table,
                 [
-                    'category'  => $category,
-                    'group_key' => $group_key,
-                    'label'     => $label,
-                    'extra'     => $extra_json,
+                    'category' => $category,
+                    'group'    => $group_key,
+                    'label'    => $label,
+                    'extra'    => $extra_json,
                 ],
                 ['id' => (int) $existing->id],
                 ['%s', '%s', '%s', '%s'],
@@ -414,23 +455,22 @@ function poke_hub_pokemon_handle_forms_form() {
             $wpdb->insert(
                 $table,
                 [
-                    'form_slug'        => $form_slug,
-                    'category'         => $category,
-                    'group_key'        => $group_key,
-                    'parent_form_slug' => '',
-                    'label'            => $label,
-                    'extra'            => $extra_json,
+                    'form_slug' => $form_slug,
+                    'category'  => $category,
+                    'group'     => $group_key,
+                    'label'     => $label,
+                    'extra'     => $extra_json,
                 ],
-                ['%s', '%s', '%s', '%s', '%s', '%s']
+                ['%s', '%s', '%s', '%s', '%s']
             );
             $variant_id = (int) $wpdb->insert_id;
         }
     } else {
         $variant_id = poke_hub_pokemon_upsert_form_variant(
             $form_slug,
+            $label,
             $category,
             $group_key,
-            $label,
             $extra
         );
     }
@@ -446,6 +486,27 @@ function poke_hub_pokemon_handle_forms_form() {
             ['%s'],
             ['%d']
         );
+
+        // Sauvegarder les associations événements (pokemon_form_variant_events)
+        $events_table = pokehub_get_table('pokemon_form_variant_events');
+        if ($events_table) {
+            $wpdb->delete($events_table, ['form_variant_id' => $variant_id], ['%d']);
+            foreach ($event_links as $ev) {
+                $ev_type = isset($ev['event_type']) ? sanitize_text_field(wp_unslash($ev['event_type'])) : '';
+                $ev_id = isset($ev['event_id']) ? (int) $ev['event_id'] : 0;
+                if ($ev_id > 0 && $ev_type !== '') {
+                    $wpdb->insert(
+                        $events_table,
+                        [
+                            'form_variant_id' => $variant_id,
+                            'event_type'      => $ev_type,
+                            'event_id'        => $ev_id,
+                        ],
+                        ['%d', '%s', '%d']
+                    );
+                }
+            }
+        }
         
         // Purger le cache des patterns Scatterbug/Vivillon si on a modifié les traductions
         delete_transient('poke_hub_scatterbug_patterns');
@@ -494,14 +555,15 @@ function poke_hub_pokemon_handle_forms_delete() {
 
     global $wpdb;
     $table = pokehub_get_table('pokemon_form_variants');
+    $events_table = pokehub_get_table('pokemon_form_variant_events');
     if (!$table) {
         return;
     }
 
+    if ($events_table) {
+        $wpdb->delete($events_table, ['form_variant_id' => $id], ['%d']);
+    }
     $wpdb->delete($table, ['id' => $id], ['%d']);
-
-    // On laisse pokemon_form_mappings tel quel : si des mappings pointent sur ce form_slug,
-    // ce sera visible dans la liste des mappings.
 
     $redirect = add_query_arg(
         [

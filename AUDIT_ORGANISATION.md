@@ -33,10 +33,9 @@ Date: 2026-01-19
 ### Module Pokémon ✅
 
 **Structure correcte :**
-- ✅ Formulaires dans `modules/pokemon/admin/forms/` (10 formulaires)
+- ✅ Formulaires dans `modules/pokemon/admin/forms/` (9 formulaires)
   - `background-form.php`
   - `form-form.php`
-  - `form-mapping-form.php`
   - `generation-form.php`
   - `item-form.php`
   - `move-form.php`
@@ -45,9 +44,8 @@ Date: 2026-01-19
   - `type-form.php`
   - `weather-form.php`
 
-- ✅ Sections admin dans `modules/pokemon/admin/sections/` (10 sections)
+- ✅ Sections admin dans `modules/pokemon/admin/sections/` (9 sections)
   - `backgrounds.php`
-  - `form-mappings.php`
   - `forms.php`
   - `generations.php`
   - `items.php`

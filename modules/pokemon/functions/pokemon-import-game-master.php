@@ -56,8 +56,6 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     // Forme brute Niantic
     $form_proto   = $settings['form'] ?? '';
-    $form_mapping = poke_hub_pokemon_get_form_mapping( $pokemon_id_proto, $form_proto );
-
     // ---------------------------------------------------------------------
     // FIX: Beaucoup d’entrées GM dupliquent la forme "de base" via *_NORMAL
     // (ex: V0032_POKEMON_NIDORAN_NORMAL avec form = NIDORAN_NORMAL).
@@ -67,26 +65,19 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $upper_form = strtoupper( (string) $form_proto );
 
         if ( $upper_form === 'NORMAL' || $upper_form === 'FORM_NORMAL' || preg_match( '/_NORMAL$/', $upper_form ) ) {
-            $form_proto   = '';
-            $form_mapping = null; // éviter qu’un mapping force un suffix
+            $form_proto = '';
+ // éviter qu’un mapping force un suffix
         }
     }
 
-    // Form slug :
-    if ( $form_mapping && ! empty( $form_mapping['form_slug'] ) ) {
-        $form_slug = sanitize_title( (string) $form_mapping['form_slug'] );
-    } else {
-        $form_slug = poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto );
-    }
+    // Form slug : normalisation depuis le proto (plus de table form_mappings)
+    $form_slug = poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto );
 
     // Nom humain de base
     $base_name = poke_hub_pokemon_gm_id_to_label( $pokemon_id_proto );
 
-    // Suffix (label_suffix) prioritaire depuis le mapping
+    // Suffix (label_suffix) depuis la forme GM si spécial
     $label_suffix = '';
-    if ( $form_mapping && ! empty( $form_mapping['label_suffix'] ) ) {
-        $label_suffix = trim( (string) $form_mapping['label_suffix'] );
-    }
 
     // Fallback suffix depuis la forme GM si spécial
     if ( $label_suffix === '' && $form_slug !== '' && $form_proto !== '' && $form_proto !== 'UNSET' && $form_proto !== 'FORM_UNSET' ) {

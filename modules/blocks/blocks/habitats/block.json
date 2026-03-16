@@ -5,8 +5,8 @@
 	"title": "Habitats",
 	"category": "pokehub",
 	"icon": "location-alt",
-	"description": "Affiche la liste des habitats avec leurs Pokémon et horaires.",
-	"keywords": ["pokemon", "habitat", "go fest", "horaire", "sauvage", "pokehub"],
+	"description": "Displays the list of habitats with their Pokémon and schedules.",
+	"keywords": ["pokemon", "habitat", "go fest", "schedule", "wild", "pokehub"],
 	"textdomain": "poke-hub",
 	"supports": {
 		"html": false,

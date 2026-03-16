@@ -6,22 +6,12 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Sous-menu Groupes de quêtes (catégories pour la page Research)
+ * Les catégories de quêtes sont gérées uniquement par le module Quêtes (Poké HUB > Quêtes > Catégories de quêtes).
+ * Le module Events n’enregistre plus de sous-menu Quest Groups.
  */
 function pokehub_add_quest_groups_admin_page() {
-    if (!poke_hub_is_module_active('events')) {
-        return;
-    }
-    add_submenu_page(
-        'poke-hub',
-        __('Quest Groups', 'poke-hub'),
-        __('Quest Groups', 'poke-hub'),
-        'manage_options',
-        'poke-hub-quest-groups',
-        'pokehub_render_quest_groups_admin_page'
-    );
+    // Désactivé : plus de sous-menu Quest Groups dans Events.
 }
-add_action('admin_menu', 'pokehub_add_quest_groups_admin_page', 17);
 
 /**
  * Rendu de la page : liste + formulaire add/edit

@@ -21,6 +21,12 @@ add_action('rest_api_init', function () {
                 $options = [];
             }
             $pool = poke_hub_collections_get_pool($category, $options);
+            if (in_array($category, ['background', 'background_shiny', 'background_special', 'background_places', 'background_shiny_special', 'background_shiny_places'], true) && function_exists('poke_hub_collections_get_background_image_url_for_pokemon')) {
+                foreach ($pool as &$p) {
+                    $p['background_image_url'] = poke_hub_collections_get_background_image_url_for_pokemon((int) $p['id']);
+                }
+                unset($p);
+            }
             return new WP_REST_Response($pool, 200);
         },
     ]);

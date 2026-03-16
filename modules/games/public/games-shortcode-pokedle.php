@@ -367,7 +367,7 @@ function poke_hub_pokedle_ajax_submit_guess() {
             if (!empty($mystery_types[1])) {
                 $available_hints[] = ['type' => 'type2', 'value' => $mystery_types[1]['name_fr'] ?: $mystery_types[1]['name_en']];
             } else {
-                $available_hints[] = ['type' => 'type2', 'value' => 'Aucun'];
+                $available_hints[] = ['type' => 'type2', 'value' => __('None', 'poke-hub')];
             }
             
             // Génération (uniquement en mode toutes générations)

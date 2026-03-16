@@ -6,91 +6,19 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * 7. Ajoute la page admin pour gérer les quêtes (priorité 16)
- * Renommé de "Season Quests" en "Quests"
+ * Les quêtes et catégories de quêtes sont gérées uniquement par le module Quêtes (menu Poké HUB > Quêtes).
+ * Le module Events n’enregistre plus de menus quêtes.
  */
 function pokehub_add_quests_admin_page() {
-    // Vérifier que le module Events est actif
-    if (!poke_hub_is_module_active('events')) {
-        return;
-    }
-    
-    add_submenu_page(
-        'poke-hub',
-        __('Quests', 'poke-hub'),
-        __('Quests', 'poke-hub'),
-        'manage_options',
-        'poke-hub-quests',
-        'pokehub_render_quests_admin_page'
-    );
+    // Désactivé : plus de sous-menu Quests dans Events.
 }
-add_action('admin_menu', 'pokehub_add_quests_admin_page', 16);
 
 /**
- * Enqueue scripts et styles pour la page admin des quêtes de saison
+ * Assets pour la page quêtes de saison : plus utilisée (menu désactivé, gestion des quêtes dans le module Quêtes).
  */
 function pokehub_quests_admin_page_assets($hook) {
-    if ($hook !== 'poke-hub_page_poke-hub-quests') {
-        return;
-    }
-    
-    // Select2 CSS
-    wp_enqueue_style(
-        'select2',
-        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css',
-        [],
-        '4.1.0'
-    );
-    
-    // Select2 JS
-    wp_enqueue_script(
-        'select2',
-        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
-        ['jquery'],
-        '4.1.0',
-        true
-    );
-    
-    // Script global pour Select2 (utilise les fonctions existantes)
-    wp_enqueue_script(
-        'pokehub-admin-select2',
-        POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js',
-        ['jquery', 'select2'],
-        POKE_HUB_VERSION,
-        true
-    );
-    
-    // Localiser les données pour Select2
-    $pokemon_list = function_exists('pokehub_get_pokemon_for_select') 
-        ? pokehub_get_pokemon_for_select() 
-        : [];
-    $mega_pokemon_list = function_exists('pokehub_get_mega_pokemon_for_select') 
-        ? pokehub_get_mega_pokemon_for_select() 
-        : [];
-    $base_pokemon_list = function_exists('pokehub_get_base_pokemon_for_select') 
-        ? pokehub_get_base_pokemon_for_select()
-        : [];
-    $items_list = function_exists('pokehub_get_items_for_select') 
-        ? pokehub_get_items_for_select()
-        : [];
-    
-    wp_localize_script('pokehub-admin-select2', 'pokehubQuestsData', [
-        'pokemon' => $pokemon_list,
-        'mega_pokemon' => $mega_pokemon_list,
-        'base_pokemon' => $base_pokemon_list,
-        'items' => $items_list,
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('pokehub_quests_ajax'),
-    ]);
-
-    wp_enqueue_style(
-        'pokehub-metaboxes-admin',
-        POKE_HUB_URL . 'assets/css/pokehub-metaboxes-admin.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    // Page poke-hub-quests gérée par le module Quêtes uniquement.
 }
-add_action('admin_enqueue_scripts', 'pokehub_quests_admin_page_assets');
 
 /**
  * Rendu de la page admin des quêtes

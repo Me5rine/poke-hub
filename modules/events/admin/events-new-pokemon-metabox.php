@@ -158,9 +158,9 @@ function pokehub_render_new_pokemon_metabox($post) {
                     </p>
                     
                     <div id="pokehub-new-pokemon-genders" style="margin-top: 15px; display: none;">
-                        <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                        <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                         <p class="description">
-                            <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                            <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                         </p>
                         <div id="pokehub-new-pokemon-genders-list"></div>
                     </div>

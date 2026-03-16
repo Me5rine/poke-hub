@@ -12,54 +12,48 @@ if (!defined('ABSPATH')) {
  */
 function pokehub_debug_blocks_registration() {
     if (!current_user_can('manage_options')) {
-        return 'Accès refusé';
+        return esc_html__('Access denied', 'poke-hub');
     }
 
     $output = [];
-    $output[] = '<h3>🔍 Diagnostic - Blocs Gutenberg</h3>';
+    $output[] = '<h3>🔍 ' . esc_html__('Diagnostic - Gutenberg Blocks', 'poke-hub') . '</h3>';
     $output[] = '<ul style="list-style: none; padding: 0;">';
 
-    // 1. Vérifier que Gutenberg est disponible
+    $yes = '✅ ' . _x('Yes', 'debug diagnostic', 'poke-hub');
+    $no = '❌ ' . _x('No', 'debug diagnostic', 'poke-hub');
+
     $gutenberg_available = function_exists('register_block_type');
-    $output[] = '<li style="margin: 10px 0;"><strong>Gutenberg disponible :</strong> ' . ($gutenberg_available ? '✅ OUI' : '❌ NON') . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Gutenberg available', 'poke-hub') . ':</strong> ' . ($gutenberg_available ? $yes : $no) . '</li>';
 
-    // 2. Vérifier si le module Blocks est activé
     $blocks_active = poke_hub_is_module_active('blocks');
-    $output[] = '<li style="margin: 10px 0;"><strong>Module Blocks activé :</strong> ' . ($blocks_active ? '✅ OUI' : '❌ NON') . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Blocks module active', 'poke-hub') . ':</strong> ' . ($blocks_active ? $yes : $no) . '</li>';
 
-    // 3. Vérifier les modules requis
     $events_active = poke_hub_is_module_active('events');
     $bonus_active = poke_hub_is_module_active('bonus');
-    $output[] = '<li style="margin: 10px 0;"><strong>Module Events activé :</strong> ' . ($events_active ? '✅ OUI' : '❌ NON') . '</li>';
-    $output[] = '<li style="margin: 10px 0;"><strong>Module Bonus activé :</strong> ' . ($bonus_active ? '✅ OUI' : '❌ NON') . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Events module active', 'poke-hub') . ':</strong> ' . ($events_active ? $yes : $no) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Bonus module active', 'poke-hub') . ':</strong> ' . ($bonus_active ? $yes : $no) . '</li>';
 
-    // 4. Vérifier les chemins
     $block_path_events = POKE_HUB_BLOCKS_PATH . '/blocks/event-dates';
     $block_json_events = $block_path_events . '/block.json';
     $render_php_events = $block_path_events . '/render.php';
-    
-    $output[] = '<li style="margin: 10px 0;"><strong>Chemin bloc events :</strong> ' . $block_path_events . '</li>';
-    $output[] = '<li style="margin: 10px 0;"><strong>block.json events existe :</strong> ' . (file_exists($block_json_events) ? '✅ OUI' : '❌ NON') . '</li>';
-    $output[] = '<li style="margin: 10px 0;"><strong>render.php events existe :</strong> ' . (file_exists($render_php_events) ? '✅ OUI' : '❌ NON') . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Event block path', 'poke-hub') . ':</strong> ' . esc_html($block_path_events) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('event-dates block.json exists', 'poke-hub') . ':</strong> ' . (file_exists($block_json_events) ? $yes : $no) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('event-dates render.php exists', 'poke-hub') . ':</strong> ' . (file_exists($render_php_events) ? $yes : $no) . '</li>';
 
     $block_path_bonus = POKE_HUB_BLOCKS_PATH . '/blocks/bonus';
     $block_json_bonus = $block_path_bonus . '/block.json';
     $render_php_bonus = $block_path_bonus . '/render.php';
-    
-    $output[] = '<li style="margin: 10px 0;"><strong>Chemin bloc bonus :</strong> ' . $block_path_bonus . '</li>';
-    $output[] = '<li style="margin: 10px 0;"><strong>block.json bonus existe :</strong> ' . (file_exists($block_json_bonus) ? '✅ OUI' : '❌ NON') . '</li>';
-    $output[] = '<li style="margin: 10px 0;"><strong>render.php bonus existe :</strong> ' . (file_exists($render_php_bonus) ? '✅ OUI' : '❌ NON') . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Bonus block path', 'poke-hub') . ':</strong> ' . esc_html($block_path_bonus) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('bonus block.json exists', 'poke-hub') . ':</strong> ' . (file_exists($block_json_bonus) ? $yes : $no) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('bonus render.php exists', 'poke-hub') . ':</strong> ' . (file_exists($render_php_bonus) ? $yes : $no) . '</li>';
 
-    // 5. Vérifier si les blocs sont enregistrés
     if (class_exists('WP_Block_Type_Registry')) {
         $registry = WP_Block_Type_Registry::get_instance();
         $event_block = $registry->is_registered('pokehub/event-dates');
         $bonus_block = $registry->is_registered('pokehub/bonus');
-        
-        $output[] = '<li style="margin: 10px 0;"><strong>Bloc pokehub/event-dates enregistré :</strong> ' . ($event_block ? '✅ OUI' : '❌ NON') . '</li>';
-        $output[] = '<li style="margin: 10px 0;"><strong>Bloc pokehub/bonus enregistré :</strong> ' . ($bonus_block ? '✅ OUI' : '❌ NON') . '</li>';
+        $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Block pokehub/event-dates registered', 'poke-hub') . ':</strong> ' . ($event_block ? $yes : $no) . '</li>';
+        $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Block pokehub/bonus registered', 'poke-hub') . ':</strong> ' . ($bonus_block ? $yes : $no) . '</li>';
 
-        // Afficher tous les blocs enregistrés
         $all_blocks = $registry->get_all_registered();
         $pokehub_blocks = [];
         foreach ($all_blocks as $name => $block) {
@@ -68,43 +62,31 @@ function pokehub_debug_blocks_registration() {
             }
         }
         if (!empty($pokehub_blocks)) {
-            $output[] = '<li style="margin: 10px 0;"><strong>Blocs Poké HUB enregistrés :</strong> ' . implode(', ', $pokehub_blocks) . '</li>';
+            $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Poké HUB blocks registered', 'poke-hub') . ':</strong> ' . esc_html(implode(', ', $pokehub_blocks)) . '</li>';
         } else {
-            $output[] = '<li style="margin: 10px 0;"><strong>Blocs Poké HUB enregistrés :</strong> ❌ AUCUN</li>';
+            $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Poké HUB blocks registered', 'poke-hub') . ':</strong> ❌ ' . esc_html__('None', 'poke-hub') . '</li>';
         }
     } else {
-        $output[] = '<li style="margin: 10px 0;"><strong>Registry des blocs :</strong> ❌ Non disponible</li>';
+        $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Block registry', 'poke-hub') . ':</strong> ' . $no . ' ' . esc_html__('not available', 'poke-hub') . '</li>';
     }
 
-    // 6. Vérifier la constante POKE_HUB_BLOCKS_PATH
-    $output[] = '<li style="margin: 10px 0;"><strong>POKE_HUB_BLOCKS_PATH défini :</strong> ' . (defined('POKE_HUB_BLOCKS_PATH') ? '✅ OUI (' . POKE_HUB_BLOCKS_PATH . ')' : '❌ NON') . '</li>';
-
-    // 7. Vérifier si la fonction d'enregistrement est appelée
-    $output[] = '<li style="margin: 10px 0;"><strong>Fonction pokehub_blocks_register_all :</strong> ' . (function_exists('pokehub_blocks_register_all') ? '✅ Existe' : '❌ N\'existe pas') . '</li>';
-
-    // 8. Vérifier si la catégorie est enregistrée
-    $output[] = '<li style="margin: 10px 0;"><strong>Fonction pokehub_register_block_category :</strong> ' . (function_exists('pokehub_register_block_category') ? '✅ Existe' : '❌ N\'existe pas') . '</li>';
-
+    $output[] = '<li style="margin: 10px 0;"><strong>POKE_HUB_BLOCKS_PATH ' . esc_html__('defined', 'poke-hub') . ':</strong> ' . (defined('POKE_HUB_BLOCKS_PATH') ? $yes . ' (' . esc_html(POKE_HUB_BLOCKS_PATH) . ')' : $no) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Function pokehub_blocks_register_all', 'poke-hub') . ':</strong> ' . (function_exists('pokehub_blocks_register_all') ? '✅ ' . esc_html__('Exists', 'poke-hub') : '❌ ' . esc_html__('Does not exist', 'poke-hub')) . '</li>';
+    $output[] = '<li style="margin: 10px 0;"><strong>' . esc_html__('Function pokehub_register_block_category', 'poke-hub') . ':</strong> ' . (function_exists('pokehub_register_block_category') ? '✅ ' . esc_html__('Exists', 'poke-hub') : '❌ ' . esc_html__('Does not exist', 'poke-hub')) . '</li>';
     $output[] = '</ul>';
 
-    // Recommandations
-    $output[] = '<h4>💡 Recommandations :</h4>';
+    $output[] = '<h4>💡 ' . esc_html__('Recommendations', 'poke-hub') . ':</h4>';
     $output[] = '<ul style="list-style: disc; padding-left: 20px;">';
-    
     if (!$blocks_active) {
-        $output[] = '<li>Activez le module <strong>Blocks</strong> dans <strong>Poké HUB → Settings → General</strong></li>';
+        $output[] = '<li>' . esc_html__('Enable the Blocks module in Poké HUB → Settings → General', 'poke-hub') . '</li>';
     }
     if (!$events_active) {
-        $output[] = '<li>Activez le module <strong>Events</strong> (requis pour le bloc event-dates)</li>';
+        $output[] = '<li>' . esc_html__('Enable the Events module (required for event-dates block)', 'poke-hub') . '</li>';
     }
-    if (!$bonus_active) {
-        $output[] = '<li>Activez le module <strong>Bonus</strong> (requis pour le bloc bonus)</li>';
+    if ($blocks_active && $events_active) {
+        $output[] = '<li>' . esc_html__('Clear WordPress cache and refresh the editor (Ctrl+F5)', 'poke-hub') . '</li>';
+        $output[] = '<li>' . esc_html__('Make sure you are in the Gutenberg editor (not the classic editor)', 'poke-hub') . '</li>';
     }
-    if ($blocks_active && $events_active && $bonus_active) {
-        $output[] = '<li>Videz le cache WordPress et rafraîchissez l\'éditeur (Ctrl+F5)</li>';
-        $output[] = '<li>Vérifiez que vous êtes bien dans l\'éditeur Gutenberg (pas l\'éditeur classique)</li>';
-    }
-    
     $output[] = '</ul>';
 
     return implode("\n", $output);

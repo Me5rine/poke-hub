@@ -43,6 +43,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             'variant_category'  => isset($_GET['filter_variant_category']) ? sanitize_text_field(wp_unslash($_GET['filter_variant_category'])) : '',
             'variant_group'     => isset($_GET['filter_variant_group']) ? sanitize_text_field(wp_unslash($_GET['filter_variant_group'])) : '',
             'regional'          => isset($_GET['filter_regional']) ? sanitize_text_field(wp_unslash($_GET['filter_regional'])) : '',
+            'event_costumed'    => isset($_GET['filter_event_costumed']) ? sanitize_text_field(wp_unslash($_GET['filter_event_costumed'])) : '',
         ];
     }
 
@@ -60,6 +61,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             'release_mega'     => __('Release (mega)', 'poke-hub'),
             'release_dynamax'  => __('Release (dynamax)', 'poke-hub'),
             'regional'         => __('Regional', 'poke-hub'),
+            'event_costumed'   => __('Event/Costumed', 'poke-hub'),
             'variant_category' => __('Variant category', 'poke-hub'),
             'variant_group'    => __('Variant group', 'poke-hub'),
         ];
@@ -75,6 +77,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             'release_mega'     => ['release_mega', false],
             'release_dynamax'  => ['release_dynamax', false],
             'regional'         => ['regional', false],
+            'event_costumed'   => ['event_costumed', false],
             'variant_category' => ['variant_category', false],
             'variant_group'    => ['variant_group', false],
         ];
@@ -185,6 +188,12 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
 
         $release          = $extra['release']          ?? [];
         $regional         = $extra['regional']         ?? [];
+        $is_event_costumed = !empty($extra['is_event_costumed']);
+        // Considérer aussi la catégorie de la forme : si la forme est "costume", le Pokémon est costumé
+        $variant_id = isset($item->form_variant_id) ? (int) $item->form_variant_id : 0;
+        if ($variant_id > 0 && isset($this->variant_map[$variant_id]) && isset($this->variant_map[$variant_id]->category) && $this->variant_map[$variant_id]->category === 'costume') {
+            $is_event_costumed = true;
+        }
         $variant_category = $extra['variant_category'] ?? '';
         $variant_group    = $extra['variant_group']    ?? '';
 
@@ -279,6 +288,18 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                     );
                 }
                 $url = add_query_arg('filter_regional', '0', $base_url);
+                return sprintf('<a href="%s">&mdash;</a>', esc_url($url));
+
+            case 'event_costumed':
+                if ($is_event_costumed) {
+                    $url = add_query_arg('filter_event_costumed', '1', $base_url);
+                    return sprintf(
+                        '<a href="%s"><span class="dashicons dashicons-tickets-alt" title="%s"></span></a>',
+                        esc_url($url),
+                        esc_attr__('Event or costumed Pokémon', 'poke-hub')
+                    );
+                }
+                $url = add_query_arg('filter_event_costumed', '0', $base_url);
                 return sprintf('<a href="%s">&mdash;</a>', esc_url($url));
 
             case 'variant_category':
@@ -501,6 +522,20 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                 </option>
             </select>
 
+            <!-- Filtre événement / costumé -->
+            <label class="screen-reader-text" for="filter_event_costumed">
+                <?php _e('Filter by event/costumed', 'poke-hub'); ?>
+            </label>
+            <select name="filter_event_costumed" id="filter_event_costumed">
+                <option value=""><?php _e('All (event/costumed or not)', 'poke-hub'); ?></option>
+                <option value="1" <?php selected($this->filters['event_costumed'], '1'); ?>>
+                    <?php _e('Event/costumed only', 'poke-hub'); ?>
+                </option>
+                <option value="0" <?php selected($this->filters['event_costumed'], '0'); ?>>
+                    <?php _e('Non-event/costumed only', 'poke-hub'); ?>
+                </option>
+            </select>
+
             <?php submit_button(__('Filter'), '', 'filter_action', false); ?>
         </div>
         <?php
@@ -517,10 +552,11 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
 
         global $wpdb;
 
-        $table_pokemon  = pokehub_get_table('pokemon');
-        $table_gens     = pokehub_get_table('generations');
-        $table_type_rel = pokehub_get_table('pokemon_type_links');
-        $table_types    = pokehub_get_table('pokemon_types');
+        $table_pokemon   = pokehub_get_table('pokemon');
+        $table_gens      = pokehub_get_table('generations');
+        $table_variants  = pokehub_get_table('pokemon_form_variants');
+        $table_type_rel  = pokehub_get_table('pokemon_type_links');
+        $table_types     = pokehub_get_table('pokemon_types');
 
         // Screen option "Pokémon per page"
         $per_page     = $this->get_items_per_page('poke_hub_pokemon_per_page', 20);
@@ -542,6 +578,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             'release_mega',
             'release_dynamax',
             'regional',
+            'event_costumed',
             'variant_category',
             'variant_group',
         ];
@@ -615,6 +652,28 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             $params[]      = '%"regional":{"is_regional":true%';
         }
 
+        // Filtre événement / costumé : extra.is_event_costumed OU forme avec category = 'costume'
+        if ($this->filters['event_costumed'] === '1') {
+            if ($table_variants) {
+                $where_parts[] = "(p.extra LIKE %s OR p.extra LIKE %s OR EXISTS (SELECT 1 FROM {$table_variants} fv WHERE fv.id = p.form_variant_id AND fv.category = 'costume'))";
+                $params[]      = '%"is_event_costumed":true%';
+                $params[]      = '%"is_event_costumed": true%';
+            } else {
+                $where_parts[] = '(p.extra LIKE %s OR p.extra LIKE %s)';
+                $params[]      = '%"is_event_costumed":true%';
+                $params[]      = '%"is_event_costumed": true%';
+            }
+        } elseif ($this->filters['event_costumed'] === '0') {
+            if ($table_variants) {
+                $where_parts[] = "((p.extra IS NULL OR (p.extra NOT LIKE %s AND p.extra NOT LIKE %s)) AND NOT EXISTS (SELECT 1 FROM {$table_variants} fv WHERE fv.id = p.form_variant_id AND fv.category = 'costume'))";
+                $params[]      = '%"is_event_costumed":true%';
+                $params[]      = '%"is_event_costumed": true%';
+            } else {
+                $where_parts[] = '(p.extra NOT LIKE %s OR p.extra IS NULL)';
+                $params[]      = '%"is_event_costumed":true%';
+            }
+        }
+
         // Jointures
         $join = "
             FROM {$table_pokemon} AS p
@@ -663,6 +722,10 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             } else {
                 $items = $wpdb->get_results($sql_items_all);
             }
+
+            // Construire la map des variantes pour le tri event_costumed (forme en catégorie costume)
+            $this->items = $items;
+            $this->build_variant_map();
 
             // Tri PHP
             usort($items, function($a, $b) use ($orderby, $order) {
@@ -715,6 +778,12 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                     case 'regional':
                         $val_a = !empty($regional_a['is_regional']) ? 1 : 0;
                         $val_b = !empty($regional_b['is_regional']) ? 1 : 0;
+                        break;
+                    case 'event_costumed':
+                        $vid_a = isset($a->form_variant_id) ? (int) $a->form_variant_id : 0;
+                        $vid_b = isset($b->form_variant_id) ? (int) $b->form_variant_id : 0;
+                        $val_a = (!empty($extra_a['is_event_costumed']) || ($vid_a > 0 && isset($this->variant_map[$vid_a]) && ($this->variant_map[$vid_a]->category ?? '') === 'costume')) ? 1 : 0;
+                        $val_b = (!empty($extra_b['is_event_costumed']) || ($vid_b > 0 && isset($this->variant_map[$vid_b]) && ($this->variant_map[$vid_b]->category ?? '') === 'costume')) ? 1 : 0;
                         break;
                     case 'variant_category':
                         $val_a = $variant_category_a;
@@ -1468,13 +1537,24 @@ function poke_hub_pokemon_handle_pokemon_form() {
         ? (float) str_replace(',', '.', $_POST['dodge_probability'])
         : 0.0;
 
-    // Releases
+    // Releases (normaliser en YYYY-MM-DD pour la base)
     $release_normal     = isset($_POST['release_normal']) ? sanitize_text_field(wp_unslash($_POST['release_normal'])) : '';
     $release_shiny      = isset($_POST['release_shiny']) ? sanitize_text_field(wp_unslash($_POST['release_shiny'])) : '';
     $release_shadow     = isset($_POST['release_shadow']) ? sanitize_text_field(wp_unslash($_POST['release_shadow'])) : '';
     $release_mega       = isset($_POST['release_mega']) ? sanitize_text_field(wp_unslash($_POST['release_mega'])) : '';
     $release_dynamax    = isset($_POST['release_dynamax']) ? sanitize_text_field(wp_unslash($_POST['release_dynamax'])) : '';
     $release_gigantamax = isset($_POST['release_gigantamax']) ? sanitize_text_field(wp_unslash($_POST['release_gigantamax'])) : '';
+    if (function_exists('poke_hub_normalize_release_date')) {
+        $release_normal     = poke_hub_normalize_release_date($release_normal);
+        $release_shiny      = poke_hub_normalize_release_date($release_shiny);
+        $release_shadow     = poke_hub_normalize_release_date($release_shadow);
+        $release_mega       = poke_hub_normalize_release_date($release_mega);
+        $release_dynamax    = poke_hub_normalize_release_date($release_dynamax);
+        $release_gigantamax = poke_hub_normalize_release_date($release_gigantamax);
+    }
+
+    // Pokémon d'événement ou costumé : si la forme a la catégorie "costume", c'est automatique ; sinon case à cocher
+    $is_event_costumed = ($variant_category === 'costume') || !empty($_POST['is_event_costumed']);
 
     // Régional
     $regional_is_regional  = !empty($_POST['regional_is_regional']);
@@ -1523,6 +1603,11 @@ function poke_hub_pokemon_handle_pokemon_form() {
         ? wp_unslash($_POST['evolutions'])
         : [];
 
+    // ---------- Event association (quand Pokémon événement/costumé) ----------
+
+    $pokemon_event_links = (isset($_POST['pokemon_event_links']) && is_array($_POST['pokemon_event_links']))
+        ? wp_unslash($_POST['pokemon_event_links'])
+        : [];
 
     // On s’assure d’avoir un slug
     if ($slug === '') {
@@ -1634,6 +1719,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
     $extra['variant_group']      = $variant_group;
     $extra['variant_id']         = $form_variant_id;
     $extra['variant_form_slug']  = $variant_form_slug;
+
+    // Pokémon d'événement ou costumé (même notion)
+    $extra['is_event_costumed']  = (bool) $is_event_costumed;
 
     // ---------- Bloc par jeu : Pokémon GO ----------
 
@@ -1787,6 +1875,23 @@ function poke_hub_pokemon_handle_pokemon_form() {
         );
     }
 
+        // Sync événements associés (si Pokémon événement/costumé)
+        if ($pokemon_id > 0 && $is_event_costumed && function_exists('pokehub_get_table')) {
+            $events_table = pokehub_get_table('pokemon_pokemon_events');
+            $wpdb->delete($events_table, ['pokemon_id' => $pokemon_id], ['%d']);
+            foreach ($pokemon_event_links as $link) {
+                $ev_type = isset($link['event_type']) ? sanitize_text_field($link['event_type']) : '';
+                $ev_id = isset($link['event_id']) ? (int) $link['event_id'] : 0;
+                if ($ev_id > 0 && $ev_type !== '') {
+                    $wpdb->insert($events_table, [
+                        'pokemon_id' => $pokemon_id,
+                        'event_type' => $ev_type,
+                        'event_id'   => $ev_id,
+                    ], ['%d', '%s', '%d']);
+                }
+            }
+        }
+
         wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
         exit;
     }
@@ -1825,6 +1930,23 @@ function poke_hub_pokemon_handle_pokemon_form() {
                 'mode' => 'form',
             ]
         );
+    }
+
+    // Sync événements associés (si Pokémon événement/costumé)
+    if ($id > 0 && $is_event_costumed && function_exists('pokehub_get_table')) {
+        $events_table = pokehub_get_table('pokemon_pokemon_events');
+        $wpdb->delete($events_table, ['pokemon_id' => $id], ['%d']);
+        foreach ($pokemon_event_links as $link) {
+            $ev_type = isset($link['event_type']) ? sanitize_text_field($link['event_type']) : '';
+            $ev_id = isset($link['event_id']) ? (int) $link['event_id'] : 0;
+            if ($ev_id > 0 && $ev_type !== '') {
+                $wpdb->insert($events_table, [
+                    'pokemon_id' => $id,
+                    'event_type' => $ev_type,
+                    'event_id'   => $ev_id,
+                ], ['%d', '%s', '%d']);
+            }
+        }
     }
 
     wp_redirect(add_query_arg('ph_msg', 'updated', $redirect_base));

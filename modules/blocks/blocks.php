@@ -31,6 +31,23 @@ add_action('init', function() {
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-eggs-helpers.php'; // Helpers bloc œufs
     require_once POKE_HUB_BLOCKS_PATH . '/admin/collection-challenges-metabox.php'; // Meta box défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/admin/special-research-metabox.php'; // Meta box études spéciales
+
+    // Bloc bonus : tous les éléments (helpers + metabox) sont chargés par le module Blocks uniquement — aucune dépendance au module Bonus
+    if (!function_exists('pokehub_get_all_bonuses_for_select')) {
+        require_once POKE_HUB_PATH . 'modules/bonus/functions/bonus-helpers.php';
+    }
+    require_once POKE_HUB_PATH . 'modules/bonus/admin/bonus-metabox.php';
+
+    // Metabox œufs (sélection des œufs pour l'article) : chargée ici si le module Eggs est inactif, pour que le bloc eggs reste utilisable
+    if (!function_exists('poke_hub_is_module_active') || !poke_hub_is_module_active('eggs')) {
+        if (!function_exists('pokehub_add_eggs_metabox')) {
+            if (!function_exists('pokehub_get_post_eggs')) {
+                require_once POKE_HUB_PATH . 'modules/eggs/functions/eggs-helpers.php';
+            }
+            require_once POKE_HUB_PATH . 'modules/eggs/admin/eggs-metabox.php';
+        }
+    }
+
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:
     // require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-debug.php';
@@ -84,15 +101,13 @@ add_action('init', function() {
             POKE_HUB_VERSION
         );
 
-        // CSS pour le bloc eggs (si module eggs actif)
-        if (poke_hub_is_module_active('eggs')) {
-            wp_enqueue_style(
-                'pokehub-eggs-front',
-                POKE_HUB_URL . 'assets/css/poke-hub-eggs-front.css',
-                [],
-                POKE_HUB_VERSION
-            );
-        }
+        // CSS pour le bloc eggs (utilisable en mode remote, ne dépend pas du module eggs)
+        wp_enqueue_style(
+            'pokehub-eggs-front',
+            POKE_HUB_URL . 'assets/css/poke-hub-eggs-front.css',
+            [],
+            POKE_HUB_VERSION
+        );
     }
     add_action('wp_enqueue_scripts', 'pokehub_blocks_enqueue_frontend_assets');
     

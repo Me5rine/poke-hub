@@ -3,9 +3,30 @@
 if (!defined('ABSPATH')) { exit; }
 
 /**
- * Liste des bonus disponibles (à adapter à ton système de bonus).
+ * Liste des bonus disponibles pour les selects (metabox, etc.).
+ * Source : table catalogue bonus_types (locale sur le site principal, distante via préfixe Pokémon ailleurs).
  */
 function pokehub_get_all_bonuses_for_select(): array {
+    $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
+    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT id, title FROM {$table} ORDER BY sort_order ASC, title ASC",
+            OBJECT_K
+        );
+        if (is_array($rows)) {
+            $out = [];
+            foreach ($rows as $row) {
+                $out[] = [
+                    'id'    => (int) $row->id,
+                    'label' => (string) $row->title,
+                ];
+            }
+            return $out;
+        }
+    }
+
+    // Fallback : CPT (site principal sans table encore migrée)
     $posts = get_posts([
         'post_type'        => 'pokehub_bonus',
         'post_status'      => 'publish',
@@ -14,11 +35,9 @@ function pokehub_get_all_bonuses_for_select(): array {
         'order'            => 'ASC',
         'suppress_filters' => false,
     ]);
-
     if (empty($posts)) {
         return [];
     }
-
     $out = [];
     foreach ($posts as $post) {
         $out[] = [
@@ -26,7 +45,6 @@ function pokehub_get_all_bonuses_for_select(): array {
             'label' => $post->post_title,
         ];
     }
-
     return $out;
 }
 
@@ -37,6 +55,38 @@ function pokehub_get_bonus_data($bonus_id) {
     $bonus_id = (int) $bonus_id;
     if (!$bonus_id) {
         return null;
+    }
+
+    $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
+    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
+        global $wpdb;
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, title, slug, description, image_slug FROM {$table} WHERE id = %d",
+            $bonus_id
+        ));
+        if ($row) {
+            $slug       = (string) $row->slug;
+            $image_slug = !empty($row->image_slug) ? (string) $row->image_slug : $slug;
+            $image_url  = '';
+            $image_tag  = '';
+            if (!empty($image_slug) && function_exists('poke_hub_get_bonus_icon_url')) {
+                $image_url = poke_hub_get_bonus_icon_url($image_slug);
+                if (!empty($image_url)) {
+                    $image_tag = '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($row->title) . '" />';
+                }
+            }
+            $description = wpautop((string) $row->description);
+            $description = apply_filters('pokehub_bonus_description', $description, (object) ['ID' => $bonus_id]);
+
+            return [
+                'ID'          => (int) $row->id,
+                'title'       => (string) $row->title,
+                'slug'        => $slug,
+                'image_url'   => $image_url,
+                'image_html'  => $image_tag,
+                'description' => $description,
+            ];
+        }
     }
 
     $post = get_post($bonus_id);
@@ -84,6 +134,21 @@ function pokehub_get_bonus_data($bonus_id) {
  * Récupère un bonus par slug (pratique plus tard, dans des shortcodes ou config).
  */
 function pokehub_get_bonus_by_slug($slug) {
+    $slug = is_string($slug) ? trim($slug) : '';
+    if ($slug === '') {
+        return null;
+    }
+    $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
+    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
+        global $wpdb;
+        $id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$table} WHERE slug = %s LIMIT 1",
+            $slug
+        ));
+        if ($id > 0) {
+            return pokehub_get_bonus_data($id);
+        }
+    }
     $post = get_page_by_path($slug, OBJECT, 'pokehub_bonus');
     if (!$post) {
         return null;
@@ -203,7 +268,9 @@ function pokehub_bonus_append_to_content($content) {
     // Ajout à la fin du contenu
     return $content . $bonus_html;
 }
-add_filter('the_content', 'pokehub_bonus_append_to_content', 20);
+if (function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('bonus')) {
+    add_filter('the_content', 'pokehub_bonus_append_to_content', 20);
+}
 
 /**
  * Rendu visuel des bonus (cartes avec badges)
@@ -320,10 +387,11 @@ function pokehub_bonus_append_to_content_visual($content) {
     return $content . $bonus_html;
 }
 
-// Remplacer l'ancien filtre par le nouveau (priorité plus basse pour être exécuté après)
+// Remplacer l'ancien filtre par le nouveau (priorité plus basse pour être exécuté après) — uniquement si le module Bonus est actif
 add_action('plugins_loaded', function() {
-    // Retirer l'ancien filtre s'il existe
+    if (!function_exists('poke_hub_is_module_active') || !poke_hub_is_module_active('bonus')) {
+        return;
+    }
     remove_filter('the_content', 'pokehub_bonus_append_to_content', 20);
-    // Ajouter le nouveau filtre avec le rendu visuel
     add_filter('the_content', 'pokehub_bonus_append_to_content_visual', 20);
-}, 25); // Priorité 25 pour être exécuté après le chargement des helpers
+}, 25);

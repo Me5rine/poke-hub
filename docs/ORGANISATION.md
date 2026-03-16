@@ -9,13 +9,16 @@ Ce guide explique comment organiser le code dans le plugin Poké HUB pour mainte
 ```
 poke-hub/
 ├── includes/              # Code partagé entre modules
-│   ├── settings/         # Gestion des paramètres
+│   ├── settings/         # Gestion des paramètres (modules : source unique dans settings-modules.php)
+│   ├── content/          # Helpers tables de contenu (content_eggs, content_quests, etc.) + éditeur quêtes partagé
 │   └── ...
 ├── modules/              # Modules fonctionnels
 │   ├── events/           # Module Événements
 │   ├── bonus/            # Module Bonus
 │   ├── blocks/           # Module Blocs Gutenberg
 │   ├── pokemon/          # Module Pokémon
+│   ├── quests/           # Module Quêtes (menu Quêtes, onglets Quêtes / Catégories de quêtes ; indépendant d’Events)
+│   ├── eggs/             # Module Œufs (admin pools, shortcode ; metabox aussi chargée par Blocks si inactif)
 │   └── ...
 ├── assets/               # Ressources statiques
 │   ├── css/
@@ -24,6 +27,8 @@ poke-hub/
 ```
 
 ## 📦 Organisation des modules
+
+**Enregistrement (source unique)** : la liste des modules (slug, chemin, libellé) est définie une seule fois dans **`includes/settings/settings-modules.php`** via `poke_hub_get_modules_config()`. Réglages > General, chargement des modules et sanitize s’appuient sur cette source. Pour ajouter un module, ajouter une entrée dans ce tableau uniquement.
 
 Chaque module suit cette structure standard :
 
@@ -64,17 +69,17 @@ modules/blocks/
 **Fonctions de rendu** → Dans les modules respectifs
 
 - `pokehub_render_event_dates()` → `modules/events/functions/events-render.php`
-- `pokehub_render_bonuses_visual()` → `modules/bonus/functions/bonus-helpers.php`
-- `pokehub_render_quests_visual()` → `modules/events/functions/events-quests-render.php`
+- `pokehub_render_bonuses_visual()` → `modules/bonus/functions/bonus-helpers.php` (chargé par le module Blocks)
+- `pokehub_render_event_quests()` → `modules/blocks/functions/blocks-quests-helpers.php` (ou module Events pour les données du post)
 
-**Pourquoi ?** Les fonctions de rendu sont spécifiques à chaque domaine métier.
+**Pourquoi ?** Les fonctions de rendu sont spécifiques à chaque domaine métier. La gestion des quêtes (menus, CRUD) est dans le module Quêtes ; le bloc event-quests et la metabox sont côté Events/Blocks.
 
 ### 2. Helpers de données
 
 **Helpers** → Dans les modules respectifs
 
 - `poke_hub_events_get_post_dates()` → `modules/events/functions/events-helpers.php`
-- `pokehub_get_bonuses_for_post()` → `modules/bonus/functions/bonus-helpers.php`
+- `pokehub_get_bonuses_for_post()` → `modules/bonus/functions/bonus-helpers.php` (chargé par le module Blocks ; types de bonus depuis site principal, voir docs/BONUS_SOURCE_AND_BLOCKS.md)
 
 **Pourquoi ?** Les helpers manipulent les données spécifiques à chaque module.
 
@@ -83,7 +88,7 @@ modules/blocks/
 **Rendu** → Dans les modules respectifs
 
 - `modules/events/functions/events-render.php` - Rendu des événements
-- `modules/bonus/functions/bonus-helpers.php` - Rendu des bonus
+- `modules/bonus/functions/bonus-helpers.php` - Rendu des bonus (chargé par le module Blocks)
 - `modules/events/functions/events-quests-render.php` - Rendu des quêtes
 
 **Pourquoi ?** Le rendu est spécifique à chaque domaine métier.
@@ -129,9 +134,10 @@ Chaque module doit avoir :
 
 ## 🔍 Références
 
-- [Architecture des Blocs](./modules/blocks/docs/ARCHITECTURE.md)
-- [Types de Blocs](./modules/blocks/docs/BLOCK_TYPES.md)
-- [Guide de Création Rapide](./modules/blocks/docs/QUICK_START.md)
+- [Architecture des Blocs](./blocks/ARCHITECTURE.md)
+- [Types de Blocs](./blocks/BLOCK_TYPES.md)
+- [Guide de Création Rapide](./blocks/QUICK_START.md)
+- [Module Quêtes](./quests/README.md)
 
 
 

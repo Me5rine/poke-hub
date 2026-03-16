@@ -191,6 +191,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     // extra['regional'] only contains is_regional, description, and map_image_id
     $regional = is_array($extra['regional'] ?? null) ? $extra['regional'] : [];
 
+    // Pokémon d'événement ou costumé : depuis extra ou dérivé de la forme (category = costume)
+    $is_event_costumed = !empty($extra['is_event_costumed']);
+
     // ================================
     // Listes de référence
     // ================================
@@ -237,9 +240,23 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             $form_variant_labels[$fv->id] = [
                 'label'     => $display,
                 'form_slug' => $fv->form_slug,
+                'category'  => isset($fv->category) ? (string) $fv->category : 'normal',
             ];
         }
     }
+
+    // Forme sélectionnée = costume ? (alors event/costumed vient de la forme, pas de la case à cocher)
+    $selected_form_is_costume = ($form_variant_id > 0 && isset($form_variant_labels[$form_variant_id]['category']) && $form_variant_labels[$form_variant_id]['category'] === 'costume');
+    if ($selected_form_is_costume) {
+        $is_event_costumed = true;
+    }
+
+    // Événements associés au Pokémon (quand marqué événement/costumé)
+    $current_pokemon_events = [];
+    if ($is_edit && !empty($edit_row->id) && function_exists('poke_hub_get_pokemon_events')) {
+        $current_pokemon_events = poke_hub_get_pokemon_events((int) $edit_row->id);
+    }
+    $all_events_picker = function_exists('poke_hub_get_events_for_picker') ? poke_hub_get_events_for_picker() : [];
 
     // 3) Liste des attaques Pokémon GO (via category + attack_stats.game_key = 'pokemon_go')
     $attacks_table       = pokehub_get_table('attacks');
@@ -421,13 +438,13 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="dex_number"><?php esc_html_e('National Dex #', 'poke-hub'); ?> *</label>
-                        <input type="number" min="1" style="max-width: 150px;" name="dex_number" id="dex_number" value="<?php echo esc_attr($dex_number); ?>" />
+                        <input type="number" min="1" style="max-width: 100px;" name="dex_number" id="dex_number" value="<?php echo esc_attr($dex_number); ?>" />
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="generation_id"><?php esc_html_e('Generation', 'poke-hub'); ?></label>
-                        <select name="generation_id" id="generation_id">
+                        <select name="generation_id" id="generation_id" style="max-width: 140px;">
                             <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
                             <?php foreach ($gens as $gen) : ?>
                                 <option value="<?php echo (int) $gen->id; ?>" <?php selected($generation_id, $gen->id); ?>>
@@ -451,6 +468,46 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <p class="description"><?php esc_html_e('Only one form per Dex number should be marked as default.', 'poke-hub'); ?></p>
                     </div>
                 </div>
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
+                        <?php if ($selected_form_is_costume) : ?>
+                            <label><?php esc_html_e('Event or costumed', 'poke-hub'); ?></label>
+                            <p><strong><?php esc_html_e('Yes (from form variant)', 'poke-hub'); ?></strong></p>
+                            <p class="description"><?php esc_html_e('The selected form is in the "Costume / Event" category.', 'poke-hub'); ?></p>
+                        <?php else : ?>
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" name="is_event_costumed" value="1" <?php checked($is_event_costumed); ?> />
+                                <span><?php esc_html_e('Event or costumed', 'poke-hub'); ?></span>
+                            </label>
+                            <p class="description"><?php esc_html_e('Optional: check for event/costumed variant if the form category is not "Costume / Event".', 'poke-hub'); ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event Association (visible lorsque le Pokémon est marqué événement/costumé) -->
+            <div id="pokehub-pokemon-event-association-wrap" class="admin-lab-form-section" style="display:<?php echo $is_event_costumed ? 'block' : 'none'; ?>;">
+                <h3><?php esc_html_e('Event Association', 'poke-hub'); ?></h3>
+                <p class="description"><?php esc_html_e('Associate this event/costumed Pokémon with one or more events. Search by event name.', 'poke-hub'); ?></p>
+                <div id="pokehub-pokemon-events-list">
+                    <?php
+                    $pokemon_event_index = 0;
+                    foreach ($current_pokemon_events as $ev) :
+                        $ev_type = isset($ev['event_type']) ? (string) $ev['event_type'] : '';
+                        $ev_id = isset($ev['event_id']) ? (int) $ev['event_id'] : 0;
+                        if (function_exists('poke_hub_render_event_picker_row')) {
+                            poke_hub_render_event_picker_row($pokemon_event_index, $ev_id, $ev_type, $all_events_picker, 'pokemon_event_links', 'pokehub-pokemon-event-row', null, 'pokehub-pokemon-remove-event');
+                        }
+                        $pokemon_event_index++;
+                    endforeach;
+                    ?>
+                </div>
+                <p><button type="button" class="button pokehub-pokemon-add-event"><?php esc_html_e('Add event', 'poke-hub'); ?></button></p>
+                <?php if (function_exists('poke_hub_render_event_picker_row')) : ?>
+                <template id="pokehub-pokemon-event-row-tpl">
+                    <?php poke_hub_render_event_picker_row('__INDEX__', 0, '', $all_events_picker, 'pokemon_event_links', 'pokehub-pokemon-event-row', null, 'pokehub-pokemon-remove-event'); ?>
+                </template>
+                <?php endif; ?>
             </div>
 
             <div class="admin-lab-form-row">
@@ -766,24 +823,33 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         <!-- Section: Release Dates -->
         <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Release dates', 'poke-hub'); ?></h2>
-            
+            <?php
+            $release_keys = ['normal', 'shiny', 'shadow', 'mega', 'dynamax', 'gigantamax'];
+            $release_values_iso = [];
+            foreach ($release_keys as $k) {
+                $v = $release[$k] ?? '';
+                $release_values_iso[$k] = (function_exists('poke_hub_normalize_release_date') && $v !== '')
+                    ? poke_hub_normalize_release_date($v)
+                    : $v;
+            }
+            ?>
             <div class="admin-lab-form-row">
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_normal"><?php esc_html_e('Normal', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_normal" id="release_normal" value="<?php echo esc_attr($release['normal'] ?? ''); ?>" />
+                        <input type="date" name="release_normal" id="release_normal" value="<?php echo esc_attr($release_values_iso['normal']); ?>" />
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_shiny"><?php esc_html_e('Shiny', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_shiny" id="release_shiny" value="<?php echo esc_attr($release['shiny'] ?? ''); ?>" />
+                        <input type="date" name="release_shiny" id="release_shiny" value="<?php echo esc_attr($release_values_iso['shiny']); ?>" />
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_shadow"><?php esc_html_e('Shadow', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_shadow" id="release_shadow" value="<?php echo esc_attr($release['shadow'] ?? ''); ?>" />
+                        <input type="date" name="release_shadow" id="release_shadow" value="<?php echo esc_attr($release_values_iso['shadow']); ?>" />
                     </div>
                 </div>
             </div>
@@ -792,19 +858,19 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_mega"><?php esc_html_e('Mega', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_mega" id="release_mega" value="<?php echo esc_attr($release['mega'] ?? ''); ?>" />
+                        <input type="date" name="release_mega" id="release_mega" value="<?php echo esc_attr($release_values_iso['mega']); ?>" />
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_dynamax"><?php esc_html_e('Dynamax', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_dynamax" id="release_dynamax" value="<?php echo esc_attr($release['dynamax'] ?? ''); ?>" />
+                        <input type="date" name="release_dynamax" id="release_dynamax" value="<?php echo esc_attr($release_values_iso['dynamax']); ?>" />
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
                         <label for="release_gigantamax"><?php esc_html_e('Gigantamax', 'poke-hub'); ?></label>
-                        <input type="text" placeholder="YYYY-MM-DD" name="release_gigantamax" id="release_gigantamax" value="<?php echo esc_attr($release['gigantamax'] ?? ''); ?>" />
+                        <input type="date" name="release_gigantamax" id="release_gigantamax" value="<?php echo esc_attr($release_values_iso['gigantamax']); ?>" />
                     </div>
                 </div>
             </div>
@@ -2241,6 +2307,52 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         ?>
     </form>
 </div>
+
+<script>
+jQuery(function($) {
+    // Afficher/masquer la section Event Association selon la case "Event or costumed"
+    $(document).on('change', 'input[name="is_event_costumed"]', function() {
+        $('#pokehub-pokemon-event-association-wrap').toggle(this.checked);
+    });
+    // Sync champ caché event_type depuis l'option sélectionnée
+    $(document).on('change', '.pokehub-event-picker-select', function() {
+        var $select = $(this);
+        var $row = $select.closest('.pokehub-event-picker-row');
+        var $hidden = $row.find('.pokehub-event-picker-type');
+        var $opt = $select.find('option:selected');
+        var src = $opt.length ? ($opt.data('source') || '') : '';
+        $hidden.val(src);
+    });
+    $('#pokehub-pokemon-events-list .pokehub-event-picker-select').each(function() {
+        $(this).trigger('change');
+    });
+    var pokemonEventRowIndex = <?php echo (int) count($current_pokemon_events); ?>;
+    $('.pokehub-pokemon-add-event').on('click', function() {
+        var tpl = document.getElementById('pokehub-pokemon-event-row-tpl');
+        if (!tpl || !tpl.content) return;
+        var html = tpl.innerHTML.replace(/__INDEX__/g, pokemonEventRowIndex);
+        $('#pokehub-pokemon-events-list').append(html);
+        pokemonEventRowIndex++;
+        reindexPokemonEventRows();
+        if ($.fn.select2) {
+            $('#pokehub-pokemon-events-list .pokehub-pokemon-event-row').last().find('.pokehub-event-picker-select').select2({ placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>', allowClear: true, width: '100%' });
+        }
+    });
+    $(document).on('click', '.pokehub-pokemon-remove-event', function() {
+        $(this).closest('.pokehub-pokemon-event-row').remove();
+        reindexPokemonEventRows();
+    });
+    function reindexPokemonEventRows() {
+        $('#pokehub-pokemon-events-list .pokehub-pokemon-event-row').each(function(i) {
+            $(this).find('.pokehub-event-picker-type').attr('name', 'pokemon_event_links[' + i + '][event_type]');
+            $(this).find('.pokehub-event-picker-select').attr('name', 'pokemon_event_links[' + i + '][event_id]');
+        });
+    }
+    if ($.fn.select2) {
+        $('#pokehub-pokemon-events-list .pokehub-event-picker-select').select2({ placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>', allowClear: true, width: '100%' });
+    }
+});
+</script>
 
 <?php if ( ! empty( $all_fast_moves ) || ! empty( $all_charged_moves ) || ! empty( $all_pokemon_for_evo ) ) : ?>
     <script>

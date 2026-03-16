@@ -45,8 +45,14 @@ class Pokehub_DB {
         }
 
         // Tables de contenu communes (post, special_event, global_pool) — œufs, quêtes, raids, etc.
-        if (in_array('events', $active_modules, true) || in_array('eggs', $active_modules, true)) {
+        if (in_array('events', $active_modules, true) || in_array('eggs', $active_modules, true) || in_array('quests', $active_modules, true)) {
             $this->createContentTables();
+        }
+
+        // Catalogue des types de bonus (source de vérité, lue à distance via même préfixe que Pokémon)
+        // Créée si module Bonus OU Blocks actif (le bloc bonus fonctionne sans le module Bonus)
+        if (in_array('bonus', $active_modules, true) || in_array('blocks', $active_modules, true)) {
+            $this->createBonusTypesTable();
         }
 
         if (in_array('user-profiles', $active_modules, true)) {
@@ -80,7 +86,6 @@ class Pokehub_DB {
      * - pokemon_type_weather_links
      * - pokemon_type_weakness_links
      * - pokemon_type_resistance_links
-     * - pokemon_form_mappings
      * - pokemon_regional_regions (ensembles de pays géographiques)
      * - pokemon_regional_mappings (mapping pattern Vivillon => pays/régions)
      */
@@ -103,12 +108,14 @@ class Pokehub_DB {
         $type_weather_links    = pokehub_get_table('pokemon_type_weather_links');
         $type_weakness_links   = pokehub_get_table('pokemon_type_weakness_links');
         $type_resistance_links = pokehub_get_table('pokemon_type_resistance_links');
-        $form_mappings_table   = pokehub_get_table('pokemon_form_mappings');
         $pokemon_form_variants = pokehub_get_table('pokemon_form_variants');
         $evolutions_table      = pokehub_get_table('pokemon_evolutions');
         $items_table           = pokehub_get_table('items');
         $backgrounds_table     = pokehub_get_table('pokemon_backgrounds');
         $background_pokemon_links = pokehub_get_table('pokemon_background_pokemon_links');
+        $background_events_table = pokehub_get_table('pokemon_background_events');
+        $form_variant_events_table = pokehub_get_table('pokemon_form_variant_events');
+        $pokemon_events_table = pokehub_get_table('pokemon_pokemon_events');
         $regional_regions_table = pokehub_get_table('pokemon_regional_regions');
         $regional_mappings_table = pokehub_get_table('pokemon_regional_mappings');
 
@@ -358,22 +365,7 @@ class Pokehub_DB {
             KEY resistance_type_id (resistance_type_id)
         ) {$charset_collate};";
 
-        // 11) Mappings de formes (costumes, clones, etc.)
-        $sql_form_mappings = "CREATE TABLE {$form_mappings_table} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            pokemon_id_proto VARCHAR(100) NOT NULL,
-            form_proto       VARCHAR(150) NOT NULL,
-            form_slug        VARCHAR(100) NOT NULL DEFAULT '',
-            label_suffix     VARCHAR(150) NOT NULL DEFAULT '',
-            sort_order       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-            flags            LONGTEXT NULL,
-
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_mapping (pokemon_id_proto, form_proto),
-            KEY form_slug (form_slug)
-        ) {$charset_collate};";
-
-        // 12) Registre global des formes de Pokémon
+        // 11) Registre global des formes de Pokémon
         $sql_form_variants = "CREATE TABLE {$pokemon_form_variants} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             form_slug VARCHAR(191) NOT NULL,
@@ -385,6 +377,28 @@ class Pokehub_DB {
             UNIQUE KEY form_slug (form_slug),
             KEY category (category),
             KEY group_idx (`group`)
+        ) {$charset_collate};";
+
+        // 11b) Liaison Form variant (costume / forme) ↔ Événements (une forme peut être associée à plusieurs événements)
+        $sql_form_variant_events = "CREATE TABLE {$form_variant_events_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            form_variant_id BIGINT(20) UNSIGNED NOT NULL,
+            event_type VARCHAR(50) NOT NULL DEFAULT '',
+            event_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY form_variant_id (form_variant_id),
+            UNIQUE KEY form_variant_event (form_variant_id, event_type, event_id)
+        ) {$charset_collate};";
+
+        // 11c) Liaison Pokémon (marqué événement/costumé) ↔ Événements (un Pokémon peut être associé à plusieurs événements)
+        $sql_pokemon_events = "CREATE TABLE {$pokemon_events_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            pokemon_id BIGINT(20) UNSIGNED NOT NULL,
+            event_type VARCHAR(50) NOT NULL DEFAULT '',
+            event_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY pokemon_id (pokemon_id),
+            UNIQUE KEY pokemon_event (pokemon_id, event_type, event_id)
         ) {$charset_collate};";
 
         // 13) Branches d'évolution Pokémon (avec item_id / lure_item_id)
@@ -466,10 +480,12 @@ class Pokehub_DB {
         ) {$charset_collate};";
 
         // 15) Backgrounds (fonds spéciaux pour Pokémon)
+        // background_type : 'location' = fonds de lieux, 'special' = fonds spéciaux (Pokémon GO)
         $sql_backgrounds = "CREATE TABLE {$backgrounds_table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             slug VARCHAR(191) NOT NULL,
             title VARCHAR(255) NOT NULL DEFAULT '',
+            background_type VARCHAR(50) NOT NULL DEFAULT 'special',
             image_url TEXT NULL,
             event_id BIGINT(20) UNSIGNED NULL DEFAULT NULL,
             event_type VARCHAR(50) NOT NULL DEFAULT '', -- 'local_post', 'remote_post', 'special_local', 'special_remote'
@@ -478,19 +494,33 @@ class Pokehub_DB {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug),
+            KEY background_type (background_type),
             KEY event_id (event_id),
             KEY event_type (event_type)
         ) {$charset_collate};";
 
         // 16) Liaison Background ↔ Pokémon (plusieurs Pokémon peuvent avoir le même background)
+        // is_shiny_locked : 1 = le fond est sorti avant le shiny, ce Pokémon ne peut pas être shiny pour ce fond
         $sql_background_pokemon_links = "CREATE TABLE {$background_pokemon_links} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             background_id BIGINT(20) UNSIGNED NOT NULL,
             pokemon_id BIGINT(20) UNSIGNED NOT NULL,
+            is_shiny_locked TINYINT(1) NOT NULL DEFAULT 0,
             PRIMARY KEY (id),
             KEY background_id (background_id),
             KEY pokemon_id (pokemon_id),
             UNIQUE KEY background_pokemon (background_id, pokemon_id)
+        ) {$charset_collate};";
+
+        // 16b) Liaison Background ↔ Événements (un fond peut être associé à plusieurs événements)
+        $sql_background_events = "CREATE TABLE {$background_events_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            background_id BIGINT(20) UNSIGNED NOT NULL,
+            event_type VARCHAR(50) NOT NULL DEFAULT '',
+            event_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY background_id (background_id),
+            UNIQUE KEY background_event (background_id, event_type, event_id)
         ) {$charset_collate};";
 
         dbDelta($sql_pokemon);
@@ -507,13 +537,37 @@ class Pokehub_DB {
         dbDelta($sql_type_weather_links);
         dbDelta($sql_type_weakness_links);
         dbDelta($sql_type_resistance_links);
-        dbDelta($sql_form_mappings);
         dbDelta($sql_form_variants);
+        dbDelta($sql_form_variant_events);
+        dbDelta($sql_pokemon_events);
         dbDelta($sql_evolutions);
         dbDelta($sql_items);
         dbDelta($sql_backgrounds);
         dbDelta($sql_background_pokemon_links);
-        
+        dbDelta($sql_background_events);
+
+        // Migration : copier event_id/event_type des backgrounds vers pokemon_background_events (une seule fois)
+        $migrated = get_option('pokehub_background_events_migrated', false);
+        if (!$migrated) {
+            $existing = $wpdb->get_results(
+                "SELECT id, event_id, event_type FROM {$backgrounds_table} WHERE event_id IS NOT NULL AND event_id > 0 AND TRIM(COALESCE(event_type, '')) != ''"
+            );
+            if (!empty($existing)) {
+                foreach ($existing as $row) {
+                    $wpdb->replace(
+                        $background_events_table,
+                        [
+                            'background_id' => (int) $row->id,
+                            'event_type'     => (string) $row->event_type,
+                            'event_id'       => (int) $row->event_id,
+                        ],
+                        ['%d', '%s', '%d']
+                    );
+                }
+            }
+            update_option('pokehub_background_events_migrated', true);
+        }
+
         // 17) Table des régions géographiques (Europe, Asie, Hémisphère Est, etc.)
         $sql_regional_regions = "CREATE TABLE {$regional_regions_table} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1233,6 +1287,39 @@ class Pokehub_DB {
         if (empty($col)) {
             $wpdb->query("ALTER TABLE {$quest_lines_tbl} ADD COLUMN quest_group_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER content_quest_id, ADD KEY quest_group_id (quest_group_id)");
         }
+    }
+
+    /**
+     * Table catalogue des types de bonus (source de vérité sur le site principal).
+     * Sur les sites distants, on lit cette table via le même préfixe que les tables Pokémon (remote_pokemon).
+     * L'id correspond au post_id du CPT pokehub_bonus sur le site principal pour garder les mêmes IDs.
+     */
+    private function createBonusTypesTable() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+        $table = pokehub_get_table('bonus_types');
+        if (empty($table)) {
+            return;
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $sql = "CREATE TABLE {$table} (
+            id BIGINT UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL DEFAULT '',
+            slug VARCHAR(191) NOT NULL DEFAULT '',
+            description LONGTEXT NULL,
+            image_slug VARCHAR(191) NULL DEFAULT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY slug (slug),
+            KEY sort_order (sort_order)
+        ) {$charset_collate};";
+
+        dbDelta($sql);
     }
 
     /**

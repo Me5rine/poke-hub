@@ -263,44 +263,6 @@ function poke_hub_pokemon_get_i18n_names( $category, $slug, $default_en ) {
 }
 
 /**
- * Récupère un mapping Game Master → forme à partir de pokemon_form_mappings.
- *
- * @param string $pokemon_id_proto ex: 'MEWTWO'
- * @param string $form_proto       ex: 'MEWTWO_A'
- * @return array|null
- */
-function poke_hub_pokemon_get_form_mapping( $pokemon_id_proto, $form_proto ) {
-    if ( ! function_exists( 'pokehub_get_table' ) ) {
-        return null;
-    }
-
-    global $wpdb;
-
-    $pokemon_id_proto = (string) $pokemon_id_proto;
-    $form_proto       = (string) $form_proto;
-
-    if ( $pokemon_id_proto === '' || $form_proto === '' ) {
-        return null;
-    }
-
-    $table = pokehub_get_table( 'pokemon_form_mappings' );
-    if ( ! $table ) {
-        return null;
-    }
-
-    $row = $wpdb->get_row(
-        $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE pokemon_id_proto = %s AND form_proto = %s LIMIT 1",
-            $pokemon_id_proto,
-            $form_proto
-        ),
-        ARRAY_A
-    );
-
-    return $row ?: null;
-}
-
-/**
  * Récupère un variant global (pokemon_form_variants) par form_slug.
  *
  * @param string $form_slug

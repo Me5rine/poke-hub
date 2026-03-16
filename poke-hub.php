@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.0.0
+Version: 2.0.1
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -42,8 +42,16 @@ require_once POKE_HUB_INCLUDES_DIR . 'settings/settings.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-modules.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-module-hooks.php';
 require_once POKE_HUB_INCLUDES_DIR . 'admin-ui.php';
+require_once POKE_HUB_INCLUDES_DIR . 'admin/event-picker.php';
 require_once POKE_HUB_INCLUDES_DIR . 'pokehub-db.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-backgrounds-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-form-variant-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-pokemon-events-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-costume-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-pokekalos-release-parser.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-pokekalos-import.php';
 require_once POKE_HUB_INCLUDES_DIR . 'content/content-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'admin-tools.php';
 require_once POKE_HUB_INCLUDES_DIR . 'content/pokemon-go-page.php';
 
 /**
@@ -120,7 +128,10 @@ function poke_hub_admin_menu_bonus() {
     if (!is_array($active_modules)) {
         $active_modules = [];
     }
-    
+    // Sur le site distant (préfixe Pokémon défini), les types de bonus sont gérés sur le site principal : on masque le menu.
+    if (function_exists('pokehub_bonus_use_remote_source') && pokehub_bonus_use_remote_source()) {
+        return;
+    }
     if (in_array('bonus', $active_modules, true)) {
         add_submenu_page(
             'poke-hub',
@@ -188,6 +199,27 @@ function poke_hub_admin_menu_eggs() {
     // lorsque le module eggs est actif.
 }
 add_action('admin_menu', 'poke_hub_admin_menu_eggs', 15);
+
+/**
+ * 7. Sous-menu Quêtes (priorité 16) – enregistré par le module quests
+ */
+function poke_hub_admin_menu_quests() {
+    $active_modules = get_option('poke_hub_active_modules', []);
+    if (!is_array($active_modules)) {
+        $active_modules = [];
+    }
+    if (in_array('quests', $active_modules, true) && function_exists('poke_hub_quests_admin_ui')) {
+        add_submenu_page(
+            'poke-hub',
+            __('Quests', 'poke-hub'),
+            __('Quests', 'poke-hub'),
+            'manage_options',
+            'poke-hub-quests',
+            'poke_hub_quests_admin_ui'
+        );
+    }
+}
+add_action('admin_menu', 'poke_hub_admin_menu_quests', 16);
 
 /**
  * 8. Sous-menu User Profiles (priorité 17)

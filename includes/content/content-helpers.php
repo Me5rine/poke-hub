@@ -2,6 +2,9 @@
 // File: includes/content/content-helpers.php
 // Tables de contenu communes : source_type = post | special_event | global_pool, source_id = ID correspondant.
 // Les dates (start_ts, end_ts) sont dupliquées ; la mise à jour des dates d'un event/post doit appeler pokehub_content_sync_dates_for_source().
+//
+// Lieu d'enregistrement unique : même préfixe que les tables Pokémon (poke_hub_pokemon_remote_prefix).
+// Centralise : Pokémon nature, field research, habitats, bonus, nouveaux Pokémon, special research, collection challenges, œufs.
 
 if (!defined('ABSPATH')) {
     exit;
@@ -342,6 +345,20 @@ function pokehub_content_get_all_eggs_aggregated_at($timestamp = null) {
 // --- Quêtes ---
 
 /**
+ * Récupère toutes les lignes content_quests (pour l’admin module Quêtes).
+ *
+ * @return array<object>
+ */
+function pokehub_content_get_all_quests_rows() {
+    global $wpdb;
+    $table = pokehub_get_table('content_quests');
+    if (!$table) {
+        return [];
+    }
+    return $wpdb->get_results("SELECT * FROM {$table} ORDER BY source_type ASC, source_id ASC, id ASC");
+}
+
+/**
  * Récupère les lignes content_quests actives à un instant T.
  *
  * @param int|null $timestamp Timestamp UTC. Si null, tous les enregistrements.
@@ -382,6 +399,65 @@ function pokehub_content_get_quests_row($source_type, $source_id) {
         (string) $source_type,
         (int) $source_id
     ));
+}
+
+/**
+ * Récupère la ligne content_quests par ID (pour l’admin module Quêtes).
+ *
+ * @param int $id content_quests.id
+ * @return object|null
+ */
+function pokehub_content_get_quests_row_by_id($id) {
+    global $wpdb;
+    $table = pokehub_get_table('content_quests');
+    if (!$table || (int) $id <= 0) {
+        return null;
+    }
+    return $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$table} WHERE id = %d LIMIT 1",
+        (int) $id
+    ));
+}
+
+/**
+ * Récupère les lignes de quêtes (task, rewards, quest_group_id) pour un content_quest_id.
+ * Même format que pokehub_content_get_quests().
+ *
+ * @param int $content_quest_id content_quests.id
+ * @return array [ ['task' => '', 'rewards' => [], 'quest_group_id' => 0 ], ... ]
+ */
+function pokehub_content_get_quests_by_content_quest_id($content_quest_id) {
+    global $wpdb;
+    $content_quest_id = (int) $content_quest_id;
+    if ($content_quest_id <= 0) {
+        return [];
+    }
+    $table = pokehub_get_table('content_quest_lines');
+    if (!$table) {
+        return [];
+    }
+    $lines = $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM {$table} WHERE content_quest_id = %d ORDER BY sort_order ASC, id ASC",
+        $content_quest_id
+    ));
+    $out = [];
+    foreach ($lines as $l) {
+        $rewards_raw = isset($l->rewards) ? $l->rewards : '';
+        $rewards     = [];
+        if ($rewards_raw !== '' && $rewards_raw !== null) {
+            $rewards = json_decode($rewards_raw, true);
+            if (is_string($rewards)) {
+                $rewards = json_decode($rewards, true);
+            }
+            $rewards = is_array($rewards) ? $rewards : [];
+        }
+        $out[] = [
+            'task'           => (string) (isset($l->task) ? $l->task : ''),
+            'rewards'        => pokehub_content_normalize_quest_rewards($rewards),
+            'quest_group_id' => isset($l->quest_group_id) ? (int) $l->quest_group_id : 0,
+        ];
+    }
+    return $out;
 }
 
 /**
@@ -544,6 +620,74 @@ function pokehub_content_save_quests($source_type, $source_id, array $quests) {
             'sort_order'      => $sort++,
         ], ['%d', '%d', '%s', '%s', '%d']);
     }
+}
+
+/**
+ * Nettoie un tableau de quêtes issu d'une requête (POST) pour enregistrement.
+ * Utilisé par la metabox events et par le module Quêtes (indépendant du module events).
+ *
+ * @param array $quests Données brutes (ex. $_POST['pokehub_quests']).
+ * @return array Quêtes nettoyées pour pokehub_content_save_quests().
+ */
+function pokehub_quests_clean_from_request(array $quests) {
+    $cleaned_quests = [];
+    foreach ($quests as $quest) {
+        $has_rewards = !empty($quest['rewards']) && is_array($quest['rewards']) && count($quest['rewards']) > 0;
+        $has_task = !empty($quest['task']);
+        if (!$has_task && !$has_rewards) {
+            continue;
+        }
+        $cleaned_quest = [
+            'task'           => $has_task ? sanitize_text_field($quest['task']) : '',
+            'rewards'        => [],
+            'quest_group_id' => isset($quest['quest_group_id']) ? max(0, (int) $quest['quest_group_id']) : 0,
+        ];
+        if (isset($quest['rewards']) && is_array($quest['rewards'])) {
+            foreach ($quest['rewards'] as $reward) {
+                $cleaned_reward = ['type' => sanitize_key($reward['type'] ?? 'pokemon')];
+                if ($cleaned_reward['type'] === 'pokemon') {
+                    if (isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])) {
+                        $cleaned_reward['pokemon_ids'] = array_map('intval', array_filter($reward['pokemon_ids'], function ($id) {
+                            return !empty($id) && is_numeric($id);
+                        }));
+                    } elseif (isset($reward['pokemon_id'])) {
+                        $pid = (int) $reward['pokemon_id'];
+                        $cleaned_reward['pokemon_ids'] = $pid > 0 ? [$pid] : [];
+                    } else {
+                        $cleaned_reward['pokemon_ids'] = [];
+                    }
+                    $cleaned_reward['force_shiny'] = !empty($reward['force_shiny']);
+                    $pokemon_genders = [];
+                    if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {
+                        foreach ($reward['pokemon_genders'] as $pokemon_id => $gender) {
+                            $pokemon_id = (int) $pokemon_id;
+                            if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
+                                $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);
+                            }
+                        }
+                    }
+                    $cleaned_reward['pokemon_genders'] = $pokemon_genders;
+                } elseif ($cleaned_reward['type'] === 'candy' || $cleaned_reward['type'] === 'mega_energy') {
+                    $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
+                    $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
+                } elseif ($cleaned_reward['type'] === 'item') {
+                    $cleaned_reward['item_id'] = isset($reward['item_id']) ? (int) $reward['item_id'] : 0;
+                    if ($cleaned_reward['item_id'] > 0 && function_exists('pokehub_get_item_data_by_id')) {
+                        $item_data = pokehub_get_item_data_by_id($cleaned_reward['item_id']);
+                        $cleaned_reward['item_name'] = $item_data ? ($item_data['name_fr'] ?? $item_data['name_en'] ?? '') : sanitize_text_field($reward['item_name'] ?? '');
+                    } else {
+                        $cleaned_reward['item_name'] = sanitize_text_field($reward['item_name'] ?? '');
+                    }
+                    $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
+                } else {
+                    $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
+                }
+                $cleaned_quest['rewards'][] = $cleaned_reward;
+            }
+        }
+        $cleaned_quests[] = $cleaned_quest;
+    }
+    return $cleaned_quests;
 }
 
 // --- Groupes de quêtes ---

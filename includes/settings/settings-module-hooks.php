@@ -161,12 +161,14 @@ add_action('admin_init', function () {
             pokehub_get_table('pokemon_type_offensive_super_effective_links'),
             pokehub_get_table('pokemon_type_offensive_not_very_effective_links'),
             pokehub_get_table('pokemon_type_offensive_no_effect_links'),
-            pokehub_get_table('pokemon_form_mappings'),
             pokehub_get_table('pokemon_form_variants'),
+            pokehub_get_table('pokemon_form_variant_events'),
+            pokehub_get_table('pokemon_pokemon_events'),
             pokehub_get_table('pokemon_evolutions'),
             pokehub_get_table('items'),
             pokehub_get_table('pokemon_backgrounds'),
             pokehub_get_table('pokemon_background_pokemon_links'),
+            pokehub_get_table('pokemon_background_events'),
             pokehub_get_table('pokemon_regional_regions'),
             pokehub_get_table('pokemon_regional_mappings'),
         ],
@@ -216,9 +218,23 @@ add_action('admin_init', function () {
             pokehub_get_table('content_egg_pokemon'),
         ],
 
+        'quests' => [
+            pokehub_get_table('content_quests'),
+            pokehub_get_table('content_quest_lines'),
+            pokehub_get_table('quest_groups'),
+        ],
+
         'collections' => [
             pokehub_get_table('collections'),
             pokehub_get_table('collection_items'),
+        ],
+
+        'bonus' => [
+            pokehub_get_table('bonus_types'),
+        ],
+        // Table bonus_types aussi créée/vérifiée quand Blocks est actif (bloc bonus utilisable sans module Bonus)
+        'blocks' => [
+            pokehub_get_table('bonus_types'),
         ],
     ];
 
@@ -266,6 +282,26 @@ add_action('admin_init', function () {
         $user_profiles_table = pokehub_get_table('user_profiles');
         if ($user_profiles_table && ($wpdb->get_var("SHOW TABLES LIKE '{$user_profiles_table}'") === $user_profiles_table)) {
             Pokehub_DB::getInstance()->migrateUserProfilesColumns();
+        }
+    }
+
+    // Migration unique : remplir bonus_types à partir du CPT pokehub_bonus (site principal uniquement)
+    if (in_array('bonus', $active_modules, true) && function_exists('pokehub_bonus_use_remote_source') && !pokehub_bonus_use_remote_source()) {
+        $bonus_types_table = pokehub_get_table('bonus_types');
+        if ($bonus_types_table && ($wpdb->get_var("SHOW TABLES LIKE '{$bonus_types_table}'") === $bonus_types_table)) {
+            if (!get_option('pokehub_bonus_types_cpt_synced', false)) {
+                $posts = get_posts([
+                    'post_type'      => 'pokehub_bonus',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                ]);
+                foreach ($posts as $post) {
+                    if (function_exists('pokehub_sync_bonus_cpt_to_table')) {
+                        pokehub_sync_bonus_cpt_to_table($post->ID);
+                    }
+                }
+                update_option('pokehub_bonus_types_cpt_synced', true);
+            }
         }
     }
 });

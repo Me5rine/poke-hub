@@ -251,10 +251,28 @@ Toutes les classes sont conçues pour être responsive :
 4. **Responsive** : Toutes les grilles utilisent `repeat(auto-fill, minmax(...))` pour s'adapter automatiquement
 5. **Accessibilité** : Les icônes ont des attributs `title` pour les tooltips et `alt` pour les images
 
+### Module Collections
+
+**Utilise au maximum les classes du système CSS commun** (voir **docs/FRONT_CSS.md**, **docs/CSS_RULES.md**, **docs/CSS_SYSTEM.md**) : `me5rine-lab-dashboard`, `me5rine-lab-title-large`, `me5rine-lab-subtitle`, `me5rine-lab-dashboard-header`, `me5rine-lab-form-button`, `me5rine-lab-form-button-secondary`, `me5rine-lab-form-button-remove`, `me5rine-lab-form-block`, `me5rine-lab-form-field`, `me5rine-lab-form-label`, `me5rine-lab-form-input`, `me5rine-lab-form-select`, `me5rine-lab-form-message`, `me5rine-lab-state-message`, `me5rine-lab-card`, `me5rine-lab-card-name`, `me5rine-lab-card-meta`, `me5rine-lab-card-actions`, `me5rine-lab-sr-only`.
+
+**Classes spécifiques Collections** (préfixe `pokehub-collections-` / `pokehub-collection-`) pour le layout et le JS uniquement :
+- `.pokehub-collections-wrap` (+ `me5rine-lab-dashboard`) - Wrapper page gestion
+- `.pokehub-collections-grid` - Grille 3 colonnes, cartes 16:9
+- `.pokehub-collections-card` (+ `me5rine-lab-card`) - Carte avec overlay et lien
+- `.pokehub-collections-card-link`, `.pokehub-collections-card-bg`, `.pokehub-collections-card-actions`, `.pokehub-collections-card-btn`
+- `.pokehub-collection-view-wrap` (+ `me5rine-lab-dashboard`), `.pokehub-collection-tiles`, `.pokehub-collection-tile`, `.pokehub-collection-tile-status`, `.pokehub-status-{owned|missing|for_trade}`
+- `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing` — légende (vert / orange / gris = possédé / à échanger / manquant), couleurs via `--admin-lab-color-notice-sucess-border`, `--admin-lab-color-notice-warning`, `--admin-lab-color-borders`
+- `.pokehub-collections-options-additive`, `.pokehub-collections-options-specific-hint` — bloc options « en plus » vs message pour catégories spécifiques (masquage avec `.is-hidden`)
+- `.pokehub-collection-multiselect-wrap`, `.pokehub-collection-multiselect-list-wrap`, `.pokehub-collection-multiselect-list`, `.pokehub-collection-multiselect-item`
+- `.pokehub-collections-modal`, `.pokehub-collections-modal-backdrop`, `.pokehub-collections-modal-content` (modal non défini dans FRONT_CSS)
+
+**Variables** : le module utilise `--me5rine-lab-*` (FRONT_CSS) ; dégradés des cartes `--pokehub-collections-card-gradient-*`. Couleurs des statuts / légende : `--admin-lab-color-notice-sucess-border`, `--admin-lab-color-notice-warning`, `--admin-lab-color-borders` (voir **modules/collections/COLLECTIONS_THEME_CSS.md**).
+
 ## Fichiers CSS
 
 Les styles sont définis dans :
 - `assets/css/poke-hub-events-front.css` - Styles pour les événements et Pokémon sauvages
 - `assets/css/poke-hub-bonus-front.css` - Styles pour les bonus
 - `assets/css/poke-hub-special-events-single.css` - Styles pour les pages single d'événements
+- `modules/collections/assets/css/collections-front.css` - Styles du module Collections (front)
 

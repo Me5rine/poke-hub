@@ -38,18 +38,12 @@ function pokehub_render_event_bonuses_metabox($post) {
         $value = [];
     }
 
-    // Liste des bonus disponibles
-    $bonuses = get_posts([
-        'post_type'      => 'pokehub_bonus',
-        'posts_per_page' => -1,
-        'orderby'        => 'title',
-        'order'          => 'ASC',
-    ]);
+    // Liste des bonus disponibles (site principal = table locale, sites distants = table via préfixe Pokémon)
+    $bonuses = function_exists('pokehub_get_all_bonuses_for_select') ? pokehub_get_all_bonuses_for_select() : [];
     ?>
     <div class="pokehub-event-bonuses-wrapper">
         <p>
-            Sélectionne un ou plusieurs bonus pour cet événement.  
-            Tu peux personnaliser le texte pour cet événement uniquement.
+            <?php esc_html_e('Select one or more bonuses for this event. You can customize the text for this event only.', 'poke-hub'); ?>
         </p>
 
         <div class="pokehub-event-bonuses-list">
@@ -61,18 +55,18 @@ function pokehub_render_event_bonuses_metabox($post) {
                     <p>
                         <strong>Bonus</strong><br>
                         <select name="pokehub_event_bonuses[<?php echo esc_attr($index); ?>][bonus_id]" style="min-width:250px;">
-                            <option value="">— Sélectionner un bonus —</option>
-                            <?php foreach ($bonuses as $bonus_post) : ?>
-                                <option value="<?php echo esc_attr($bonus_post->ID); ?>" <?php selected($bonus_id, $bonus_post->ID); ?>>
-                                    <?php echo esc_html($bonus_post->post_title); ?>
+                            <option value=""><?php esc_html_e('— Select a bonus —', 'poke-hub'); ?></option>
+                            <?php foreach ($bonuses as $b) : ?>
+                                <option value="<?php echo esc_attr($b['id']); ?>" <?php selected($bonus_id, (int) $b['id']); ?>>
+                                    <?php echo esc_html($b['label']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <button type="button" class="button-link-delete pokehub-remove-bonus" style="float:right;">Supprimer</button>
+                        <button type="button" class="button-link-delete pokehub-remove-bonus" style="float:right;"><?php esc_html_e('Delete', 'poke-hub'); ?></button>
                     </p>
 
                     <p style="margin-top:8px;">
-                        <strong>Description spécifique à cet événement</strong><br>
+                        <strong><?php esc_html_e('Description specific to this event', 'poke-hub'); ?></strong><br>
                         <textarea name="pokehub_event_bonuses[<?php echo esc_attr($index); ?>][description]" rows="2" style="width:100%;"><?php
                             echo esc_textarea($description);
                         ?></textarea>
@@ -83,7 +77,7 @@ function pokehub_render_event_bonuses_metabox($post) {
 
         <p>
             <button type="button" class="button button-secondary" id="pokehub-add-bonus-row">
-                + Ajouter un bonus
+                <?php esc_html_e('Add bonus', 'poke-hub'); ?>
             </button>
         </p>
     </div>
@@ -99,15 +93,15 @@ function pokehub_render_event_bonuses_metabox($post) {
                     '<p>' +
                         '<strong>Bonus</strong><br>' +
                         '<select name="pokehub_event_bonuses['+index+'][bonus_id]" style="min-width:250px;">' +
-                            '<option value="">— Sélectionner un bonus —</option>' +
-                            <?php foreach ($bonuses as $bonus_post) : ?>
-                                '<option value="<?php echo esc_js($bonus_post->ID); ?>"><?php echo esc_js($bonus_post->post_title); ?></option>' +
+                            '<option value=""><?php echo esc_js(__('— Select a bonus —', 'poke-hub')); ?></option>' +
+                            <?php foreach ($bonuses as $b) : ?>
+                                '<option value="<?php echo esc_js($b['id']); ?>"><?php echo esc_js($b['label']); ?></option>' +
                             <?php endforeach; ?>
                         '</select>' +
-                        '<button type="button" class="button-link-delete pokehub-remove-bonus" style="float:right;">Supprimer</button>' +
+                        '<button type="button" class="button-link-delete pokehub-remove-bonus" style="float:right;"><?php echo esc_js(__('Delete', 'poke-hub')); ?></button>' +
                     '</p>' +
                     '<p style="margin-top:8px;">' +
-                        '<strong>Description spécifique à cet événement</strong><br>' +
+                        '<strong><?php echo esc_js(__('Description specific to this event', 'poke-hub')); ?></strong><br>' +
                         '<textarea name="pokehub_event_bonuses['+index+'][description]" rows="2" style="width:100%;"></textarea>' +
                     '</p>' +
                 '</div>';

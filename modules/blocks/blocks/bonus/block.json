@@ -5,8 +5,8 @@
 	"title": "Bonus",
 	"category": "pokehub",
 	"icon": "awards",
-	"description": "Affiche les bonus de l'événement sous forme de cartes visuelles avec icônes et badges.",
-	"keywords": ["bonus", "récompense", "reward", "pokehub"],
+	"description": "Displays the event bonuses as visual cards with icons and badges.",
+	"keywords": ["bonus", "reward", "pokehub"],
 	"textdomain": "poke-hub",
 	"supports": {
 		"html": false,

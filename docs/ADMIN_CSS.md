@@ -662,8 +662,7 @@ span[style*="color: red"] {
 }
 
 /* Subscription - Add Forms */
-#add-tier-form,
-#add-mapping-form {
+#add-tier-form {
     display: none;
     margin: 20px 0;
     padding: 15px;

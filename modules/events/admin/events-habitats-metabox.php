@@ -502,9 +502,9 @@ function pokehub_render_habitat_editor_item($index, $habitat) {
             </select>
             
             <div class="pokehub-habitats-pokemon-genders" data-habitat-index="<?php echo esc_attr($index); ?>" style="margin-top: 10px; display: none;">
-                <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                 <p class="description" style="margin: 5px 0; font-size: 12px;">
-                    <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                    <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                 </p>
                 <div class="pokehub-habitats-pokemon-genders-list" data-habitat-index="<?php echo esc_attr($index); ?>"></div>
             </div>
@@ -535,9 +535,9 @@ function pokehub_render_habitat_editor_item($index, $habitat) {
             </select>
             
             <div class="pokehub-habitats-shiny-genders" data-habitat-index="<?php echo esc_attr($index); ?>" style="margin-top: 10px; display: none;">
-                <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                 <p class="description" style="margin: 5px 0; font-size: 12px;">
-                    <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                    <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                 </p>
                 <div class="pokehub-habitats-shiny-genders-list" data-habitat-index="<?php echo esc_attr($index); ?>"></div>
             </div>

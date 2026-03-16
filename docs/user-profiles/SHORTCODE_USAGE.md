@@ -196,7 +196,9 @@ These pages are created as children of the `pokemon-go` page and can be managed 
 
 ### Disable Automatic Page Creation
 
-You can disable automatic page creation in **Poké HUB > Settings > General** under "User Profiles Settings". 
+You can disable automatic page creation in **Poké HUB > Settings > General** under "User Profiles Settings".
+
+When multiple sites share the same database, you can set the **Base URL for profile links** in **Poké HUB > Settings > Sources** (section "User Profiles Source", visible only when the User Profiles module is active). This ensures profile links in friend codes and Vivillon pages point to the correct site.
 
 If disabled, you will need to manually create pages with the shortcodes:
 - Create a page with slug `friend-codes` and add `[poke_hub_friend_codes]` in the content

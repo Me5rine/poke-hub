@@ -8,12 +8,13 @@
 modules/blocks/
 ├── blocks.php                    # Point d'entrée du module
 ├── admin/                        # Meta boxes pour certains blocs
-│   ├── collection-challenges-metabox.php   # Défis de collection (post meta)
-│   └── special-research-metabox.php       # Études spéciales (post meta)
+│   ├── collection-challenges-metabox.php   # Défis de collection (tables de contenu)
+│   └── special-research-metabox.php        # Études spéciales (tables de contenu)
 ├── functions/
-│   ├── blocks-register.php      # Enregistrement de tous les blocs
+│   ├── blocks-register.php      # Enregistrement de tous les blocs (bonus: requires [])
 │   ├── blocks-helpers.php       # Helpers génériques pour les blocs
 │   ├── blocks-quests-helpers.php           # Helpers quêtes (éditeur)
+│   ├── blocks-eggs-helpers.php              # Helpers bloc œufs (post ou global)
 │   ├── blocks-collection-challenges-helpers.php  # Helpers défis de collection
 │   ├── blocks-special-research-helpers.php      # Helpers études spéciales
 │   └── blocks-debug.php         # Outils de diagnostic
@@ -25,7 +26,8 @@ modules/blocks/
 │   ├── habitats/                # Bloc "Habitats"
 │   ├── new-pokemon-evolutions/  # Bloc "Nouveaux Pokémon - Lignées d'évolution"
 │   ├── collection-challenges/   # Bloc "Défis de Collection"
-│   └── special-research/        # Bloc "Études Spéciales"
+│   ├── special-research/        # Bloc "Études Spéciales"
+│   └── eggs/                    # Bloc "Œufs"
 └── docs/
     ├── README.md                # Index des blocs (ce dossier)
     ├── ARCHITECTURE.md          # Ce fichier
@@ -47,7 +49,7 @@ Chaque bloc contient typiquement : `block.json`, `index.js` (éditeur), `render.
   - `pokehub_render_event_dates()` - Rendu des dates avec feux verts/rouges
   - `pokehub_render_quests_visual()` - Rendu des quêtes
 - **Events (habitats, wild)** : `modules/events/functions/events-render.php` et helpers Pokémon
-- **Bonus** : `modules/bonus/functions/bonus-helpers.php`
+- **Bonus** : `modules/bonus/functions/bonus-helpers.php` (chargé par le module Blocks ; pas de dépendance au module Bonus)
   - `pokehub_render_bonuses_visual()` - Rendu des cartes de bonus
 - **Quêtes** : `modules/events/functions/events-quests-render.php`
   - `pokehub_render_quests_visual()` - Rendu des quêtes et récompenses
@@ -58,8 +60,8 @@ Chaque bloc contient typiquement : `block.json`, `index.js` (éditeur), `render.
 ### 3. **Helpers** (dans les modules respectifs + module blocks)
 - **Events** : `modules/events/functions/events-helpers.php`, `events-queries.php`
   - `poke_hub_events_get_post_dates()` - Récupération des dates d'événement
-- **Bonus** : `modules/bonus/functions/bonus-helpers.php`
-  - `pokehub_get_bonuses_for_post()` - Récupération des bonus d'un post
+- **Bonus** : `modules/bonus/functions/bonus-helpers.php` (chargé par le module Blocks)
+  - `pokehub_get_bonuses_for_post()` - Récupération des bonus d'un post (données depuis site principal en mode distant)
 - **Blocks** : `modules/blocks/functions/`
   - `blocks-quests-helpers.php` - Données quêtes pour l’éditeur
   - `blocks-collection-challenges-helpers.php` - Données défis de collection (post meta + rendu)
@@ -120,13 +122,15 @@ Voir le guide [QUICK_START.md](./QUICK_START.md) pour les étapes détaillées.
    - Récupère les données via les helpers du module concerné
    - Appelle la fonction de rendu du module concerné
    - Wrappe dans `get_block_wrapper_attributes()`
-5. Enregistrer dans `blocks-register.php` avec les modules requis :
+5. Enregistrer dans `blocks-register.php` avec les modules requis (souvent `events` pour les blocs de contenu ; `[]` pour le bloc Bonus, qui ne dépend que du module Blocks) :
    ```php
    'mon-bloc' => [
-       'requires' => ['events'],  // modules qui doivent être actifs
+       'requires' => ['events'],  // ou ['bonus'] ou [] selon le cas
    ],
    ```
-   Si un module requis est désactivé, le bloc n’est pas enregistré.
+   Si un module requis est désactivé, le bloc n’est pas enregistré. Les données des blocs sont stockées dans les tables de contenu (scope `content_source`) : **même préfixe** que les tables Pokémon (Réglages > Sources > Pokémon table prefix (remote)) — une seule base pour les Pokémon et tous les contenus. Usage en mode remote sans le module Pokémon.
+
+**Metaboxes chargées par le module Blocks :** pour les blocs qui ont besoin d’une metabox (œufs, bonus, défis de collection), le module Blocks charge la metabox Eggs (depuis `modules/eggs/admin/eggs-metabox.php`) et la metabox Bonus lorsque les modules Eggs ou Bonus sont inactifs, afin que les blocs restent configurables.
 
 ## 🔍 Fichiers obsolètes (à supprimer)
 

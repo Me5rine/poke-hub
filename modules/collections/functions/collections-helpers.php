@@ -97,19 +97,79 @@ function poke_hub_collections_generate_share_token(): string {
  */
 function poke_hub_collections_get_categories(): array {
     return [
-        'perfect_4'       => __('Pokémon 4* (parfaits)', 'poke-hub'),
-        'shiny'           => __('Chromatiques', 'poke-hub'),
-        'costume'         => __('Pokémon costumés', 'poke-hub'),
-        'costume_shiny'   => __('Costumés chromatiques', 'poke-hub'),
-        'background'      => __('Pokémon avec fonds', 'poke-hub'),
-        'background_shiny'=> __('Fonds chromatiques', 'poke-hub'),
-        'lucky'           => __('Chanceux', 'poke-hub'),
-        'shadow'          => __('Obscurs', 'poke-hub'),
-        'purified'        => __('Purifiés', 'poke-hub'),
-        'gigantamax'     => __('Gigamax', 'poke-hub'),
+        'perfect_4'       => __('Pokémon 4* (perfect)', 'poke-hub'),
+        'shiny'           => __('Shiny', 'poke-hub'),
+        'costume'         => __('Costumed Pokémon', 'poke-hub'),
+        'costume_shiny'   => __('Shiny costumed', 'poke-hub'),
+        'background'      => __('Pokémon with backgrounds (all)', 'poke-hub'),
+        'background_special' => __('Backgrounds: special', 'poke-hub'),
+        'background_places'  => __('Backgrounds: locations', 'poke-hub'),
+        'background_shiny'=> __('Shiny backgrounds (all)', 'poke-hub'),
+        'background_shiny_special' => __('Shiny backgrounds: special', 'poke-hub'),
+        'background_shiny_places'  => __('Shiny backgrounds: locations', 'poke-hub'),
+        'lucky'           => __('Lucky', 'poke-hub'),
+        'shadow'          => __('Shadow', 'poke-hub'),
+        'purified'        => __('Purified', 'poke-hub'),
+        'gigantamax'     => __('Gigantamax', 'poke-hub'),
         'dynamax'        => __('Dynamax', 'poke-hub'),
-        'custom'         => __('Liste personnalisée', 'poke-hub'),
+        'custom'         => __('Custom list', 'poke-hub'),
     ];
+}
+
+/**
+ * Catégories « spécifiques » : la collection affiche uniquement ce type (ex. Gigantamax, Dynamax).
+ * Pour ces catégories on ne propose pas les options « afficher Méga / Gigantamax / Dynamax / costumes ».
+ *
+ * @return string[]
+ */
+function poke_hub_collections_get_specific_categories(): array {
+    return [
+        'gigantamax',
+        'dynamax',
+        'costume',
+        'costume_shiny',
+        'shadow',
+        'purified',
+        'background',
+        'background_shiny',
+        'background_special',
+        'background_shiny_special',
+        'background_places',
+        'background_shiny_places',
+    ];
+}
+
+/**
+ * Indique si la catégorie est « spécifique » (liste = uniquement ce type, pas d’options d’ajout Méga/Giga/Dynamax/costumes).
+ *
+ * @param string $category Slug de catégorie
+ * @return bool
+ */
+function poke_hub_collections_category_is_specific(string $category): bool {
+    return in_array($category, poke_hub_collections_get_specific_categories(), true);
+}
+
+/**
+ * Retourne l'URL de l'image du premier fond lié à un Pokémon (pour affichage fond + sprite).
+ *
+ * @param int $pokemon_id ID du Pokémon
+ * @return string URL du fond ou chaîne vide
+ */
+function poke_hub_collections_get_background_image_url_for_pokemon(int $pokemon_id): string {
+    global $wpdb;
+    $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
+    $backgrounds_table = pokehub_get_table('pokemon_backgrounds');
+    if (!$links_table || !$backgrounds_table) {
+        return '';
+    }
+    $url = $wpdb->get_var($wpdb->prepare(
+        "SELECT b.image_url FROM {$links_table} l
+         INNER JOIN {$backgrounds_table} b ON l.background_id = b.id
+         WHERE l.pokemon_id = %d AND TRIM(COALESCE(b.image_url, '')) != ''
+         ORDER BY b.id ASC LIMIT 1",
+        $pokemon_id
+    ));
+    return is_string($url) ? trim($url) : '';
 }
 
 /**
@@ -123,11 +183,14 @@ function poke_hub_collections_default_options(): array {
         'include_gender'         => true,
         'include_forms'          => true,
         'include_costumes'       => true,
+        'include_mega'           => true,
+        'include_gigantamax'     => true,
+        'include_dynamax'        => true,
         'include_special_attacks'=> false,
-        'exclude_mega'           => false,
-        'one_per_species'        => false, // une seule entrée par dex_number (forme par défaut)
-        'group_by_generation'   => true,  // grouper les tuiles par génération
-        'display_mode'          => 'tiles', // tiles | select
+        'one_per_species'        => false,
+        'group_by_generation'   => true,
+        'generations_collapsed'  => false,
+        'display_mode'          => 'tiles',
         'public'                => false,
     ];
 }
@@ -151,13 +214,16 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     }
 
     $opts = array_merge(poke_hub_collections_default_options(), $options);
+    if (array_key_exists('exclude_mega', $options) && !array_key_exists('include_mega', $options)) {
+        $opts['include_mega'] = empty($options['exclude_mega']);
+    }
     $where = ['1 = 1'];
 
     // Filtre par catégorie
     switch ($category) {
         case 'costume':
         case 'costume_shiny':
-            $where[] = "fv.category = 'costume'";
+            $where[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) = 'costume' OR (p.extra IS NOT NULL AND (p.extra LIKE '%\"is_event_costumed\":true%' OR p.extra LIKE '%\"is_event_costumed\": true%')))";
             break;
         case 'shadow':
             $where[] = 'p.has_shadow = 1';
@@ -171,25 +237,56 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         case 'dynamax':
             $where[] = "(fv.category = 'dynamax' OR fv.form_slug LIKE '%dynamax%' OR fv.form_slug = 'normal')";
             break;
+        case 'background':
+        case 'background_shiny':
+            $links_table = pokehub_get_table('pokemon_background_pokemon_links');
+            if ($links_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l WHERE l.pokemon_id = p.id)";
+            }
+            break;
+        case 'background_special':
+        case 'background_shiny_special': {
+            $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
+            $bg_table     = pokehub_get_table('pokemon_backgrounds');
+            if ($links_table && $bg_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND LOWER(TRIM(COALESCE(b.background_type, ''))) = 'special')";
+            }
+            break;
+        }
+        case 'background_places':
+        case 'background_shiny_places': {
+            $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
+            $bg_table     = pokehub_get_table('pokemon_backgrounds');
+            if ($links_table && $bg_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND LOWER(TRIM(COALESCE(b.background_type, ''))) IN ('location', 'lieu', 'place'))";
+            }
+            break;
+        }
         case 'perfect_4':
         case 'shiny':
         case 'lucky':
-        case 'background':
-        case 'background_shiny':
         case 'custom':
         default:
             break;
     }
 
-    if (!empty($opts['include_costumes']) && !in_array($category, ['costume', 'costume_shiny'], true)) {
-        // rien
-    } elseif (empty($opts['include_costumes']) && !in_array($category, ['costume', 'costume_shiny'], true)) {
-        $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category = 'normal')";
-    }
-
-    // Exclure les Méga si demandé
-    if (!empty($opts['exclude_mega'])) {
-        $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category != 'mega')";
+    // Options « en plus » (Méga, Gigantamax, Dynamax, costumes) : uniquement pour les catégories non spécifiques
+    $is_specific = poke_hub_collections_category_is_specific($category);
+    if (!$is_specific) {
+        if (!empty($opts['include_costumes'])) {
+            // rien
+        } elseif (empty($opts['include_costumes'])) {
+            $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category = 'normal')";
+        }
+        if (empty($opts['include_mega'])) {
+            $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category != 'mega')";
+        }
+        if (empty($opts['include_gigantamax'])) {
+            $where[] = "(fv.category IS NULL OR fv.category = '' OR (fv.category != 'gigantamax' AND fv.form_slug NOT LIKE '%gigantamax%'))";
+        }
+        if (empty($opts['include_dynamax'])) {
+            $where[] = "(fv.category IS NULL OR fv.category = '' OR (fv.category != 'dynamax' AND fv.form_slug NOT LIKE '%dynamax%'))";
+        }
     }
 
     // Une seule entrée par espèce (forme par défaut)
@@ -205,6 +302,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         case 'shiny':
         case 'costume_shiny':
         case 'background_shiny':
+        case 'background_shiny_special':
+        case 'background_shiny_places':
             $release_context = 'shiny';
             break;
         case 'shadow':
@@ -220,6 +319,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         case 'perfect_4':
         case 'costume':
         case 'background':
+        case 'background_special':
+        case 'background_places':
         case 'lucky':
         case 'custom':
         default:
@@ -262,15 +363,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 $filtered[] = $row;
             }
         }
-        // Si aucun Pokémon n'a de date de sortie, afficher quand même la liste (données pas encore renseignées)
-        if (count($filtered) > 0) {
-            $results = $filtered;
-        } else {
-            foreach ($results as &$row) {
-                unset($row['extra']);
-            }
-            unset($row);
-        }
+        $results = $filtered;
     } else {
         foreach ($results as &$row) {
             unset($row['extra']);
@@ -293,7 +386,7 @@ function poke_hub_collections_group_pool_by_generation(array $pool): array {
         $gen_num = isset($p['generation_number']) ? (int) $p['generation_number'] : 0;
         $gen_name = isset($p['generation_name']) && (string) $p['generation_name'] !== ''
             ? $p['generation_name']
-            : ($gen_num > 0 ? sprintf(__('Génération %d', 'poke-hub'), $gen_num) : '');
+            : ($gen_num > 0 ? sprintf(__('Generation %d', 'poke-hub'), $gen_num) : '');
         $key = $gen_name !== '' ? $gen_name : "\xFF"; // sans nom en dernier après tri
         if (!isset($by_gen[$key])) {
             $by_gen[$key] = ['order' => $gen_num, 'items' => []];
@@ -378,7 +471,7 @@ function poke_hub_collections_create(int $user_id, array $data): array {
         $collections_table,
         [
             'user_id'     => $user_id,
-            'name'        => $name ?: __('Ma collection', 'poke-hub'),
+            'name'        => $name ?: __('My collection', 'poke-hub'),
             'slug'        => $slug,
             'share_token' => $share_token,
             'category'    => $category,
@@ -395,7 +488,7 @@ function poke_hub_collections_create(int $user_id, array $data): array {
     $collection_id = (int) $wpdb->insert_id;
     return [
         'success'        => true,
-        'message'       => __('Collection créée.', 'poke-hub'),
+        'message'       => __('Collection created.', 'poke-hub'),
         'collection_id'  => $collection_id,
         'slug'           => $slug,
         'share_token'    => $share_token,
@@ -414,12 +507,12 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
 
     $collections_table = pokehub_get_table('collections');
     if (!$collections_table) {
-        return ['success' => false, 'message' => __('Erreur technique.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
     }
 
     $ip = preg_replace('/[^0-9a-f.:]/', '', $ip);
     if ($ip === '') {
-        return ['success' => false, 'message' => __('Impossible d’identifier votre connexion.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Unable to identify your connection.', 'poke-hub')];
     }
 
     $name     = isset($data['name']) ? sanitize_text_field($data['name']) : '';
@@ -441,7 +534,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
         $collections_table,
         [
             'user_id'      => 0,
-            'name'         => $name ?: __('Ma collection', 'poke-hub'),
+            'name'         => $name ?: __('My collection', 'poke-hub'),
             'slug'         => $slug,
             'share_token'  => $share_token,
             'anonymous_ip' => $ip,
@@ -453,13 +546,13 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
     );
 
     if ($r === false) {
-        return ['success' => false, 'message' => __('Impossible de créer la collection.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Could not create collection.', 'poke-hub')];
     }
 
     $collection_id = (int) $wpdb->insert_id;
     return [
         'success'        => true,
-        'message'        => __('Collection créée.', 'poke-hub'),
+        'message'        => __('Collection created.', 'poke-hub'),
         'collection_id'   => $collection_id,
         'share_token'    => $share_token,
     ];
@@ -477,12 +570,12 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
     global $wpdb;
 
     if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
-        return ['success' => false, 'message' => __('Vous ne pouvez pas modifier cette collection.', 'poke-hub')];
+        return ['success' => false, 'message' => __('You cannot edit this collection.', 'poke-hub')];
     }
 
     $collections_table = pokehub_get_table('collections');
     if (!$collections_table) {
-        return ['success' => false, 'message' => __('Erreur technique.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
     }
 
     $updates = [];
@@ -508,7 +601,7 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
     }
 
     if (empty($updates)) {
-        return ['success' => true, 'message' => __('Aucune modification.', 'poke-hub')];
+        return ['success' => true, 'message' => __('No changes.', 'poke-hub')];
     }
 
     $r = $wpdb->update(
@@ -520,10 +613,10 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
     );
 
     if ($r === false) {
-        return ['success' => false, 'message' => __('Impossible de sauvegarder.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Could not save.', 'poke-hub')];
     }
 
-    return ['success' => true, 'message' => __('Paramètres enregistrés.', 'poke-hub')];
+    return ['success' => true, 'message' => __('Settings saved.', 'poke-hub')];
 }
 
 /**
@@ -730,19 +823,19 @@ function poke_hub_collections_claim(int $collection_id, int $user_id, string $ip
 
     $col = poke_hub_collections_get_one($collection_id);
     if (!$col) {
-        return ['success' => false, 'message' => __('Collection introuvable.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Collection not found.', 'poke-hub')];
     }
     if ((int) $col['user_id'] !== 0) {
-        return ['success' => false, 'message' => __('Cette collection est déjà rattachée à un compte.', 'poke-hub')];
+        return ['success' => false, 'message' => __('This collection is already linked to an account.', 'poke-hub')];
     }
     $ip = preg_replace('/[^0-9a-f.:]/', '', $ip);
     if ($ip === '' || empty($col['anonymous_ip']) || $col['anonymous_ip'] !== $ip) {
-        return ['success' => false, 'message' => __('Cette collection n’a pas été créée depuis cette connexion.', 'poke-hub')];
+        return ['success' => false, 'message' => __('This collection was not created from this connection.', 'poke-hub')];
     }
 
     $collections_table = pokehub_get_table('collections');
     if (!$collections_table) {
-        return ['success' => false, 'message' => __('Erreur technique.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
     }
 
     $slug = sanitize_title($col['name'] ?: 'collection-' . $user_id . '-' . time());
@@ -764,10 +857,10 @@ function poke_hub_collections_claim(int $collection_id, int $user_id, string $ip
     );
 
     if ($r === false) {
-        return ['success' => false, 'message' => __('Impossible de rattacher.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Could not attach.', 'poke-hub')];
     }
 
-    return ['success' => true, 'message' => __('Collection rattachée à votre compte.', 'poke-hub')];
+    return ['success' => true, 'message' => __('Collection linked to your account.', 'poke-hub')];
 }
 
 /**
@@ -783,18 +876,18 @@ function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?stri
 
     if ($user_id > 0) {
         if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
-            return ['success' => false, 'message' => __('Vous ne pouvez pas supprimer cette collection.', 'poke-hub')];
+            return ['success' => false, 'message' => __('You cannot delete this collection.', 'poke-hub')];
         }
     } else {
         if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
-            return ['success' => false, 'message' => __('Vous ne pouvez pas supprimer cette collection.', 'poke-hub')];
+            return ['success' => false, 'message' => __('You cannot delete this collection.', 'poke-hub')];
         }
     }
 
     $collections_table = pokehub_get_table('collections');
     $items_table       = pokehub_get_table('collection_items');
     if (!$collections_table) {
-        return ['success' => false, 'message' => __('Erreur technique.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
     }
 
     if ($items_table) {
@@ -803,10 +896,10 @@ function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?stri
     $r = $wpdb->delete($collections_table, ['id' => $collection_id], ['%d']);
 
     if ($r === false) {
-        return ['success' => false, 'message' => __('Impossible de supprimer.', 'poke-hub')];
+        return ['success' => false, 'message' => __('Could not delete.', 'poke-hub')];
     }
 
-    return ['success' => true, 'message' => __('Collection supprimée.', 'poke-hub')];
+    return ['success' => true, 'message' => __('Collection deleted.', 'poke-hub')];
 }
 
 /**

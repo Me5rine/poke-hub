@@ -186,9 +186,9 @@ function pokehub_render_wild_pokemon_metabox($post) {
                     </p>
                     
                     <div id="pokehub-wild-pokemon-genders" style="margin-top: 15px; display: none;">
-                        <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                        <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                         <p class="description">
-                            <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                            <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                         </p>
                         <div id="pokehub-wild-pokemon-genders-list"></div>
                     </div>
@@ -228,9 +228,9 @@ function pokehub_render_wild_pokemon_metabox($post) {
                     </p>
                     
                     <div id="pokehub-forced-shiny-genders" style="margin-top: 15px; display: none;">
-                        <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                        <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                         <p class="description">
-                            <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                            <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                         </p>
                         <div id="pokehub-forced-shiny-genders-list"></div>
                     </div>
@@ -270,9 +270,9 @@ function pokehub_render_wild_pokemon_metabox($post) {
                     </p>
                     
                     <div id="pokehub-rare-pokemon-genders" style="margin-top: 15px; display: none;">
-                        <strong><?php _e('Genres (optionnel)', 'poke-hub'); ?></strong>
+                        <strong><?php _e('Genders (optional)', 'poke-hub'); ?></strong>
                         <p class="description">
-                            <?php _e('Pour les Pokémon avec dysmorphisme de genre, vous pouvez forcer un genre spécifique. Par défaut, l\'image mâle sera utilisée.', 'poke-hub'); ?>
+                            <?php _e('For Pokémon with gender dimorphism, you can force a specific gender. By default, the male image will be used.', 'poke-hub'); ?>
                         </p>
                         <div id="pokehub-rare-pokemon-genders-list"></div>
                     </div>

@@ -29,6 +29,7 @@
   --admin-lab-color-notice-error-border: #f5c6cb;
   --admin-lab-color-notice-sucess-background: #d4edda;
   --admin-lab-color-notice-sucess-border: #c3e6cb;
+  --admin-lab-color-notice-warning: #ff9800;
 
   /* Couleurs de texte */
   --admin-lab-color-text: var(--e-global-color-text, #5D697D);

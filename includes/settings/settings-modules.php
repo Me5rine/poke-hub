@@ -6,44 +6,62 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Liste des modules disponibles dans Poké HUB.
+ * Source unique d'enregistrement des modules Poké HUB.
+ * Tout le plugin s'appuie sur cette liste : réglages (General), chargement, sanitize.
+ * Pour ajouter un module : ajouter une entrée ici (path + label). Aucun autre fichier à modifier.
  *
- * Slug => chemin relatif depuis modules/
- *
- * Exemple d’utilisation :
- *   $registry = poke_hub_get_modules_registry();
- *   $pokedex_file = POKE_HUB_MODULES_DIR . $registry['pokedex'];
- *
- * @return array<string,string>
+ * @return array<string,array{path: string, label: string}>
  */
-function poke_hub_get_modules_registry(): array {
+function poke_hub_get_modules_config(): array {
     return [
-        'events'        => 'events/events.php',
-        'bonus'         => 'bonus/bonus.php',
-        'pokemon'       => 'pokemon/pokemon.php',
-        'user-profiles' => 'user-profiles/user-profiles.php',
-        'games'         => 'games/games.php',
-        'eggs'          => 'eggs/eggs.php',
-        'blocks'        => 'blocks/blocks.php',
-        'collections'   => 'collections/collections.php',
+        'events'        => ['path' => 'events/events.php',        'label' => __('Events', 'poke-hub')],
+        'bonus'         => ['path' => 'bonus/bonus.php',          'label' => __('Bonus', 'poke-hub')],
+        'pokemon'       => ['path' => 'pokemon/pokemon.php',      'label' => __('Pokémon', 'poke-hub')],
+        'quests'        => ['path' => 'quests/quests.php',       'label' => __('Quests', 'poke-hub')],
+        'user-profiles' => ['path' => 'user-profiles/user-profiles.php', 'label' => __('User Profiles', 'poke-hub')],
+        'games'         => ['path' => 'games/games.php',         'label' => __('Games', 'poke-hub')],
+        'eggs'          => ['path' => 'eggs/eggs.php',            'label' => __('Eggs', 'poke-hub')],
+        'blocks'        => ['path' => 'blocks/blocks.php',        'label' => __('Blocks', 'poke-hub')],
+        'collections'   => ['path' => 'collections/collections.php', 'label' => __('Pokémon GO Collections', 'poke-hub')],
     ];
 }
 
 /**
- * Libellés des modules (pour l'affichage dans les réglages).
- * Doit être synchronisé avec le registry : un module dans le registry doit avoir un libellé ici.
+ * Registre des modules : slug => chemin relatif depuis modules/.
+ * Dérivé de poke_hub_get_modules_config().
+ *
+ * @return array<string,string>
+ */
+function poke_hub_get_modules_registry(): array {
+    $config = poke_hub_get_modules_config();
+    $out = [];
+    foreach ($config as $slug => $data) {
+        $out[$slug] = $data['path'];
+    }
+    return $out;
+}
+
+/**
+ * Libellés des modules : slug => libellé affiché.
+ * Dérivé de poke_hub_get_modules_config().
  *
  * @return array<string,string>
  */
 function poke_hub_get_modules_labels(): array {
-    return [
-        'events'        => __('Events', 'poke-hub'),
-        'bonus'         => __('Bonus', 'poke-hub'),
-        'pokemon'       => __('Pokémon', 'poke-hub'),
-        'user-profiles' => __('User Profiles', 'poke-hub'),
-        'games'         => __('Games', 'poke-hub'),
-        'eggs'          => __('Eggs', 'poke-hub'),
-        'blocks'        => __('Blocks', 'poke-hub'),
-        'collections'   => __('Collections Pokémon GO', 'poke-hub'),
-    ];
+    $config = poke_hub_get_modules_config();
+    $out = [];
+    foreach ($config as $slug => $data) {
+        $out[$slug] = $data['label'];
+    }
+    return $out;
+}
+
+/**
+ * Liste ordonnée des slugs (même ordre que la config).
+ * Utile pour l’affichage (onglet General) et les boucles.
+ *
+ * @return array<int,string>
+ */
+function poke_hub_get_ordered_module_slugs(): array {
+    return array_keys(poke_hub_get_modules_config());
 }

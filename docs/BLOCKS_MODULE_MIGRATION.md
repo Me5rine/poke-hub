@@ -11,7 +11,10 @@ Les blocs Gutenberg ont été centralisés dans un nouveau module **Blocks** pou
 ### Maintenant
 - Tous les blocs sont centralisés dans le module `blocks`
 - Structure : `modules/blocks/blocks/`
-- Gestion des dépendances : chaque bloc déclare les modules requis
+- Gestion des dépendances : chaque bloc déclare les modules requis (souvent uniquement `events` ; plus de dépendance au module Pokémon pour l’enregistrement)
+- **Tables de contenu** : les données (œufs, quêtes, bonus, défis de collection, etc.) sont stockées dans des tables avec le scope **`content_source`** — même préfixe que les tables Pokémon (Réglages > Sources > Pokémon table prefix (remote)). Une seule base pour les Pokémon et tous les contenus ; blocs utilisables en mode remote.
+- **Bonus** : le bloc Bonus et la metabox « Bonus de l’événement » ne dépendent pas du module Bonus ; ils sont chargés uniquement par le module Blocks. Les types de bonus viennent du site principal (voir [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md)).
+- **Metaboxes** : la metabox Bonus est toujours chargée par le module Blocks ; la metabox Eggs est chargée par Blocks lorsque le module Eggs est inactif
 
 ## 🚀 Activation
 
@@ -19,21 +22,26 @@ Les blocs Gutenberg ont été centralisés dans un nouveau module **Blocks** pou
 2. Cochez la case **Blocks**
 3. Cliquez sur **Save Changes**
 
-Les blocs seront automatiquement enregistrés selon leurs dépendances :
-- **Dates d'événement** : nécessite le module `events`
-- **Bonus** : nécessite le module `bonus`
+Les blocs seront automatiquement enregistrés selon leurs dépendances (voir `docs/blocks/README.md` pour la liste à jour) :
+- La plupart des blocs (dates, quêtes, œufs, wild-pokemon, habitats, défis de collection, études spéciales, nouveaux Pokémon) ne requièrent que le module **events**
+- **Bonus** : **aucun** module requis en plus de Blocks ; tout (bloc + metabox + helpers) est chargé par le module Blocks. Les types de bonus viennent du site principal (local ou distant selon le préfixe Pokémon)
 
 ## 📁 Structure actuelle
 
 ```
 modules/blocks/
-├── blocks.php                    # Point d'entrée
+├── blocks.php                    # Point d'entrée (charge helpers + metabox Bonus ; metabox Eggs si module Eggs inactif)
+├── admin/                        # Metaboxes Collection Challenges, Études spéciales
 ├── functions/
-│   ├── blocks-register.php      # Enregistrement centralisé
-│   └── blocks-helpers.php       # Helpers
+│   ├── blocks-register.php      # Enregistrement centralisé (bonus: requires [])
+│   ├── blocks-helpers.php       # Helpers
+│   ├── blocks-eggs-helpers.php  # Helpers bloc œufs
+│   └── ...
 └── blocks/
-    ├── event-dates/              # Bloc Dates (dépend de events)
-    └── bonus/                    # Bloc Bonus (dépend de bonus)
+    ├── event-dates/              # Bloc Dates (requires: events)
+    ├── bonus/                    # Bloc Bonus (requires: [] — chargé par Blocks uniquement)
+    ├── eggs/                     # Bloc Œufs (requires: events)
+    └── ...
 ```
 
 ## ➕ Ajouter de nouveaux blocs
