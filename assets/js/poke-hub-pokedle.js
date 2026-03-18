@@ -348,7 +348,7 @@
                 .data('pokemon-name', pokemon.name);
             
             // Ajouter l'image du Pokémon si disponible
-            const imageUrl = pokemon.image_url || (gameData.imageBaseUrl ? `${gameData.imageBaseUrl}/${pokemon.slug}.png` : '');
+            const imageUrl = (pokemon.image_url && typeof pokemon.image_url === 'string') ? pokemon.image_url : '';
             if (imageUrl) {
                 const $img = $('<img class="pokedle-autocomplete-image" />')
                     .attr('src', imageUrl)
@@ -510,7 +510,7 @@
         const $hints = $('<div class="pokedle-attempt-hints-row"></div>');
 
         // 1. Image du Pokémon (rectangle blanc avec bordure pointillée)
-        const imageUrl = pokemon.image_url || (gameData.imageBaseUrl ? `${gameData.imageBaseUrl}/${pokemon.slug}.png` : '');
+        const imageUrl = (pokemon.image_url && typeof pokemon.image_url === 'string') ? pokemon.image_url : '';
         const $pokemonCell = $('<div class="pokedle-hint-cell pokedle-pokemon-image-cell"></div>');
         if (imageUrl) {
             const $img = $('<img class="pokedle-pokemon-sprite" />')
@@ -703,7 +703,7 @@
         
         console.log('Mystery Pokémon found:', mysteryPokemon.name);
         
-        const mysteryImageUrl = mysteryPokemon.image_url || (gameData.imageBaseUrl ? `${gameData.imageBaseUrl}/${mysteryPokemon.slug}.png` : '');
+        const mysteryImageUrl = (mysteryPokemon.image_url && typeof mysteryPokemon.image_url === 'string') ? mysteryPokemon.image_url : '';
         
         const $result = $('#pokedle-result');
         console.log('Result container found:', $result.length);
@@ -793,7 +793,7 @@
         
         console.log('Mystery Pokémon found:', mysteryPokemon.name);
         
-        const mysteryImageUrl = mysteryPokemon.image_url || (gameData.imageBaseUrl ? `${gameData.imageBaseUrl}/${mysteryPokemon.slug}.png` : '');
+        const mysteryImageUrl = (mysteryPokemon.image_url && typeof mysteryPokemon.image_url === 'string') ? mysteryPokemon.image_url : '';
         
         let $result = $('#pokedle-result');
         console.log('Result container found:', $result.length);
@@ -929,7 +929,7 @@
             return;
         }
 
-        const imageUrl = pokemon.image_url || (gameData.imageBaseUrl ? `${gameData.imageBaseUrl}/${pokemon.slug}.png` : '');
+        const imageUrl = (pokemon.image_url && typeof pokemon.image_url === 'string') ? pokemon.image_url : '';
         
         let resultHtml = '<div class="pokedle-success">';
         resultHtml += '<h3>Pokémon du jour</h3>';

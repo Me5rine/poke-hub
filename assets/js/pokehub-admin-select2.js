@@ -184,7 +184,7 @@ jQuery(function($) {
             if (id) pokemonMap[id] = text;
         });
 
-        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon').each(function() {
+        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon, select.pokehub-quest-pokemon-select').each(function() {
             var $select = $(this);
             if ($select.data('select2')) return;
 
@@ -404,7 +404,7 @@ jQuery(function($) {
             if (id) pokemonMap[id] = text;
         });
 
-        var largeListSelector = '#pokehub-wild-pokemon-select, #pokehub-forced-shiny-select, #pokehub-rare-pokemon-select, #pokehub-new-pokemon-select, select.pokehub-eggs-pokemon-select, select.pokehub-eggs-pool-select, .pokehub-habitats-metabox select.pokehub-select-pokemon, .pokehub-collection-challenges-metabox select.pokehub-select-pokemon';
+        var largeListSelector = '#pokehub-wild-pokemon-select, #pokehub-forced-shiny-select, #pokehub-rare-pokemon-select, #pokehub-new-pokemon-select, select.pokehub-eggs-pokemon-select, select.pokehub-eggs-pool-select, .pokehub-habitats-metabox select.pokehub-select-pokemon, .pokehub-collection-challenges-metabox select.pokehub-select-pokemon, .pokehub-featured-pokemon-hours-metabox select.pokehub-select-pokemon';
         $ctx.find(largeListSelector).each(function() {
             var $select = $(this);
             if ($select.data('select2')) return;

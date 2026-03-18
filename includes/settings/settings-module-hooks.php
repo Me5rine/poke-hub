@@ -200,6 +200,9 @@ add_action('admin_init', function () {
                 pokehub_get_table('content_new_pokemon_entries'),
                 pokehub_get_table('content_raids'),
                 pokehub_get_table('content_raid_bosses'),
+                // Bloc "jour -> Pokémon(s) -> heures"
+                pokehub_get_table('content_day_pokemon_hours'),
+                pokehub_get_table('content_day_pokemon_hour_entries'),
             ]
         ),
 
@@ -235,6 +238,10 @@ add_action('admin_init', function () {
         // Table bonus_types aussi créée/vérifiée quand Blocks est actif (bloc bonus utilisable sans module Bonus)
         'blocks' => [
             pokehub_get_table('bonus_types'),
+            // Les blocs "Day Pokémon Hours / Featured Hours" utilisent cette structure.
+            // Elle doit donc exister même si seuls les blocs sont activés.
+            pokehub_get_table('content_day_pokemon_hours'),
+            pokehub_get_table('content_day_pokemon_hour_entries'),
         ],
     ];
 

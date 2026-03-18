@@ -322,6 +322,9 @@ function pokehub_get_table(string $key): string {
         'content_new_pokemon_entries'     => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon_entries'],
         'content_raids'                   => ['scope' => 'content_source', 'suffix' => 'content_raids'],
         'content_raid_bosses'             => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
+        // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
+        'content_day_pokemon_hours'       => ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hours'],
+        'content_day_pokemon_hour_entries'=> ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hour_entries'],
         // Alias ancien format (évite double préfixe si du code appelle get_table('pokehub_content_*'))
         'pokehub_content_eggs' => ['scope' => 'content_source', 'suffix' => 'content_eggs'],
         'pokehub_content_egg_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_egg_pokemon'],

@@ -45,7 +45,13 @@ class Pokehub_DB {
         }
 
         // Tables de contenu communes (post, special_event, global_pool) — œufs, quêtes, raids, etc.
-        if (in_array('events', $active_modules, true) || in_array('eggs', $active_modules, true) || in_array('quests', $active_modules, true)) {
+        // Les blocs utilisent aussi ces tables (ex: Day Pokémon Hours / Featured Hours).
+        if (
+            in_array('events', $active_modules, true)
+            || in_array('eggs', $active_modules, true)
+            || in_array('quests', $active_modules, true)
+            || in_array('blocks', $active_modules, true)
+        ) {
             $this->createContentTables();
         }
 
@@ -943,6 +949,8 @@ class Pokehub_DB {
             'content_collection_challenges', 'content_collection_challenge_items', 'content_bonus', 'content_bonus_entries',
             'content_wild_pokemon', 'content_wild_pokemon_entries', 'content_new_pokemon', 'content_new_pokemon_entries',
             'content_raids', 'content_raid_bosses',
+            // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
+            'content_day_pokemon_hours', 'content_day_pokemon_hour_entries',
         ];
 
         foreach ($content_keys as $key) {
@@ -1008,6 +1016,8 @@ class Pokehub_DB {
         $wild_entries_tbl  = pokehub_get_table('content_wild_pokemon_entries');
         $new_pokemon_tbl   = pokehub_get_table('content_new_pokemon');
         $new_pokemon_entries_tbl = pokehub_get_table('content_new_pokemon_entries');
+        $day_pokemon_hours_tbl = pokehub_get_table('content_day_pokemon_hours');
+        $day_pokemon_hour_entries_tbl = pokehub_get_table('content_day_pokemon_hour_entries');
         $raids_tbl         = pokehub_get_table('content_raids');
         $raid_bosses_tbl   = pokehub_get_table('content_raid_bosses');
 
@@ -1231,6 +1241,37 @@ class Pokehub_DB {
             KEY pokemon_id (pokemon_id)
         ) {$charset_collate};";
 
+        $sql_day_pokemon_hours = "CREATE TABLE {$day_pokemon_hours_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            content_type VARCHAR(30) NOT NULL DEFAULT 'featured_hours',
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY content_type (content_type),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_day_pokemon_hour_entries = "CREATE TABLE {$day_pokemon_hour_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_day_pokemon_hours_id BIGINT UNSIGNED NOT NULL,
+            day_date VARCHAR(10) NOT NULL DEFAULT '',
+            start_time VARCHAR(8) NOT NULL DEFAULT '',
+            end_time VARCHAR(8) NOT NULL DEFAULT '',
+            end_day_date VARCHAR(10) NOT NULL DEFAULT '',
+            pokemon_ids LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_day_pokemon_hours_id (content_day_pokemon_hours_id),
+            KEY day_date (day_date),
+            KEY end_day_date (end_day_date)
+        ) {$charset_collate};";
+
         $sql_raids = "CREATE TABLE {$raids_tbl} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             source_type VARCHAR(20) NOT NULL DEFAULT 'post',
@@ -1275,6 +1316,22 @@ class Pokehub_DB {
         dbDelta($sql_wild_entries);
         dbDelta($sql_new_pokemon);
         dbDelta($sql_new_pokemon_entries);
+        dbDelta($sql_day_pokemon_hours);
+        dbDelta($sql_day_pokemon_hour_entries);
+
+        // Migration: ajoute end_day_date pour supporter un end sur un autre jour
+        $col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s
+               AND TABLE_NAME = %s
+               AND COLUMN_NAME = 'end_day_date'",
+            $wpdb->dbname,
+            $day_pokemon_hour_entries_tbl
+        ));
+        if (empty($col)) {
+            $wpdb->query("ALTER TABLE {$day_pokemon_hour_entries_tbl} ADD COLUMN end_day_date VARCHAR(10) NOT NULL DEFAULT '' AFTER end_time, ADD KEY end_day_date (end_day_date)");
+        }
         dbDelta($sql_raids);
         dbDelta($sql_raid_bosses);
 

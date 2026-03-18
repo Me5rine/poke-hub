@@ -695,6 +695,19 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
  * URL de base principale des assets Pokémon (définie dans les settings).
  */
 function poke_hub_pokemon_get_assets_base_url() {
+    // Une seule source : si les réglages "généraux" Pokémon sont configurés,
+    // on les utilise pour construire l'URL des sprites.
+    $bucket = trim((string) get_option('poke_hub_assets_bucket_base_url', ''));
+    $path_pokemon = (string) get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/');
+    if ($bucket !== '') {
+        $bucket = rtrim($bucket, '/');
+        $path_pokemon = '/' . ltrim($path_pokemon, '/');
+        $dir = $bucket . rtrim($path_pokemon, '/');
+        return $dir;
+    }
+
+    // Compatibilité rétro : si le bucket générique n'est pas configuré,
+    // on utilise l'option dédiée (ou constante) si présente.
     $opt = trim((string) get_option('poke_hub_pokemon_assets_base_url', ''));
     if ($opt !== '') {
         return rtrim($opt, '/');
@@ -782,7 +795,6 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
     ]);
 
     $base_url     = poke_hub_pokemon_get_assets_base_url();
-    $fallback_url = poke_hub_pokemon_get_assets_fallback_base_url();
 
     $slug = isset($pokemon->slug) ? $pokemon->slug : '';
     if ($slug === '') {
@@ -801,9 +813,11 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
     if ($base_url !== '') {
         $primary = $base_url . '/' . ltrim($path, '/');
     }
-    if ($fallback_url !== '') {
-        $fallback = $fallback_url . '/' . ltrim($path, '/');
-    }
+
+    // Important : on ne veut qu'une seule source d'image.
+    // On conserve la clé "fallback" pour compatibilité (codes existants),
+    // mais elle pointe vers la même URL que "primary".
+    $fallback = $primary;
 
     $sources = [
         'primary'  => $primary,

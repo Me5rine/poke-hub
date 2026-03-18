@@ -21,6 +21,24 @@ add_action('rest_api_init', function () {
                 $options = [];
             }
             $pool = poke_hub_collections_get_pool($category, $options);
+
+            // Génère l'URL image Pokémon via le helper central,
+            // pour que la construction soit identique partout (slug + suffixes).
+            $is_shiny_category = in_array(
+                $category,
+                ['shiny', 'costume_shiny', 'background_shiny', 'background_shiny_special', 'background_shiny_places'],
+                true
+            );
+            if (function_exists('poke_hub_pokemon_get_image_url')) {
+                foreach ($pool as &$p) {
+                    $pokemon_obj = (object) $p;
+                    $p['image_url'] = poke_hub_pokemon_get_image_url($pokemon_obj, [
+                        'shiny' => $is_shiny_category,
+                    ]);
+                }
+                unset($p);
+            }
+
             if (in_array($category, ['background', 'background_shiny', 'background_special', 'background_places', 'background_shiny_special', 'background_shiny_places'], true) && function_exists('poke_hub_collections_get_background_image_url_for_pokemon')) {
                 $only_shiny_active = in_array($category, ['background_shiny', 'background_shiny_special', 'background_shiny_places'], true);
                 foreach ($pool as &$p) {

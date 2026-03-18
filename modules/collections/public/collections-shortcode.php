@@ -346,7 +346,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         $group_by_gen = !empty($opts['group_by_generation']);
         $pool_by_gen  = $group_by_gen ? poke_hub_collections_group_pool_by_generation($pool) : ['' => $pool];
         $gens_collapsed = !empty($opts['generations_collapsed']);
-        $assets_base  = function_exists('poke_hub_pokemon_asset_url') ? poke_hub_pokemon_asset_url('pokemon') : (get_option('poke_hub_pokemon_assets_base_url', '') . get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/'));
+        $is_shiny_collection = in_array($collection_category, ['shiny', 'costume_shiny', 'background_shiny', 'background_shiny_special', 'background_shiny_places'], true);
         ?>
         <div class="pokehub-collection-tiles" data-pool="<?php echo esc_attr(wp_json_encode($pool)); ?>" data-items="<?php echo esc_attr(wp_json_encode($items)); ?>">
             <?php foreach ($pool_by_gen as $gen_key => $gen_pool) : ?>
@@ -357,7 +357,10 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 <?php endif; ?>
                 <?php foreach ($gen_pool as $p) :
                     $status = $items[$p['id']] ?? 'missing';
-                    $img_src = $assets_base ? rtrim($assets_base, '/') . '/' . $p['id'] . '.png' : '';
+                    // Image URL calculée côté PHP via le helper global.
+                    $img_src = function_exists('poke_hub_pokemon_get_image_url')
+                        ? poke_hub_pokemon_get_image_url((object) $p, ['shiny' => $is_shiny_collection])
+                        : '';
                     $bg_url = isset($p['background_image_url']) ? trim((string) $p['background_image_url']) : '';
                 ?>
                 <div class="pokehub-collection-tile" data-pokemon-id="<?php echo (int) $p['id']; ?>" data-status="<?php echo esc_attr($status); ?>" tabindex="0" role="button">

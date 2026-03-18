@@ -20,6 +20,10 @@ function pokehub_blocks_register_all() {
         'wild-pokemon' => [
             'requires' => [],
         ],
+        'day-pokemon-hours' => [
+            // Bloc alimenté par une metabox spécifique (tables de contenu)
+            'requires' => [],
+        ],
         'event-quests' => [
             'requires' => [],
         ],

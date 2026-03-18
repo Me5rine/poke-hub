@@ -19,6 +19,23 @@ add_action('save_post', function ($post_id) {
     if (!in_array($post_type, $allowed, true)) {
         return;
     }
+
+    // Garde globale : pendant la génération des posts enfants "featured_hours",
+    // on évite de relancer la sync `start_ts/end_ts` et d'entrer dans une cascade.
+    if (!empty($GLOBALS['pokehub_skip_content_sync'])) {
+        return;
+    }
+
+    // Les "featured_hours" créent des posts enfants classic event.
+    // Pour éviter une cascade `save_post` -> sync -> update -> ... on saute
+    // si c'est bien un child.
+    if (function_exists('get_post_meta')) {
+        $parent_id = get_post_meta($post_id, '_pokehub_featured_hours_parent_post_id', true);
+        if (!empty($parent_id)) {
+            return;
+        }
+    }
+
     if (function_exists('pokehub_content_get_dates_for_source')) {
         $dates = pokehub_content_get_dates_for_source('post', $post_id);
         if ($dates['start_ts'] > 0 || $dates['end_ts'] > 0) {
@@ -82,6 +99,8 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
     $start_ts    = (int) $start_ts;
     $end_ts      = (int) $end_ts;
 
+    static $content_tables_ensured = false;
+
     $tables_with_dates = [
         'content_eggs',
         'content_quests',
@@ -91,6 +110,7 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         'content_bonus',
         'content_wild_pokemon',
         'content_new_pokemon',
+        'content_day_pokemon_hours',
         'content_raids',
     ];
 
@@ -102,6 +122,62 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         if (empty($table)) {
             continue;
         }
+
+        // La sauvegarde de featured-hours déclenche souvent `save_post` en cascade.
+        // Si certaines tables n'existent pas encore (install fraîche / mauvaise config modules),
+        // on évite de planter toute la sauvegarde.
+        $table_name = $table;
+        if (strpos($table_name, '.') !== false) {
+            $parts = explode('.', $table_name);
+            $table_name = (string) end($parts);
+        }
+
+        $table_exists = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+            $wpdb->dbname,
+            $table_name
+        )) > 0;
+
+        if (!$table_exists) {
+            if (!$content_tables_ensured && class_exists('Pokehub_DB') && function_exists('pokehub_get_table')) {
+                // Tente une (re)création des tables de contenu manquantes.
+                try {
+                    // Certains blocs (ex: Day Pokémon Hours / Featured Hours) utilisent des tables
+                    // de "content" qui ne sont créées que si le module `blocks` est inclus.
+                    Pokehub_DB::getInstance()->createTables(['events', 'eggs', 'quests', 'blocks']);
+                } catch (Throwable $t) {
+                    // ignore; la table pourrait rester manquante dans certains setups.
+                }
+                $content_tables_ensured = true;
+            } elseif (!$content_tables_ensured && !class_exists('Pokehub_DB') && function_exists('pokehub_get_table')) {
+                // Si la classe n'est pas encore chargée, on tente de la charger.
+                try {
+                    $db_file = dirname(__DIR__) . '/pokehub-db.php';
+                    if (file_exists($db_file)) {
+                        require_once $db_file;
+                    }
+                    if (class_exists('Pokehub_DB')) {
+                        // Certains blocs (ex: Day Pokémon Hours / Featured Hours) utilisent des tables
+                        // de "content" qui ne sont créées que si le module `blocks` est inclus.
+                        Pokehub_DB::getInstance()->createTables(['events', 'eggs', 'quests', 'blocks']);
+                        $content_tables_ensured = true;
+                    }
+                } catch (Throwable $t) {
+                    // ignore
+                }
+            }
+
+            $table_exists = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                $wpdb->dbname,
+                $table_name
+            )) > 0;
+        }
+
+        if (!$table_exists) {
+            continue;
+        }
+
         $wpdb->query($wpdb->prepare(
             "UPDATE {$table} SET start_ts = %d, end_ts = %d WHERE source_type = %s AND source_id = %d",
             $start_ts,
@@ -1539,4 +1615,1359 @@ function pokehub_content_save_collection_challenges($source_type, $source_id, ar
             'sort_order'          => $sort++,
         ], ['%d', '%s', '%d']);
     }
+}
+
+// --- Bloc "Jour -> Pokémon(s) -> Heures" ---
+
+/**
+ * Récupère les "sets" jour/pokémon/heures pour une source.
+ *
+ * Retourne une structure :
+ * [
+ *   [
+ *     'content_type' => 'featured_hours',
+ *     'days' => [
+ *        ['date' => 'YYYY-MM-DD', 'start_time' => '18:00', 'end_time' => '19:00', 'pokemon_ids' => [1,2]],
+ *        ...
+ *     ]
+ *   ],
+ *   ...
+ * ]
+ *
+ * @param string $source_type 'post' | 'special_event' | 'global_pool'
+ * @param int    $source_id
+ * @return array
+ */
+function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): array {
+    global $wpdb;
+
+    $source_type = (string) $source_type;
+    $source_id   = (int) $source_id;
+
+    $tz = function_exists('wp_timezone') ? wp_timezone() : null;
+    if (!$tz) {
+        $tz = new DateTimeZone('UTC');
+    }
+
+    // Helpers locaux : timestamp UTC -> date (Y-m-d) + time (H:i) en heure locale.
+    $format_local_parts = function (int $timestamp) use ($tz): array {
+        if ($timestamp <= 0) {
+            return [];
+        }
+        try {
+            $dt = new DateTime('@' . $timestamp);
+            $dt->setTimezone($tz);
+            return [
+                'date' => $dt->format('Y-m-d'),
+                'time' => $dt->format('H:i'),
+            ];
+        } catch (Exception $e) {
+            return [];
+        }
+    };
+
+    // 1) Raiders (content_raids + content_raid_bosses)
+    $out = [];
+    $raid_sets_map = []; // set_key => set struct
+    $raid_days_map = []; // set_key => [day_key => [pokemon_ids=>true]]
+    $raid_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_raids') : '';
+    $raid_bosses_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_raid_bosses') : '';
+    if ($raid_tbl && $raid_bosses_tbl) {
+        $raid_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$raid_tbl} WHERE source_type = %s AND source_id = %d ORDER BY start_ts ASC, id ASC",
+            $source_type,
+            $source_id
+        ), ARRAY_A);
+
+        foreach ($raid_rows as $rr) {
+            $rid = (int) ($rr['id'] ?? 0);
+            $start_ts = (int) ($rr['start_ts'] ?? 0);
+            $end_ts = (int) ($rr['end_ts'] ?? 0);
+            if ($rid <= 0 || $start_ts <= 0 || $end_ts <= 0) {
+                continue;
+            }
+
+            $st_parts = $format_local_parts($start_ts);
+            $et_parts = $format_local_parts($end_ts);
+            if (empty($st_parts) || empty($et_parts)) {
+                continue;
+            }
+            $date = (string) ($st_parts['date'] ?? '');
+            $end_date = (string) ($et_parts['date'] ?? $date);
+            $start_time = (string) ($st_parts['time'] ?? '');
+            $end_time = (string) ($et_parts['time'] ?? '');
+            if ($date === '' || $start_time === '' || $end_time === '') {
+                continue;
+            }
+            $day_key = $date . '|' . $end_date . '|' . $start_time . '|' . $end_time;
+
+            $bosses = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$raid_bosses_tbl} WHERE content_raid_id = %d ORDER BY sort_order ASC, id ASC",
+                $rid
+            ), ARRAY_A);
+
+            if (empty($bosses)) {
+                continue;
+            }
+
+            $first = $bosses[0];
+            $tier = (int) ($first['tier'] ?? 1);
+            $is_mega = !empty($first['is_mega']) ? 1 : 0;
+            $set_key = $tier . '|' . $is_mega;
+
+            if (!isset($raid_sets_map[$set_key])) {
+                $raid_sets_map[$set_key] = [
+                    'content_type' => 'raids',
+                    'raid_tier' => $tier,
+                    'raid_is_mega' => (int) $is_mega,
+                    'days_map' => [],
+                ];
+                $raid_days_map[$set_key] = [];
+            }
+
+            if (!isset($raid_days_map[$set_key][$day_key])) {
+                $raid_days_map[$set_key][$day_key] = [];
+            }
+
+            foreach ($bosses as $b) {
+                $pid = (int) ($b['pokemon_id'] ?? 0);
+                if ($pid > 0) {
+                    $raid_days_map[$set_key][$day_key][$pid] = true;
+                }
+            }
+        }
+
+        foreach ($raid_sets_map as $set_key => $set) {
+            $days = [];
+            if (!empty($raid_days_map[$set_key])) {
+                $day_items = [];
+                foreach ($raid_days_map[$set_key] as $day_key => $pid_map) {
+                    $parts = explode('|', (string) $day_key);
+                    if (count($parts) !== 4) continue;
+                    $day_items[] = [
+                        'date' => $parts[0],
+                        'end_date' => $parts[1],
+                        'start_time' => $parts[2],
+                        'end_time' => $parts[3],
+                        'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                    ];
+                }
+                usort($day_items, function($a, $b) {
+                    $da = (string) ($a['date'] ?? '');
+                    $db = (string) ($b['date'] ?? '');
+                    if ($da === $db) {
+                        $sa = (string) ($a['start_time'] ?? '');
+                        $sb = (string) ($b['start_time'] ?? '');
+                        return $sa <=> $sb;
+                    }
+                    return $da <=> $db;
+                });
+                $days = $day_items;
+            }
+            $out[] = [
+                'content_type' => 'raids',
+                'raid_tier' => (int) ($set['raid_tier'] ?? 1),
+                'raid_is_mega' => (int) ($set['raid_is_mega'] ?? 0),
+                'days' => $days,
+            ];
+        }
+    }
+
+    // 2) Œufs (content_eggs + content_egg_pokemon)
+    $egg_sets_map = []; // egg_type_id => set struct
+    $egg_days_map = []; // egg_type_id => [day_key => [pokemon_ids=>true]]
+    $eggs_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_eggs') : '';
+    $egg_pokemon_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_egg_pokemon') : '';
+    if ($eggs_tbl && $egg_pokemon_tbl) {
+        $egg_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$eggs_tbl} WHERE source_type = %s AND source_id = %d ORDER BY start_ts ASC, id ASC",
+            $source_type,
+            $source_id
+        ), ARRAY_A);
+
+        foreach ($egg_rows as $er) {
+            $eid = (int) ($er['id'] ?? 0);
+            $start_ts = (int) ($er['start_ts'] ?? 0);
+            $end_ts = (int) ($er['end_ts'] ?? 0);
+            if ($eid <= 0 || $start_ts <= 0 || $end_ts <= 0) {
+                continue;
+            }
+
+            $st_parts = $format_local_parts($start_ts);
+            $et_parts = $format_local_parts($end_ts);
+            if (empty($st_parts) || empty($et_parts)) {
+                continue;
+            }
+
+            $date = (string) ($st_parts['date'] ?? '');
+            $end_date = (string) ($et_parts['date'] ?? $date);
+            $start_time = (string) ($st_parts['time'] ?? '');
+            $end_time = (string) ($et_parts['time'] ?? '');
+            if ($date === '' || $start_time === '' || $end_time === '') {
+                continue;
+            }
+            $day_key = $date . '|' . $end_date . '|' . $start_time . '|' . $end_time;
+
+            $egg_pokemons = $wpdb->get_results($wpdb->prepare(
+                "SELECT egg_type_id, pokemon_id FROM {$egg_pokemon_tbl} WHERE content_egg_id = %d ORDER BY sort_order ASC, id ASC",
+                $eid
+            ), ARRAY_A);
+
+            if (empty($egg_pokemons)) {
+                continue;
+            }
+
+            foreach ($egg_pokemons as $ep) {
+                $egg_type_id = (int) ($ep['egg_type_id'] ?? 0);
+                $pid = (int) ($ep['pokemon_id'] ?? 0);
+                if ($egg_type_id <= 0 || $pid <= 0) {
+                    continue;
+                }
+
+                if (!isset($egg_sets_map[$egg_type_id])) {
+                    $egg_sets_map[$egg_type_id] = [
+                        'content_type' => 'eggs',
+                        'egg_type_id' => $egg_type_id,
+                    ];
+                    $egg_days_map[$egg_type_id] = [];
+                }
+
+                if (!isset($egg_days_map[$egg_type_id][$day_key])) {
+                    $egg_days_map[$egg_type_id][$day_key] = [];
+                }
+                $egg_days_map[$egg_type_id][$day_key][$pid] = true;
+            }
+        }
+
+        $egg_type_ids = array_keys($egg_sets_map);
+        sort($egg_type_ids, SORT_NUMERIC);
+        foreach ($egg_type_ids as $egg_type_id) {
+            $day_items = [];
+            foreach (($egg_days_map[$egg_type_id] ?? []) as $day_key => $pid_map) {
+                $parts = explode('|', (string) $day_key);
+                if (count($parts) !== 4) continue;
+                $day_items[] = [
+                    'date' => $parts[0],
+                    'end_date' => $parts[1],
+                    'start_time' => $parts[2],
+                    'end_time' => $parts[3],
+                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                ];
+            }
+            usort($day_items, function($a, $b) {
+                $da = (string) ($a['date'] ?? '');
+                $db = (string) ($b['date'] ?? '');
+                if ($da === $db) {
+                    $sa = (string) ($a['start_time'] ?? '');
+                    $sb = (string) ($b['start_time'] ?? '');
+                    return $sa <=> $sb;
+                }
+                return $da <=> $db;
+            });
+
+            $out[] = [
+                'content_type' => 'eggs',
+                'egg_type_id' => (int) ($egg_type_id),
+                'days' => $day_items,
+            ];
+        }
+    }
+
+    // 3) Quêtes (content_quests + content_quest_lines) -> une seule set dans l'éditeur
+    $quest_days_map = []; // day_key => [pokemon_ids=>true]
+    $quests_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quests') : '';
+    $quest_lines_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quest_lines') : '';
+    if ($quests_tbl && $quest_lines_tbl) {
+        $quest_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d ORDER BY start_ts ASC, id ASC",
+            $source_type,
+            $source_id
+        ), ARRAY_A);
+
+        foreach ($quest_rows as $qr) {
+            $qid = (int) ($qr['id'] ?? 0);
+            $start_ts = (int) ($qr['start_ts'] ?? 0);
+            $end_ts = (int) ($qr['end_ts'] ?? 0);
+            if ($qid <= 0 || $start_ts <= 0 || $end_ts <= 0) {
+                continue;
+            }
+
+            $st_parts = $format_local_parts($start_ts);
+            $et_parts = $format_local_parts($end_ts);
+            if (empty($st_parts) || empty($et_parts)) {
+                continue;
+            }
+
+            $date = (string) ($st_parts['date'] ?? '');
+            $end_date = (string) ($et_parts['date'] ?? $date);
+            $start_time = (string) ($st_parts['time'] ?? '');
+            $end_time = (string) ($et_parts['time'] ?? '');
+            if ($date === '' || $start_time === '' || $end_time === '') {
+                continue;
+            }
+
+            $day_key = $date . '|' . $end_date . '|' . $start_time . '|' . $end_time;
+
+            $lines = $wpdb->get_results($wpdb->prepare(
+                "SELECT rewards FROM {$quest_lines_tbl} WHERE content_quest_id = %d ORDER BY sort_order ASC, id ASC",
+                $qid
+            ), ARRAY_A);
+
+            foreach ($lines as $l) {
+                $raw_rewards = isset($l['rewards']) ? $l['rewards'] : '';
+                if ($raw_rewards === '' || $raw_rewards === null) {
+                    continue;
+                }
+                $rewards = json_decode($raw_rewards, true);
+                if (is_string($rewards)) {
+                    $rewards = json_decode($rewards, true);
+                }
+                if (!is_array($rewards)) {
+                    continue;
+                }
+
+                foreach ($rewards as $reward) {
+                    if (empty($reward) || !is_array($reward)) {
+                        continue;
+                    }
+                    $rtype = isset($reward['type']) ? sanitize_key((string) $reward['type']) : '';
+                    if ($rtype !== 'pokemon') {
+                        continue;
+                    }
+                    if (!empty($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])) {
+                        foreach ($reward['pokemon_ids'] as $pid) {
+                            $pid = (int) $pid;
+                            if ($pid > 0) {
+                                if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = [];
+                                $quest_days_map[$day_key][$pid] = true;
+                            }
+                        }
+                    } elseif (isset($reward['pokemon_id'])) {
+                        $pid = (int) $reward['pokemon_id'];
+                        if ($pid > 0) {
+                            if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = [];
+                            $quest_days_map[$day_key][$pid] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!empty($quest_days_map)) {
+            $day_items = [];
+            foreach ($quest_days_map as $day_key => $pid_map) {
+                $parts = explode('|', (string) $day_key);
+                if (count($parts) !== 4) continue;
+                $day_items[] = [
+                    'date' => $parts[0],
+                    'end_date' => $parts[1],
+                    'start_time' => $parts[2],
+                    'end_time' => $parts[3],
+                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                ];
+            }
+            usort($day_items, function($a, $b) {
+                $da = (string) ($a['date'] ?? '');
+                $db = (string) ($b['date'] ?? '');
+                if ($da === $db) {
+                    $sa = (string) ($a['start_time'] ?? '');
+                    $sb = (string) ($b['start_time'] ?? '');
+                    return $sa <=> $sb;
+                }
+                return $da <=> $db;
+            });
+
+            $out[] = [
+                'content_type' => 'quests',
+                'days' => $day_items,
+            ];
+        }
+    }
+
+    // 4) Autres contenus : content_day_pokemon_hours (hors raids/eggs/quests)
+    $main_tbl    = function_exists('pokehub_get_table') ? pokehub_get_table('content_day_pokemon_hours') : '';
+    $entries_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_day_pokemon_hour_entries') : '';
+    if ($main_tbl && $entries_tbl) {
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$main_tbl} WHERE source_type = %s AND source_id = %d ORDER BY sort_order ASC, id ASC",
+            $source_type,
+            $source_id
+        ), ARRAY_A);
+
+        foreach ((array) $rows as $r) {
+            $content_hours_id = (int) ($r['id'] ?? 0);
+            $ct = (string) ($r['content_type'] ?? 'featured_hours');
+            if ($content_hours_id <= 0) continue;
+            if (in_array($ct, ['raids', 'eggs', 'quests'], true)) continue;
+
+            $entries = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$entries_tbl} WHERE content_day_pokemon_hours_id = %d ORDER BY sort_order ASC, id ASC",
+                $content_hours_id
+            ), ARRAY_A);
+
+            $days = [];
+            foreach ($entries as $e) {
+                $pokemon_ids_raw = $e['pokemon_ids'] ?? '';
+                $pokemon_ids = [];
+                if (is_string($pokemon_ids_raw) && $pokemon_ids_raw !== '') {
+                    $decoded = json_decode($pokemon_ids_raw, true);
+                    if (is_array($decoded)) {
+                        $pokemon_ids = $decoded;
+                    }
+                } elseif (is_array($pokemon_ids_raw)) {
+                    $pokemon_ids = $pokemon_ids_raw;
+                }
+
+                $days[] = [
+                    'date' => (string) ($e['day_date'] ?? ''),
+                'end_date' => (string) ($e['end_day_date'] ?? ''),
+                    'start_time' => (string) ($e['start_time'] ?? ''),
+                    'end_time' => (string) ($e['end_time'] ?? ''),
+                    'pokemon_ids' => array_values(array_map('intval', array_filter((array) $pokemon_ids, function ($id) {
+                        return is_numeric($id) && (int) $id > 0;
+                    }))),
+                ];
+            }
+
+            $out[] = [
+                'content_type' => $ct,
+                'days' => $days,
+            ];
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Récupère les entrées (days) pour un content_type donné.
+ *
+ * @param string $source_type
+ * @param int    $source_id
+ * @param string $content_type
+ * @return array[] ['date','start_time','end_time','pokemon_ids']
+ */
+function pokehub_content_get_day_pokemon_hours_entries($source_type, $source_id, string $content_type): array {
+    $content_type = sanitize_key($content_type);
+    if ($content_type === '') {
+        $content_type = 'featured_hours';
+    }
+
+    $sets = pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id);
+    $merged = []; // day_key => ['date','end_date','start_time','end_time','pokemon_ids_map'=>[pid=>true]]
+    foreach ($sets as $set) {
+        if (($set['content_type'] ?? '') !== $content_type) {
+            continue;
+        }
+        if (!empty($set['days']) && is_array($set['days'])) {
+            foreach ($set['days'] as $d) {
+                if (is_array($d)) {
+                    $date = (string) ($d['date'] ?? '');
+                    $end_date = trim((string) ($d['end_date'] ?? ''));
+                    if ($end_date === '') {
+                        $end_date = $date;
+                    }
+                    $start_time = (string) ($d['start_time'] ?? '');
+                    $end_time = (string) ($d['end_time'] ?? '');
+                    if ($date === '') {
+                        continue;
+                    }
+                    $day_key = $date . '|' . $end_date . '|' . $start_time . '|' . $end_time;
+                    if (!isset($merged[$day_key])) {
+                        $merged[$day_key] = [
+                            'date' => $date,
+                            'end_date' => $end_date,
+                            'start_time' => $start_time,
+                            'end_time' => $end_time,
+                            'pokemon_ids_map' => [],
+                        ];
+                    }
+                    $pokemon_ids = isset($d['pokemon_ids']) && is_array($d['pokemon_ids']) ? $d['pokemon_ids'] : [];
+                    foreach ($pokemon_ids as $pid) {
+                        $pid = (int) $pid;
+                        if ($pid > 0) {
+                            $merged[$day_key]['pokemon_ids_map'][$pid] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $days = [];
+    foreach ($merged as $item) {
+        $days[] = [
+            'date' => (string) ($item['date'] ?? ''),
+            'end_date' => (string) ($item['end_date'] ?? ($item['date'] ?? '')),
+            'start_time' => (string) ($item['start_time'] ?? ''),
+            'end_time' => (string) ($item['end_time'] ?? ''),
+            'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($item['pokemon_ids_map'] ?? [])))),
+        ];
+    }
+
+    usort($days, function($a, $b) {
+        $da = (string) ($a['date'] ?? '');
+        $db = (string) ($b['date'] ?? '');
+        if ($da === $db) {
+            $sa = (string) ($a['start_time'] ?? '');
+            $sb = (string) ($b['start_time'] ?? '');
+            return $sa <=> $sb;
+        }
+        return $da <=> $db;
+    });
+
+    return $days;
+}
+
+/**
+ * Sauvegarde les "sets" jour/pokémon/heures pour une source.
+ *
+ * @param string $source_type
+ * @param int    $source_id
+ * @param array  $sets [
+ *   [
+ *     'content_type' => 'featured_hours',
+ *     'days' => [
+ *       ['date'=>'YYYY-MM-DD','start_time'=>'18:00','end_time'=>'19:00','pokemon_ids'=>[1,2]],
+ *       ...
+ *     ]
+ *   ],
+ *   ...
+ * ]
+ */
+function pokehub_content_save_day_pokemon_hours($source_type, $source_id, array $sets): void {
+    global $wpdb;
+
+    $source_type = (string) $source_type;
+    $source_id   = (int) $source_id;
+
+    $main_tbl    = pokehub_get_table('content_day_pokemon_hours');
+    $entries_tbl = pokehub_get_table('content_day_pokemon_hour_entries');
+    if (!$main_tbl || !$entries_tbl) {
+        return;
+    }
+
+    // 1) Nettoyer la structure reçue
+    $cleaned_sets = [];
+    foreach ($sets as $set) {
+        if (!is_array($set)) continue;
+
+        $content_type = isset($set['content_type']) ? sanitize_key((string) $set['content_type']) : 'featured_hours';
+        if ($content_type === '') {
+            $content_type = 'featured_hours';
+        }
+
+        $days_raw = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+        $days = [];
+        foreach ($days_raw as $day) {
+            if (!is_array($day)) continue;
+
+            $date = sanitize_text_field((string) ($day['date'] ?? ''));
+            $start_time = sanitize_text_field((string) ($day['start_time'] ?? ''));
+            $end_time   = sanitize_text_field((string) ($day['end_time'] ?? ''));
+            $end_date   = sanitize_text_field((string) ($day['end_date'] ?? ''));
+            if ($end_date === '') {
+                $end_date = $date;
+            }
+
+            $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+            if (!is_array($pokemon_ids)) {
+                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            }
+            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
+                return is_numeric($id) && (int) $id > 0;
+            })));
+
+            if ($date === '' || empty($pokemon_ids)) {
+                continue;
+            }
+
+            $days[] = [
+                'date'        => $date,
+                'end_date'    => $end_date,
+                'start_time'  => $start_time,
+                'end_time'    => $end_time,
+                'pokemon_ids' => $pokemon_ids,
+            ];
+        }
+
+        if (empty($days)) {
+            continue;
+        }
+
+        $cleaned_sets[] = [
+            'content_type' => $content_type,
+            'days'          => $days,
+        ];
+    }
+
+    if (empty($cleaned_sets)) {
+        // Supprimer les données existantes (si rien n'est fourni)
+        $existing = $wpdb->get_results($wpdb->prepare(
+            "SELECT id FROM {$main_tbl} WHERE source_type = %s AND source_id = %d",
+            $source_type,
+            $source_id
+        ), ARRAY_A);
+        if (!empty($existing)) {
+            foreach ($existing as $r) {
+                $mid = (int) ($r['id'] ?? 0);
+                if ($mid > 0) {
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$entries_tbl} WHERE content_day_pokemon_hours_id = %d", $mid));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$main_tbl} WHERE id = %d", $mid));
+                }
+            }
+        }
+        return;
+    }
+
+    $desired_types = array_values(array_unique(array_map(function($s) {
+        return (string) ($s['content_type'] ?? 'featured_hours');
+    }, $cleaned_sets)));
+
+    // 2) Récupérer les rows existantes
+    $existing_rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, content_type FROM {$main_tbl} WHERE source_type = %s AND source_id = %d",
+        $source_type,
+        $source_id
+    ), ARRAY_A);
+
+    $existing_by_type = [];
+    foreach ($existing_rows as $r) {
+        $cid = (int) ($r['id'] ?? 0);
+        $ct  = (string) ($r['content_type'] ?? '');
+        if ($cid > 0 && $ct !== '') {
+            $existing_by_type[$ct] = $cid;
+        }
+    }
+
+    // 3) Supprimer les content_type non soumis
+    foreach ($existing_by_type as $ct => $mid) {
+        if (!in_array($ct, $desired_types, true)) {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$entries_tbl} WHERE content_day_pokemon_hours_id = %d", (int) $mid));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$main_tbl} WHERE id = %d", (int) $mid));
+            unset($existing_by_type[$ct]);
+        }
+    }
+
+    // 4) Upsert + insert des entries
+    $sort_order = 0;
+    foreach ($cleaned_sets as $set) {
+        $content_type = (string) ($set['content_type'] ?? 'featured_hours');
+        $days = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+        if (empty($days)) continue;
+
+        $start_ts = 0;
+        $end_ts = 0;
+        $tz = wp_timezone();
+
+        foreach ($days as $d) {
+            $date = (string) ($d['date'] ?? '');
+            $end_date_raw = trim((string) ($d['end_date'] ?? ''));
+            $end_date_effective = ($end_date_raw !== '') ? $end_date_raw : $date;
+            $st = (string) ($d['start_time'] ?? '');
+            $et = (string) ($d['end_time'] ?? '');
+            if ($date === '') continue;
+
+            // Calcul optionnel : sert surtout si tu veux un filtre "actif"
+            if ($st !== '') {
+                try {
+                    $dtStart = new DateTime($date . ' ' . $st, $tz);
+                    $ts = (int) $dtStart->getTimestamp();
+                    if ($ts > 0 && ($start_ts === 0 || $ts < $start_ts)) {
+                        $start_ts = $ts;
+                    }
+                } catch (Exception $e) {
+                    // ignore parse errors
+                }
+            }
+            if ($et !== '') {
+                try {
+                    $dtEnd = new DateTime($end_date_effective . ' ' . $et, $tz);
+                    $ts = (int) $dtEnd->getTimestamp();
+                    if ($ts > 0 && $ts > $end_ts) {
+                        $end_ts = $ts;
+                    }
+                } catch (Exception $e) {
+                    // ignore parse errors
+                }
+            }
+        }
+
+        $row_id = isset($existing_by_type[$content_type]) ? (int) $existing_by_type[$content_type] : 0;
+        if ($row_id > 0) {
+            $wpdb->update($main_tbl, [
+                'content_type' => $content_type,
+                'start_ts'     => (int) $start_ts,
+                'end_ts'       => (int) $end_ts,
+                'sort_order'   => (int) $sort_order,
+                'updated_at'   => current_time('mysql'),
+            ], ['id' => $row_id], ['%s', '%d', '%d', '%d', '%s'], ['%d']);
+        } else {
+            $wpdb->insert($main_tbl, [
+                'source_type'  => $source_type,
+                'source_id'    => $source_id,
+                'content_type' => $content_type,
+                'start_ts'     => (int) $start_ts,
+                'end_ts'       => (int) $end_ts,
+                'sort_order'   => (int) $sort_order,
+            ], ['%s', '%d', '%s', '%d', '%d', '%d']);
+            $row_id = (int) $wpdb->insert_id;
+            $existing_by_type[$content_type] = $row_id;
+        }
+
+        if ($row_id <= 0) continue;
+
+        // On remplace les entries pour ce set
+        $wpdb->query($wpdb->prepare("DELETE FROM {$entries_tbl} WHERE content_day_pokemon_hours_id = %d", $row_id));
+
+        $entry_sort = 0;
+        foreach ($days as $d) {
+            $date = (string) ($d['date'] ?? '');
+            $end_date_raw = trim((string) ($d['end_date'] ?? ''));
+            $st = (string) ($d['start_time'] ?? '');
+            $et = (string) ($d['end_time'] ?? '');
+            $pokemon_ids = isset($d['pokemon_ids']) && is_array($d['pokemon_ids']) ? $d['pokemon_ids'] : [];
+
+            if ($date === '' || empty($pokemon_ids)) continue;
+
+            $wpdb->insert($entries_tbl, [
+                'content_day_pokemon_hours_id' => $row_id,
+                'day_date'  => $date,
+                'start_time'=> $st,
+                'end_time'  => $et,
+                'end_day_date' => $end_date_raw,
+                'pokemon_ids' => wp_json_encode(array_values(array_map('intval', $pokemon_ids))),
+                'sort_order'=> (int) $entry_sort,
+            ], ['%d', '%s', '%s', '%s', '%s', '%s', '%d']);
+
+            $entry_sort++;
+        }
+
+        $sort_order++;
+    }
+}
+
+/**
+ * Sauvegarde day-by-day des raids dans les tables existantes.
+ * - Un row `content_raids` par entrée (date + start/end).
+ * - Des rows `content_raid_bosses` par Pokémon.
+ *
+ * @param string $source_type
+ * @param int $source_id
+ * @param array $sets Structure: [ [ 'raid_tier'=>int, 'raid_is_mega'=>bool, 'days'=>[...] ], ... ]
+ *                      Chaque day: ['date'=>YYYY-MM-DD,'start_time'=>'HH:MM','end_time'=>'HH:MM','pokemon_ids'=>[...]]
+ */
+function pokehub_content_save_day_pokemon_hours_raids(string $source_type, int $source_id, array $sets): void {
+    global $wpdb;
+    $source_type = (string) $source_type;
+    $source_id = (int) $source_id;
+
+    $raids_tbl = pokehub_get_table('content_raids');
+    $raid_bosses_tbl = pokehub_get_table('content_raid_bosses');
+    if (!$raids_tbl || !$raid_bosses_tbl) {
+        return;
+    }
+
+    $tz = wp_timezone();
+    $make_ts = function(string $date, string $time) use ($tz): int {
+        $date = trim($date);
+        $time = trim($time);
+        if ($date === '' || $time === '') return 0;
+        try {
+            $dt = new DateTime($date . ' ' . $time, $tz);
+            return (int) $dt->getTimestamp();
+        } catch (Exception $e) {
+            return 0;
+        }
+    };
+
+    // Nettoyage complet pour cette source (évite de mélanger plusieurs sauvegardes).
+    $raid_ids = $wpdb->get_results($wpdb->prepare(
+        "SELECT id FROM {$raids_tbl} WHERE source_type = %s AND source_id = %d",
+        $source_type,
+        $source_id
+    ), ARRAY_A);
+
+    foreach ((array) $raid_ids as $r) {
+        $rid = (int) ($r['id'] ?? 0);
+        if ($rid > 0) {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$raid_bosses_tbl} WHERE content_raid_id = %d", $rid));
+        }
+    }
+    $wpdb->query($wpdb->prepare("DELETE FROM {$raids_tbl} WHERE source_type = %s AND source_id = %d", $source_type, $source_id));
+
+    $sort_order = 0;
+    foreach ($sets as $set) {
+        if (!is_array($set)) continue;
+        $tier = isset($set['raid_tier']) ? max(1, min(5, (int) $set['raid_tier'])) : 1;
+        $is_mega = !empty($set['raid_is_mega']) ? 1 : 0;
+        $days_raw = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+
+        foreach ($days_raw as $day) {
+            if (!is_array($day)) continue;
+            $date = sanitize_text_field((string) ($day['date'] ?? ''));
+            $end_date = sanitize_text_field((string) ($day['end_date'] ?? ''));
+            $st = sanitize_text_field((string) ($day['start_time'] ?? ''));
+            $et = sanitize_text_field((string) ($day['end_time'] ?? ''));
+            if ($end_date === '') {
+                $end_date = $date;
+            }
+            $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+            if (!is_array($pokemon_ids)) {
+                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            }
+            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
+                return is_numeric($id) && (int) $id > 0;
+            })));
+
+            if ($date === '' || empty($pokemon_ids)) continue;
+
+            $start_ts = $make_ts($date, $st);
+            $end_ts = $make_ts($end_date, $et);
+            if ($start_ts <= 0 || $end_ts <= 0) continue;
+
+            $wpdb->insert($raids_tbl, [
+                'source_type' => $source_type,
+                'source_id' => $source_id,
+                'start_ts' => (int) $start_ts,
+                'end_ts' => (int) $end_ts,
+                'name' => null,
+                'sort_order' => (int) $sort_order,
+            ], ['%s', '%d', '%d', '%d', '%s', '%d']);
+
+            $raid_id = (int) $wpdb->insert_id;
+            if ($raid_id <= 0) continue;
+
+            $boss_sort = 0;
+            foreach ($pokemon_ids as $pid) {
+                $wpdb->insert($raid_bosses_tbl, [
+                    'content_raid_id' => $raid_id,
+                    'tier' => (int) $tier,
+                    'pokemon_id' => (int) $pid,
+                    'is_mega' => (int) $is_mega,
+                    'sort_order' => (int) $boss_sort++,
+                ], ['%d', '%d', '%d', '%d', '%d']);
+            }
+
+            $sort_order++;
+        }
+    }
+}
+
+/**
+ * Sauvegarde day-by-day des œufs dans les tables existantes.
+ * - Un row `content_eggs` par entrée (date + start/end).
+ * - Des rows `content_egg_pokemon` par Pokémon (avec egg_type_id).
+ *
+ * @param string $source_type
+ * @param int $source_id
+ * @param array $sets Structure: [ [ 'egg_type_id'=>int, 'days'=>[...] ], ... ]
+ */
+function pokehub_content_save_day_pokemon_hours_eggs(string $source_type, int $source_id, array $sets): void {
+    global $wpdb;
+    $source_type = (string) $source_type;
+    $source_id = (int) $source_id;
+
+    $eggs_tbl = pokehub_get_table('content_eggs');
+    $egg_pokemon_tbl = pokehub_get_table('content_egg_pokemon');
+    if (!$eggs_tbl || !$egg_pokemon_tbl) {
+        return;
+    }
+
+    $tz = wp_timezone();
+    $make_ts = function(string $date, string $time) use ($tz): int {
+        $date = trim($date);
+        $time = trim($time);
+        if ($date === '' || $time === '') return 0;
+        try {
+            $dt = new DateTime($date . ' ' . $time, $tz);
+            return (int) $dt->getTimestamp();
+        } catch (Exception $e) {
+            return 0;
+        }
+    };
+
+    // Nettoyage complet pour cette source.
+    $egg_ids = $wpdb->get_results($wpdb->prepare(
+        "SELECT id FROM {$eggs_tbl} WHERE source_type = %s AND source_id = %d",
+        $source_type,
+        $source_id
+    ), ARRAY_A);
+
+    foreach ((array) $egg_ids as $r) {
+        $eid = (int) ($r['id'] ?? 0);
+        if ($eid > 0) {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$egg_pokemon_tbl} WHERE content_egg_id = %d", $eid));
+        }
+    }
+    $wpdb->query($wpdb->prepare("DELETE FROM {$eggs_tbl} WHERE source_type = %s AND source_id = %d", $source_type, $source_id));
+
+    $sort_order = 0;
+    foreach ($sets as $set) {
+        if (!is_array($set)) continue;
+        $egg_type_id = isset($set['egg_type_id']) ? (int) $set['egg_type_id'] : 0;
+        $days_raw = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+        if ($egg_type_id <= 0) continue;
+
+        foreach ($days_raw as $day) {
+            if (!is_array($day)) continue;
+            $date = sanitize_text_field((string) ($day['date'] ?? ''));
+            $end_date = sanitize_text_field((string) ($day['end_date'] ?? ''));
+            $st = sanitize_text_field((string) ($day['start_time'] ?? ''));
+            $et = sanitize_text_field((string) ($day['end_time'] ?? ''));
+            if ($end_date === '') {
+                $end_date = $date;
+            }
+            $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+            if (!is_array($pokemon_ids)) {
+                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            }
+            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
+                return is_numeric($id) && (int) $id > 0;
+            })));
+
+            if ($date === '' || empty($pokemon_ids)) continue;
+
+            $start_ts = $make_ts($date, $st);
+            $end_ts = $make_ts($end_date, $et);
+            if ($start_ts <= 0 || $end_ts <= 0) continue;
+
+            $wpdb->insert($eggs_tbl, [
+                'source_type' => $source_type,
+                'source_id' => $source_id,
+                'start_ts' => (int) $start_ts,
+                'end_ts' => (int) $end_ts,
+                'name' => null,
+                'sort_order' => (int) $sort_order,
+            ], ['%s', '%d', '%d', '%d', '%s', '%d']);
+
+            $egg_id = (int) $wpdb->insert_id;
+            if ($egg_id <= 0) continue;
+
+            $boss_sort = 0;
+            foreach ($pokemon_ids as $pid) {
+                $wpdb->insert($egg_pokemon_tbl, [
+                    'content_egg_id' => $egg_id,
+                    'egg_type_id' => (int) $egg_type_id,
+                    'pokemon_id' => (int) $pid,
+                    'rarity' => 1,
+                    'is_worldwide_override' => 0,
+                    'is_forced_shiny' => 0,
+                    'sort_order' => (int) $boss_sort++,
+                ], ['%d', '%d', '%d', '%d', '%d', '%d', '%d']);
+            }
+
+            $sort_order++;
+        }
+    }
+}
+
+/**
+ * Sauvegarde day-by-day des quêtes dans les tables existantes.
+ * - Un row `content_quests` par entrée (date + start/end).
+ * - Une (ou plusieurs) row(s) `content_quest_lines` avec rewards pokemon.
+ *
+ * @param string $source_type
+ * @param int $source_id
+ * @param array $sets Structure: [ [ 'days'=>[...] ], ... ]
+ */
+function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int $source_id, array $sets): void {
+    global $wpdb;
+    $source_type = (string) $source_type;
+    $source_id = (int) $source_id;
+
+    $quests_tbl = pokehub_get_table('content_quests');
+    $quest_lines_tbl = pokehub_get_table('content_quest_lines');
+    if (!$quests_tbl || !$quest_lines_tbl) {
+        return;
+    }
+
+    $tz = wp_timezone();
+    $make_ts = function(string $date, string $time) use ($tz): int {
+        $date = trim($date);
+        $time = trim($time);
+        if ($date === '' || $time === '') return 0;
+        try {
+            $dt = new DateTime($date . ' ' . $time, $tz);
+            return (int) $dt->getTimestamp();
+        } catch (Exception $e) {
+            return 0;
+        }
+    };
+
+    // Nettoyage complet pour cette source.
+    $quest_ids = $wpdb->get_results($wpdb->prepare(
+        "SELECT id FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d",
+        $source_type,
+        $source_id
+    ), ARRAY_A);
+
+    foreach ((array) $quest_ids as $r) {
+        $qid = (int) ($r['id'] ?? 0);
+        if ($qid > 0) {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$quest_lines_tbl} WHERE content_quest_id = %d", $qid));
+        }
+    }
+    $wpdb->query($wpdb->prepare("DELETE FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d", $source_type, $source_id));
+
+    $sort_order = 0;
+    foreach ($sets as $set) {
+        if (!is_array($set)) continue;
+        $days_raw = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+
+        foreach ($days_raw as $day) {
+            if (!is_array($day)) continue;
+            $date = sanitize_text_field((string) ($day['date'] ?? ''));
+            $end_date = sanitize_text_field((string) ($day['end_date'] ?? ''));
+            $st = sanitize_text_field((string) ($day['start_time'] ?? ''));
+            $et = sanitize_text_field((string) ($day['end_time'] ?? ''));
+            if ($end_date === '') {
+                $end_date = $date;
+            }
+            $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+            if (!is_array($pokemon_ids)) {
+                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            }
+            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
+                return is_numeric($id) && (int) $id > 0;
+            })));
+
+            if ($date === '' || empty($pokemon_ids)) continue;
+
+            $start_ts = $make_ts($date, $st);
+            $end_ts = $make_ts($end_date, $et);
+            if ($start_ts <= 0 || $end_ts <= 0) continue;
+
+            $wpdb->insert($quests_tbl, [
+                'source_type' => $source_type,
+                'source_id' => $source_id,
+                'start_ts' => (int) $start_ts,
+                'end_ts' => (int) $end_ts,
+                'sort_order' => (int) $sort_order,
+            ], ['%s', '%d', '%d', '%d', '%d']);
+
+            $quest_id = (int) $wpdb->insert_id;
+            if ($quest_id <= 0) continue;
+
+            // Une line unique (task vide) contenant tous les Pokémon récompensés.
+            $rewards = [[
+                'type' => 'pokemon',
+                'pokemon_ids' => $pokemon_ids,
+                'force_shiny' => false,
+                'pokemon_genders' => [],
+            ]];
+
+            $wpdb->insert($quest_lines_tbl, [
+                'content_quest_id' => $quest_id,
+                'quest_group_id' => null,
+                'task' => '',
+                'rewards' => wp_json_encode($rewards),
+                'sort_order' => 0,
+            ], ['%d', '%d', '%s', '%s', '%d']);
+
+            $sort_order++;
+        }
+    }
+}
+
+/**
+ * Sauvegarde "Heure vedette" (featured_hours) en utilisant un système d'événements classiques enfants.
+ *
+ * Principe :
+ * - On supprime les événements classiques enfants déjà générés pour le parent.
+ * - Pour chaque journée + Pokémon, on crée un post `post` enfant lié au parent.
+ * - On stocke ensuite le planning dans `content_day_pokemon_hours` sur ce post enfant (content_type=featured_hours).
+ * - Le rendu du bloc `day-pokemon-hours` (featured_hours) va reconstituer l'affichage en lisant ces posts enfants.
+ *
+ * Note : on utilise `post_parent` + une meta dédiée pour retrouver les enfants.
+ *
+ * @param string $source_type (attendu 'post')
+ * @param int    $source_id   ID du post parent (événement principal)
+ * @param array  $sets        Structure metabox : [ [ 'content_type'=>'featured_hours', 'days'=>[...] ], ... ]
+ */
+function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(string $source_type, int $source_id, array $sets): void {
+    if (!function_exists('wp_insert_post') || !function_exists('update_post_meta') || !function_exists('wp_delete_post')) {
+        return;
+    }
+
+    // Flag anti-cascade : ce hook déclenche des wp_insert_post, qui vont relancer save_post.
+    // On désactive la sync de dates pendant toute la génération.
+    $GLOBALS['pokehub_skip_content_sync'] = true;
+
+    global $wpdb;
+    $source_type = (string) $source_type;
+    $parent_id   = (int) $source_id;
+    if ($parent_id <= 0) {
+        unset($GLOBALS['pokehub_skip_content_sync']);
+        return;
+    }
+
+    $parent_post_type = function_exists('get_post_type') ? (string) get_post_type($parent_id) : 'post';
+    if ($parent_post_type === '') {
+        $parent_post_type = 'post';
+    }
+
+    $child_parent_meta_key = '_pokehub_featured_hours_parent_post_id';
+
+    // 1) Nettoyage : supprimer les posts enfants générés précédemment
+    $child_ids = $wpdb->get_col($wpdb->prepare(
+        "SELECT pm.post_id
+         FROM {$wpdb->postmeta} pm
+         WHERE pm.meta_key = %s
+           AND pm.meta_value = %d",
+        $child_parent_meta_key,
+        $parent_id
+    ));
+
+    if (!empty($child_ids) && is_array($child_ids)) {
+        foreach ($child_ids as $cid) {
+            $cid = (int) $cid;
+            if ($cid > 0) {
+                if (function_exists('pokehub_content_save_day_pokemon_hours')) {
+                    // Nettoie la table content_day_pokemon_hours pour éviter les orphelins.
+                    pokehub_content_save_day_pokemon_hours('post', $cid, []);
+                }
+                wp_delete_post($cid, true);
+            }
+        }
+    }
+
+    // 2) Résoudre le slug event_type (si possible)
+    $spotlight_event_type_slug = 'spotlight-hour';
+    $candidate_slugs = ['spotlight-hour', 'spotlight_hour', 'spotlighthour', 'spotlighthourly'];
+    if (function_exists('poke_hub_events_get_event_type_by_slug')) {
+        foreach ($candidate_slugs as $slug) {
+            $obj = poke_hub_events_get_event_type_by_slug((string) $slug);
+            if ($obj && !empty($obj->slug)) {
+                $spotlight_event_type_slug = (string) $obj->slug;
+                break;
+            }
+        }
+    }
+
+    // 3) Création des posts enfants + écriture dans content_day_pokemon_hours
+    $tz = wp_timezone();
+    $make_ts = function(string $date, string $time) use ($tz): int {
+        $date = trim($date);
+        $time = trim($time);
+        if ($date === '' || $time === '') return 0;
+        try {
+            $dt = new DateTime($date . ' ' . $time, $tz);
+            return (int) $dt->getTimestamp();
+        } catch (Exception $e) {
+            return 0;
+        }
+    };
+
+    $pokemon_data_fn = function_exists('pokehub_get_pokemon_data_by_id') ? 'pokehub_get_pokemon_data_by_id' : null;
+
+    foreach ($sets as $set) {
+        if (!is_array($set)) continue;
+        $ct = isset($set['content_type']) ? sanitize_key((string) $set['content_type']) : 'featured_hours';
+        if ($ct !== 'featured_hours') continue;
+
+        $days_raw = isset($set['days']) && is_array($set['days']) ? $set['days'] : [];
+        foreach ($days_raw as $day) {
+            if (!is_array($day)) continue;
+
+            $date = sanitize_text_field((string) ($day['date'] ?? ''));
+            $st   = sanitize_text_field((string) ($day['start_time'] ?? ''));
+            $et   = sanitize_text_field((string) ($day['end_time'] ?? ''));
+            $end_date = sanitize_text_field((string) ($day['end_date'] ?? ''));
+            if ($end_date === '') {
+                $end_date = $date;
+            }
+
+            $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+            if (!is_array($pokemon_ids)) {
+                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            }
+            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
+                return is_numeric($id) && (int) $id > 0;
+            })));
+
+            if ($date === '' || $st === '' || $et === '' || empty($pokemon_ids)) {
+                continue;
+            }
+
+            $start_ts = $make_ts($date, $st);
+            $end_ts   = $make_ts($end_date, $et);
+            if ($start_ts <= 0 || $end_ts <= 0 || $end_ts <= $start_ts) {
+                continue;
+            }
+
+            foreach ($pokemon_ids as $pid) {
+                $pid = (int) $pid;
+                if ($pid <= 0) continue;
+
+                $display_name = '';
+                if ($pokemon_data_fn) {
+                    $p = call_user_func($pokemon_data_fn, $pid);
+                    if (is_array($p)) {
+                        $name_fr = isset($p['name_fr']) ? (string) $p['name_fr'] : '';
+                        $name_en = isset($p['name_en']) ? (string) $p['name_en'] : '';
+                        $display_name = $name_fr !== '' ? $name_fr : $name_en;
+                        if ($display_name === '' && !empty($p['name'])) {
+                            $display_name = (string) $p['name'];
+                        }
+                    }
+                }
+                if ($display_name === '') {
+                    $display_name = '#' . $pid;
+                }
+
+                $child_title = sprintf(
+                    /* translators: 1 = pokemon name, 2 = date */
+                    __('Spotlight: %1$s (%2$s)', 'poke-hub'),
+                    $display_name,
+                    $date
+                );
+
+                $child_post_id = wp_insert_post([
+                    'post_type'   => $parent_post_type,
+                    'post_status' => 'publish',
+                    'post_title'  => $child_title,
+                    'post_parent' => $parent_id,
+                    'post_content'=> '',
+                ], true);
+
+                if (is_wp_error($child_post_id) || (int) $child_post_id <= 0) {
+                    continue;
+                }
+
+                $child_post_id = (int) $child_post_id;
+
+                // Metas dates (content auto-detection + events queries)
+                update_post_meta($child_post_id, '_event_enabled', '1');
+                update_post_meta($child_post_id, '_event_mode', 'fixed');
+                update_post_meta($child_post_id, '_event_sort_start', (string) $start_ts);
+                update_post_meta($child_post_id, '_event_sort_end', (string) $end_ts);
+                update_post_meta($child_post_id, '_admin_lab_event_start', (string) $start_ts);
+                update_post_meta($child_post_id, '_admin_lab_event_end', (string) $end_ts);
+
+                // Type d'événement (si la taxonomie locale est disponible)
+                update_post_meta($child_post_id, '_event_type_slug', (string) $spotlight_event_type_slug);
+                if (function_exists('wp_set_post_terms') && function_exists('get_term_by')) {
+                    $term = get_term_by('slug', $spotlight_event_type_slug, 'event_type');
+                    if ($term && !empty($term->term_id)) {
+                        wp_set_post_terms($child_post_id, [(int) $term->term_id], 'event_type', false);
+                    }
+                }
+
+                // Lien parent -> enfant (pour le rendu featured_hours)
+                update_post_meta($child_post_id, $child_parent_meta_key, (string) $parent_id);
+
+                // Sauvegarde planning featured_hours sur l'enfant
+                if (function_exists('pokehub_content_save_day_pokemon_hours')) {
+                    pokehub_content_save_day_pokemon_hours('post', $child_post_id, [
+                        [
+                            'content_type' => 'featured_hours',
+                            'days' => [
+                                [
+                                    'date' => $date,
+                                    'end_date' => $end_date,
+                                    'start_time' => $st,
+                                    'end_time' => $et,
+                                    'pokemon_ids' => [$pid],
+                                ],
+                            ],
+                        ],
+                    ]);
+                }
+            }
+        }
+    }
+
+    unset($GLOBALS['pokehub_skip_content_sync']);
+}
+
+/**
+ * Lit l'affichage "featured_hours" depuis les posts enfants (événements classiques) liés au parent.
+ *
+ * @param int $parent_post_id
+ * @return array[] ['date','start_time','end_time','pokemon_ids']
+ */
+function pokehub_content_get_featured_hours_classic_events_entries_for_parent(int $parent_post_id): array {
+    if ($parent_post_id <= 0) {
+        return [];
+    }
+    if (!function_exists('pokehub_content_get_day_pokemon_hours_entries')) {
+        return [];
+    }
+
+    global $wpdb;
+    $child_parent_meta_key = '_pokehub_featured_hours_parent_post_id';
+
+    $child_ids = $wpdb->get_col($wpdb->prepare(
+        "SELECT pm.post_id
+         FROM {$wpdb->postmeta} pm
+         WHERE pm.meta_key = %s
+           AND pm.meta_value = %d",
+        $child_parent_meta_key,
+        $parent_post_id
+    ));
+
+    if (empty($child_ids) || !is_array($child_ids)) {
+        return pokehub_content_get_day_pokemon_hours_entries('post', $parent_post_id, 'featured_hours');
+    }
+
+    $merged = []; // day_key => pokemon_ids_map
+    foreach ($child_ids as $cid) {
+        $cid = (int) $cid;
+        if ($cid <= 0) continue;
+
+        $days = pokehub_content_get_day_pokemon_hours_entries('post', $cid, 'featured_hours');
+        if (empty($days) || !is_array($days)) continue;
+
+        foreach ($days as $d) {
+            if (!is_array($d)) continue;
+            $date = (string) ($d['date'] ?? '');
+            $end_date = (string) ($d['end_date'] ?? $date);
+            $st   = (string) ($d['start_time'] ?? '');
+            $et   = (string) ($d['end_time'] ?? '');
+            if ($date === '') continue;
+            $day_key = $date . '|' . $end_date . '|' . $st . '|' . $et;
+
+            if (!isset($merged[$day_key])) {
+                $merged[$day_key] = [
+                    'date' => $date,
+                    'end_date' => $end_date,
+                    'start_time' => $st,
+                    'end_time' => $et,
+                    'pokemon_ids_map' => [],
+                ];
+            }
+            $pids = isset($d['pokemon_ids']) && is_array($d['pokemon_ids']) ? $d['pokemon_ids'] : [];
+            foreach ($pids as $pid) {
+                $pid = (int) $pid;
+                if ($pid > 0) {
+                    $merged[$day_key]['pokemon_ids_map'][$pid] = true;
+                }
+            }
+        }
+    }
+
+    $out = [];
+    foreach ($merged as $item) {
+        $out[] = [
+            'date' => (string) ($item['date'] ?? ''),
+            'end_date' => (string) ($item['end_date'] ?? ($item['date'] ?? '')),
+            'start_time' => (string) ($item['start_time'] ?? ''),
+            'end_time' => (string) ($item['end_time'] ?? ''),
+            'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($item['pokemon_ids_map'] ?? [])))),
+        ];
+    }
+
+    usort($out, function($a, $b) {
+        $da = (string) ($a['date'] ?? '');
+        $db = (string) ($b['date'] ?? '');
+        if ($da === $db) {
+            $sa = (string) ($a['start_time'] ?? '');
+            $sb = (string) ($b['start_time'] ?? '');
+            return $sa <=> $sb;
+        }
+        return $da <=> $db;
+    });
+
+    return $out;
 }

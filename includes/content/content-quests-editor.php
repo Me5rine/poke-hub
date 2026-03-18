@@ -87,7 +87,9 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                     data-reward-index="<?php echo esc_attr($reward_index); ?>"
                                 >
                                     <?php
-                                    if (!empty($selected_pokemon_ids) && function_exists('pokehub_get_pokemon_for_select')) {
+                                    // Même logique que les selects "nature" : précharger la liste complète pour afficher les options
+                                    // directement (Select2 local, sans dépendre d'un chargement AJAX).
+                                    if (function_exists('pokehub_get_pokemon_for_select')) {
                                         $pokemon_list = pokehub_get_pokemon_for_select();
                                         foreach ($pokemon_list as $pokemon_option) {
                                             $is_selected = in_array((int) $pokemon_option['id'], $selected_pokemon_ids, true);

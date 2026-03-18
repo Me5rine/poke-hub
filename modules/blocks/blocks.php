@@ -57,6 +57,7 @@ add_action('init', function() {
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-quests-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-habitats-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-new-pokemon-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php';
 
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:

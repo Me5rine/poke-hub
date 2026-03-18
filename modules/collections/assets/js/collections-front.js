@@ -195,10 +195,10 @@
                     var items = col.items || {};
                     var tilesEl = localWrap.querySelector('.pokehub-collection-tiles-local');
                     if (!tilesEl) return;
-                    var assetsBase = (pokeHubCollections.pokemonIconsBase || '');
                     pool.forEach(function (p) {
                         var status = items[p.id] || 'missing';
-                        var imgSrc = assetsBase ? assetsBase + p.id + '.png' : '';
+                        // Image URL calculée côté PHP via le helper global (slug + suffixes).
+                        var imgSrc = (p.image_url && typeof p.image_url === 'string') ? p.image_url : '';
                         var bgUrl = (p.background_image_url && typeof p.background_image_url === 'string') ? p.background_image_url.trim() : '';
                         var figureHtml = '<div class="pokehub-collection-tile-figure">' +
                             (bgUrl ? '<div class="pokehub-collection-tile-bg" style="background-image: url(' + bgUrl + ');" aria-hidden="true"></div>' : '') +

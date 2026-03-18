@@ -674,3 +674,45 @@
     }
 }
 
+/* ===== Bloc Day Pokémon Hours ===== */
+.pokehub-day-pokemon-hours-block-wrapper {
+    margin: 2rem 0;
+}
+
+.pokehub-day-pokemon-hours-global-time {
+    text-align: center;
+    margin: -0.25rem 0 1rem;
+}
+
+.pokehub-day-pokemon-hours-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pokehub-day-pokemon-hours-row {
+    background: var(--admin-lab-color-white, #ffffff);
+    border: 1px solid var(--admin-lab-color-block-border, var(--admin-lab-color-borders, #e6e6e6));
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+
+.pokehub-day-pokemon-hours-row-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.pokehub-day-pokemon-hours-row-time {
+    font-size: 0.875rem;
+    color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5D697D));
+}
+
+.pokehub-day-pokemon-hours-row-pokemon {
+    margin-top: 0.35rem;
+    font-weight: 600;
+    color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+}
+
