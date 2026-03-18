@@ -431,6 +431,7 @@ function poke_hub_events_render_list(array $events): void {
  * @param int $end_ts Timestamp de fin
  * @return string HTML
  */
+if (!function_exists('pokehub_render_event_dates')) {
 function pokehub_render_event_dates($start_ts, $end_ts) {
     if (!$start_ts || !$end_ts) {
         return '';
@@ -482,6 +483,7 @@ function pokehub_render_event_dates($start_ts, $end_ts) {
     </div>
     <?php
     return ob_get_clean();
+}
 }
 
 /**

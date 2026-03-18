@@ -8,28 +8,34 @@ if (!defined('ABSPATH')) {
 /**
  * Récupère les quêtes d'un événement (depuis les tables de contenu).
  */
-function pokehub_get_event_quests(int $post_id): array {
-    if (function_exists('pokehub_content_get_quests')) {
-        return pokehub_content_get_quests('post', $post_id);
+if (!function_exists('pokehub_get_event_quests')) {
+    function pokehub_get_event_quests(int $post_id): array {
+        if (function_exists('pokehub_content_get_quests')) {
+            return pokehub_content_get_quests('post', $post_id);
+        }
+        return [];
     }
-    return [];
 }
 
 /**
  * Sauvegarde les quêtes d'un événement
  */
-function pokehub_save_event_quests(int $post_id, array $quests): void {
-    $cleaned_quests = function_exists('pokehub_quests_clean_from_request') ? pokehub_quests_clean_from_request($quests) : [];
-    if (function_exists('pokehub_content_save_quests')) {
-        pokehub_content_save_quests('post', $post_id, $cleaned_quests);
+if (!function_exists('pokehub_save_event_quests')) {
+    function pokehub_save_event_quests(int $post_id, array $quests): void {
+        $cleaned_quests = function_exists('pokehub_quests_clean_from_request') ? pokehub_quests_clean_from_request($quests) : [];
+        if (function_exists('pokehub_content_save_quests')) {
+            pokehub_content_save_quests('post', $post_id, $cleaned_quests);
+        }
     }
 }
 
 /**
  * Récupère les quêtes d'un post (alias pour compatibilité)
  */
-function pokehub_events_get_post_quests(int $post_id): array {
-    return pokehub_get_event_quests($post_id);
+if (!function_exists('pokehub_events_get_post_quests')) {
+    function pokehub_events_get_post_quests(int $post_id): array {
+        return pokehub_get_event_quests($post_id);
+    }
 }
 
 /**

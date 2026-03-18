@@ -14,15 +14,18 @@ if (!defined('ABSPATH')) {
  */
 function poke_hub_get_modules_config(): array {
     return [
-        'events'        => ['path' => 'events/events.php',        'label' => __('Events', 'poke-hub')],
-        'bonus'         => ['path' => 'bonus/bonus.php',          'label' => __('Bonus', 'poke-hub')],
-        'pokemon'       => ['path' => 'pokemon/pokemon.php',      'label' => __('Pokémon', 'poke-hub')],
-        'quests'        => ['path' => 'quests/quests.php',       'label' => __('Quests', 'poke-hub')],
-        'user-profiles' => ['path' => 'user-profiles/user-profiles.php', 'label' => __('User Profiles', 'poke-hub')],
-        'games'         => ['path' => 'games/games.php',         'label' => __('Games', 'poke-hub')],
-        'eggs'          => ['path' => 'eggs/eggs.php',            'label' => __('Eggs', 'poke-hub')],
-        'blocks'        => ['path' => 'blocks/blocks.php',        'label' => __('Blocks', 'poke-hub')],
-        'collections'   => ['path' => 'collections/collections.php', 'label' => __('Pokémon GO Collections', 'poke-hub')],
+        // IMPORTANT : ne pas appeler __() ici (ce fichier est utilisé tôt, ex: plugins_loaded)
+        // sinon WordPress déclenche _load_textdomain_just_in_time "too early".
+        // La traduction est appliquée plus tard dans poke_hub_get_modules_labels().
+        'events'        => ['path' => 'events/events.php',        'label' => 'Events'],
+        'bonus'         => ['path' => 'bonus/bonus.php',          'label' => 'Bonus'],
+        'pokemon'       => ['path' => 'pokemon/pokemon.php',      'label' => 'Pokémon'],
+        'quests'        => ['path' => 'quests/quests.php',        'label' => 'Quests'],
+        'user-profiles' => ['path' => 'user-profiles/user-profiles.php', 'label' => 'User Profiles'],
+        'games'         => ['path' => 'games/games.php',          'label' => 'Games'],
+        'eggs'          => ['path' => 'eggs/eggs.php',            'label' => 'Eggs'],
+        'blocks'        => ['path' => 'blocks/blocks.php',        'label' => 'Blocks'],
+        'collections'   => ['path' => 'collections/collections.php', 'label' => 'Pokémon GO Collections'],
     ];
 }
 
@@ -51,7 +54,8 @@ function poke_hub_get_modules_labels(): array {
     $config = poke_hub_get_modules_config();
     $out = [];
     foreach ($config as $slug => $data) {
-        $out[$slug] = $data['label'];
+        $label = isset($data['label']) ? (string) $data['label'] : '';
+        $out[$slug] = $label !== '' ? __($label, 'poke-hub') : '';
     }
     return $out;
 }

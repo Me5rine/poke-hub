@@ -99,20 +99,22 @@ add_action('admin_enqueue_scripts', 'pokehub_wild_pokemon_metabox_assets');
 /**
  * Récupère les Pokémon sauvages d'un post (depuis les tables de contenu).
  */
-function pokehub_get_wild_pokemon($post_id) {
-    if (function_exists('pokehub_content_get_wild_pokemon')) {
-        $list = pokehub_content_get_wild_pokemon('post', (int) $post_id);
-        $out = [];
-        foreach ($list as $w) {
-            $out[] = [
-                'pokemon_id'   => (int) $w['pokemon_id'],
-                'is_rare'      => !empty($w['is_rare']),
-                'force_shiny'  => !empty($w['force_shiny']),
-            ];
+if (!function_exists('pokehub_get_wild_pokemon')) {
+    function pokehub_get_wild_pokemon($post_id) {
+        if (function_exists('pokehub_content_get_wild_pokemon')) {
+            $list = pokehub_content_get_wild_pokemon('post', (int) $post_id);
+            $out = [];
+            foreach ($list as $w) {
+                $out[] = [
+                    'pokemon_id'   => (int) $w['pokemon_id'],
+                    'is_rare'      => !empty($w['is_rare']),
+                    'force_shiny'  => !empty($w['force_shiny']),
+                ];
+            }
+            return $out;
         }
-        return $out;
+        return [];
     }
-    return [];
 }
 
 /**

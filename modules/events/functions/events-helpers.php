@@ -5,47 +5,54 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-function poke_hub_event_get_meta($post_id, $key, $default = null) {
-    $val = get_post_meta($post_id, $key, true);
-    return ($val !== '' && $val !== null) ? $val : $default;
+if (!function_exists('poke_hub_event_get_meta')) {
+    function poke_hub_event_get_meta($post_id, $key, $default = null) {
+        $val = get_post_meta($post_id, $key, true);
+        return ($val !== '' && $val !== null) ? $val : $default;
+    }
 }
 
-function poke_hub_event_get_status($post_id) {
-    // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
-    // sont toujours en UTC et doivent être comparés avec time() (UTC)
-    $now   = (int) time();
-    $start = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_start', 0);
-    $end   = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_end', 0);
+if (!function_exists('poke_hub_event_get_status')) {
+    function poke_hub_event_get_status($post_id) {
+        // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
+        // sont toujours en UTC et doivent être comparés avec time() (UTC)
+        $now   = (int) time();
+        $start = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_start', 0);
+        $end   = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_end', 0);
 
-    if (!$start || !$end) {
+        if (!$start || !$end) {
+            return 'past';
+        }
+
+        if ($start <= $now && $end >= $now) {
+            return 'current';
+        }
+        if ($start > $now) {
+            return 'upcoming';
+        }
+
         return 'past';
     }
-
-    if ($start <= $now && $end >= $now) {
-        return 'current';
-    }
-    if ($start > $now) {
-        return 'upcoming';
-    }
-
-    return 'past';
 }
 
-function poke_hub_event_get_duration($post_id) {
-    $start = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_start', 0);
-    $end   = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_end', 0);
+if (!function_exists('poke_hub_event_get_duration')) {
+    function poke_hub_event_get_duration($post_id) {
+        $start = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_start', 0);
+        $end   = (int) poke_hub_event_get_meta($post_id, '_admin_lab_event_end', 0);
 
-    if (!$start || !$end || $end <= $start) {
-        return '';
+        if (!$start || !$end || $end <= $start) {
+            return '';
+        }
+
+        return human_time_diff($start, $end);
     }
-
-    return human_time_diff($start, $end);
 }
 
 /**
  * Détermine le statut de l'événement (current / upcoming / past)
  * à partir des timestamps.
  */
+if (!function_exists('poke_hub_events_compute_status')) {
 function poke_hub_events_compute_status(int $start_ts, int $end_ts): string {
     // Utiliser time() au lieu de current_time('timestamp') car les timestamps Unix
     // sont toujours en UTC et doivent être comparés avec time() (UTC)
@@ -58,6 +65,7 @@ function poke_hub_events_compute_status(int $start_ts, int $end_ts): string {
         return 'upcoming';
     }
     return 'past';
+}
 }
 
 /**
@@ -72,6 +80,7 @@ function poke_hub_events_compute_status(int $start_ts, int $end_ts): string {
  * @param int $post_id ID du post
  * @return array{start_ts: int|null, end_ts: int|null} Tableau avec start_ts et end_ts, ou null si non trouvé
  */
+if (!function_exists('poke_hub_events_get_post_dates')) {
 function poke_hub_events_get_post_dates(int $post_id): array {
     // Vérifier le mode de l'événement
     $mode = get_post_meta($post_id, '_event_mode', true);
@@ -125,6 +134,7 @@ function poke_hub_events_get_post_dates(int $post_id): array {
     }
     
     return ['start_ts' => null, 'end_ts' => null];
+}
 }
 
 if (!function_exists('poke_hub_special_event_parse_datetime')) {

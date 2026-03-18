@@ -11,6 +11,7 @@ if (!defined('ABSPATH')) {
  * @param array $quests Tableau de quêtes
  * @return string HTML
  */
+if (!function_exists('pokehub_render_event_quests')) {
 function pokehub_render_event_quests(array $quests): string {
     if (empty($quests)) {
         return '';
@@ -197,4 +198,5 @@ function pokehub_render_event_quests(array $quests): string {
     <?php
     
     return ob_get_clean();
+}
 }

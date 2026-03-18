@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.0.3
+Version: 2.0.4
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -22,7 +22,8 @@ function poke_hub_load_textdomain() {
         dirname(plugin_basename(__FILE__)) . '/languages'
     );
 }
-add_action('plugins_loaded', 'poke_hub_load_textdomain');
+// WordPress 6.7+ : charger les traductions à init ou plus tard.
+add_action('init', 'poke_hub_load_textdomain');
 
 // Récupérer la version depuis l'entête du plugin
 $poke_hub_plugin_data = get_file_data(__FILE__, ['Version' => 'Version'], false);
