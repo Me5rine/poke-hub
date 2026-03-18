@@ -1,5 +1,5 @@
 /**
- * Enregistrement côté client du bloc "Nouveaux Pokémon - Lignées d'évolution"
+ * Enregistrement côté client du bloc "New Pokemon"
  * 
  * Même si le bloc est entièrement rendu côté serveur (render.php),
  * WordPress a besoin de ce fichier JavaScript pour afficher le bloc dans l'éditeur.
@@ -65,7 +65,7 @@
                     };
                 });
             }
-            pokemonOptions.unshift({ label: __('Sélectionner un Pokémon...', 'poke-hub'), value: '' });
+            pokemonOptions.unshift({ label: __('Select a Pokémon...', 'poke-hub'), value: '' });
 
             // Gérer le changement de sélection
             var handlePokemonChange = function(newValue) {
@@ -117,7 +117,7 @@
             // Construire le texte d'affichage
             var displayText = '';
             if (autoDetect) {
-                displayText = __('Nouveaux Pokémon - Lignées d\'évolution', 'poke-hub');
+                displayText = __('New Pokemon', 'poke-hub');
             } else if (Array.isArray(pokemonIds) && pokemonIds.length > 0) {
                 var pokemonNames = pokemonIds.map(function(pokemonId) {
                     var pokemon = pokemonList.find(function(p) {
@@ -125,9 +125,9 @@
                     });
                     return pokemon ? (pokemon.name_fr || pokemon.name_en || 'Pokémon #' + pokemon.id) : 'Pokémon #' + pokemonId;
                 });
-                displayText = __('Nouveaux Pokémon:', 'poke-hub') + ' ' + pokemonNames.join(', ');
+                displayText = __('New Pokemon:', 'poke-hub') + ' ' + pokemonNames.join(', ');
             } else {
-                displayText = __('Nouveaux Pokémon - Lignées d\'évolution', 'poke-hub');
+                displayText = __('New Pokemon', 'poke-hub');
             }
 
             // Construire les contrôles de l'inspecteur
@@ -143,22 +143,22 @@
                             label: __('Auto detection', 'poke-hub'),
                             checked: autoDetect,
                             onChange: function(value) { setAttributes({ autoDetect: value }); },
-                            help: __('Récupère automatiquement les nouveaux Pokémon depuis la metabox de l\'article.', 'poke-hub')
+                            help: __('Automatically retrieves new Pokémon from the post metabox.', 'poke-hub')
                         }),
                         !autoDetect ? el(
                             'div',
                             { style: { marginTop: '15px' } },
                             el(SelectControl, {
-                                label: __('Ajouter un Pokémon', 'poke-hub'),
+                                label: __('Add a Pokémon', 'poke-hub'),
                                 value: '',
                                 options: pokemonOptions,
                                 onChange: handlePokemonChange,
-                                help: __('Sélectionnez un ou plusieurs nouveaux Pokémon à afficher avec leur lignée d\'évolution.', 'poke-hub')
+                                help: __('Select one or more new Pokémon to display with their complete evolution line.', 'poke-hub')
                             }),
                             selectedPokemonList.length > 0 ? el(
                                 'div',
                                 { style: { marginTop: '15px' } },
-                                el('strong', { style: { display: 'block', marginBottom: '10px' } }, __('Pokémon sélectionnés:', 'poke-hub')),
+                                el('strong', { style: { display: 'block', marginBottom: '10px' } }, __('Selected Pokémon:', 'poke-hub')),
                                 el(
                                     'ul',
                                     { style: { marginTop: '5px', marginBottom: '0', paddingLeft: '20px', listStyle: 'disc' } },
@@ -185,7 +185,7 @@
                                                     },
                                                     style: { marginLeft: '10px' }
                                                 },
-                                                __('Retirer', 'poke-hub')
+                                                    __('Remove', 'poke-hub')
                                             ) : el(
                                                 'button',
                                                 {
@@ -196,7 +196,7 @@
                                                         handleRemovePokemon(pokemon.id);
                                                     }
                                                 },
-                                                __('Retirer', 'poke-hub')
+                                                __('Remove', 'poke-hub')
                                             )
                                         );
                                     })
@@ -204,7 +204,7 @@
                             ) : el(
                                 'p',
                                 { style: { fontStyle: 'italic', color: '#666', marginTop: '10px' } },
-                                __('Aucun Pokémon sélectionné. Utilisez le menu déroulant ci-dessus pour ajouter des Pokémon.', 'poke-hub')
+                                __('No Pokémon selected. Use the dropdown above to add Pokémon.', 'poke-hub')
                             )
                         ) : null
                     )
@@ -216,7 +216,7 @@
                 blockProps,
                 inspectorControls,
                 el('p', {}, displayText),
-                el('small', {}, __('Ce bloc affiche les nouveaux Pokémon avec leur lignée d\'évolution complète.', 'poke-hub'))
+                el('small', {}, __('This block displays the selected new Pokémon with their complete evolution line.', 'poke-hub'))
             );
         },
         save: function() {

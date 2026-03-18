@@ -487,18 +487,26 @@ function pokehub_get_pokemon_type_color(int $pokemon_id): string {
 }
 
 /**
- * Vérifie si un Pokémon peut être shiny (depuis extra->release->shiny)
+ * Vérifie si un Pokémon peut être shiny ("chromatique" dans l'UI).
+ *
+ * Règle Pokémon GO (changement récent) :
+ * si un Pokémon de base (1ère étape de la lignée d'évolution) est shiny-disponible,
+ * alors ses évolutions peuvent aussi être trouvées directement en shiny.
  * 
  * @param int $pokemon_id ID du Pokémon
  * @return bool True si le Pokémon peut être shiny, false sinon
  */
 function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
+    static $result_cache = [];
+    static $direct_shiny_cache = [];
+    static $base_id_cache = [];
+
     if (!function_exists('pokehub_get_table')) {
         return false;
     }
 
     global $wpdb;
-    
+
     $pokemon_id = (int) $pokemon_id;
     if ($pokemon_id <= 0) {
         return false;
@@ -511,7 +519,7 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
     // Vérifier si un préfixe Pokémon distant est configuré
     $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
     $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
+
     $use_remote = false;
     if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
         if (function_exists('poke_hub_pokemon_get_table_prefix')) {
@@ -521,36 +529,96 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
             }
         }
     }
-    
-    if ($use_remote) {
-        $pokemon_table = pokehub_get_table('remote_pokemon');
-    } else {
-        $pokemon_table = pokehub_get_table('pokemon');
-    }
-    
+
+    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     if (!$pokemon_table) {
         return false;
     }
-    
-    // Récupérer le champ extra
-    $row = $wpdb->get_row(
-        $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $pokemon_id)
-    );
-    
-    if (!$row || empty($row->extra)) {
-        return false;
-    }
-    
-    // Décoder le JSON extra
-    $extra = json_decode($row->extra, true);
-    if (!is_array($extra)) {
-        return false;
-    }
-    
-    // Vérifier si une date de sortie shiny existe (extra->release->shiny)
-    $release_shiny = $extra['release']['shiny'] ?? '';
 
-    return !empty($release_shiny);
+    $cache_prefix = $use_remote ? 'remote' : 'local';
+    $cache_key = $cache_prefix . ':' . $pokemon_id;
+    if (isset($result_cache[$cache_key])) {
+        return (bool) $result_cache[$cache_key];
+    }
+
+    // Helper : shiny-disponible "direct" (extra->release->shiny uniquement, sans règle propagation)
+    $has_direct_shiny = function (int $id) use ($wpdb, $pokemon_table, $cache_prefix, &$direct_shiny_cache): bool {
+        $id = (int) $id;
+        if ($id <= 0) {
+            return false;
+        }
+
+        $key = $cache_prefix . ':direct:' . $id;
+        if (isset($direct_shiny_cache[$key])) {
+            return (bool) $direct_shiny_cache[$key];
+        }
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $id)
+        );
+
+        if (!$row || empty($row->extra)) {
+            $direct_shiny_cache[$key] = false;
+            return false;
+        }
+
+        $extra = json_decode($row->extra, true);
+        $release_shiny = is_array($extra) ? ($extra['release']['shiny'] ?? '') : '';
+
+        $direct_shiny_cache[$key] = (!empty($release_shiny));
+        return (bool) $direct_shiny_cache[$key];
+    };
+
+    // Si le Pokémon lui-même est shiny-disponible : ok.
+    if ($has_direct_shiny($pokemon_id)) {
+        $result_cache[$cache_key] = true;
+        return true;
+    }
+
+    // Sinon, on regarde si le "base" de la lignée est shiny-disponible.
+    $evolutions_table = $use_remote ? pokehub_get_table('remote_pokemon_evolutions') : pokehub_get_table('pokemon_evolutions');
+    if (!$evolutions_table) {
+        $result_cache[$cache_key] = false;
+        return false;
+    }
+
+    // Remonter jusqu'au Pokémon de base (pas une cible d'évolution).
+    $base_id = $pokemon_id;
+    $base_cache_key = $cache_prefix . ':base:' . $pokemon_id;
+    if (isset($base_id_cache[$base_cache_key])) {
+        $base_id = (int) $base_id_cache[$base_cache_key];
+    } else {
+        $visited = [];
+        for ($depth = 0; $depth < 10; $depth++) {
+            if (isset($visited[$base_id])) {
+                break; // évite une boucle en cas de données incohérentes
+            }
+            $visited[$base_id] = true;
+
+            $prev_base = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT base_pokemon_id
+                     FROM {$evolutions_table}
+                     WHERE target_pokemon_id = %d
+                     LIMIT 1",
+                    $base_id
+                )
+            );
+
+            $prev_base = (int) $prev_base;
+            if ($prev_base <= 0 || $prev_base === $base_id) {
+                break;
+            }
+
+            $base_id = $prev_base;
+        }
+
+        $base_id_cache[$base_cache_key] = $base_id;
+    }
+
+    $is_base_shiny = $has_direct_shiny($base_id);
+    $result_cache[$cache_key] = (bool) $is_base_shiny;
+    return (bool) $is_base_shiny;
 }
 
 /**
@@ -573,6 +641,13 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
     $pokemon_id = (int) $pokemon_id;
     if ($pokemon_id <= 0) {
         return false;
+    }
+
+    // Règle GO : si le Pokémon de base est shiny-disponible,
+    // alors ses évolutions peuvent aussi être trouvées en shiny.
+    // (on réutilise la logique centralisée via pokehub_pokemon_can_be_shiny()).
+    if ($context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
+        return pokehub_pokemon_can_be_shiny($pokemon_id);
     }
 
     $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');

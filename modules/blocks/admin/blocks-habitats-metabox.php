@@ -8,6 +8,7 @@ if (!defined('ABSPATH')) {
 /**
  * Ajoute la metabox pour les habitats d'événement
  */
+if (!function_exists('pokehub_add_event_habitats_metabox')) {
 function pokehub_add_event_habitats_metabox() {
     $screens = apply_filters('pokehub_event_habitats_post_types', [
         'post',
@@ -25,11 +26,13 @@ function pokehub_add_event_habitats_metabox() {
         );
     }
 }
+}
 add_action('add_meta_boxes', 'pokehub_add_event_habitats_metabox');
 
 /**
  * Enqueue scripts et styles pour la metabox des habitats
  */
+if (!function_exists('pokehub_habitats_metabox_assets')) {
 function pokehub_habitats_metabox_assets($hook) {
     global $post_type;
     
@@ -101,11 +104,13 @@ function pokehub_habitats_metabox_assets($hook) {
         'saved_genders' => $saved_genders,
     ]);
 }
+}
 add_action('admin_enqueue_scripts', 'pokehub_habitats_metabox_assets');
 
 /**
  * Sauvegarde des habitats
  */
+if (!function_exists('pokehub_save_event_habitats')) {
 function pokehub_save_event_habitats($post_id) {
     // Vérifications de sécurité
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -209,11 +214,13 @@ function pokehub_save_event_habitats($post_id) {
         pokehub_content_save_habitats('post', $post_id, $cleaned_habitats);
     }
 }
+}
 add_action('save_post', 'pokehub_save_event_habitats');
 
 /**
  * Rendu de la metabox des habitats
  */
+if (!function_exists('pokehub_render_event_habitats_metabox')) {
 function pokehub_render_event_habitats_metabox($post) {
     wp_nonce_field('pokehub_save_event_habitats', 'pokehub_habitats_nonce');
 
@@ -418,10 +425,12 @@ function pokehub_render_event_habitats_metabox($post) {
     </script>
     <?php
 }
+}
 
 /**
  * Rendu d'un item d'habitat dans l'éditeur
  */
+if (!function_exists('pokehub_render_habitat_editor_item')) {
 function pokehub_render_habitat_editor_item($index, $habitat) {
     $is_numeric = is_numeric($index);
     $display_index = $is_numeric ? ($index + 1) : $index;
@@ -608,5 +617,6 @@ function pokehub_render_habitat_editor_item($index, $habitat) {
         </div>
     </div>
     <?php
+}
 }
 

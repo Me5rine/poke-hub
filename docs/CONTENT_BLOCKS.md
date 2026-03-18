@@ -109,14 +109,14 @@ Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons
 
 #### Bloc "Pokémon Eggs" (`pokehub/eggs`)
 
-Affiche les œufs (par type : 2 km, 5 km, 10 km, etc.) et les Pokémon associés. Données saisies dans la metabox « Eggs (event / article) » sur le post, ou depuis un pool global.
+Affiche les œufs (par type : 2 km, 5 km, 10 km, etc.) et les Pokémon associés. Données saisies dans la metabox « Eggs » sur le post, ou depuis un pool global.
 
 **Attributs :**
 - `source` (string, défaut: `post`) : `post` = données de l’article, `global` = pool actif à la date du jour
 - `poolId` (number, optionnel) : si `source` = `global` et > 0, utilise ce pool
 - `blockTitle` (string) : titre affiché au-dessus du bloc
 
-**Metabox :** « Eggs (event / article) » — affichée sur les articles/événements. Chargée par le module Blocks même si le module Eggs est inactif (bloc utilisable en mode remote).
+**Metabox :** « Eggs » — affichée sur les articles/événements. Chargée par le module Blocks même si le module Eggs est inactif (bloc utilisable en mode remote).
 
 **Styles :** `assets/css/poke-hub-eggs-front.css`
 

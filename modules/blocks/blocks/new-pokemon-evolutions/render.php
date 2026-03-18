@@ -1,6 +1,6 @@
 <?php
 /**
- * Rendu du bloc "Nouveaux Pokémon - Lignées d'évolution"
+ * Rendu du bloc "New Pokemon"
  *
  * @var array    $attributes Les attributs du bloc.
  * @var string   $content    Le contenu HTML du bloc.
@@ -549,7 +549,7 @@ function pokehub_format_evolution_conditions($evolution) {
     
     // Bonbons
     if (!empty($evolution['candy_cost']) && (int) $evolution['candy_cost'] > 0) {
-        $conditions[] = sprintf(__('%d bonbons', 'poke-hub'), (int) $evolution['candy_cost']);
+        $conditions[] = sprintf(__('%d candies', 'poke-hub'), (int) $evolution['candy_cost']);
     }
     
     // Objet requis
@@ -560,33 +560,33 @@ function pokehub_format_evolution_conditions($evolution) {
     
     // Leurre
     if (!empty($evolution['lure_item_slug'])) {
-        $conditions[] = __('Leurre requis', 'poke-hub');
+        $conditions[] = __('Lure required', 'poke-hub');
     }
     
-    // Météo
+    // Weather
     if (!empty($evolution['weather_name_fr']) || !empty($evolution['weather_name_en'])) {
         $weather_name = !empty($evolution['weather_name_fr']) ? $evolution['weather_name_fr'] : $evolution['weather_name_en'];
-        $conditions[] = sprintf(__('Météo: %s', 'poke-hub'), $weather_name);
+        $conditions[] = sprintf(__('Weather: %s', 'poke-hub'), $weather_name);
     }
     
-    // Sexe
+    // Gender
     if (!empty($evolution['gender_requirement'])) {
         $gender = strtoupper($evolution['gender_requirement']);
         if ($gender === 'MALE') {
-            $conditions[] = __('Mâle', 'poke-hub');
+            $conditions[] = __('Male', 'poke-hub');
         } elseif ($gender === 'FEMALE') {
-            $conditions[] = __('Femelle', 'poke-hub');
+            $conditions[] = __('Female', 'poke-hub');
         }
     }
     
-    // Quête
+    // Quest
     if (!empty($evolution['quest_template_id'])) {
-        $conditions[] = __('Quête requise', 'poke-hub');
+        $conditions[] = __('Quest required', 'poke-hub');
     }
     
-    // Échange
+    // Trade
     if (!empty($evolution['is_trade_evolution']) && (int) $evolution['is_trade_evolution'] === 1) {
-        $conditions[] = __('Échange requis', 'poke-hub');
+        $conditions[] = __('Trade required', 'poke-hub');
     }
     
     return implode(' • ', $conditions);
@@ -624,7 +624,7 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-new-poke
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php esc_html_e('Nouveaux Pokémon - Lignées d\'évolution', 'poke-hub'); ?></h2>
+    <h2 class="pokehub-block-title"><?php esc_html_e('New Pokemon', 'poke-hub'); ?></h2>
     
     <?php 
     /**

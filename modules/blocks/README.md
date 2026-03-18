@@ -23,7 +23,7 @@ modules/blocks/
     ├── bonus/                   # Bonus
     ├── wild-pokemon/            # Pokémon Sauvages
     ├── habitats/                # Habitats
-    ├── new-pokemon-evolutions/  # Nouveaux Pokémon - Lignées d'évolution
+    ├── new-pokemon-evolutions/  # New Pokemon
     ├── collection-challenges/   # Défis de Collection
     └── special-research/        # Études Spéciales
 ```

@@ -24,7 +24,7 @@ modules/blocks/
 │   ├── bonus/                   # Bloc "Bonus"
 │   ├── wild-pokemon/            # Bloc "Pokémon Sauvages"
 │   ├── habitats/                # Bloc "Habitats"
-│   ├── new-pokemon-evolutions/  # Bloc "Nouveaux Pokémon - Lignées d'évolution"
+│   ├── new-pokemon-evolutions/  # Bloc "New Pokemon"
 │   ├── collection-challenges/   # Bloc "Défis de Collection"
 │   ├── special-research/        # Bloc "Études Spéciales"
 │   └── eggs/                    # Bloc "Œufs"

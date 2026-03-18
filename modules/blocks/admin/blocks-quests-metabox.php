@@ -10,6 +10,7 @@ require_once POKE_HUB_PATH . 'includes/content/content-quests-editor.php';
 /**
  * Ajoute la metabox pour les quêtes d'événement
  */
+if (!function_exists('pokehub_add_event_quests_metabox')) {
 function pokehub_add_event_quests_metabox() {
     $screens = apply_filters('pokehub_event_quests_post_types', [
         'post',
@@ -19,7 +20,7 @@ function pokehub_add_event_quests_metabox() {
     foreach ($screens as $screen) {
         add_meta_box(
             'pokehub_event_quests',
-            __('Event Quests (Field Research)', 'poke-hub'),
+            __('Field Research', 'poke-hub'),
             'pokehub_render_event_quests_metabox',
             $screen,
             'normal',
@@ -27,11 +28,13 @@ function pokehub_add_event_quests_metabox() {
         );
     }
 }
+}
 add_action('add_meta_boxes', 'pokehub_add_event_quests_metabox');
 
 /**
  * Enqueue scripts et styles pour la metabox des quêtes
  */
+if (!function_exists('pokehub_quests_metabox_assets')) {
 function pokehub_quests_metabox_assets($hook) {
     global $post_type;
     
@@ -114,11 +117,13 @@ function pokehub_quests_metabox_assets($hook) {
         'saved_genders' => $saved_genders,
     ]);
 }
+}
 add_action('admin_enqueue_scripts', 'pokehub_quests_metabox_assets');
 
 /**
  * Rendu de la metabox des quêtes
  */
+if (!function_exists('pokehub_render_event_quests_metabox')) {
 function pokehub_render_event_quests_metabox($post) {
     wp_nonce_field('pokehub_save_event_quests', 'pokehub_event_quests_nonce');
 
@@ -360,10 +365,12 @@ function pokehub_render_event_quests_metabox($post) {
     </script>
     <?php
 }
+}
 
 /**
  * Sauvegarde des quêtes
  */
+if (!function_exists('pokehub_save_event_quests_metabox')) {
 function pokehub_save_event_quests_metabox($post_id) {
     // Vérifications de sécurité
     if (!isset($_POST['pokehub_event_quests_nonce']) || 
@@ -379,13 +386,19 @@ function pokehub_save_event_quests_metabox($post_id) {
         return;
     }
 
-    // Sauvegarder les quêtes
-    if (isset($_POST['pokehub_quests']) && is_array($_POST['pokehub_quests'])) {
-        pokehub_save_event_quests($post_id, $_POST['pokehub_quests']);
-    } else {
-        // Si aucune quête, supprimer la meta
-        delete_post_meta($post_id, '_pokehub_event_quests');
+    // Sauvegarde indépendante du module Events : écrire directement dans les tables de contenu.
+    $raw_quests = (isset($_POST['pokehub_quests']) && is_array($_POST['pokehub_quests'])) ? $_POST['pokehub_quests'] : [];
+    $cleaned_quests = function_exists('pokehub_quests_clean_from_request')
+        ? pokehub_quests_clean_from_request($raw_quests)
+        : [];
+
+    if (function_exists('pokehub_content_save_quests')) {
+        pokehub_content_save_quests('post', (int) $post_id, $cleaned_quests);
     }
+
+    // Compatibilité legacy : nettoyer l'ancienne meta si elle existait.
+    delete_post_meta($post_id, '_pokehub_event_quests');
+}
 }
 add_action('save_post', 'pokehub_save_event_quests_metabox');
 

@@ -10,7 +10,7 @@ function pokehub_add_eggs_metabox() {
     foreach ($screens as $screen) {
         add_meta_box(
             'pokehub_eggs',
-            __('Eggs (event / article)', 'poke-hub'),
+            __('Eggs', 'poke-hub'),
             'pokehub_render_eggs_metabox',
             $screen,
             'normal',

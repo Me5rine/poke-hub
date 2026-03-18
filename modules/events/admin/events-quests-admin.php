@@ -5,6 +5,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Les quêtes de saison réutilisent le rendu de l'éditeur.
+require_once POKE_HUB_PATH . 'includes/content/content-quests-editor.php';
+
 /**
  * Les quêtes et catégories de quêtes sont gérées uniquement par le module Quêtes (menu Poké HUB > Quêtes).
  * Le module Events n’enregistre plus de menus quêtes.
@@ -301,9 +304,7 @@ function pokehub_render_quests_admin_page() {
 }
 
 /**
- * NOTE: La fonction pokehub_render_quest_editor_item() est définie dans events-quests-metabox.php
- * qui est chargé avant ce fichier. Elle est réutilisée ici pour la page admin.
- * 
- * Pas besoin de la redéfinir ici, elle est déjà disponible.
+ * NOTE: `pokehub_render_quest_editor_item()` est fournie par `includes/content/content-quests-editor.php`
+ * et réutilisée ici pour la page admin.
  */
 

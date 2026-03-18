@@ -8,6 +8,7 @@ if (!defined('ABSPATH')) {
 /**
  * Ajoute la metabox pour les nouveaux Pokémon
  */
+if (!function_exists('pokehub_add_new_pokemon_metabox')) {
 function pokehub_add_new_pokemon_metabox() {
     $screens = apply_filters('pokehub_new_pokemon_post_types', [
         'post',
@@ -17,7 +18,7 @@ function pokehub_add_new_pokemon_metabox() {
     foreach ($screens as $screen) {
         add_meta_box(
             'pokehub_new_pokemon',
-            __('Nouveaux Pokémon', 'poke-hub'),
+            __('New Pokémon', 'poke-hub'),
             'pokehub_render_new_pokemon_metabox',
             $screen,
             'normal',
@@ -25,11 +26,13 @@ function pokehub_add_new_pokemon_metabox() {
         );
     }
 }
+}
 add_action('add_meta_boxes', 'pokehub_add_new_pokemon_metabox');
 
 /**
  * Enqueue scripts et styles pour la metabox des nouveaux Pokémon
  */
+if (!function_exists('pokehub_new_pokemon_metabox_assets')) {
 function pokehub_new_pokemon_metabox_assets($hook) {
     global $post_type;
     
@@ -94,11 +97,13 @@ function pokehub_new_pokemon_metabox_assets($hook) {
         'saved_genders' => $saved_genders,
     ]);
 }
+}
 add_action('admin_enqueue_scripts', 'pokehub_new_pokemon_metabox_assets');
 
 /**
  * Récupère les nouveaux Pokémon d'un post (depuis les tables de contenu).
  */
+if (!function_exists('pokehub_get_new_pokemon')) {
 function pokehub_get_new_pokemon($post_id) {
     if (function_exists('pokehub_content_get_new_pokemon')) {
         $data = pokehub_content_get_new_pokemon('post', (int) $post_id);
@@ -106,10 +111,12 @@ function pokehub_get_new_pokemon($post_id) {
     }
     return [];
 }
+}
 
 /**
  * Rendu de la metabox des nouveaux Pokémon
  */
+if (!function_exists('pokehub_render_new_pokemon_metabox')) {
 function pokehub_render_new_pokemon_metabox($post) {
     wp_nonce_field('pokehub_save_new_pokemon', 'pokehub_new_pokemon_nonce');
 
@@ -241,10 +248,12 @@ function pokehub_render_new_pokemon_metabox($post) {
     </script>
     <?php
 }
+}
 
 /**
  * Sauvegarde des nouveaux Pokémon
  */
+if (!function_exists('pokehub_save_new_pokemon_metabox')) {
 function pokehub_save_new_pokemon_metabox($post_id) {
     // Vérifications de sécurité
     if (!isset($_POST['pokehub_new_pokemon_nonce']) || 
@@ -285,6 +294,7 @@ function pokehub_save_new_pokemon_metabox($post_id) {
     if (function_exists('pokehub_content_save_new_pokemon')) {
         pokehub_content_save_new_pokemon('post', $post_id, $pokemon_ids, $pokemon_genders);
     }
+}
 }
 add_action('save_post', 'pokehub_save_new_pokemon_metabox');
 

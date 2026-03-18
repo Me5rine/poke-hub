@@ -152,20 +152,23 @@ function poke_hub_collections_category_is_specific(string $category): bool {
 /**
  * Retourne l'URL de l'image du premier fond lié à un Pokémon (pour affichage fond + sprite).
  *
- * @param int $pokemon_id ID du Pokémon
+ * @param int  $pokemon_id          ID du Pokémon
+ * @param bool $only_shiny_active  Si vrai, ne prend que les fonds où le Pokémon n'est PAS shiny lock
  * @return string URL du fond ou chaîne vide
  */
-function poke_hub_collections_get_background_image_url_for_pokemon(int $pokemon_id): string {
+function poke_hub_collections_get_background_image_url_for_pokemon(int $pokemon_id, bool $only_shiny_active = false): string {
     global $wpdb;
     $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
     $backgrounds_table = pokehub_get_table('pokemon_backgrounds');
     if (!$links_table || !$backgrounds_table) {
         return '';
     }
+
+    $lock_sql = $only_shiny_active ? ' AND l.is_shiny_locked = 0' : '';
     $url = $wpdb->get_var($wpdb->prepare(
         "SELECT b.image_url FROM {$links_table} l
          INNER JOIN {$backgrounds_table} b ON l.background_id = b.id
-         WHERE l.pokemon_id = %d AND TRIM(COALESCE(b.image_url, '')) != ''
+         WHERE l.pokemon_id = %d{$lock_sql} AND TRIM(COALESCE(b.image_url, '')) != ''
          ORDER BY b.id ASC LIMIT 1",
         $pokemon_id
     ));
@@ -256,27 +259,44 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             $where[] = "(fv.category = 'dynamax' OR fv.form_slug LIKE '%dynamax%' OR fv.form_slug = 'normal')";
             break;
         case 'background':
-        case 'background_shiny':
             $links_table = pokehub_get_table('pokemon_background_pokemon_links');
             if ($links_table) {
                 $where[] = "EXISTS (SELECT 1 FROM {$links_table} l WHERE l.pokemon_id = p.id)";
             }
             break;
+        case 'background_shiny':
+            $links_table = pokehub_get_table('pokemon_background_pokemon_links');
+            if ($links_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l WHERE l.pokemon_id = p.id AND (l.is_shiny_locked = 0 OR l.is_shiny_locked IS NULL))";
+            }
+            break;
         case 'background_special':
-        case 'background_shiny_special': {
             $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
             $bg_table     = pokehub_get_table('pokemon_backgrounds');
             if ($links_table && $bg_table) {
                 $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND LOWER(TRIM(COALESCE(b.background_type, ''))) = 'special')";
             }
             break;
+        case 'background_shiny_special': {
+            $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
+            $bg_table     = pokehub_get_table('pokemon_backgrounds');
+            if ($links_table && $bg_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND l.is_shiny_locked = 0 AND LOWER(TRIM(COALESCE(b.background_type, ''))) = 'special')";
+            }
+            break;
         }
         case 'background_places':
-        case 'background_shiny_places': {
             $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
             $bg_table     = pokehub_get_table('pokemon_backgrounds');
             if ($links_table && $bg_table) {
                 $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND LOWER(TRIM(COALESCE(b.background_type, ''))) IN ('location', 'lieu', 'place'))";
+            }
+            break;
+        case 'background_shiny_places': {
+            $links_table   = pokehub_get_table('pokemon_background_pokemon_links');
+            $bg_table     = pokehub_get_table('pokemon_backgrounds');
+            if ($links_table && $bg_table) {
+                $where[] = "EXISTS (SELECT 1 FROM {$links_table} l INNER JOIN {$bg_table} b ON l.background_id = b.id WHERE l.pokemon_id = p.id AND l.is_shiny_locked = 0 AND LOWER(TRIM(COALESCE(b.background_type, ''))) IN ('location', 'lieu', 'place'))";
             }
             break;
         }
@@ -370,10 +390,25 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         return [];
     }
 
-    // Ne garder que les Pokémon ayant une date de sortie dans GO pour ce contexte
+    // Ne garder que les Pokémon ayant une sortie GO pour ce contexte.
+    //
+    // Note shiny (règle GO récente) :
+    // une évolution peut être "shiny trouvable directement" si le Pokémon de base est shiny.
+    // On ne peut donc pas se limiter à extra->release->shiny sur chaque évolution.
     if (function_exists('poke_hub_pokemon_is_released_in_go')) {
         $filtered = [];
         foreach ($results as $row) {
+            $pokemon_id = (int) ($row['id'] ?? 0);
+
+            // Cas spécial shiny : propager la logique via pokehub_pokemon_can_be_shiny().
+            if ($release_context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
+                if (pokehub_pokemon_can_be_shiny($pokemon_id)) {
+                    unset($row['extra']);
+                    $filtered[] = $row;
+                }
+                continue;
+            }
+
             $extra = isset($row['extra']) ? json_decode($row['extra'], true) : null;
             $release = is_array($extra) ? trim((string) ($extra['release'][$release_context] ?? '')) : '';
             if ($release !== '') {

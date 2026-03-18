@@ -159,6 +159,16 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         }
 
         $body   = wp_remote_retrieve_body($response);
+        // Pokekalos renvoie parfois HTTP 200 avec une page "Ce Pokémon n'existe pas."
+        // (pas de notes, donc sinon on log "aucune date trouvée" à tort)
+        if (is_string($body) && strpos($body, "Ce Pokémon n'existe pas.") !== false) {
+            $log[] = "  [SKIP] dex={$dex_number} {$url_slug} : fiche Pokekalos inexistante";
+            $skipped++;
+            if ($delay > 0) {
+                sleep($delay);
+            }
+            continue;
+        }
         $release = poke_hub_parse_pokekalos_notes_release($body);
 
         $has_any = false;
@@ -256,30 +266,52 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                     $skipped++;
                     continue;
                 }
-                $url = $base_url . $url_slug . '-' . $dex_number . 'm.html';
-                $response = wp_remote_get($url, [
-                    'timeout' => 15,
-                    'user-agent' => 'Poke-Hub/1.0 (WordPress; import dates Pokekalos)',
-                ]);
-                if (is_wp_error($response)) {
-                    $log[] = "  [ERR] méga {$url_slug}-{$dex_number}m : " . $response->get_error_message();
-                    $errors++;
-                    if ($delay > 0) {
-                        sleep($delay);
+                // Certaines pages Méga utilisent un numéro national "zéro-paddé"
+                // ex. mega-alakazam-065m.html / mega-scarhino-0214m.html
+                $dex_candidates = array_values(array_unique([
+                    (string) $dex_number,
+                    sprintf('%03d', $dex_number),
+                    sprintf('%04d', $dex_number),
+                ]));
+
+                $release = null;
+                $used_dex = (string) $dex_number;
+
+                foreach ($dex_candidates as $dex_candidate) {
+                    $url = $base_url . $url_slug . '-' . $dex_candidate . 'm.html';
+                    $response = wp_remote_get($url, [
+                        'timeout' => 15,
+                        'user-agent' => 'Poke-Hub/1.0 (WordPress; import dates Pokekalos)',
+                    ]);
+
+                    if (is_wp_error($response)) {
+                        $errors++;
+                        continue;
                     }
-                    continue;
+
+                    $code = wp_remote_retrieve_response_code($response);
+                    if ($code !== 200) {
+                        continue;
+                    }
+
+                    $body = wp_remote_retrieve_body($response);
+                    if (is_string($body) && strpos($body, "Ce Pokémon n'existe pas.") !== false) {
+                        continue;
+                    }
+
+                    $release = poke_hub_parse_pokekalos_notes_release($body);
+                    $used_dex = (string) $dex_candidate;
+                    break;
                 }
-                $code = wp_remote_retrieve_response_code($response);
-                if ($code !== 200) {
-                    $log[] = "  [SKIP] méga {$url_slug}-{$dex_number}m : HTTP {$code}";
+
+                if ($release === null) {
+                    $log[] = "  [SKIP] méga {$url_slug}-{$dex_number}m : fiche Pokekalos inexistante";
                     $skipped++;
                     if ($delay > 0) {
                         sleep($delay);
                     }
                     continue;
                 }
-                $body    = wp_remote_retrieve_body($response);
-                $release = poke_hub_parse_pokekalos_notes_release($body);
                 $has_any = false;
                 foreach ($release as $v) {
                     if ($v !== '') {
@@ -288,7 +320,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                     }
                 }
                 if (!$has_any) {
-                    $log[] = "  [SKIP] méga {$url_slug}-{$dex_number}m : aucune date trouvée";
+                    $log[] = "  [SKIP] méga {$url_slug}-{$used_dex}m : aucune date trouvée";
                     $skipped++;
                     if ($delay > 0) {
                         sleep($delay);
@@ -369,7 +401,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                         $summary[] = $k . '=' . substr($v, 0, 20) . (strlen($v) > 20 ? '…' : '');
                     }
                 }
-            $log[] = "  [OK] méga {$url_slug}-{$dex_number}m : " . implode(', ', $summary);
+            $log[] = "  [OK] méga {$url_slug}-{$used_dex}m : " . implode(', ', $summary);
             if ($delay > 0) {
                 sleep($delay);
             }

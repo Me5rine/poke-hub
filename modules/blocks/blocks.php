@@ -32,6 +32,7 @@ add_action('init', function() {
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-eggs-helpers.php'; // Helpers bloc œufs
     require_once POKE_HUB_BLOCKS_PATH . '/admin/collection-challenges-metabox.php'; // Meta box défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/admin/special-research-metabox.php'; // Meta box études spéciales
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-admin-ajax.php'; // AJAX helpers admin (indépendant du module Events)
 
     // Bloc bonus : tous les éléments (helpers + metabox) sont chargés par le module Blocks uniquement — aucune dépendance au module Bonus
     if (!function_exists('pokehub_get_all_bonuses_for_select')) {
@@ -48,6 +49,14 @@ add_action('init', function() {
             require_once POKE_HUB_PATH . 'modules/eggs/admin/eggs-metabox.php';
         }
     }
+
+    // Metaboxs pour les blocs "events" (wild / field research / habitats / nouveaux Pokémon).
+    // Elles doivent être disponibles dès que le module Blocks est actif, sans dépendre
+    // du module Events.
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-wild-pokemon-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-quests-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-habitats-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-new-pokemon-metabox.php';
 
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:
@@ -82,6 +91,24 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-new-pokemon-evolutions-front',
             POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
+            [],
+            POKE_HUB_VERSION
+        );
+
+        // Styles front des blocs (dates / quests / habitats / wild / etc.).
+        // Déplacés dans un fichier dédié pour éviter une dépendance au module "events".
+        wp_enqueue_style(
+            'pokehub-blocks-front-style',
+            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
+            [],
+            POKE_HUB_VERSION
+        );
+
+        // Le bloc "bonus" a ses propres styles (contenus dans le module Bonus),
+        // mais le bloc est utilisable même quand le module Bonus est inactif.
+        wp_enqueue_style(
+            'pokehub-bonus-style',
+            POKE_HUB_URL . 'assets/css/poke-hub-bonus-front.css',
             [],
             POKE_HUB_VERSION
         );

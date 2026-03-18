@@ -22,12 +22,8 @@ require_once __DIR__ . '/functions/events-render.php';
 require_once __DIR__ . '/functions/events-quests-helpers.php';
 require_once __DIR__ . '/functions/events-quests-render.php';
 require_once __DIR__ . '/functions/events-quests-global.php';
-require_once __DIR__ . '/admin/events-quests-metabox.php';
 require_once __DIR__ . '/admin/events-quests-admin.php';
 require_once __DIR__ . '/admin/events-quest-groups-admin.php';
-require_once __DIR__ . '/admin/events-wild-pokemon-metabox.php';
-require_once __DIR__ . '/admin/events-habitats-metabox.php';
-require_once __DIR__ . '/admin/events-new-pokemon-metabox.php';
 require_once __DIR__ . '/public/shortcode-events.php';
 require_once __DIR__ . '/public/events-front-routing.php';
 

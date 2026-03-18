@@ -8,6 +8,7 @@ if (!defined('ABSPATH')) {
 /**
  * Ajoute la metabox pour les Pokémon sauvages
  */
+if (!function_exists('pokehub_add_wild_pokemon_metabox')) {
 function pokehub_add_wild_pokemon_metabox() {
     $screens = apply_filters('pokehub_wild_pokemon_post_types', [
         'post',
@@ -17,7 +18,7 @@ function pokehub_add_wild_pokemon_metabox() {
     foreach ($screens as $screen) {
         add_meta_box(
             'pokehub_wild_pokemon',
-            __('Pokémon Sauvages (Wild Encounters)', 'poke-hub'),
+            __('Wild Encounters', 'poke-hub'),
             'pokehub_render_wild_pokemon_metabox',
             $screen,
             'normal',
@@ -25,11 +26,13 @@ function pokehub_add_wild_pokemon_metabox() {
         );
     }
 }
+}
 add_action('add_meta_boxes', 'pokehub_add_wild_pokemon_metabox');
 
 /**
  * Enqueue scripts et styles pour la metabox des Pokémon sauvages
  */
+if (!function_exists('pokehub_wild_pokemon_metabox_assets')) {
 function pokehub_wild_pokemon_metabox_assets($hook) {
     global $post_type;
     
@@ -94,6 +97,7 @@ function pokehub_wild_pokemon_metabox_assets($hook) {
         'saved_genders' => $saved_genders,
     ]);
 }
+}
 add_action('admin_enqueue_scripts', 'pokehub_wild_pokemon_metabox_assets');
 
 /**
@@ -120,6 +124,7 @@ if (!function_exists('pokehub_get_wild_pokemon')) {
 /**
  * Rendu de la metabox des Pokémon sauvages
  */
+if (!function_exists('pokehub_render_wild_pokemon_metabox')) {
 function pokehub_render_wild_pokemon_metabox($post) {
     wp_nonce_field('pokehub_save_wild_pokemon', 'pokehub_wild_pokemon_nonce');
 
@@ -431,11 +436,13 @@ function pokehub_render_wild_pokemon_metabox($post) {
     </script>
     <?php
 }
+}
 
 
 /**
  * Sauvegarde des Pokémon sauvages
  */
+if (!function_exists('pokehub_save_wild_pokemon_metabox')) {
 function pokehub_save_wild_pokemon_metabox($post_id) {
     // Vérifications de sécurité
     if (!isset($_POST['pokehub_wild_pokemon_nonce']) || 
@@ -496,6 +503,7 @@ function pokehub_save_wild_pokemon_metabox($post_id) {
     if (function_exists('pokehub_content_save_wild_pokemon')) {
         pokehub_content_save_wild_pokemon('post', $post_id, $wild_list);
     }
+}
 }
 add_action('save_post', 'pokehub_save_wild_pokemon_metabox');
 

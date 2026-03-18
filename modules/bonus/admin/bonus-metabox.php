@@ -17,7 +17,7 @@ function pokehub_add_bonus_metabox() {
     foreach ($screens as $screen) {
         add_meta_box(
             'pokehub_event_bonuses',
-            'Bonus de l’événement',
+            __('Event Bonuses', 'poke-hub'),
             'pokehub_render_event_bonuses_metabox',
             $screen,
             'normal',
