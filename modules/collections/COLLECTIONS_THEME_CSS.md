@@ -1,5 +1,7 @@
 # Collections – CSS et thème
 
+**Emplacement du CSS** : le CSS front des collections est dans le **CSS global du plugin** : `assets/css/poke-hub-collections-front.css` (aucun fichier CSS dans le module). Un **fichier à inclure dans le thème** est fourni : `assets/theme/poke-hub-collections-theme.css` (voir ci‑dessous).
+
 Le module Collections **réutilise au maximum les classes et variables du système CSS commun** du plugin. Voir en priorité :
 
 - **docs/FRONT_CSS.md** – variables `--me5rine-lab-*`, boutons, cartes, titres, dashboard, formulaires
@@ -8,7 +10,7 @@ Le module Collections **réutilise au maximum les classes et variables du systè
 
 ## Classes utilisées (système commun)
 
-Collections applique notamment : `me5rine-lab-dashboard`, `me5rine-lab-title-large`, `me5rine-lab-subtitle`, `me5rine-lab-dashboard-header`, `me5rine-lab-form-button`, `me5rine-lab-form-button-secondary`, `me5rine-lab-form-button-remove`, `me5rine-lab-form-block`, `me5rine-lab-form-field`, `me5rine-lab-form-label`, `me5rine-lab-form-input`, `me5rine-lab-form-select`, `me5rine-lab-form-message`, `me5rine-lab-form-message-warning`, `me5rine-lab-state-message`, `me5rine-lab-card`, `me5rine-lab-card-name`, `me5rine-lab-card-meta`, `me5rine-lab-card-actions`, `me5rine-lab-sr-only`.
+Collections applique notamment : `me5rine-lab-dashboard`, `me5rine-lab-title-large`, `me5rine-lab-subtitle`, `me5rine-lab-dashboard-header`, `me5rine-lab-dashboard-header-actions`, `me5rine-lab-form-button`, `me5rine-lab-form-button-secondary`, `me5rine-lab-form-button-remove`, `me5rine-lab-form-block`, `me5rine-lab-form-field`, `me5rine-lab-form-label`, `me5rine-lab-form-input`, `me5rine-lab-form-select`, `me5rine-lab-form-message`, `me5rine-lab-form-message-warning`, `me5rine-lab-form-hint`, `me5rine-lab-state-message`, `me5rine-lab-card`, `me5rine-lab-card-name`, `me5rine-lab-card-meta`, `me5rine-lab-card-actions`, `me5rine-lab-sr-only`. Layout vue collection : `pokehub-collection-view-header-main` (groupe titre à côté des actions).
 
 Pour harmoniser avec le thème, **surcharger les variables `--me5rine-lab-*`** dans le thème (définies dans FRONT_CSS.md). Une seule modification de variable change le style partout.
 
@@ -24,7 +26,9 @@ Seules les variables suivantes sont propres au module (dégradé des cartes de l
 | `--pokehub-collections-card-overlay` | Overlay sombre sur la carte (rgba(0,0,0,0.7)) |
 | `--pokehub-collections-modal-backdrop` | Fond du modal (rgba(0,0,0,0.5)) |
 
-Exemple dans le thème pour raccorder les cartes à la couleur primaire :
+**Inclure directement dans le thème** : le plugin fournit `assets/theme/poke-hub-collections-theme.css`, à enqueue après `poke-hub-collections-front` (dépendance), ou à copier dans le thème. Ce fichier ne contient que les variables à surcharger.
+
+Exemple dans le thème (ou via le fichier fourni) pour raccorder les cartes à la couleur primaire :
 
 ```css
 :root {
@@ -34,12 +38,27 @@ Exemple dans le thème pour raccorder les cartes à la couleur primaire :
 }
 ```
 
-## Image de fond par type de collection
+## Image de fond des cartes (liste des collections)
 
-Vous pouvez définir **une image de fond par catégorie** (shiny, costume, background, etc.) pour les cartes de la liste des collections, via le filtre PHP **`poke_hub_collections_card_background_image_url`**.
+### Priorité d’affichage
 
+1. **Image personnalisée** : si l’utilisateur a renseigné une image de couverture dans les paramètres de la collection (option `card_background_image_url`), cette URL est utilisée.
+2. **Image par défaut par catégorie** : sinon, le filtre **`poke_hub_collections_card_background_image_url`** est appelé avec la catégorie de la collection ; le thème peut ainsi fournir une image par défaut pour chaque type (shiny, costume, **custom**, etc.).
+3. **Dégradé** : si aucune URL n’est fournie, la carte utilise le dégradé défini par les variables `--pokehub-collections-card-gradient-*`.
+
+### Image par défaut pour les collections « personnalisées » (custom)
+
+Pour les collections de type **« Liste personnalisée »** (`custom`), vous pouvez définir une **image par défaut** via le même filtre, en retournant une URL lorsque `$category === 'custom'`. Les utilisateurs peuvent ensuite éventuellement remplacer cette image en personnalisant la couverture dans les paramètres de leur collection.
+
+### Personnalisation par l’utilisateur
+
+Dans la **vue d’une collection**, le panneau **Paramètres** (drawer) propose le champ **« Image de couverture (carte sur la liste des collections) »**. L’URL saisie est enregistrée dans `options.card_background_image_url` et utilisée en priorité sur la liste des collections. Vide = utilisation du défaut par catégorie (filtre) ou du dégradé.
+
+### Filtre PHP (défauts par catégorie)
+
+**Filtre :** `poke_hub_collections_card_background_image_url`  
 **Paramètres :** `( string $url, string $category )`  
-**Retour :** l’URL de l’image à utiliser pour cette catégorie (chaîne vide = dégradé par défaut).
+**Retour :** l’URL de l’image à utiliser pour cette catégorie (chaîne vide = dégradé).
 
 Exemple dans le thème (functions.php ou fichier dédié) :
 
@@ -48,16 +67,8 @@ add_filter('poke_hub_collections_card_background_image_url', function ($url, $ca
     $images = [
         'shiny'           => 'https://exemple.com/images/collections-shiny.jpg',
         'costume'         => 'https://exemple.com/images/collections-costume.jpg',
-        'costume_shiny'   => 'https://exemple.com/images/collections-costume-shiny.jpg',
-        'background'      => 'https://exemple.com/images/collections-background.jpg',
-        'background_shiny'=> 'https://exemple.com/images/collections-background-shiny.jpg',
-        'perfect_4'       => 'https://exemple.com/images/collections-perfect.jpg',
-        'lucky'           => 'https://exemple.com/images/collections-lucky.jpg',
-        'shadow'          => 'https://exemple.com/images/collections-shadow.jpg',
-        'purified'        => 'https://exemple.com/images/collections-purified.jpg',
-        'gigantamax'     => 'https://exemple.com/images/collections-gigantamax.jpg',
-        'dynamax'        => 'https://exemple.com/images/collections-dynamax.jpg',
-        'custom'         => 'https://exemple.com/images/collections-custom.jpg',
+        'custom'         => 'https://exemple.com/images/collections-custom-default.jpg', // défaut listes personnalisées
+        // … autres catégories
     ];
     return $images[$category] ?? '';
 }, 10, 2);
@@ -73,17 +84,17 @@ add_filter('poke_hub_collections_card_background_image_url', function ($url, $ca
 
 Chaque carte a aussi l’attribut **`data-category`** (ex. `data-category="shiny"`) pour un ciblage CSS éventuel.
 
-## Légende des tuiles et couleurs de statut
+## Légende des tuiles et couleurs (comme les notices)
 
-En vue collection (mode tuiles), une **légende** indique le sens du clic sur les tuiles (possédé / à échanger / manquant). Les couleurs réutilisent les variables du thème (notices) pour rester cohérentes :
+En vue collection (mode tuiles), les couleurs reprennent **celles des notices** (global-colors.css). Le module charge `global-colors.css` en front lorsque la page collections est affichée.
 
-| Élément | Variable / classe | Rôle |
-|--------|-------------------|------|
-| Vert (possédé) | `--admin-lab-color-notice-sucess-border` | Pastille et bordure tuile « possédé » |
-| Orange (à échanger) | `--admin-lab-color-notice-warning` | Pastille et bordure tuile « à l’échange » |
-| Gris (manquant) | `--admin-lab-color-borders` ou `--me5rine-lab-border` | Pastille « manquant » |
+| Statut | Couleur | Variable (global-colors) |
+|--------|---------|---------------------------|
+| **Possédé** | Vert : **contour et bulle** = `--admin-lab-color-var-green` (#42af13), fond = notice success | `--admin-lab-color-var-green` (contour + pastille), `--admin-lab-color-notice-sucess-background` (fond tuile) |
+| **Disponible à l'échange** | Orange (notice warning) | `--admin-lab-color-notice-warning` |
+| **Manquant** | Gris (comme actuellement) | `--me5rine-lab-border` |
 
-Classes : `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing`. Les tuiles utilisent `data-status="owned"|"for_trade"|"missing"` et `.pokehub-collection-tile-status`.
+Aucune couleur dédiée : tout repose sur les variables notice. Pour harmoniser, surchargez-les dans le thème (comme pour les notices admin). Classes layout : `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing`. Tuiles : `data-status="owned"|"for_trade"|"missing"` et `.pokehub-collection-tile-status`.
 
 ## Paramètres adaptatifs (création / édition)
 
@@ -95,4 +106,4 @@ Pour les **catégories spécifiques** (Gigantamax, Dynamax, Costume, etc.), le b
 
 ## Style inline (cartes uniquement)
 
-Quand une image de fond est fournie par le filtre ci‑dessus, elle est appliquée en **inline** sur `.pokehub-collections-card-bg` (background-image, background-size: cover, background-position: center). Sans image, le dégradé des variables CSS est utilisé. La bannière « collections anonymes » est masquée via la classe `.is-hidden`.
+Quand une image de fond est fournie (personnalisée ou via le filtre), elle est appliquée en **inline** sur `.pokehub-collections-card-bg` (background-image, background-size: cover, background-position: center). Sans image, le dégradé des variables CSS est utilisé. La bannière « collections anonymes » est masquée via la classe `.is-hidden`.

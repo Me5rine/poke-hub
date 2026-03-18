@@ -101,6 +101,13 @@ if ($current_tab === 'pokehub-profile') {
    - Saves data via `poke_hub_save_user_profile()` function
    - Shows success message after saving
 
+4. **Messages et notices** : Les shortcodes User Profiles affichent des blocs de message (succès, erreur, avertissement, information) avec les classes `me5rine-lab-form-message` et modificateurs :
+   - **Succès (vert)** : profil sauvegardé, code ajouté
+   - **Erreur (rouge)** : validation, échec sauvegarde
+   - **Avertissement (orange)** : utilisateur non connecté, action à confirmer
+   - **Information (bleu)** : notification (ex. changement d’email)
+   Voir **`../POKEHUB_CSS_CLASSES.md`** (section « Notices ») pour les classes exactes et leur utilisation détaillée dans le module User Profiles.
+
 ## Styling
 
 The shortcode uses Ultimate Member CSS classes by default:
@@ -233,5 +240,5 @@ If disabled, you will need to manually create pages with the shortcodes:
 
 ### Styling
 
-The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Additional specific styles are in `user-profiles-friend-codes.css`.
+The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Additional specific styles are in `user-profiles-friend-codes.css`. For **notices** (success, error, warning, info), see `../POKEHUB_CSS_CLASSES.md` (section « Notices ») — red / green / orange / blue convention and usage in User Profiles pages.
 

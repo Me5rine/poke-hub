@@ -246,7 +246,7 @@ function pokehub_special_events_inject_content($content) {
         }
         
         // Hook pour ajouter du contenu personnalisé
-        // L'événement passé au hook contient maintenant computed_image_url si disponible
+        // L'événement passé au hook contient computed_image_url si disponible
         do_action('pokehub_special_event_content', $event);
         ?>
     </div>

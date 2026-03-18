@@ -406,7 +406,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     $regional_countries = poke_hub_pokemon_get_regional_countries_for_import( $template_id, $form_slug, $pokemon_id_proto );
                 }
                 
-                // Les pays et région_slugs sont maintenant stockés dans pokemon_regional_mappings (single source of truth)
+                // Source de vérité: pokemon_regional_mappings (countries + region_slugs)
                 // Si un mapping existe déjà, on le met à jour avec les données de la config auto si nécessaire
                 // Sinon, on crée un nouveau mapping avec les données de la config auto
                 if ( function_exists( 'poke_hub_pokemon_get_regional_mapping_by_pattern' ) && !empty( $slug ) ) {
@@ -442,9 +442,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 }
                 
                 // Construire les données régionales
-                // IMPORTANT: On ne stocke plus countries et region_slugs dans extra['regional']
-                // Ces données sont maintenant dans pokemon_regional_mappings (single source of truth)
-                // On garde seulement is_regional, description, et map_image_id
+                // Dans extra['regional'], on garde uniquement: is_regional, description, map_image_id.
                 $extra['regional'] = [
                     'is_regional'  => true,
                     'description'  => $existing_regional['description'] ?? '',

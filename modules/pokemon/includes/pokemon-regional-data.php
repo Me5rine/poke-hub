@@ -232,7 +232,7 @@ function poke_hub_get_all_regional_data() {
     ];
     
     // ====== REGIONAL POKÉMON BY EXACT SLUG ======
-    // ALL regional Pokémon are now defined by their EXACT slug (as stored in database)
+    // Les Pokémon régionaux sont définis par leur slug exact (tel que stocké en base)
     // Format: 'pokemon-slug' or 'pokemon-form-slug' => array of countries/regions
     // This is much simpler and avoids ambiguity!
     // NOTE: These arrays may contain both country names AND region names (which will be separated during processing)
@@ -241,8 +241,6 @@ function poke_hub_get_all_regional_data() {
     // - Galarian/Alolan/Hisuian/Paldean forms are NOT regional in GO (they are available worldwide)
     // - Cosmetic forms (colors, sizes) are NOT regional (e.g., Minior colors, Squawkabilly colors)
     
-    // This is now deprecated - all entries moved to $form_based_mappings below
-    // Kept for backward compatibility during migration
     $regional_pokemon = [];
     
     // ====== FLABÉBÉ EVOLUTION LINE (Gen 6) ======
@@ -273,7 +271,7 @@ function poke_hub_get_all_regional_data() {
     ];
     
     // ====== REGIONAL POKÉMON MAPPINGS BY EXACT SLUG ======
-    // UNIFIED system: ALL regional Pokémon defined by their EXACT slug (as stored in database)
+    // Système unifié: mappings par slug exact (tel que stocké en base)
     // Format: 'pokemon-slug' or 'pokemon-form-slug' => array of countries/regions
     // The slug MUST match exactly the slug in the pokemon table (column `slug`)
     // IMPORTANT: 

@@ -36,6 +36,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`../CSS_RULES.md`** → **CSS à copier dans le thème** (fichier principal)
 - **`../CSS_SYSTEM.md`** → Documentation du système de classes génériques `me5rine-lab-form-*`
 - **`../PLUGIN_INTEGRATION.md`** → Guide pour utiliser les classes CSS dans d'autres plugins
+- **`../POKEHUB_CSS_CLASSES.md`** → **Notices** : convention des couleurs (rouge / vert / orange / bleu) et utilisation détaillée dans les pages User Profiles (profil, codes amis, Vivillon)
 
 ## Réglages
 

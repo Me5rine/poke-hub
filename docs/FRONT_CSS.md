@@ -776,6 +776,8 @@ Pour les tuiles d'actions sociales dans les formulaires de campagne :
 
 ## Messages et Notices Génériques
 
+**Convention des couleurs** : les notices utilisent **rouge** pour les erreurs, **vert** pour le succès, **orange** pour l’avertissement (warning) et **bleu** pour les messages d’information. Voir aussi **docs/POKEHUB_CSS_CLASSES.md** (section « Notices ») et l’utilisation dans le module User Profiles.
+
 ```css
 /* Message générique - Système unifié */
 .me5rine-lab-form-message {

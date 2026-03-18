@@ -38,10 +38,17 @@ function poke_hub_collections_enqueue_front_assets() {
     }
     do_action('poke_hub_collections_enqueue_assets');
 
+    /* Même variables que les notices (notice-sucess, notice-warning) → global-colors.css en dépendance */
+    wp_enqueue_style(
+        'poke-hub-global-colors',
+        POKE_HUB_URL . 'assets/css/global-colors.css',
+        [],
+        POKE_HUB_VERSION
+    );
     wp_enqueue_style(
         'poke-hub-collections-front',
-        POKE_HUB_COLLECTIONS_URL . 'assets/css/collections-front.css',
-        [],
+        POKE_HUB_URL . 'assets/css/poke-hub-collections-front.css',
+        ['poke-hub-global-colors'],
         POKE_HUB_VERSION
     );
 

@@ -57,11 +57,22 @@ if (!function_exists('pokehub_get_pokemon_data_by_id') || !function_exists('poke
     return '';
 }
 
-if ($auto_detect && function_exists('pokehub_get_wild_pokemon')) {
-    $wild_list = pokehub_get_wild_pokemon($post_id);
+// Auto-détection : privilégier les tables de contenu (indépendant du module events)
+$wild_list = [];
+if ($auto_detect) {
+    if (function_exists('pokehub_content_get_wild_pokemon')) {
+        $wild_list = pokehub_content_get_wild_pokemon('post', (int) $post_id);
+    } elseif (function_exists('pokehub_get_wild_pokemon')) {
+        // Fallback compat (si le module events est actif)
+        $wild_list = pokehub_get_wild_pokemon((int) $post_id);
+    }
+}
+
+if ($auto_detect && !empty($wild_list) && is_array($wild_list)) {
     $pokemon_ids = [];
     $rare_pokemon_ids = [];
     $forced_shiny_ids = [];
+    $pokemon_genders = [];
     foreach ($wild_list as $w) {
         $pid = (int) $w['pokemon_id'];
         if ($pid <= 0) {
@@ -73,6 +84,9 @@ if ($auto_detect && function_exists('pokehub_get_wild_pokemon')) {
         }
         if (!empty($w['force_shiny'])) {
             $forced_shiny_ids[] = $pid;
+        }
+        if (!empty($w['gender']) && in_array($w['gender'], ['male', 'female'], true)) {
+            $pokemon_genders[$pid] = $w['gender'];
         }
     }
     $pokemon_ids = array_values(array_unique($pokemon_ids));
@@ -157,27 +171,8 @@ if (!function_exists('pokehub_process_wild_pokemon_item')) {
     }
 }
 
-// Récupérer les genres depuis les postmeta ou l'événement spécial
-$pokemon_genders = [];
-if ($auto_detect) {
-    // D'abord depuis les postmeta (priorité)
-    if (isset($meta_pokemon_genders) && is_array($meta_pokemon_genders)) {
-        $pokemon_genders = $meta_pokemon_genders;
-    }
-    
-    // Ensuite depuis l'événement spécial (fallback)
-    if (function_exists('poke_hub_special_event_get_pokemon_gender')) {
-        foreach (array_unique(array_merge($pokemon_ids, $rare_pokemon_ids, $forced_shiny_ids)) as $pid) {
-            // Ne pas écraser si déjà défini dans les postmeta
-            if (!isset($pokemon_genders[$pid])) {
-                $gender = poke_hub_special_event_get_pokemon_gender($post_id, $pid);
-                if ($gender !== null) {
-                    $pokemon_genders[$pid] = $gender;
-                }
-            }
-        }
-    }
-}
+// Genres : déjà récupérés depuis les tables de contenu si disponibles
+$pokemon_genders = isset($pokemon_genders) && is_array($pokemon_genders) ? $pokemon_genders : [];
 
 // Traiter les Pokémon sauvages classiques et shiny forcés ensemble
 // Les shiny forcés doivent apparaître avec les sauvages classiques

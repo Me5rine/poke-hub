@@ -119,7 +119,6 @@
                 });
         }
         
-        // Run detection once after a delay to ensure Select2 is initialized
         setTimeout(function() { autoDetectCountry(); }, 500);
         
         // Update checkbox styling when checked/unchecked
@@ -278,7 +277,6 @@
             }
         });
 
-        // Also handle paste event
         $(document).on('paste', '#friend_code', function(e) {
             var $input = $(this);
             setTimeout(function() {
@@ -336,7 +334,6 @@
             }
         });
 
-        // Also handle paste event for XP
         $(document).on('paste', '#xp', function(e) {
             var $input = $(this);
             setTimeout(function() {
@@ -962,7 +959,6 @@
             setTimeout(applyInitialFilteringUM, 1200);
             setTimeout(applyInitialFilteringUM, 2000);
             
-            // Also check for mismatch after a delay if country field has a saved value
             setTimeout(function() {
                 var $countrySelect = $('#poke-hub-profile-form #country');
                 if ($countrySelect.length > 0) {
@@ -1163,7 +1159,7 @@
                     }
                 }
                 
-                // Now, try to find the country in the select options (case-insensitive, with normalization)
+                // Essayer de retrouver le pays dans les options du select (insensible à la casse, normalisation)
                 var foundOption = null;
                 var countryToSetLower = (countryToSet || '').trim().toLowerCase();
                 
@@ -1496,8 +1492,7 @@
             return true;
         });
 
-        // Select2 initialization is now handled by pokehub-front-select2.js
-        // No need to initialize here to avoid conflicts and ensure consistent styling
+        // L'initialisation Select2 est gérée par pokehub-front-select2.js
     });
 
 })(jQuery);

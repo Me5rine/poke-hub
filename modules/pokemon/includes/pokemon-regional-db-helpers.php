@@ -372,8 +372,6 @@ function poke_hub_pokemon_save_regional_mapping($mapping, $id = null) {
             ['%d']
         );
         if ($result !== false) {
-            // Note: Pokémon now read from pokemon_regional_mappings directly, no need to update them
-            // The mapping table is the single source of truth
             return (int) $id;
         } else {
             return false;
@@ -387,8 +385,6 @@ function poke_hub_pokemon_save_regional_mapping($mapping, $id = null) {
         );
         if ($result !== false) {
             $insert_id = (int) $wpdb->insert_id;
-            // Note: Pokémon now read from pokemon_regional_mappings directly, no need to update them
-            // The mapping table is the single source of truth
             return $insert_id;
         } else {
             return false;

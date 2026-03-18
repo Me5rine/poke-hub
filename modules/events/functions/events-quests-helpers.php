@@ -15,8 +15,6 @@ function pokehub_get_event_quests(int $post_id): array {
     return [];
 }
 
-/* pokehub_quests_clean_from_request() : includes/content/content-helpers.php */
-
 /**
  * Sauvegarde les quêtes d'un événement
  */
@@ -41,7 +39,6 @@ function pokehub_events_get_post_quests(int $post_id): array {
  * @return array Format: [['id' => 1, 'text' => 'Pikachu (#025)'], ...]
  */
 function pokehub_quests_get_pokemon_for_select(): array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_pokemon_for_select')) {
         return pokehub_get_pokemon_for_select();
     }
@@ -55,7 +52,6 @@ function pokehub_quests_get_pokemon_for_select(): array {
  * @return array Format: [['id' => 1, 'text' => 'Pierre Évolutive'], ...]
  */
 function pokehub_quests_get_items_for_select(): array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_items_for_select')) {
         return pokehub_get_items_for_select();
     }
@@ -68,7 +64,6 @@ function pokehub_quests_get_items_for_select(): array {
  * @deprecated Utiliser pokehub_get_pokemon_data_by_id() à la place
  */
 function pokehub_quests_get_pokemon_data(int $pokemon_id): ?array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_pokemon_data_by_id')) {
         return pokehub_get_pokemon_data_by_id($pokemon_id);
     }
@@ -82,7 +77,6 @@ function pokehub_quests_get_pokemon_data(int $pokemon_id): ?array {
  * @return array Format: [['id' => 1, 'text' => 'Charizard (Mega X)', ...], ...]
  */
 function pokehub_quests_get_mega_pokemon_for_select(): array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_mega_pokemon_for_select')) {
         return pokehub_get_mega_pokemon_for_select();
     }
@@ -96,7 +90,6 @@ function pokehub_quests_get_mega_pokemon_for_select(): array {
  * @return array Format: [['id' => 1, 'text' => 'Pikachu (#025)', ...], ...]
  */
 function pokehub_quests_get_base_pokemon_for_select(): array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_base_pokemon_for_select')) {
         return pokehub_get_base_pokemon_for_select();
     }
@@ -109,7 +102,6 @@ function pokehub_quests_get_base_pokemon_for_select(): array {
  * @deprecated Utiliser pokehub_get_item_data_by_id() à la place
  */
 function pokehub_quests_get_item_data(int $item_id): ?array {
-    // Déléguer à la fonction globale
     if (function_exists('pokehub_get_item_data_by_id')) {
         return pokehub_get_item_data_by_id($item_id);
     }
@@ -124,8 +116,6 @@ function pokehub_quests_get_item_data(int $item_id): ?array {
  * @return string URL de l'image ou chaîne vide
  */
 function pokehub_get_quest_pokemon_image($pokemon_id, $is_shiny = false) {
-    // Les helpers d'images sont maintenant dans pokemon-public-helpers.php
-    // et sont disponibles même si le module Pokémon n'est pas actif
     if (!function_exists('poke_hub_pokemon_get_image_url')) {
         error_log('[POKE-HUB] pokehub_get_quest_pokemon_image - poke_hub_pokemon_get_image_url n\'existe pas');
         return '';

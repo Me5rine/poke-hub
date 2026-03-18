@@ -11,7 +11,7 @@ if (!function_exists('poke_hub_pokemon_save_regional_region')) {
     require_once __DIR__ . '/pokemon-regional-db-helpers.php';
 }
 
-// Load SINGLE SOURCE OF TRUTH for all regional data (must be loaded first)
+// Source de vérité: données régionales
 require_once __DIR__ . '/pokemon-regional-data.php';
 
 /**
@@ -92,8 +92,6 @@ function poke_hub_seed_regional_data($force = false) {
         poke_hub_seed_form_based_regional_mappings($force);
     }
     
-    // Note: No need to sync mappings to Pokémon anymore - Pokémon read directly from pokemon_regional_mappings (single source of truth)
-    
     // Marquer que le seed a été fait
     update_option('poke_hub_regional_data_seeded', true);
     
@@ -137,7 +135,7 @@ function poke_hub_seed_regional_regions($force = false) {
 /**
  * Get Vivillon patterns data for seeding
  * Returns the static mapping of patterns to countries/regions
- * Now reads from pokemon-regional-data.php (single source of truth)
+ * Lit les données depuis pokemon-regional-data.php (source de vérité)
  * 
  * @return array Array with 'patterns' (array of pattern slugs) and 'mappings' (array of pattern => countries/regions)
  */
@@ -247,15 +245,11 @@ function poke_hub_seed_vivillon_patterns($force = false) {
  * Uses pokemon-regional-data.php as SINGLE SOURCE OF TRUTH
  * Seeds ALL regional Pokémon using their EXACT slugs (as stored in database)
  * 
- * NOTE: This function is now DEPRECATED - all mappings are handled by poke_hub_seed_form_based_regional_mappings()
- * This is kept for backward compatibility and migration
+ * @deprecated Les mappings sont gérés par poke_hub_seed_form_based_regional_mappings()
  * 
  * @param bool $force Force update even if data already exists
  */
 function poke_hub_seed_regional_pokemon_mappings($force = false) {
-    // This function is deprecated - all mappings are now done via form_based_mappings with exact slugs
-    // The seeding is now handled by poke_hub_seed_form_based_regional_mappings()
-    // We keep this function empty for backward compatibility
     return;
 }
 

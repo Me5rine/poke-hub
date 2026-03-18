@@ -929,7 +929,7 @@ function poke_hub_pokemon_is_temp_evo_primal( string $temp_evo_id ): bool {
 
 /**
  * Get regional Pokémon auto-configuration for Game Master import.
- * Now reads from pokemon-regional-data.php as SINGLE SOURCE OF TRUTH
+ * Lit les données depuis pokemon-regional-data.php (source de vérité)
  *
  * @return array
  */
@@ -959,7 +959,7 @@ function poke_hub_pokemon_get_regional_auto_config() {
         'auto_detect_countries' => true,
     ];
     
-    // NOTE: All other regional Pokémon are now defined by their EXACT slug in form_based_mappings
+    // NOTE: Les autres Pokémon régionaux sont définis par slug exact dans form_based_mappings
     // This function is mainly kept for Vivillon pattern detection and backward compatibility
     // The actual regional detection is done by checking the exact slug in poke_hub_pokemon_get_regional_countries_for_import()
 
@@ -991,7 +991,7 @@ function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_
 
     // 0) FIRST PRIORITY: Check by EXACT slug in form_based_mappings (unified system)
     // This is the SINGLE SOURCE OF TRUTH - if slug matches, use it!
-    // ALL regional Pokémon are now defined by their EXACT slug (as stored in database)
+    // Les Pokémon régionaux sont définis par leur slug exact (tel que stocké en base)
     // This avoids ambiguity and ensures only the correct forms are marked as regional
     // IMPORTANT: For base Pokémon (no form), we check the base slug (e.g., "farfetchd")
     // For Pokémon with forms, we check the full slug (e.g., "farfetchd-galar")
@@ -1044,7 +1044,7 @@ function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_
 
     // 2) Form-based overrides - REMOVED
     // All form-based regionals (Basculin, Shellos, Flabébé, Oricorio, Tauros Paldea)
-    // are now defined by their EXACT slug in form_based_mappings
+    // sont définis par leur slug exact dans form_based_mappings
     // The slug exact matching in section 0 handles all these cases
     // No need for pokemon_id_proto-based detection anymore
 
@@ -1063,7 +1063,7 @@ function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_
         }
         
         // Try to find pattern in Vivillon mapping
-        // IMPORTANT: Le mapping utilise maintenant le pattern uniquement (e.g., "continental"),
+        // IMPORTANT: Le mapping utilise le pattern uniquement (e.g., "continental"),
         // pas le pattern_slug complet (e.g., "vivillon-continental")
         if (!empty($pattern_from_slug) && function_exists('poke_hub_get_vivillon_pattern_country_mapping')) {
             $vivillon_mapping = poke_hub_get_vivillon_pattern_country_mapping();

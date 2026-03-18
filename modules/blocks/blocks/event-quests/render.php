@@ -45,19 +45,17 @@ if (!$post_id) {
 
 $auto_detect = $attributes['autoDetect'] ?? true;
 
-// Vérifier que les fonctions sont disponibles
-if (!function_exists('pokehub_get_event_quests') || !function_exists('pokehub_render_event_quests')) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] event-quests: Fonctions non disponibles - get_quests=' . (int) function_exists('pokehub_get_event_quests') . ', render=' . (int) function_exists('pokehub_render_event_quests'));
-    }
-    return '';
-}
-
-// Si auto-détection activée, récupérer depuis les meta
+// Récupération des quêtes : priorité aux tables de contenu (indépendant du module events)
+$quests = [];
 if ($auto_detect) {
-    $quests = pokehub_get_event_quests($post_id);
-} else {
-    // Pour l'instant, on ne supporte que l'auto-détection
+    if (function_exists('pokehub_content_get_quests')) {
+        $quests = pokehub_content_get_quests('post', (int) $post_id);
+    } elseif (function_exists('pokehub_get_event_quests')) {
+        // Fallback compat (si le module events est actif)
+        $quests = pokehub_get_event_quests((int) $post_id);
+    }
+}
+if (!is_array($quests)) {
     $quests = [];
 }
 
@@ -68,8 +66,13 @@ if (empty($quests)) {
     return '';
 }
 
-// Récupérer le HTML du rendu
-$quests_html = pokehub_render_event_quests($quests);
+// Récupérer le HTML du rendu (events si dispo, sinon fallback Blocks)
+$quests_html = '';
+if (function_exists('pokehub_render_event_quests')) {
+    $quests_html = pokehub_render_event_quests($quests);
+} elseif (function_exists('pokehub_blocks_render_event_quests')) {
+    $quests_html = pokehub_blocks_render_event_quests($quests);
+}
 
 if (empty($quests_html)) {
     if (defined('WP_DEBUG') && WP_DEBUG) {

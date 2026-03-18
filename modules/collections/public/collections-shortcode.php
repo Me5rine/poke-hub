@@ -44,10 +44,10 @@ add_shortcode('poke_hub_collections', function ($atts) {
 
     ob_start();
     ?>
-    <div class="pokehub-collections-wrap collections-dashboard me5rine-lab-dashboard" data-logged-in="<?php echo $is_logged_in ? '1' : '0'; ?>">
-        <h2 class="pokehub-collections-title me5rine-lab-title-large"><?php esc_html_e('My collections', 'poke-hub'); ?></h2>
-        <div class="pokehub-collections-header pokehub-collections-header-row me5rine-lab-dashboard-header">
-            <p class="pokehub-collections-subtitle me5rine-lab-subtitle"><?php esc_html_e('Track your shiny, costumed, 100% and more in one place.', 'poke-hub'); ?></p>
+    <div class="pokehub-collections-wrap me5rine-lab-dashboard" data-logged-in="<?php echo $is_logged_in ? '1' : '0'; ?>">
+        <h2 class="me5rine-lab-title-large"><?php esc_html_e('My collections', 'poke-hub'); ?></h2>
+        <div class="me5rine-lab-dashboard-header">
+            <p class="me5rine-lab-subtitle"><?php esc_html_e('Track your shiny, costumed, 100% and more in one place.', 'poke-hub'); ?></p>
             <div class="me5rine-lab-dashboard-header-actions">
                 <button type="button" class="pokehub-collections-btn-create me5rine-lab-form-button button button-primary">
                     <?php esc_html_e('New collection', 'poke-hub'); ?>
@@ -68,7 +68,7 @@ add_shortcode('poke_hub_collections', function ($atts) {
 
         <div class="pokehub-collections-list">
             <?php if (empty($collections)) : ?>
-                <p class="pokehub-collections-empty me5rine-lab-state-message">
+                <p class="pokehub-collections-empty me5rine-lab-state-message" role="status">
                     <?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?>
                 </p>
             <?php else : ?>
@@ -79,16 +79,16 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         $col_token = $col['share_token'] ?? '';
                         $col_view_url = $col_token !== '' ? $collections_base_url . '/' . $col_token : add_query_arg(['id' => $col['id'], 'view' => '1'], get_permalink());
                         $col_edit_url = $col_token !== '' ? $collections_base_url . '/' . $col_token . '?edit=1' : add_query_arg(['id' => $col['id'], 'view' => '1', 'edit' => '1'], get_permalink());
-                        $card_bg_image = apply_filters('poke_hub_collections_card_background_image_url', '', $col['category']);
+                        $card_bg_image = poke_hub_collections_get_card_background_image_url($col);
                         $card_bg_style = $card_bg_image !== '' ? ' style="background-image: url(' . esc_url($card_bg_image) . '); background-size: cover; background-position: center;"' : '';
                     ?>
-                        <li class="pokehub-collections-card me5rine-lab-card" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" data-category="<?php echo esc_attr($col['category']); ?>">
+                        <li class="me5rine-lab-card" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" data-category="<?php echo esc_attr($col['category']); ?>">
                             <a href="<?php echo esc_url($col_view_url); ?>" class="pokehub-collections-card-link">
                                 <span class="pokehub-collections-card-bg"<?php echo $card_bg_style; ?>></span>
-                                <span class="pokehub-collections-card-name me5rine-lab-card-name"><?php echo esc_html($col['name']); ?></span>
-                                <span class="pokehub-collections-card-meta me5rine-lab-card-meta"><?php echo esc_html($categories[$col['category']] ?? $col['category']); ?></span>
+                                <span class="me5rine-lab-card-name"><?php echo esc_html($col['name']); ?></span>
+                                <span class="me5rine-lab-card-meta"><?php echo esc_html($categories[$col['category']] ?? $col['category']); ?></span>
                             </a>
-                            <div class="pokehub-collections-card-actions me5rine-lab-card-actions">
+                            <div class="me5rine-lab-card-actions">
                                 <a href="<?php echo esc_url($col_edit_url); ?>" class="pokehub-collections-card-btn pokehub-collections-card-btn-settings me5rine-lab-form-button-secondary" title="<?php esc_attr_e('Settings', 'poke-hub'); ?>"><span class="me5rine-lab-sr-only"><?php esc_html_e('Settings', 'poke-hub'); ?></span></a>
                                 <button type="button" class="pokehub-collections-card-btn pokehub-collections-card-btn-delete pokehub-collections-btn-delete-list me5rine-lab-form-button-remove" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" title="<?php esc_attr_e('Delete', 'poke-hub'); ?>"><span class="me5rine-lab-sr-only"><?php esc_html_e('Delete', 'poke-hub'); ?></span></button>
                             </div>
@@ -102,13 +102,13 @@ add_shortcode('poke_hub_collections', function ($atts) {
         <div class="pokehub-collections-drawer pokehub-collections-drawer-create" id="pokehub-collections-drawer-create" role="dialog" aria-label="<?php esc_attr_e('New collection', 'poke-hub'); ?>" aria-hidden="true">
             <div class="pokehub-collections-drawer-backdrop" id="pokehub-collections-drawer-create-backdrop"></div>
             <div class="pokehub-collections-drawer-panel">
-                <div class="pokehub-collections-drawer-header">
-                    <h3 class="pokehub-collections-drawer-title me5rine-lab-title-medium"><?php esc_html_e('New collection', 'poke-hub'); ?></h3>
+                <div class="me5rine-lab-card-header pokehub-collections-drawer-header">
+                    <h3 class="me5rine-lab-title-medium"><?php esc_html_e('New collection', 'poke-hub'); ?></h3>
                     <button type="button" class="pokehub-collections-drawer-close" id="pokehub-collections-drawer-create-close" aria-label="<?php esc_attr_e('Close', 'poke-hub'); ?>">&times;</button>
                 </div>
                 <div class="pokehub-collections-drawer-body">
-                    <p class="pokehub-collections-modal-desc me5rine-lab-subtitle"><?php esc_html_e('Choose a name and type; you can refine options later.', 'poke-hub'); ?></p>
-                    <div class="pokehub-collections-form me5rine-lab-form-section">
+                    <p class="me5rine-lab-subtitle"><?php esc_html_e('Choose a name and type; you can refine options later.', 'poke-hub'); ?></p>
+                    <div class="pokehub-collections-form me5rine-lab-form-block">
                         <div class="me5rine-lab-form-field">
                             <label for="pokehub-collection-name" class="me5rine-lab-form-label"><?php esc_html_e('Name', 'poke-hub'); ?></label>
                             <input type="text" id="pokehub-collection-name" class="me5rine-lab-form-input" placeholder="<?php esc_attr_e('e.g. My Shiny Pokémon', 'poke-hub'); ?>" />
@@ -126,9 +126,9 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         </div>
 
                         <details class="pokehub-collections-advanced me5rine-lab-form-block" id="pokehub-collection-advanced">
-                            <summary class="pokehub-collections-advanced-summary"><?php esc_html_e('Customize content and display', 'poke-hub'); ?></summary>
+                            <summary class="me5rine-lab-title-medium pokehub-collections-advanced-summary"><?php esc_html_e('Customize content and display', 'poke-hub'); ?></summary>
                             <div class="pokehub-collections-advanced-inner">
-                                <fieldset class="pokehub-collections-options me5rine-lab-form-block">
+                                <fieldset class="me5rine-lab-form-block">
                                     <legend class="me5rine-lab-form-label"><?php esc_html_e('Content to show', 'poke-hub'); ?></legend>
                                     <div class="pokehub-collections-options-additive" id="pokehub-collection-options-additive">
                                         <label><input type="checkbox" id="pokehub-collection-include-national" checked /> <?php esc_html_e('Show national Pokédex', 'poke-hub'); ?></label>
@@ -144,7 +144,7 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                         <?php esc_html_e('This collection type only shows that specific category (e.g. Gigantamax only). No extra filters.', 'poke-hub'); ?>
                                     </p>
                                 </fieldset>
-                                <fieldset class="pokehub-collections-options me5rine-lab-form-block">
+                                <fieldset class="me5rine-lab-form-block">
                                     <legend class="me5rine-lab-form-label"><?php esc_html_e('Display', 'poke-hub'); ?></legend>
                                     <label><input type="checkbox" id="pokehub-collection-one-per-species" /> <?php esc_html_e('One entry per species (e.g. one Unown)', 'poke-hub'); ?></label>
                                     <label><input type="checkbox" id="pokehub-collection-group-by-generation" checked /> <?php esc_html_e('Group by region / generation', 'poke-hub'); ?></label>
@@ -217,10 +217,12 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
     if ($local && $slug !== '' && (strpos($slug, 'local-') === 0 || $slug !== '')) {
         ob_start();
         ?>
-        <div class="pokehub-collection-view-wrap pokehub-collection-view-local" data-local="1" data-collection-slug="<?php echo esc_attr($slug); ?>" data-can-edit="1">
-            <header class="pokehub-collection-view-header">
+        <div class="pokehub-collection-view-wrap me5rine-lab-dashboard" data-local="1" data-collection-slug="<?php echo esc_attr($slug); ?>" data-can-edit="1">
+            <header class="me5rine-lab-dashboard-header pokehub-collection-view-header">
                 <a href="<?php echo esc_url(remove_query_arg(['collection', 'id', 'view', 'local'])); ?>" class="pokehub-collection-back">&larr; <?php esc_html_e('Back to collections', 'poke-hub'); ?></a>
-                <h2 class="pokehub-collection-view-title pokehub-collection-local-title"><?php esc_html_e('Loading…', 'poke-hub'); ?></h2>
+                <div class="pokehub-collection-view-header-main">
+                    <h2 class="me5rine-lab-title-large pokehub-collection-view-title pokehub-collection-local-title"><?php esc_html_e('Loading…', 'poke-hub'); ?></h2>
+                </div>
             </header>
             <div class="pokehub-collection-stats pokehub-collection-local-stats">—</div>
             <div class="pokehub-collection-tiles pokehub-collection-tiles-local" data-pool="[]" data-items="{}"></div>
@@ -290,11 +292,13 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
          data-edit-name="<?php echo esc_attr($collection['name']); ?>"
          data-edit-options="<?php echo esc_attr(wp_json_encode($opts)); ?>"
          data-edit-is-public="<?php echo !empty($collection['is_public']) ? '1' : '0'; ?>">
-        <div class="pokehub-collection-view-header me5rine-lab-dashboard-header">
+        <div class="me5rine-lab-dashboard-header pokehub-collection-view-header">
             <a href="<?php echo esc_url($collections_base); ?>" class="pokehub-collection-back">&larr; <?php esc_html_e('Back to my collections', 'poke-hub'); ?></a>
-            <h2 class="pokehub-collection-view-title me5rine-lab-title-large"><?php echo esc_html($collection['name']); ?></h2>
+            <div class="pokehub-collection-view-header-main">
+                <h2 class="me5rine-lab-title-large pokehub-collection-view-title"><?php echo esc_html($collection['name']); ?></h2>
+            </div>
             <?php if ($can_edit) : ?>
-            <div class="pokehub-collection-view-actions me5rine-lab-dashboard-header-actions">
+            <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
                 <button type="button" class="pokehub-collections-btn-edit-settings me5rine-lab-form-button-secondary button"><?php esc_html_e('Settings', 'poke-hub'); ?></button>
                 <button type="button" class="pokehub-collections-btn-share me5rine-lab-form-button button"><?php esc_html_e('Share', 'poke-hub'); ?></button>
             </div>
@@ -313,7 +317,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         $display_mode = $collection['options']['display_mode'] ?? 'tiles';
         if ($total > 0 && $display_mode !== 'select') :
             ?>
-        <p class="pokehub-collection-legend me5rine-lab-form-hint" aria-hidden="true">
+        <p class="pokehub-collection-legend me5rine-lab-form-hint" role="note" aria-hidden="true">
             <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <?php esc_html_e('Owned', 'poke-hub'); ?></span>
             <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-for-trade" aria-hidden="true"></span> <?php esc_html_e('For trade', 'poke-hub'); ?></span>
             <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-missing" aria-hidden="true"></span> <?php esc_html_e('Missing', 'poke-hub'); ?></span>
@@ -328,7 +332,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         <?php endif; ?>
 
         <?php if (!empty($collection['options']['display_mode']) && $collection['options']['display_mode'] === 'select') : ?>
-            <div class="pokehub-collection-select-mode pokehub-collection-multiselect-wrap me5rine-lab-form-block">
+            <div class="pokehub-collection-multiselect-wrap me5rine-lab-form-block">
                 <div class="me5rine-lab-form-field">
                     <label for="pokehub-collection-missing-select" class="me5rine-lab-form-label"><?php esc_html_e('Add missing Pokémon', 'poke-hub'); ?></label>
                     <select id="pokehub-collection-missing-select" class="pokehub-collection-missing-select me5rine-lab-form-select" multiple="multiple" data-placeholder="<?php esc_attr_e('Search by name or #…', 'poke-hub'); ?>" style="width: 100%;"></select>
@@ -347,7 +351,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             <?php foreach ($pool_by_gen as $gen_key => $gen_pool) : ?>
                 <?php if ($gen_key !== '') : ?>
                     <details class="pokehub-collection-generation-block me5rine-lab-form-block" data-generation="<?php echo esc_attr($gen_key); ?>" <?php echo $gens_collapsed ? '' : ' open'; ?>>
-                        <summary class="pokehub-collection-generation-title me5rine-lab-title-medium"><?php echo esc_html($gen_key); ?></summary>
+                        <summary class="me5rine-lab-title-medium"><?php echo esc_html($gen_key); ?></summary>
                         <div class="pokehub-collection-generation-tiles">
                 <?php endif; ?>
                 <?php foreach ($gen_pool as $p) :
@@ -379,12 +383,12 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         <div class="pokehub-collections-drawer" id="pokehub-collections-drawer" role="dialog" aria-label="<?php esc_attr_e('Collection settings', 'poke-hub'); ?>" aria-hidden="true">
             <div class="pokehub-collections-drawer-backdrop" id="pokehub-collections-drawer-backdrop"></div>
             <div class="pokehub-collections-drawer-panel">
-                <div class="pokehub-collections-drawer-header">
-                    <h3 class="pokehub-collections-drawer-title me5rine-lab-title-medium"><?php esc_html_e('Settings', 'poke-hub'); ?></h3>
+                <div class="me5rine-lab-card-header pokehub-collections-drawer-header">
+                    <h3 class="me5rine-lab-title-medium"><?php esc_html_e('Settings', 'poke-hub'); ?></h3>
                     <button type="button" class="pokehub-collections-drawer-close" id="pokehub-collections-drawer-close" aria-label="<?php esc_attr_e('Close', 'poke-hub'); ?>">&times;</button>
                 </div>
                 <div class="pokehub-collections-drawer-body">
-                    <div class="pokehub-collections-form pokehub-collections-form-edit me5rine-lab-form-section">
+                    <div class="pokehub-collections-form-edit me5rine-lab-form-block">
                         <div class="me5rine-lab-form-field">
                             <label for="pokehub-edit-collection-name" class="me5rine-lab-form-label"><?php esc_html_e('Name', 'poke-hub'); ?></label>
                             <input type="text" id="pokehub-edit-collection-name" class="me5rine-lab-form-input" value="<?php echo esc_attr($collection['name']); ?>" />
@@ -392,7 +396,12 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         <div class="me5rine-lab-form-field">
                             <label><input type="checkbox" id="pokehub-edit-collection-public" <?php checked(!empty($collection['is_public'])); ?> /> <?php esc_html_e('Make this collection public', 'poke-hub'); ?></label>
                         </div>
-                        <fieldset class="pokehub-collections-options me5rine-lab-form-block">
+                        <div class="me5rine-lab-form-field">
+                            <label for="pokehub-edit-card-background-image" class="me5rine-lab-form-label"><?php esc_html_e('Cover image (card on collections list)', 'poke-hub'); ?></label>
+                            <input type="url" id="pokehub-edit-card-background-image" class="me5rine-lab-form-input" placeholder="https://…" value="<?php echo esc_attr($opts['card_background_image_url'] ?? ''); ?>" />
+                            <p class="me5rine-lab-form-description"><?php esc_html_e('Optional. Leave empty to use the default image for this collection type.', 'poke-hub'); ?></p>
+                        </div>
+                        <fieldset class="me5rine-lab-form-block">
                             <legend class="me5rine-lab-form-label"><?php esc_html_e('Content to show', 'poke-hub'); ?></legend>
                             <?php if ($is_specific_category) : ?>
                                 <p class="pokehub-collections-options-specific-hint me5rine-lab-form-hint"><?php echo esc_html(sprintf(__('This collection only shows %s. No extra form filters.', 'poke-hub'), $categories[$collection_category] ?? $collection_category)); ?></p>
@@ -405,7 +414,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                                 <label><input type="checkbox" id="pokehub-edit-one-per-species" <?php checked(!empty($opts['one_per_species'])); ?> /> <?php esc_html_e('One entry per species (e.g. one Unown)', 'poke-hub'); ?></label>
                             <?php endif; ?>
                         </fieldset>
-                        <fieldset class="pokehub-collections-options me5rine-lab-form-block">
+                        <fieldset class="me5rine-lab-form-block">
                             <legend class="me5rine-lab-form-label"><?php esc_html_e('Display', 'poke-hub'); ?></legend>
                             <label><input type="checkbox" id="pokehub-edit-group-by-generation" <?php checked(!empty($opts['group_by_generation'])); ?> /> <?php esc_html_e('Group by region / generation', 'poke-hub'); ?></label>
                             <label><input type="checkbox" id="pokehub-edit-generations-collapsed" <?php checked(!empty($opts['generations_collapsed'])); ?> /> <?php esc_html_e('Collapse generations by default', 'poke-hub'); ?></label>

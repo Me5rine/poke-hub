@@ -318,11 +318,14 @@
                 if (raw) specificCategories = JSON.parse(raw);
             } catch (e) {}
             var isSpecificCategory = specificCategories.indexOf(category) !== -1;
+            var cardBgEl = document.getElementById('pokehub-edit-card-background-image');
+            var cardBgUrl = cardBgEl ? cardBgEl.value.trim() : '';
             var options = Object.assign({}, currentOptions, {
                 display_mode: displayMode,
                 one_per_species: document.getElementById('pokehub-edit-one-per-species') ? document.getElementById('pokehub-edit-one-per-species').checked : false,
                 group_by_generation: document.getElementById('pokehub-edit-group-by-generation') ? document.getElementById('pokehub-edit-group-by-generation').checked : true,
                 generations_collapsed: document.getElementById('pokehub-edit-generations-collapsed') ? document.getElementById('pokehub-edit-generations-collapsed').checked : false,
+                card_background_image_url: cardBgUrl,
             });
             if (!isSpecificCategory) {
                 options.include_costumes = document.getElementById('pokehub-edit-include-costumes') ? document.getElementById('pokehub-edit-include-costumes').checked : true;

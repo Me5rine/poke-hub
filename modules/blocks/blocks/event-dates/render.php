@@ -47,17 +47,11 @@ $auto_detect = $attributes['autoDetect'] ?? true;
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';
 
-// Vérifier que les fonctions sont disponibles
-if (!function_exists('poke_hub_events_get_post_dates') || !function_exists('pokehub_render_event_dates')) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] event-dates: Fonctions non disponibles - get_dates=' . (int) function_exists('poke_hub_events_get_post_dates') . ', render=' . (int) function_exists('pokehub_render_event_dates'));
-    }
-    return '';
-}
-
 // Si auto-détection activée, récupérer depuis les meta via le helper centralisé
 if ($auto_detect) {
-    $dates = poke_hub_events_get_post_dates($post_id);
+    $dates = function_exists('poke_hub_events_get_post_dates')
+        ? poke_hub_events_get_post_dates($post_id)
+        : ['start_ts' => null, 'end_ts' => null];
     
     if (!$dates['start_ts'] || !$dates['end_ts']) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -83,7 +77,9 @@ if ($auto_detect) {
 }
 
 // Récupérer le HTML du rendu
-$dates_html = pokehub_render_event_dates($start_ts, $end_ts);
+$dates_html = function_exists('pokehub_render_event_dates')
+    ? pokehub_render_event_dates($start_ts, $end_ts)
+    : '';
 
 if (empty($dates_html)) {
     if (defined('WP_DEBUG') && WP_DEBUG) {

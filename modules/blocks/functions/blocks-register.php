@@ -14,31 +14,32 @@ function pokehub_blocks_register_all() {
     // On ne dépend pas du module Pokémon pour enregistrer les blocs.
     $blocks = [
         'event-dates' => [
-            'requires' => ['events'],
+            // Ne doit pas dépendre du module Events : le bloc lit les dates depuis les meta / tables de contenu.
+            'requires' => [],
         ],
         'wild-pokemon' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'event-quests' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'bonus' => [
             'requires' => [], // Bloc utilisable même sans le module Bonus (table content_source)
         ],
         'habitats' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'new-pokemon-evolutions' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'collection-challenges' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'special-research' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
         'eggs' => [
-            'requires' => ['events'],
+            'requires' => [],
         ],
     ];
     

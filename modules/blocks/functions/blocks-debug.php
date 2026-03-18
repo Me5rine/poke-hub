@@ -81,7 +81,7 @@ function pokehub_debug_blocks_registration() {
         $output[] = '<li>' . esc_html__('Enable the Blocks module in Poké HUB → Settings → General', 'poke-hub') . '</li>';
     }
     if (!$events_active) {
-        $output[] = '<li>' . esc_html__('Enable the Events module (required for event-dates block)', 'poke-hub') . '</li>';
+        $output[] = '<li>' . esc_html__('Events module is optional. If an event block shows no data, make sure the post has dates/content saved (metabox) so it is synchronized into the content tables.', 'poke-hub') . '</li>';
     }
     if ($blocks_active && $events_active) {
         $output[] = '<li>' . esc_html__('Clear WordPress cache and refresh the editor (Ctrl+F5)', 'poke-hub') . '</li>';

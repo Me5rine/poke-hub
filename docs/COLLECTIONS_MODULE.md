@@ -93,7 +93,7 @@ Pour les collections “locales” (non connecté), pas de ligne en base : le fr
 - `modules/collections/functions/collections-helpers.php` — pool, CRUD collections/items.
 - `modules/collections/public/collections-shortcode.php` — shortcodes `[poke_hub_collections]` et `[poke_hub_collection_view]`.
 - `modules/collections/public/collections-rest.php` — API REST (pool, CRUD, items).
-- `modules/collections/assets/css/collections-front.css` et `assets/js/collections-front.js` — front.
+- `assets/css/poke-hub-collections-front.css` — styles front (CSS global du plugin). `assets/theme/poke-hub-collections-theme.css` — fichier à inclure dans le thème pour surcharges. `modules/collections/assets/js/collections-front.js` — front.
 
 ## Mise en place d’une page
 

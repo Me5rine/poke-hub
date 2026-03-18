@@ -192,7 +192,25 @@ function poke_hub_collections_default_options(): array {
         'generations_collapsed'  => false,
         'display_mode'          => 'tiles',
         'public'                => false,
+        'card_background_image_url' => '',
     ];
+}
+
+/**
+ * URL d'image de fond pour la carte d'une collection (liste des collections).
+ * Priorité : 1) image personnalisée (options.card_background_image_url), 2) filtre par catégorie.
+ *
+ * @param array $collection Ligne collection avec au minimum 'category' et optionnellement 'options' (array)
+ * @return string URL à utiliser pour le background de la carte, ou chaîne vide
+ */
+function poke_hub_collections_get_card_background_image_url(array $collection): string {
+    $options = isset($collection['options']) && is_array($collection['options']) ? $collection['options'] : [];
+    $custom  = isset($options['card_background_image_url']) ? trim((string) $options['card_background_image_url']) : '';
+    if ($custom !== '') {
+        return esc_url($custom);
+    }
+    $category = isset($collection['category']) ? $collection['category'] : 'custom';
+    return (string) apply_filters('poke_hub_collections_card_background_image_url', '', $category);
 }
 
 /**
@@ -427,6 +445,19 @@ function poke_hub_collections_get_client_ip(): string {
 }
 
 /**
+ * Sanitize les options de collection (URLs, etc.).
+ *
+ * @param array $options Options brutes
+ * @return array Options sanitized
+ */
+function poke_hub_collections_sanitize_options(array $options): array {
+    if (isset($options['card_background_image_url']) && is_string($options['card_background_image_url'])) {
+        $options['card_background_image_url'] = esc_url_raw(trim($options['card_background_image_url']));
+    }
+    return $options;
+}
+
+/**
  * Crée une collection pour un utilisateur connecté.
  *
  * @param int   $user_id User ID
@@ -453,6 +484,7 @@ function poke_hub_collections_create(int $user_id, array $data): array {
     }
 
     $options = array_merge(poke_hub_collections_default_options(), $options);
+    $options = poke_hub_collections_sanitize_options($options);
     $options_json = wp_json_encode($options);
 
     $existing = $wpdb->get_var($wpdb->prepare(
@@ -525,6 +557,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
     }
 
     $options    = array_merge(poke_hub_collections_default_options(), $options);
+    $options    = poke_hub_collections_sanitize_options($options);
     $options_json = wp_json_encode($options);
 
     $share_token = poke_hub_collections_generate_share_token();
@@ -591,6 +624,7 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
 
     if (isset($data['options']) && is_array($data['options'])) {
         $options = array_merge(poke_hub_collections_default_options(), $data['options']);
+        $options = poke_hub_collections_sanitize_options($options);
         $updates['options'] = wp_json_encode($options);
         $formats[] = '%s';
     }

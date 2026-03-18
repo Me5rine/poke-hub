@@ -88,13 +88,11 @@ function poke_hub_get_user_profile_by_id($profile_id) {
         return [];
     }
     
-    // Get table name
     $table_name = pokehub_get_table('user_profiles');
     if (empty($table_name)) {
         return [];
     }
     
-    // Get profile by ID
     $row = $wpdb->get_row($wpdb->prepare(
         "SELECT * FROM {$table_name} WHERE id = %d LIMIT 1",
         $profile_id
@@ -104,7 +102,6 @@ function poke_hub_get_user_profile_by_id($profile_id) {
         return [];
     }
     
-    // Extract user_id and discord_id from row
     $wp_user_id = !empty($row['user_id']) ? (int) $row['user_id'] : null;
     $discord_id_value = !empty($row['discord_id']) ? $row['discord_id'] : null;
     
@@ -222,13 +219,11 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
         return [];
     }
 
-    // Get table name
     $table_name = pokehub_get_table('user_profiles');
     if (empty($table_name)) {
         return [];
     }
 
-    // Build query to search by user_id or discord_id
     if ($wp_user_id !== null && $discord_id_value !== null) {
         // Search by both (OR condition)
         $query = $wpdb->prepare(
@@ -440,8 +435,8 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         }
     }
     
-    // Validate that the country label exists in Ultimate Member's countries list
-    // Now $country contains the UM country (mapped from custom if needed)
+    // Valider que le libellé du pays existe dans la liste Ultimate Member
+    // Ici, $country contient le pays UM (mappé depuis un custom si nécessaire)
     // IMPORTANT: If this country came from a custom country mapping, we trust the mapping
     // and skip strict validation (the mapping is the source of truth)
     $is_from_custom_mapping = ($country_custom_value !== null);
@@ -470,7 +465,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         $team = '';
     }
 
-    // Get table name
     $table_name = pokehub_get_table('user_profiles');
     if (empty($table_name)) {
         return false;
@@ -490,7 +484,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         $profile_type = 'anonymous';
     }
 
-    // Check if row exists (by profile_id, user_id, or discord_id)
     $existing_row = null;
     
     // If updating by profile_id, use that first
@@ -515,7 +508,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         );
     }
 
-    // Prepare data for insert/update
     // For anonymous users, country is stored in the table
     $data = [
         'team'                => $team,
@@ -637,7 +629,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
             }
         }
 
-        // Build format array dynamically based on $data keys
         $format = [];
         foreach ($data as $key => $value) {
             if ($key === 'user_id' || $key === 'xp' || $key === 'friend_code_public') {
@@ -672,8 +663,6 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
             ));
         }
     } else {
-        // Insert new row
-        // Build format array dynamically based on $data keys
         $format = [];
         foreach ($data as $key => $value) {
             if ($key === 'user_id' || $key === 'xp' || $key === 'friend_code_public') {
@@ -754,7 +743,6 @@ function poke_hub_sync_user_profile_ids_from_subscription($user_id) {
         return false;
     }
     
-    // Get table name
     $table_name = pokehub_get_table('user_profiles');
     if (empty($table_name)) {
         return false;
@@ -813,7 +801,6 @@ function poke_hub_sync_user_profile_ids_from_subscription($user_id) {
 function poke_hub_sync_user_profile_ids_on_save($user_id, $discord_id) {
     global $wpdb;
     
-    // Get table name and check if it exists
     $table_name = pokehub_get_table('user_profiles');
     if (empty($table_name) || !function_exists('pokehub_table_exists') || !pokehub_table_exists($table_name)) {
         return;

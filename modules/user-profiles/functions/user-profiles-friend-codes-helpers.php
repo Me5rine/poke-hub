@@ -206,7 +206,6 @@ function poke_hub_get_public_friend_codes($args = []) {
     
     $base_where_sql = implode(' AND ', $where);
     
-    // Get total count
     $count_query = "SELECT COUNT(DISTINCT up.id) FROM {$table_name} AS up";
     
     // If country filter, we need to join with usermeta and check country_custom (priority), table column, and usermeta
@@ -240,7 +239,6 @@ function poke_hub_get_public_friend_codes($args = []) {
     $orderby = in_array($args['orderby'], $allowed_orderby, true) ? $args['orderby'] : 'created_at';
     $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
     
-    // Get items
     $offset = ($args['paged'] - 1) * $args['per_page'];
     // Use COALESCE to get country: prioritize country_custom, then table column (for anonymous), then usermeta (for logged-in users)
     $query = "SELECT up.*, 
@@ -364,7 +362,6 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         }
     }
     
-    // Get table name first
     $table_name = pokehub_get_table('user_profiles');
     
     if (empty($table_name)) {
@@ -375,11 +372,6 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         ];
     }
     
-    // Debug: verify table name uses global prefix
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-    }
-    
-    // Check if profile exists or if friend code exists (anywhere)
     $existing_by_user = null;
     $existing_by_code = null;
     $existing_by_code_with_user = null;
@@ -428,7 +420,6 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         }
     }
     
-    // Prepare data
     $profile_data = [
         'friend_code' => $friend_code,
         'friend_code_public' => 1,
@@ -582,7 +573,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                         ));
                     }
                     
-                    // Remove country from table since it's now linked to a user
+                    // Retirer le country en table: profil lié à un user
                     $wpdb->update($table_name, ['country' => null], ['id' => $existing_by_code['id']], ['%s'], ['%d']);
                 }
                 

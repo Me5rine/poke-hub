@@ -52,8 +52,6 @@ add_shortcode('poke_hub_friend_codes', function ($atts) {
             'team' => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
         ];
         
-        // The validation country/pattern is now done inside poke_hub_add_public_friend_code()
-        // so it returns a proper result with message like other validations
         $result = poke_hub_add_public_friend_code($form_data, $is_logged_in);
         
         if ($result['success']) {

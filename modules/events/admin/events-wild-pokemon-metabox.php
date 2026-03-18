@@ -330,7 +330,7 @@ function pokehub_render_wild_pokemon_metabox($post) {
                     if ($excludeSelect.data('select2')) {
                         $excludeSelect.trigger('change.select2');
                         
-                        // Retirer les valeurs qui sont maintenant dans l'autre select
+                        // Retirer les valeurs déjà sélectionnées dans l'autre select
                         if (filteredExcludeIds.length !== excludeSelectedIds.length) {
                             $excludeSelect.val(filteredExcludeIds).trigger('change');
                         }

@@ -7,7 +7,6 @@ window.pokeHubFriendCodesLoaded = true;
 (function($) {
     'use strict';
     
-    // Ensure DOM is ready
     $(document).ready(function() {
         // Auto-detect country from IP if country field is empty (optional, non-blocking)
         // This runs on all pages where the friend codes script is loaded
@@ -155,17 +154,14 @@ window.pokeHubFriendCodesLoaded = true;
                 });
         }
         
-        // Run detection once after a delay to ensure Select2 is initialized
         setTimeout(function() { 
             autoDetectCountry();
         }, 500);
         
-        // Also try after a shorter delay
         setTimeout(function() {
             autoDetectCountry();
         }, 100);
         
-        // Also check for mismatch after a delay if country field has a saved value
         setTimeout(function() {
             var $countrySelect = $('#country');
             if ($countrySelect.length > 0) {
@@ -861,7 +857,6 @@ window.pokeHubFriendCodesLoaded = true;
                     
                     // Check if country has a value (including auto-detected, even if disabled)
                     var countryValue = $countrySelect.val();
-                    // Also check hidden input if country field is disabled (auto-detected)
                     if ((!countryValue || countryValue === '' || countryValue === '0') && $countrySelect.prop('disabled')) {
                         var $hiddenCountry = $countrySelect.siblings('input[name="country"][type="hidden"]');
                         if ($hiddenCountry.length > 0) {
@@ -884,7 +879,6 @@ window.pokeHubFriendCodesLoaded = true;
         // Apply filtering immediately
         applyInitialFiltering();
         
-        // Also apply after delays to catch auto-detected countries
         setTimeout(applyInitialFiltering, 600);
         setTimeout(applyInitialFiltering, 1200);
         setTimeout(applyInitialFiltering, 2000);
@@ -1247,7 +1241,7 @@ window.pokeHubFriendCodesLoaded = true;
                 }
             }
             
-            // Now, try to find the country in the select options (case-insensitive, with normalization)
+            // Essayer de retrouver le pays dans les options du select (insensible à la casse, normalisation)
             var foundOption = null;
             var countryToSetLower = (countryToSet || '').trim().toLowerCase();
             

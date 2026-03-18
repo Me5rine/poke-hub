@@ -475,7 +475,7 @@ function poke_hub_dom_inner_html(DOMDocument $dom, DOMNode $node) {
     $first_line = preg_replace('/<\/?span[^>]*>/i', '', $first_line);
     $first_line = preg_replace('/<\/?a[^>]*>/i', '', $first_line);
 
-    // Now strip any remaining tags
+    // Strip les tags restants
     $value = strip_tags($first_line);
     $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
