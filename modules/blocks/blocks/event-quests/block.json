@@ -16,6 +16,10 @@
 		"autoDetect": {
 			"type": "boolean",
 			"default": true
+		},
+		"eventPostId": {
+			"type": "number",
+			"default": 0
 		}
 	},
 	"editorScript": "file:./index.js",

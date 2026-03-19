@@ -244,26 +244,7 @@ function poke_hub_games_get_leaderboard(string $period_type, string $period_star
     );
     
     $results = $wpdb->get_results($sql, ARRAY_A);
-    
-    // Si aucun résultat, vérifier s'il y a des données pour cette période (débogage)
-    if (empty($results) && defined('WP_DEBUG') && WP_DEBUG) {
-        $debug_count = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$points_table} WHERE period_type = %s AND period_start = %s",
-                $period_type,
-                $period_start
-            )
-        );
-        if ($debug_count > 0) {
-            error_log(sprintf(
-                'PokeHub Games: Leaderboard query returned no results but %d rows exist for period_type=%s, period_start=%s',
-                $debug_count,
-                $period_type,
-                $period_start
-            ));
-        }
-    }
-    
+
     // Nettoyer les résultats : s'assurer que display_name est toujours défini
     foreach ($results as &$result) {
         if (empty($result['display_name']) || $result['display_name'] === '') {

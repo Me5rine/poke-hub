@@ -92,7 +92,9 @@ function pokehub_special_events_setup_query() {
     $event_title = !empty($event->title_fr) ? $event->title_fr : $event->title;
     
     $fake_post = new stdClass();
-    $fake_post->ID = -999; // ID négatif pour éviter les conflits
+    // Utiliser l'ID SQL réel de l'event pour que les blocs/tables
+    // puissent mapper via `post_id` => `special_event.id`.
+    $fake_post->ID = !empty($event->id) ? (int) $event->id : -999;
     $fake_post->post_author = 1;
     $fake_post->post_date = current_time('mysql');
     $fake_post->post_date_gmt = current_time('mysql', 1);

@@ -121,19 +121,6 @@ if (!function_exists('pokehub_get_event_quests')) {
 }
 
 /**
- * Rendu des quêtes d'événement : fallback vers la version Blocks si disponible.
- * (La version complète est dans le module Events ; ici on évite juste une dépendance fatale.)
- */
-if (!function_exists('pokehub_render_event_quests')) {
-    function pokehub_render_event_quests(array $quests): string {
-        if (function_exists('pokehub_blocks_render_event_quests')) {
-            return (string) pokehub_blocks_render_event_quests($quests);
-        }
-        return '';
-    }
-}
-
-/**
  * Pokémon sauvages d'un post via tables de contenu.
  * Format: [ ['pokemon_id'=>int,'is_rare'=>bool,'force_shiny'=>bool,'gender'=>?string], ... ]
  */

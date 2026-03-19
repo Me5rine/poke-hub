@@ -906,15 +906,10 @@ function poke_hub_get_scatterbug_patterns() {
         // If patterns found, return them
         if (!empty($patterns)) {
             return $patterns;
-        } else {
-            error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - patterns vide, utilise fallback');
         }
-    } else {
-        error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - fonction poke_hub_pokemon_get_scatterbug_patterns inexistante');
     }
 
     // Fallback: default list if Pokemon module is not active or no patterns found
-    error_log('[POKE-HUB] poke_hub_get_scatterbug_patterns - retourne liste par défaut');
     return [
         'archipelago' => __('Archipel', 'poke-hub'),
         'continental' => __('Continental', 'poke-hub'),

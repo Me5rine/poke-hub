@@ -19,11 +19,6 @@ require_once __DIR__ . '/admin/events-admin-special-events.php';
 require_once __DIR__ . '/functions/events-helpers.php';
 require_once __DIR__ . '/functions/events-queries.php';
 require_once __DIR__ . '/functions/events-render.php';
-require_once __DIR__ . '/functions/events-quests-helpers.php';
-require_once __DIR__ . '/functions/events-quests-render.php';
-require_once __DIR__ . '/functions/events-quests-global.php';
-require_once __DIR__ . '/admin/events-quests-admin.php';
-require_once __DIR__ . '/admin/events-quest-groups-admin.php';
 require_once __DIR__ . '/public/shortcode-events.php';
 require_once __DIR__ . '/public/events-front-routing.php';
 
@@ -31,8 +26,14 @@ require_once __DIR__ . '/public/events-front-routing.php';
  * Assets front (optionnel pour l'instant, mais prêt à être utilisé).
  */
 function poke_hub_events_assets() {
+    wp_enqueue_style(
+        'poke-hub-global-colors',
+        POKE_HUB_URL . 'assets/css/global-colors.css',
+        [],
+        POKE_HUB_VERSION
+    );
     // CSS principal + Select2
-    wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', [], POKE_HUB_VERSION);
+    wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', ['poke-hub-global-colors'], POKE_HUB_VERSION);
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
 
     // CSS pour les pages d'événements spéciaux individuels

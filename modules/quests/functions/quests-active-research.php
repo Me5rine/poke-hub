@@ -1,8 +1,13 @@
 <?php
-// modules/events/functions/events-quests-global.php
+// modules/quests/functions/quests-active-research.php
 
 if (!defined('ABSPATH')) {
     exit;
+}
+
+// Même rendu que le bloc Field Research (module Blocks), sans dépendre du module Events
+if (!function_exists('pokehub_blocks_render_event_quests')) {
+    require_once POKE_HUB_PATH . 'modules/blocks/functions/blocks-field-research.php';
 }
 
 /**
@@ -20,37 +25,9 @@ function pokehub_get_all_active_quests($timestamp = null) {
     if (!function_exists('pokehub_content_get_quests_active_at') || !function_exists('pokehub_content_get_quests')) {
         return [];
     }
+
     $rows = pokehub_content_get_quests_active_at($timestamp);
     $out = [];
-
-    // Quêtes de saison (options) : si la date est dans la période, les ajouter
-    $season_start = get_option('pokehub_season_start', '');
-    $season_end = get_option('pokehub_season_end', '');
-    $season_quests_option = get_option('pokehub_season_quests', []);
-    if (is_array($season_quests_option) && !empty($season_quests_option)) {
-        $in_season = true;
-        if ($season_start !== '' || $season_end !== '') {
-            $start_ts = $season_start ? strtotime($season_start) : 0;
-            $end_ts = $season_end ? strtotime($season_end . ' 23:59:59') : PHP_INT_MAX;
-            $in_season = ($start_ts === 0 || $timestamp >= $start_ts) && ($end_ts === PHP_INT_MAX || $timestamp <= $end_ts);
-        }
-        if ($in_season) {
-            foreach ($season_quests_option as $q) {
-                if (empty($q['task']) && empty($q['rewards'])) {
-                    continue;
-                }
-                $out[] = [
-                    'task'             => $q['task'] ?? '',
-                    'rewards'          => $q['rewards'] ?? [],
-                    'quest_group_id'   => isset($q['quest_group_id']) ? (int) $q['quest_group_id'] : 0,
-                    'source'           => 'season',
-                    'event_id'         => 0,
-                    'event_title'      => __('Season', 'poke-hub'),
-                    'content_quest_id' => 0,
-                ];
-            }
-        }
-    }
 
     foreach ($rows as $row) {
         $source_type = (string) $row->source_type;
@@ -120,10 +97,6 @@ function pokehub_render_quests_by_groups(array $quests) {
         }
     }
     $group_objects = function_exists('pokehub_get_quest_groups') ? pokehub_get_quest_groups() : [];
-    $group_by_id = [];
-    foreach ($group_objects as $g) {
-        $group_by_id[(int) $g->id] = $g;
-    }
     ob_start();
     foreach ($group_objects as $g) {
         $gid = (int) $g->id;
@@ -135,14 +108,14 @@ function pokehub_render_quests_by_groups(array $quests) {
         ?>
         <div class="pokehub-quest-group"<?php echo $color_style; ?>>
             <h3 class="pokehub-quest-group-title"><?php echo esc_html($title); ?></h3>
-            <?php echo pokehub_render_event_quests($groups_index[$gid]); ?>
+            <?php echo pokehub_blocks_render_event_quests($groups_index[$gid]); ?>
         </div>
         <?php
     }
     if (!empty($no_group)) {
         ?>
         <div class="pokehub-quest-group pokehub-quest-group-uncategorized">
-            <?php echo pokehub_render_event_quests($no_group); ?>
+            <?php echo pokehub_blocks_render_event_quests($no_group); ?>
         </div>
         <?php
     }
@@ -157,15 +130,37 @@ function pokehub_render_quests_by_groups(array $quests) {
  * @return string HTML
  */
 function pokehub_render_all_active_quests() {
+    if (!is_admin()) {
+        wp_enqueue_style(
+            'poke-hub-global-colors',
+            POKE_HUB_URL . 'assets/css/global-colors.css',
+            [],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style(
+            'pokehub-blocks-front-style',
+            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
+            ['poke-hub-global-colors'],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_script(
+            'pokehub-events-quests',
+            POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
+            ['jquery'],
+            POKE_HUB_VERSION,
+            true
+        );
+    }
+
     $all_quests = pokehub_get_all_active_quests();
-    
+
     if (empty($all_quests)) {
         return '<p>' . __('No active quests available.', 'poke-hub') . '</p>';
     }
-    
+
     $season_quests = [];
     $event_quests = [];
-    
+
     foreach ($all_quests as $quest) {
         if ($quest['source'] === 'season') {
             $season_quests[] = $quest;
@@ -173,7 +168,7 @@ function pokehub_render_all_active_quests() {
             $event_quests[] = $quest;
         }
     }
-    
+
     ob_start();
     ?>
     <div class="pokehub-all-quests pokehub-research-page">
@@ -224,11 +219,9 @@ function pokehub_render_all_active_quests() {
 }
 
 /**
- * Shortcode pour afficher toutes les quêtes actives
+ * Shortcode pour afficher toutes les quêtes actives.
  */
 function pokehub_all_quests_shortcode($atts) {
     return pokehub_render_all_active_quests();
 }
 add_shortcode('pokehub_all_quests', 'pokehub_all_quests_shortcode');
-
-

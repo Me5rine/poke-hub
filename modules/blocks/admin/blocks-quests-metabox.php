@@ -373,8 +373,7 @@ function pokehub_render_event_quests_metabox($post) {
 if (!function_exists('pokehub_save_event_quests_metabox')) {
 function pokehub_save_event_quests_metabox($post_id) {
     // Vérifications de sécurité
-    if (!isset($_POST['pokehub_event_quests_nonce']) || 
-        !wp_verify_nonce($_POST['pokehub_event_quests_nonce'], 'pokehub_save_event_quests')) {
+    if (wp_is_post_revision($post_id)) {
         return;
     }
 
@@ -387,9 +386,85 @@ function pokehub_save_event_quests_metabox($post_id) {
     }
 
     // Sauvegarde indépendante du module Events : écrire directement dans les tables de contenu.
-    $raw_quests = (isset($_POST['pokehub_quests']) && is_array($_POST['pokehub_quests'])) ? $_POST['pokehub_quests'] : [];
+    // Gutenberg peut envoyer les metaboxes sérialisées dans `post_data` (au lieu de champs directs dans $_POST).
+    $raw_quests = [];
+
+    $extract_quests_from_array = static function ($data) {
+        if (!is_array($data)) {
+            return [null, null];
+        }
+        if (isset($data['pokehub_quests']) && is_array($data['pokehub_quests'])) {
+            return [$data['pokehub_quests'], 'pokehub_quests'];
+        }
+        if (isset($data['pokehub_season_quests']) && is_array($data['pokehub_season_quests'])) {
+            return [$data['pokehub_season_quests'], 'pokehub_season_quests'];
+        }
+        foreach ($data as $key => $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+            if ($key === 'meta' || $key === 'data' || $key === 'payload' || $key === 'attributes') {
+                $nested = $extract_quests_from_array($value);
+                if (is_array($nested[0])) {
+                    return $nested;
+                }
+            }
+        }
+        return [null, null];
+    };
+    if (isset($_POST['pokehub_quests']) && is_array($_POST['pokehub_quests'])) {
+        $raw_quests = $_POST['pokehub_quests'];
+    } elseif (isset($_POST['pokehub_season_quests']) && is_array($_POST['pokehub_season_quests'])) {
+        $raw_quests = $_POST['pokehub_season_quests'];
+    } elseif (isset($_POST['post_data']) && is_string($_POST['post_data'])) {
+        $parsed_post_data = [];
+        parse_str(wp_unslash($_POST['post_data']), $parsed_post_data);
+        if (isset($parsed_post_data['pokehub_quests']) && is_array($parsed_post_data['pokehub_quests'])) {
+            $raw_quests = $parsed_post_data['pokehub_quests'];
+        } elseif (isset($parsed_post_data['pokehub_season_quests']) && is_array($parsed_post_data['pokehub_season_quests'])) {
+            $raw_quests = $parsed_post_data['pokehub_season_quests'];
+        }
+    }
+
+    // Fallback 1 : certaines requêtes passent les champs via $_REQUEST.
+    if (!is_array($raw_quests) || empty($raw_quests)) {
+        [$req_quests, $req_key] = $extract_quests_from_array($_REQUEST);
+        if (is_array($req_quests)) {
+            $raw_quests = $req_quests;
+            $payload_source = 'request[' . $req_key . ']';
+        }
+    }
+
+    // Fallback 2 : payload REST JSON (éditeur de blocs / autosave / plugins tiers).
+    if (!is_array($raw_quests) || empty($raw_quests)) {
+        $input = file_get_contents('php://input');
+        if (is_string($input) && $input !== '') {
+            $decoded = json_decode($input, true);
+            if (is_array($decoded)) {
+                [$json_quests, $json_key] = $extract_quests_from_array($decoded);
+                if (is_array($json_quests)) {
+                    $raw_quests = $json_quests;
+                }
+            }
+        }
+    }
+
+    if (!is_array($raw_quests)) {
+        $raw_quests = [];
+    }
+
+    // Pas de payload quêtes : ne rien écraser.
+    if (empty($raw_quests)) {
+        return;
+    }
+
+    // Sécurité nonce (optionnelle dans certains contextes modernes où WP ne renvoie pas tous les nonces
+    // des metaboxes, mais les champs sont bien présents). Si nonce présent et invalide => on bloque.
+    if (isset($_POST['pokehub_event_quests_nonce']) && !wp_verify_nonce($_POST['pokehub_event_quests_nonce'], 'pokehub_save_event_quests')) {
+        return;
+    }
     $cleaned_quests = function_exists('pokehub_quests_clean_from_request')
-        ? pokehub_quests_clean_from_request($raw_quests)
+        ? pokehub_quests_clean_from_request(wp_unslash($raw_quests))
         : [];
 
     if (function_exists('pokehub_content_save_quests')) {

@@ -633,9 +633,6 @@ function poke_hub_purge_nginx_cache($urls = null, $purge_all = false) {
     // Fallback: Purge all if URL-specific purge is not available
     // (better to purge all than nothing, but log it)
     if (function_exists('rt_wp_nginx_helper_purge_all')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[PokeHub] URL-specific purge not available, purging all cache instead');
-        }
         rt_wp_nginx_helper_purge_all();
         return true;
     }

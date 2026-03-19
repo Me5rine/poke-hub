@@ -39,12 +39,7 @@ if (!defined('POKE_HUB_TRANSLATIONS_DEBUG')) {
 }
 
 function poke_hub_tr_log($message, $context = null) {
-    if (!POKE_HUB_TRANSLATIONS_DEBUG) return;
-    $line = '[PokeHubTranslations] ' . $message;
-    if ($context !== null) {
-        $line .= ' | ' . wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-    error_log($line);
+    // Pas de sortie logs (error_log désactivé pour la prod).
 }
 
 /* -------------------------------------------------------------------------
@@ -129,19 +124,7 @@ function poke_hub_http_request_with_retry($url, $args = [], $max_retries = 2) {
         $last_error = $response;
         $error_code = $response->get_error_code();
         $error_message = $response->get_error_message();
-        
-        // Log de l'erreur
-        if (function_exists('error_log')) {
-            error_log(sprintf(
-                '[PokeHub] HTTP request failed: %s - %s (URL: %s, attempt %d/%d)',
-                $error_code,
-                $error_message,
-                $url,
-                $attempt + 1,
-                $max_retries + 1
-            ));
-        }
-        
+
         // Erreurs retryables : timeout, connexion, DNS
         $retryable_errors = [
             'http_request_failed',

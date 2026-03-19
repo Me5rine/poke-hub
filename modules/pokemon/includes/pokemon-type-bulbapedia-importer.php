@@ -34,34 +34,17 @@ function poke_hub_pokemon_import_type_from_bulbapedia($type_name_en) {
     }
 
     if (is_wp_error($response)) {
-        // Log de l'erreur pour debugging
-        if (function_exists('error_log')) {
-            error_log(sprintf(
-                '[PokeHub] Type Bulbapedia fetch error: %s - %s (URL: %s)',
-                $response->get_error_code(),
-                $response->get_error_message(),
-                $url
-            ));
-        }
         return $response;
     }
 
     $code = wp_remote_retrieve_response_code($response);
     if ($code !== 200) {
-        $error = new WP_Error('http_error', 'Bad response code: ' . $code, ['status_code' => $code]);
-        if (function_exists('error_log')) {
-            error_log(sprintf('[PokeHub] Type Bulbapedia HTTP error: %d (URL: %s)', $code, $url));
-        }
-        return $error;
+        return new WP_Error('http_error', 'Bad response code: ' . $code, ['status_code' => $code]);
     }
 
     $body = wp_remote_retrieve_body($response);
     if (empty($body)) {
-        $error = new WP_Error('empty_response', 'Empty response from Bulbapedia.', ['url' => $url]);
-        if (function_exists('error_log')) {
-            error_log(sprintf('[PokeHub] Type Bulbapedia empty body (URL: %s)', $url));
-        }
-        return $error;
+        return new WP_Error('empty_response', 'Empty response from Bulbapedia.', ['url' => $url]);
     }
 
     // Parse le HTML avec DOMDocument
@@ -574,12 +557,6 @@ function poke_hub_pokemon_import_all_types_for_pokemon_go() {
                 'type' => $type_name,
                 'error' => $bulbapedia_data->get_error_message(),
             ];
-            // Log l'erreur pour debug
-            error_log(sprintf(
-                'Poke Hub: Erreur import type %s depuis Bulbapedia: %s',
-                $type_name,
-                $bulbapedia_data->get_error_message()
-            ));
             continue;
         }
         
@@ -601,10 +578,6 @@ function poke_hub_pokemon_import_all_types_for_pokemon_go() {
                 'type' => $type_name,
                 'error' => 'Aucune donnée récupérée depuis Bulbapedia',
             ];
-            error_log(sprintf(
-                'Poke Hub: Aucune donnée récupérée pour le type %s depuis Bulbapedia',
-                $type_name
-            ));
             continue;
         }
 

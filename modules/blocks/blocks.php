@@ -26,7 +26,8 @@ add_action('init', function() {
      */
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-register.php';   // Enregistrement des blocs
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-helpers.php';    // Helpers pour les blocs
-    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-quests-helpers.php'; // Helpers quêtes (fallback sans module events)
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-field-research.php'; // Field Research (rendu bloc event-quests)
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-quests-helpers.php'; // Helpers quêtes (données post)
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-collection-challenges-helpers.php'; // Helpers défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-special-research-helpers.php'; // Helpers études spéciales
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-eggs-helpers.php'; // Helpers bloc œufs
@@ -96,13 +97,30 @@ add_action('init', function() {
             POKE_HUB_VERSION
         );
 
+        // Variables de couleur (thème / Elementor) — nécessaire pour quêtes dépliées, etc.
+        wp_enqueue_style(
+            'poke-hub-global-colors',
+            POKE_HUB_URL . 'assets/css/global-colors.css',
+            [],
+            POKE_HUB_VERSION
+        );
+
         // Styles front des blocs (dates / quests / habitats / wild / etc.).
         // Déplacés dans un fichier dédié pour éviter une dépendance au module "events".
         wp_enqueue_style(
             'pokehub-blocks-front-style',
             POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
-            [],
+            ['poke-hub-global-colors'],
             POKE_HUB_VERSION
+        );
+
+        // Toggle expand/collapse Field Research (bloc event-quests) — indépendant du module Events
+        wp_enqueue_script(
+            'pokehub-events-quests',
+            POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
+            ['jquery'],
+            POKE_HUB_VERSION,
+            true
         );
 
         // Le bloc "bonus" a ses propres styles (contenus dans le module Bonus),
@@ -188,10 +206,6 @@ add_action('init', function() {
             }
             
             $GLOBALS['pokehub_block_content_cache'][$block_key . '_before_um'] = $block_content;
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('[POKEHUB] SAUVEGARDE contenu pour ' . $block['blockName'] . ' len=' . strlen($block_content) . ' (priorité 9, avant UM)');
-            }
         }
         
         return $block_content;
@@ -211,139 +225,12 @@ add_action('init', function() {
             
             if (isset($GLOBALS['pokehub_block_content_cache'][$cached_key])) {
                 $restored_content = $GLOBALS['pokehub_block_content_cache'][$cached_key];
-                
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('[POKEHUB] RESTAURATION du contenu pour ' . $block['blockName'] . ' depuis le cache, len=' . strlen($restored_content) . ' (priorité 11, après UM)');
-                }
-                
+
                 return $restored_content;
             }
         }
         
         return $block_content;
     }, 11, 2); // Priorité 11 = après Ultimate Member (priorité 10)
-    
-    // Debug : vérifier que les blocs sont bien parsés
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        // Log de l'état AU DÉBUT de la chaîne render_block (priorité 1)
-        add_filter('render_block', function ($block_content, $block) {
-            if (!empty($block['blockName']) && strpos($block['blockName'], 'pokehub/') === 0) {
-                error_log('[POKEHUB] render_block START ' . $block['blockName'] . ' len=' . strlen($block_content));
-            }
-            return $block_content;
-        }, 1, 2);
-
-        // Dump la liste des callbacks branchés sur render_block (1 seule fois, priorité 2)
-        add_filter('render_block', function ($block_content, $block) {
-            static $done = false;
-            if ($done) return $block_content;
-
-            if (!empty($block['blockName']) && strpos($block['blockName'], 'pokehub/') === 0) {
-                $done = true;
-                global $wp_filter;
-
-                if (isset($wp_filter['render_block']) && is_object($wp_filter['render_block'])) {
-                    $callbacks = $wp_filter['render_block']->callbacks ?? [];
-                    $callback_list = [];
-                    
-                    // Extraire seulement les infos essentielles pour éviter les erreurs mémoire
-                    foreach ($callbacks as $priority => $hooks) {
-                        foreach ($hooks as $hook) {
-                            $callback_info = [];
-                            
-                            if (is_string($hook['function'])) {
-                                $callback_info['type'] = 'function';
-                                $callback_info['name'] = $hook['function'];
-                            } elseif (is_array($hook['function'])) {
-                                $callback_info['type'] = 'method';
-                                if (is_object($hook['function'][0])) {
-                                    $callback_info['class'] = get_class($hook['function'][0]);
-                                } else {
-                                    $callback_info['class'] = $hook['function'][0];
-                                }
-                                $callback_info['method'] = $hook['function'][1] ?? 'unknown';
-                            } elseif (is_object($hook['function']) && ($hook['function'] instanceof Closure)) {
-                                $callback_info['type'] = 'closure';
-                                $callback_info['name'] = 'Closure';
-                            } else {
-                                $callback_info['type'] = 'unknown';
-                                $callback_info['name'] = 'Unknown';
-                            }
-                            
-                            $callback_info['priority'] = $priority;
-                            $callback_info['accepted_args'] = $hook['accepted_args'] ?? 1;
-                            
-                            $callback_list[] = $callback_info;
-                        }
-                    }
-                    
-                    error_log('[POKEHUB] render_block callbacks (' . count($callback_list) . '): ' . json_encode($callback_list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-                } else {
-                    error_log('[POKEHUB] render_block: aucun hook trouvé dans $wp_filter');
-                }
-            }
-            return $block_content;
-        }, 2, 2);
-
-        // Hook sur render_block pour voir ce qui se passe lors du rendu (priorité 10)
-        add_filter('render_block', function($block_content, $block) {
-            if (isset($block['blockName']) && strpos($block['blockName'], 'pokehub/') === 0) {
-                error_log('[POKEHUB] render_block appelé pour ' . $block['blockName'] . ', longueur=' . strlen($block_content));
-                if (empty($block_content)) {
-                    error_log('[POKEHUB] ATTENTION: render_block retourne une string vide pour ' . $block['blockName']);
-                }
-            }
-            return $block_content;
-        }, 10, 2);
-
-        // Log de l'état À LA FIN de la chaîne render_block (priorité 999)
-        add_filter('render_block', function ($block_content, $block) {
-            if (!empty($block['blockName']) && strpos($block['blockName'], 'pokehub/') === 0) {
-                error_log('[POKEHUB] render_block END   ' . $block['blockName'] . ' len=' . strlen($block_content));
-            }
-            return $block_content;
-        }, 999, 2);
-        
-        // Debug : vérifier que les blocs sont bien parsés dans the_content
-        add_filter('the_content', function($content) {
-            // Vérifier si le contenu contient des commentaires de blocs
-            if (preg_match('/<!-- wp:pokehub\//', $content)) {
-                error_log('[POKEHUB] the_content contient des blocs pokehub avant parsing');
-            }
-            return $content;
-        }, 1);
-        
-        // Log juste après le parsing des blocs (do_blocks s'exécute généralement avec priorité 9)
-        add_filter('the_content', function($content) {
-            // Vérifier si le contenu contient des commentaires de blocs (non parsés)
-            if (preg_match('/<!-- wp:pokehub\//', $content)) {
-                error_log('[POKEHUB] ATTENTION: the_content contient encore des commentaires de blocs pokehub après parsing (priorité 10)');
-            }
-            // Vérifier si le contenu contient du HTML généré par nos blocs
-            if (strpos($content, 'pokehub-event-dates-block-wrapper') !== false ||
-                strpos($content, 'pokehub-wild-pokemon-block-wrapper') !== false ||
-                strpos($content, 'pokehub-event-quests-block-wrapper') !== false ||
-                strpos($content, 'pokehub-bonus-block-wrapper') !== false) {
-                error_log('[POKEHUB] the_content contient du HTML généré par nos blocs (priorité 10), longueur=' . strlen($content));
-            }
-            return $content;
-        }, 10);
-        
-        add_filter('the_content', function($content) {
-            // Vérifier si le contenu contient du HTML généré par nos blocs
-            if (strpos($content, 'pokehub-event-dates-block-wrapper') !== false ||
-                strpos($content, 'pokehub-wild-pokemon-block-wrapper') !== false ||
-                strpos($content, 'pokehub-event-quests-block-wrapper') !== false ||
-                strpos($content, 'pokehub-bonus-block-wrapper') !== false) {
-                error_log('[POKEHUB] the_content contient du HTML généré par nos blocs après parsing (priorité 100), longueur=' . strlen($content));
-            } else {
-                // Vérifier si les commentaires de blocs sont toujours là (non parsés)
-                if (preg_match('/<!-- wp:pokehub\//', $content)) {
-                    error_log('[POKEHUB] ATTENTION: the_content contient encore des commentaires de blocs pokehub (non parsés) à priorité 100');
-                }
-            }
-            return $content;
-        }, 100);
-    }
 }, 5);
 

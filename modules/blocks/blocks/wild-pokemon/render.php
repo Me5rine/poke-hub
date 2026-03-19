@@ -11,11 +11,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Debug : vérifier si le render est appelé
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] wild-pokemon render.php appelé');
-}
-
 // Récupération robuste du post_id (compatible Elementor et autres contextes)
 $post_id = 0;
 
@@ -51,9 +46,6 @@ $show_rare_section = $attributes['showRareSection'] ?? true;
 
 // Vérifier que les fonctions sont disponibles
 if (!function_exists('pokehub_get_pokemon_data_by_id') || !function_exists('poke_hub_pokemon_get_shiny_info') || !function_exists('poke_hub_pokemon_get_regional_info') || !function_exists('pokehub_get_pokemon_type_color')) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] wild-pokemon: Fonctions non disponibles - data=' . (int) function_exists('pokehub_get_pokemon_data_by_id') . ', shiny=' . (int) function_exists('poke_hub_pokemon_get_shiny_info') . ', regional=' . (int) function_exists('poke_hub_pokemon_get_regional_info') . ', color=' . (int) function_exists('pokehub_get_pokemon_type_color'));
-    }
     return '';
 }
 
@@ -104,9 +96,6 @@ if (empty($pokemon_ids) && empty($rare_pokemon_ids) && empty($forced_shiny_ids) 
 
 // Vérifier qu'on a au moins des Pokémon à afficher
 if (empty($pokemon_ids) && empty($rare_pokemon_ids) && empty($forced_shiny_ids)) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] wild-pokemon: Aucun Pokémon trouvé pour post_id=' . $post_id . ' (auto_detect=' . ($auto_detect ? '1' : '0') . ')');
-    }
     return '';
 }
 
@@ -205,9 +194,6 @@ usort($rare_pokemon_list, function($a, $b) {
 });
 
 if (empty($pokemon_list) && empty($rare_pokemon_list)) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] wild-pokemon: Liste de Pokémon vide après traitement pour post_id=' . $post_id);
-    }
     return '';
 }
 
@@ -299,8 +285,5 @@ ob_start();
 </div>
 <?php
 $output = ob_get_clean();
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] wild-pokemon: HTML généré, longueur=' . strlen($output) . ' pour post_id=' . $post_id);
-}
 return $output;
 

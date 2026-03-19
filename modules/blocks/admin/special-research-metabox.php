@@ -65,9 +65,6 @@ function pokehub_render_special_research_metabox($post) {
         $data = pokehub_content_get_special_research('post', (int) $post->ID);
         $research = isset($data['steps']) ? $data['steps'] : [];
         $research_type = isset($data['research_type']) ? $data['research_type'] : 'special';
-        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-            error_log('[PokeHub SR LOG] render_metabox: post_id=' . $post->ID . ' research_steps_count=' . count($research) . ' research_type=' . $research_type);
-        }
     }
     if (empty($research_type)) {
         $research_type = 'special';
@@ -928,10 +925,6 @@ function pokehub_render_special_research_reward_editor($research_index, $step_in
                             }
                         }
                     }
-                }
-                // Debug: tracer les données reçues (à retirer après diagnostic)
-                if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-                    error_log('[PokeHub Special Research] reward_editor pokemon: reward=' . wp_json_encode($reward) . ' selected_pokemon_ids=' . wp_json_encode($selected_pokemon_ids));
                 }
                 ?>
                 <label>

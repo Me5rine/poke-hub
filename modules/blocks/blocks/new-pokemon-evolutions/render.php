@@ -140,28 +140,9 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
     }
     
     if (!$evolutions_table || !$pokemon_table) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Tables non disponibles - evolutions_table: ' . ($evolutions_table ?: 'NULL') . ', pokemon_table: ' . ($pokemon_table ?: 'NULL'));
-        }
         return [];
     }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        // Test direct de la requête pour voir si elle trouve des résultats
-        $test_count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$evolutions_table} WHERE base_pokemon_id = %d AND base_form_variant_id = 0",
-            (int) $pokemon_id
-        ));
-        error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Test direct - Table: ' . $evolutions_table . ', Pokémon ID: ' . $pokemon_id . ', Count: ' . $test_count);
-        
-        // Test aussi sans condition sur base_form_variant_id
-        $test_count2 = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$evolutions_table} WHERE base_pokemon_id = %d",
-            (int) $pokemon_id
-        ));
-        error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Test direct (sans form) - Count: ' . $test_count2);
-    }
-    
+
     // D'abord, chercher avec la forme spécifique
     // Utiliser LEFT JOIN au lieu de INNER JOIN pour ne pas exclure les évolutions si le target_pokemon n'existe pas
     $evolutions = $wpdb->get_results(
@@ -192,11 +173,7 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
         ),
         ARRAY_A
     );
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Requête 1 (avec form_variant_id=' . $form_variant_id . ') - ' . count($evolutions) . ' résultat(s)');
-    }
-    
+
     // Si pas de résultats, chercher aussi avec form_variant_id = 0
     if (empty($evolutions)) {
         $evolutions = $wpdb->get_results(
@@ -226,10 +203,6 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
             ),
             ARRAY_A
         );
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Requête 2 (avec form_variant_id=0) - ' . count($evolutions) . ' résultat(s)');
-        }
     }
     
     // Si toujours pas de résultats, chercher sans condition sur base_form_variant_id
@@ -261,20 +234,8 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
             ),
             ARRAY_A
         );
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Requête 3 (sans condition form) - ' . count($evolutions) . ' résultat(s)');
-        }
     }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG && !empty($evolutions)) {
-        error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: ' . count($evolutions) . ' évolution(s) trouvée(s) pour Pokémon ID ' . $pokemon_id);
-    }
-    
-    if (defined('WP_DEBUG') && WP_DEBUG && empty($evolutions)) {
-        error_log('[POKEHUB] pokehub_get_pokemon_evolutions_out: Aucune évolution trouvée pour Pokémon ID ' . $pokemon_id . ' (form_variant_id: ' . $form_variant_id . ')');
-    }
-    
+
     return $evolutions ?: [];
 }
 }
@@ -596,21 +557,9 @@ function pokehub_format_evolution_conditions($evolution) {
 // Traiter chaque Pokémon
 $evolution_lines = [];
 foreach ($pokemon_ids as $pokemon_id) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] new-pokemon-evolutions: Traitement du Pokémon ID ' . $pokemon_id);
-    }
     $line = pokehub_build_evolution_line($pokemon_id);
     if ($line) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            $pkm_name = isset($line['pokemon']['name_fr']) ? $line['pokemon']['name_fr'] : (isset($line['pokemon']['name_en']) ? $line['pokemon']['name_en'] : 'ID ' . $line['pokemon']['id']);
-            $evolutions_count = isset($line['evolutions']) && is_array($line['evolutions']) ? count($line['evolutions']) : 0;
-            error_log('[POKEHUB] new-pokemon-evolutions: Lignée construite pour ID ' . $pokemon_id . ' - Pokémon de base: ' . $pkm_name . ' (ID: ' . $line['pokemon']['id'] . ') avec ' . $evolutions_count . ' évolution(s)');
-        }
         $evolution_lines[] = $line;
-    } else {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[POKEHUB] new-pokemon-evolutions: Aucune lignée construite pour ID ' . $pokemon_id);
-        }
     }
 }
 

@@ -119,6 +119,22 @@ function poke_hub_events_get_post_dates(int $post_id): array {
         }
     }
     
+    // Fallback spécial : événement "fake page" injecté via rewrite.
+    // Dans ce cas, les meta WordPress peuvent être vides, mais on dispose des
+    // dates via `$pokehub_current_special_event`.
+    global $pokehub_current_special_event;
+    if (isset($pokehub_current_special_event)
+        && !empty($pokehub_current_special_event->id)
+        && (int) $pokehub_current_special_event->id === (int) $post_id
+        && !empty($pokehub_current_special_event->start_ts)
+        && !empty($pokehub_current_special_event->end_ts)
+    ) {
+        return [
+            'start_ts' => (int) $pokehub_current_special_event->start_ts,
+            'end_ts' => (int) $pokehub_current_special_event->end_ts,
+        ];
+    }
+
     // Permettre aux autres plugins/thèmes d'ajouter leurs propres formats
     $custom_dates = apply_filters('pokehub_events_get_custom_dates', null, $post_id);
     if ($custom_dates && isset($custom_dates['start']) && isset($custom_dates['end'])) {

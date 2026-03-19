@@ -1105,22 +1105,13 @@ function poke_hub_pokemon_get_display_info($pokemon, array $args = []) {
  * @return array Format: [['id' => 1, 'text' => 'Pikachu (#025)', 'name_fr' => 'Pikachu', 'name_en' => 'Pikachu', 'dex_number' => 25], ...]
  */
 function pokehub_get_pokemon_for_select(): array {
-    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select called, is_admin=' . (is_admin() ? '1' : '0'));
-    }
     if (!function_exists('pokehub_get_table')) {
-        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: pokehub_get_table not found, return []');
-        }
         return [];
     }
 
     global $wpdb;
     
     if (!isset($wpdb) || !is_object($wpdb)) {
-        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: wpdb not available, return []');
-        }
         return [];
     }
 
@@ -1147,14 +1138,7 @@ function pokehub_get_pokemon_for_select(): array {
         $form_variants_table = pokehub_get_table('pokemon_form_variants');
     }
     
-    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: use_remote=' . ($use_remote ? '1' : '0') . ' wpdb_prefix=' . $wpdb->prefix . ' actual_prefix=' . $actual_prefix . ' pokemon_table=' . ($pokemon_table ?: 'NULL') . ' form_variants_table=' . ($form_variants_table ?: 'NULL'));
-    }
-    
     if (!$pokemon_table || !$form_variants_table) {
-        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: tables missing, return []');
-        }
         return [];
     }
     
@@ -1168,18 +1152,6 @@ function pokehub_get_pokemon_for_select(): array {
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
     $rows = $wpdb->get_results($sql, ARRAY_A);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-        $count = is_array($rows) ? count($rows) : 0;
-        error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: query returned rows=' . $count . ' last_error=' . ($wpdb->last_error ?: 'none'));
-        if ($count === 0 && $wpdb->last_error) {
-            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: sql=' . $sql);
-        }
-        if ($count > 0) {
-            $first = $rows[0];
-            error_log('[PokeHub SR LOG] pokehub_get_pokemon_for_select: first row id=' . ($first['id'] ?? '') . ' text_sample=' . (isset($first['name_fr']) ? substr($first['name_fr'], 0, 30) : ''));
-        }
-    }
     
     if (empty($rows)) {
         return [];

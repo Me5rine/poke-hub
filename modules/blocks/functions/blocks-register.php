@@ -71,9 +71,6 @@ function pokehub_blocks_register_all() {
             $block_json_data = json_decode(file_get_contents($block_json), true);
             
             if (!$block_json_data) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('Poké HUB: Erreur de parsing JSON pour le bloc ' . $block_name . ' dans: ' . $block_json);
-                }
                 continue;
             }
             
@@ -96,11 +93,7 @@ function pokehub_blocks_register_all() {
                     if (is_string($result) && !empty($result)) {
                         $output = $result;
                     }
-                    
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('[POKEHUB] render_callback: retour capturé, longueur=' . strlen($output));
-                    }
-                    
+
                     return $output;
                 };
             }
@@ -113,11 +106,7 @@ function pokehub_blocks_register_all() {
                 unset($args['render']);
             }
             
-            $result = register_block_type($block_path, $args);
-            
-            if (defined('WP_DEBUG') && WP_DEBUG && !$result) {
-                error_log('Poké HUB: Échec de l\'enregistrement du bloc ' . $block_name . ' depuis: ' . $block_path);
-            }
+            register_block_type($block_path, $args);
         }
     }
 }

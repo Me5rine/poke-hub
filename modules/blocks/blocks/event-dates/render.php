@@ -11,11 +11,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Debug : vérifier si le render est appelé
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] event-dates render.php appelé');
-}
-
 // Récupération robuste du post_id (compatible Elementor et autres contextes)
 $post_id = 0;
 
@@ -54,9 +49,6 @@ if ($auto_detect) {
         : ['start_ts' => null, 'end_ts' => null];
     
     if (!$dates['start_ts'] || !$dates['end_ts']) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('[POKEHUB] event-dates: Aucune date trouvée pour post_id=' . $post_id . ' (start_ts=' . ($dates['start_ts'] ?? 'null') . ', end_ts=' . ($dates['end_ts'] ?? 'null') . ')');
-        }
         return '';
     }
     
@@ -82,9 +74,6 @@ $dates_html = function_exists('pokehub_render_event_dates')
     : '';
 
 if (empty($dates_html)) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('[POKEHUB] event-dates: HTML vide pour post_id=' . $post_id . ' (start_ts=' . $start_ts . ', end_ts=' . $end_ts . ')');
-    }
     return '';
 }
 
@@ -96,13 +85,6 @@ $output = '<div ' . $wrapper_attributes . '>';
 $output .= '<h2 class="pokehub-block-title">' . esc_html__('Date', 'poke-hub') . '</h2>';
 $output .= $dates_html;
 $output .= '</div>';
-
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('[POKEHUB] event-dates: HTML généré, longueur=' . strlen($output) . ' pour post_id=' . $post_id);
-    if (empty($output)) {
-        error_log('[POKEHUB] event-dates: ATTENTION - output est vide');
-    }
-}
 
 return $output;
 

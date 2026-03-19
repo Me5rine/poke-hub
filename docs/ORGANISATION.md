@@ -70,7 +70,7 @@ modules/blocks/
 
 - `pokehub_render_event_dates()` → `modules/events/functions/events-render.php`
 - `pokehub_render_bonuses_visual()` → `modules/bonus/functions/bonus-helpers.php` (chargé par le module Blocks)
-- `pokehub_render_event_quests()` → `modules/blocks/functions/blocks-quests-helpers.php` (ou module Events pour les données du post)
+- `pokehub_blocks_render_event_quests()` → `modules/blocks/functions/blocks-field-research.php` (Field Research / bloc `event-quests`)
 
 **Pourquoi ?** Les fonctions de rendu sont spécifiques à chaque domaine métier. La gestion des quêtes (menus, CRUD) est dans le module Quêtes ; le bloc event-quests et la metabox sont côté Events/Blocks.
 

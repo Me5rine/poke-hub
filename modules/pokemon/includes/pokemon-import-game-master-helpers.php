@@ -38,38 +38,17 @@ function poke_hub_pokemon_load_gamemaster_json( $source ) {
         }
 
         if ( is_wp_error( $response ) ) {
-            // Log de l'erreur pour debugging
-            if ( function_exists( 'error_log' ) ) {
-                error_log( sprintf(
-                    '[PokeHub] Game Master fetch error: %s - %s (URL: %s)',
-                    $response->get_error_code(),
-                    $response->get_error_message(),
-                    $source
-                ) );
-            }
             return $response;
         }
 
         $code = wp_remote_retrieve_response_code( $response );
         if ( 200 !== $code ) {
-            $error = new \WP_Error( 'http_error', 'Bad response code: ' . $code, [ 'status_code' => $code ] );
-            if ( function_exists( 'error_log' ) ) {
-                error_log( sprintf(
-                    '[PokeHub] Game Master HTTP error: %d (URL: %s)',
-                    $code,
-                    $source
-                ) );
-            }
-            return $error;
+            return new \WP_Error( 'http_error', 'Bad response code: ' . $code, [ 'status_code' => $code ] );
         }
 
         $body = wp_remote_retrieve_body( $response );
         if ( ! is_string( $body ) || $body === '' ) {
-            $error = new \WP_Error( 'empty_body', 'Empty Game Master body.', [ 'url' => $source ] );
-            if ( function_exists( 'error_log' ) ) {
-                error_log( sprintf( '[PokeHub] Game Master empty body (URL: %s)', $source ) );
-            }
-            return $error;
+            return new \WP_Error( 'empty_body', 'Empty Game Master body.', [ 'url' => $source ] );
         }
 
         return $body;

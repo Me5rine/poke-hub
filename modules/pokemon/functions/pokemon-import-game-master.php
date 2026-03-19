@@ -451,8 +451,6 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
         }
     } catch ( Exception $e ) {
-        // En cas d'erreur, logger mais continuer l'import
-        error_log( '[POKE-HUB] Error during regional detection for ' . $pokemon_id_proto . '/' . $form_slug . ': ' . $e->getMessage() );
         // Ne pas définir $extra['regional'] si erreur, on laisse les données existantes intactes
     }
 
@@ -1813,7 +1811,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             require_once $importer_file;
         } else {
             $stats['types_import_error'] = 'Fichier importer Bulbapedia introuvable';
-            error_log( 'Poke Hub: Fichier importer Bulbapedia introuvable: ' . $importer_file );
         }
     
         if ( function_exists( 'poke_hub_pokemon_import_all_types_for_pokemon_go' ) ) {
@@ -1828,16 +1825,11 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             }
             if ( ! empty( $type_import_stats['errors'] ) && is_array( $type_import_stats['errors'] ) ) {
                 $stats['types_import_errors'] = $type_import_stats['errors'];
-                error_log( sprintf(
-                    'Poke Hub: Erreurs lors de l\'import des types: %d erreur(s)',
-                    count( $type_import_stats['errors'] )
-                ) );
             }
     
         } elseif ( empty( $stats['types_import_error'] ) ) {
             // Si on n'a pas déjà une erreur "fichier introuvable"
             $stats['types_import_error'] = 'Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée';
-            error_log( 'Poke Hub: Fonction poke_hub_pokemon_import_all_types_for_pokemon_go() non trouvée' );
         }
     
     } else {
