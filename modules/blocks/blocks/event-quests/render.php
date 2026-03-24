@@ -61,4 +61,14 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
     return;
 }
 
-echo pokehub_blocks_render_event_quests($quests);
+$quests_html = pokehub_blocks_render_event_quests($quests);
+if ($quests_html === '') {
+    return '';
+}
+
+$wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-event-quests-block-wrapper']);
+
+return '<div ' . $wrapper_attributes . '>'
+    . '<h2 class="pokehub-block-title">' . esc_html__('Field Research', 'poke-hub') . '</h2>'
+    . $quests_html
+    . '</div>';
