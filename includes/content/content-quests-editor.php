@@ -85,16 +85,34 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                     multiple
                                     data-quest-index="<?php echo esc_attr($index); ?>"
                                     data-reward-index="<?php echo esc_attr($reward_index); ?>"
+                                    data-placeholder="<?php esc_attr_e('Search Pokémon…', 'poke-hub'); ?>"
+                                    <?php
+                                    $selected_ids_attr = array_values(array_filter(array_map('intval', $selected_pokemon_ids), static function ($id) {
+                                        return $id > 0;
+                                    }));
+                                    if ($selected_ids_attr !== []) {
+                                        echo ' data-selected-ids="' . esc_attr(implode(',', $selected_ids_attr)) . '"';
+                                    }
+                                    ?>
                                 >
                                     <?php
-                                    // Même logique que les selects "nature" : précharger la liste complète pour afficher les options
-                                    // directement (Select2 local, sans dépendre d'un chargement AJAX).
-                                    if (function_exists('pokehub_get_pokemon_for_select')) {
-                                        $pokemon_list = pokehub_get_pokemon_for_select();
-                                        foreach ($pokemon_list as $pokemon_option) {
-                                            $is_selected = in_array((int) $pokemon_option['id'], $selected_pokemon_ids, true);
-                                            echo '<option value="' . esc_attr($pokemon_option['id']) . '" ' . selected($is_selected, true, false) . '>' . esc_html($pokemon_option['text']) . '</option>';
+                                    // Uniquement les Pokémon sélectionnés (comme Pokémon sauvages / œufs) : Select2 + REST évite 1000+ <option>.
+                                    foreach ($selected_ids_attr as $pid) {
+                                        $label = '#' . $pid;
+                                        if (function_exists('pokehub_get_pokemon_data_by_id')) {
+                                            $pokemon_data = pokehub_get_pokemon_data_by_id($pid);
+                                            if ($pokemon_data) {
+                                                $dex_number = isset($pokemon_data['dex_number']) ? (int) $pokemon_data['dex_number'] : 0;
+                                                $name       = $pokemon_data['name'] ?? ($pokemon_data['name_fr'] ?? $pokemon_data['name_en'] ?? '');
+                                                $form       = !empty($pokemon_data['form']) ? ' (' . $pokemon_data['form'] . ')' : '';
+                                                $label      = $name;
+                                                if ($dex_number > 0) {
+                                                    $label .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
+                                                }
+                                                $label .= $form;
+                                            }
                                         }
+                                        echo '<option value="' . esc_attr((string) $pid) . '" selected>' . esc_html($label) . '</option>';
                                     }
                                     ?>
                                 </select>

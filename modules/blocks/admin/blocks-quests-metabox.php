@@ -108,6 +108,8 @@ function pokehub_quests_metabox_assets($hook) {
         'items' => $items_list,
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('pokehub_quests_ajax'),
+        'rest_nonce' => wp_create_nonce('wp_rest'),
+        'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
     ]);
     
     // Localiser les données pour la gestion des genres
@@ -208,7 +210,7 @@ function pokehub_render_event_quests_metabox($post) {
                 '</select></label>' +
                 '<div class="pokehub-reward-pokemon-fields" style="display:block;">' +
                 '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
-                '<select name="' + prefix + '[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon pokehub-quest-pokemon-select" style="width: 100%; min-width: 250px;" multiple data-quest-index="' + questIndex + '" data-reward-index="' + rewardIndex + '">' +
+                '<select name="' + prefix + '[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon pokehub-quest-pokemon-select" style="width: 100%; min-width: 250px;" multiple data-quest-index="' + questIndex + '" data-reward-index="' + rewardIndex + '" data-placeholder="<?php echo esc_js(__('Search Pokémon…', 'poke-hub')); ?>">' +
                 '</select>' +
                 '</label> ' +
                 '<label title="<?php echo esc_js(__('Force shiny only if the Pokémon is shiny-lock. Otherwise, shiny status will be retrieved from the database.', 'poke-hub')); ?>">' +

@@ -178,10 +178,10 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
         <ul class="pokehub-event-quests-list">
             <?php
             foreach ($quests as $quest_index => $quest) :
-                $task    = isset($quest['task']) ? (string) $quest['task'] : '';
+                $task    = isset($quest['task']) ? trim((string) $quest['task']) : '';
                 $rewards = isset($quest['rewards']) && is_array($quest['rewards']) ? $quest['rewards'] : [];
 
-                if ($task === '' || $rewards === []) {
+                if ($rewards === []) {
                     continue;
                 }
 
@@ -204,7 +204,18 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
 
                 <li class="pokehub-quest-item">
                     <div class="pokehub-quest-main">
-                        <div class="pokehub-quest-task"><?php echo esc_html($task); ?></div>
+                        <div class="pokehub-quest-task">
+                            <?php
+                            if ($task !== '') {
+                                echo esc_html($task);
+                            } else {
+                                echo '<span class="pokehub-quest-task-placeholder">';
+                                /* translators: Shown when the quest task field is empty but rewards are listed (e.g. early event announcement). */
+                                esc_html_e('Task TBA', 'poke-hub');
+                                echo '</span>';
+                            }
+                            ?>
+                        </div>
 
                         <div class="pokehub-quest-rewards-preview" aria-hidden="false">
                             <?php if ($pokemon_slots !== []) : ?>

@@ -721,7 +721,7 @@ function pokehub_content_save_quests($source_type, $source_id, array $quests) {
 
     $sort = 0;
     foreach ($quests as $q) {
-        $task    = isset($q['task']) ? sanitize_text_field($q['task']) : '';
+        $task    = isset($q['task']) ? trim(sanitize_text_field($q['task'])) : '';
         $rewards = isset($q['rewards']) && is_array($q['rewards']) ? $q['rewards'] : [];
         if ($task === '' && empty($rewards)) {
             continue;
@@ -750,13 +750,14 @@ function pokehub_content_save_quests($source_type, $source_id, array $quests) {
 function pokehub_quests_clean_from_request(array $quests) {
     $cleaned_quests = [];
     foreach ($quests as $quest) {
+        $task_input  = isset($quest['task']) ? trim((string) $quest['task']) : '';
         $has_rewards = !empty($quest['rewards']) && is_array($quest['rewards']) && count($quest['rewards']) > 0;
-        $has_task = !empty($quest['task']);
+        $has_task    = $task_input !== '';
         if (!$has_task && !$has_rewards) {
             continue;
         }
         $cleaned_quest = [
-            'task'           => $has_task ? sanitize_text_field($quest['task']) : '',
+            'task'           => $has_task ? sanitize_text_field($task_input) : '',
             'rewards'        => [],
             'quest_group_id' => isset($quest['quest_group_id']) ? max(0, (int) $quest['quest_group_id']) : 0,
         ];
@@ -802,6 +803,9 @@ function pokehub_quests_clean_from_request(array $quests) {
                 }
                 $cleaned_quest['rewards'][] = $cleaned_reward;
             }
+        }
+        if ($cleaned_quest['task'] === '' && empty($cleaned_quest['rewards'])) {
+            continue;
         }
         $cleaned_quests[] = $cleaned_quest;
     }

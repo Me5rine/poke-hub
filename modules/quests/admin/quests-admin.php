@@ -179,6 +179,8 @@ function poke_hub_quests_enqueue_editor_assets($hook) {
         'items' => $items_list,
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('pokehub_quests_ajax'),
+        'rest_nonce' => wp_create_nonce('wp_rest'),
+        'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
     ]);
     wp_localize_script('pokehub-admin-select2', 'pokehubQuestsGender', [
         'ajax_url' => admin_url('admin-ajax.php'),

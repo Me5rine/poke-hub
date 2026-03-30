@@ -202,13 +202,27 @@ jQuery(function($) {
                 } else if (fromOptions && fromOptions.length) {
                     ids = fromOptions.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
                 }
-                if (ids.length) {
-                    $select.attr('data-selected-ids', ids.join(','));
+            if (ids.length) {
+                $select.attr('data-selected-ids', ids.join(','));
                 }
             }
 
-            // 2) Hydrater les options selected AVANT Select2 (ne jamais vider le select)
-            if (ids.length) {
+            // 2) Mode AJAX : même comportement que pokehubInitLargePokemonSelect2 (Pokémon sauvages) — pas de milliers d’options en DOM.
+            if (useAjax) {
+                if (ids.length) {
+                    var labelMap = {};
+                    ids.forEach(function(id) {
+                        var $o = $select.find('option[value="' + id + '"]');
+                        labelMap[id] = ($o.length ? $o.text() : null) || pokemonMap[id] || ('#' + id);
+                    });
+                    $select.empty();
+                    ids.forEach(function(id) {
+                        $select.append(new Option(labelMap[id], id, true, true));
+                    });
+                } else {
+                    $select.empty();
+                }
+            } else if (ids.length) {
                 ids.forEach(function(id) {
                     var $opt = $select.find('option[value="' + id + '"]');
                     if (!$opt.length) {
@@ -260,7 +274,7 @@ jQuery(function($) {
         });
 
         // Réappliquer les valeurs sur les selects déjà initialisés par Select2 (au cas où une autre init aurait vidé la sélection)
-        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon').each(function() {
+        $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon, select.pokehub-quest-pokemon-select').each(function() {
             var $select = $(this);
             if (!$select.data('select2')) return;
             var raw = ($select.attr('data-selected-ids') || '').trim();
@@ -489,10 +503,9 @@ jQuery(function($) {
     pokehubInitLureSelect2(document);
     pokehubInitPokemonSelect2(document);
     pokehubInitLargePokemonSelect2(document);
-    // Études spéciales : n'init que dans la metabox si présente
-    var $srMetabox = $('#pokehub-special-research-metabox, .pokehub-special-research-metabox');
-    var questCtx = ($srMetabox.length) ? $srMetabox[0] : document;
-    pokehubInitQuestPokemonSelect2(questCtx);
+    // Field Research / quêtes : toujours document (les selects ne sont pas dans la metabox études spéciales).
+    // Si on limitait au conteneur SR, les quêtes sur l’article ne recevaient pas Select2 et affichaient la liste HTML brute.
+    pokehubInitQuestPokemonSelect2(document);
     pokehubInitQuestItemSelect2(questCtx);
     
     // Initialiser Select2 pour le champ multiselect des pays régionaux
