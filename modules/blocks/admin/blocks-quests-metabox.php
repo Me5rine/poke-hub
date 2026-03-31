@@ -391,7 +391,8 @@ function pokehub_save_event_quests_metabox($post_id) {
     // Gutenberg peut envoyer les metaboxes sérialisées dans `post_data` (au lieu de champs directs dans $_POST).
     $raw_quests = [];
 
-    $extract_quests_from_array = static function ($data) {
+    $extract_quests_from_array = null;
+    $extract_quests_from_array = static function ($data) use (&$extract_quests_from_array) {
         if (!is_array($data)) {
             return [null, null];
         }
