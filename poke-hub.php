@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.0.16
+Version: 2.0.18
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -528,3 +528,31 @@ function poke_hub_enqueue_metaboxes_admin_styles($hook) {
     );
 }
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_metaboxes_admin_styles');
+
+function poke_hub_enqueue_pokemon_image_fallback_script() {
+    if (!function_exists('poke_hub_pokemon_get_assets_base_url') || !function_exists('poke_hub_pokemon_get_assets_fallback_base_url')) {
+        return;
+    }
+
+    $primary_base = trim((string) poke_hub_pokemon_get_assets_base_url());
+    $fallback_base = trim((string) poke_hub_pokemon_get_assets_fallback_base_url());
+
+    if ($primary_base === '' || $fallback_base === '' || rtrim($primary_base, '/') === rtrim($fallback_base, '/')) {
+        return;
+    }
+
+    wp_enqueue_script(
+        'poke-hub-pokemon-image-fallback',
+        POKE_HUB_URL . 'assets/js/pokehub-pokemon-image-fallback.js',
+        [],
+        POKE_HUB_VERSION,
+        true
+    );
+
+    wp_localize_script('poke-hub-pokemon-image-fallback', 'PokeHubPokemonImageFallback', [
+        'primaryBase' => rtrim($primary_base, '/'),
+        'fallbackBase' => rtrim($fallback_base, '/'),
+    ]);
+}
+add_action('wp_enqueue_scripts', 'poke_hub_enqueue_pokemon_image_fallback_script', 20);
+add_action('admin_enqueue_scripts', 'poke_hub_enqueue_pokemon_image_fallback_script', 20);

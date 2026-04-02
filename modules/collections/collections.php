@@ -60,16 +60,9 @@ function poke_hub_collections_enqueue_front_assets() {
         true
     );
 
-    $pokemon_assets_base = (function () {
-        // On utilise le helper unifié pour éviter que Collections diverge
-        // du reste (bucket + chemin Pokémon côté admin).
-        if (function_exists('poke_hub_pokemon_get_assets_base_url')) {
-            return poke_hub_pokemon_get_assets_base_url();
-        }
-
-        // fallback rétrocompat
-        return rtrim((string) get_option('poke_hub_pokemon_assets_base_url', ''), '/') . get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/');
-    })();
+    $pokemon_assets_base = function_exists('poke_hub_pokemon_get_assets_base_url')
+        ? poke_hub_pokemon_get_assets_base_url()
+        : '';
 
     wp_localize_script('poke-hub-collections-front', 'pokeHubCollections', [
         'ajaxUrl'    => admin_url('admin-ajax.php'),

@@ -13,22 +13,17 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
 #### Fonctions disponibles
 
 1. **`poke_hub_pokemon_get_assets_base_url()`**
-   - Récupère l'URL de base principale des assets Pokémon
-   - Utilise d'abord les réglages "généraux" :
+   - URL de base principale des sprites Pokémon
+   - Construite uniquement à partir des réglages Sources :
      - `poke_hub_assets_bucket_base_url` (bucket commun)
-     - `poke_hub_assets_path_pokemon` (chemin Pokémon)
-   - (Rétrocompatibilité) si le bucket générique n'est pas configuré,
-     utilise ensuite l'option dédiée `poke_hub_pokemon_assets_base_url` ou la constante `POKE_HUB_POKEMON_ASSETS_BASE_URL`
-   - Retourne une chaîne vide si rien n'est configuré
+     - `poke_hub_assets_path_pokemon` (chemin Pokémon, ex. `/pokemon-go/pokemon/`)
+   - Retourne une chaîne vide si le bucket n'est pas renseigné
 
 2. **`poke_hub_pokemon_get_assets_fallback_base_url()`**
-   - Récupère l'URL de base de secours (fallback)
-   - Vérifie d'abord l'option WordPress `poke_hub_pokemon_assets_fallback_base_url`
-   - Puis la constante `POKE_HUB_POKEMON_ASSETS_FALLBACK_BASE_URL`
-   - Retourne une chaîne vide si rien n'est configuré
-   - Note : pour éviter toute divergence, `poke_hub_pokemon_get_image_sources()` force
-     `fallback` à être identique à `primary` (mode monosource). Cette option reste donc
-     principalement là pour compatibilité / overrides via filtre.
+   - URL de base de secours (même clés de fichiers que la source principale)
+   - Option WordPress : `poke_hub_pokemon_assets_fallback_base_url`
+   - Retourne une chaîne vide si l'option n'est pas renseignée
+   - Un script front peut basculer automatiquement de la principale vers le fallback si l'image HTTP échoue
 
 3. **`poke_hub_pokemon_build_image_key_from_slug($slug, array $args = [])`**
    - Construit une clé d'image à partir du slug du Pokémon
@@ -50,8 +45,8 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
    - Retourne l'URL complète de l'image principale
 
 5. **`poke_hub_pokemon_get_image_sources($pokemon, array $args = [])`**
-   - Version complète : retourne les URLs `primary` et `fallback` (en pratique identiques
-     en mode monosource)
+   - Version complète : retourne les URLs `primary` et `fallback`
+   - Si aucun fallback n'est configuré, `fallback` est identique à `primary`
    - Paramètres :
      - `$pokemon` : Objet Pokémon (doit avoir `slug` ou `dex_number`)
      - `$args` : Tableau d'options :
@@ -62,7 +57,7 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
      ```php
      [
        'primary'  => string,  // URL principale (peut être vide)
-      'fallback' => string,  // URL de secours (identique à `primary` en mode monosource)
+      'fallback' => string,  // URL de secours si configurée, sinon identique à `primary`
      ]
      ```
    - Applique le filtre `poke_hub_pokemon_image_sources` pour personnalisation
@@ -71,22 +66,11 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
 
 ### Paramètres dans l'administration
 
-Les URLs de base peuvent être configurées dans :
+Les URLs sont configurées dans :
 **Réglages > Poke Hub > Sources** (onglet "Sources")
 
-- **Pokémon assets base URL** : URL principale (ex: `https://cdn.example.com/pokemon`)
-- **Fallback assets base URL** : URL de secours (ex: `https://backup.example.com/pokemon`)
-  - Note : le plugin utilise une approche monosource pour les images Pokémon
-    (`fallback` renvoyé par le helper est identique à `primary`) afin d'éviter les divergences.
-
-### Constantes PHP (alternative)
-
-Vous pouvez également définir ces constantes dans votre `wp-config.php` :
-
-```php
-define('POKE_HUB_POKEMON_ASSETS_BASE_URL', 'https://cdn.example.com/pokemon');
-define('POKE_HUB_POKEMON_ASSETS_FALLBACK_BASE_URL', 'https://backup.example.com/pokemon');
-```
+- **Assets bucket base URL** + chemin **Pokémon** (section Image Sources) : source principale des sprites (`slug.png`, etc.)
+- **Pokémon assets fallback base URL** : URL de secours (même structure de fichiers que la principale)
 
 ## Structure des fichiers images
 
@@ -153,7 +137,6 @@ $image_url = poke_hub_pokemon_get_image_url($pokemon, [
 ```php
 $sources = poke_hub_pokemon_get_image_sources($pokemon, ['shiny' => true]);
 
-// En mode monosource, primary et fallback sont identiques.
 $image_url = $sources['primary'];
 
 // Ou avec gestion d'erreur côté client (HTML)
@@ -197,7 +180,7 @@ Exemple : Si `dex_number = 1`, le fichier sera `001.png`
 - ✅ Fonctions helper pour générer les URLs
 - ✅ Support des variantes shiny
 - ✅ Support des variantes de genre (male/female)
-- ✅ fallback conservé (mais identique à `primary` pour éviter les divergences)
+- ✅ fallback optionnel (même chemins relatifs que la source principale)
 - ✅ Configuration via l'interface d'administration
 - ✅ Filtre WordPress pour personnalisation
 - ✅ Construction automatique des clés d'image

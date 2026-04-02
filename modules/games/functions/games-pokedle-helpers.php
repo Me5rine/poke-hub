@@ -81,8 +81,8 @@ function poke_hub_pokedle_compare_pokemon(int $guessed_pokemon_id, int $mystery_
     $hints['pokemon'] = $guessed['name_fr'] ?: $guessed['name_en'];
 
     // Type 1 et Type 2 avec détection des types mal placés
-    $guessed_types = poke_hub_games_get_pokemon_types($guessed_pokemon_id);
-    $mystery_types = poke_hub_games_get_pokemon_types($mystery_pokemon_id);
+    $guessed_types = pokehub_get_pokemon_types_for_display($guessed_pokemon_id);
+    $mystery_types = pokehub_get_pokemon_types_for_display($mystery_pokemon_id);
     
     // Créer des tableaux d'IDs pour faciliter la comparaison
     $guessed_type_ids = [];

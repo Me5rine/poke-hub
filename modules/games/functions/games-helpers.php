@@ -61,42 +61,6 @@ function poke_hub_games_get_pokemon_by_id(int $pokemon_id): ?array {
 }
 
 /**
- * Récupère les types d'un Pokémon
- * 
- * @param int $pokemon_id
- * @return array
- */
-function poke_hub_games_get_pokemon_types(int $pokemon_id): array {
-    global $wpdb;
-
-    $pokemon_id = (int) $pokemon_id;
-    if ($pokemon_id <= 0) {
-        return [];
-    }
-
-    $types_table = pokehub_get_table('pokemon_types');
-    $type_links_table = pokehub_get_table('pokemon_type_links');
-    
-    if (!$types_table || !$type_links_table) {
-        return [];
-    }
-
-    $types = $wpdb->get_results(
-        $wpdb->prepare(
-            "SELECT t.id, t.slug, t.name_fr, t.name_en, t.color
-             FROM {$types_table} t
-             INNER JOIN {$type_links_table} ptl ON t.id = ptl.type_id
-             WHERE ptl.pokemon_id = %d
-             ORDER BY ptl.slot ASC",
-            $pokemon_id
-        ),
-        ARRAY_A
-    );
-
-    return $types ?: [];
-}
-
-/**
  * Récupère la génération d'un Pokémon
  * 
  * @param int $pokemon_id

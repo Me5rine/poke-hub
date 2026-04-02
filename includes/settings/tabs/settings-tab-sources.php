@@ -49,8 +49,7 @@ $assets_path_types = get_option('poke_hub_assets_path_types', '/pokemon-go/types
 $assets_path_vivillon = get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/');
 $assets_path_weathers = get_option('poke_hub_assets_path_weathers', '/pokemon-go/weathers/');
 
-// Pokémon images base URL - toujours disponible (rétrocompatibilité)
-$pokemon_assets_base_url     = get_option('poke_hub_pokemon_assets_base_url', '');
+// Pokémon images fallback base URL (bucket secondaire, même clés de fichiers)
 $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base_url', '');
 
 // Pokémon tables prefix - toujours disponible
@@ -139,12 +138,6 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     }
     if (isset($_POST['poke_hub_assets_path_weathers'])) {
         update_option('poke_hub_assets_path_weathers', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_weathers'])));
-    }
-
-    // Pokémon - toujours disponible (sources image et préfixe) - rétrocompatibilité
-    if (isset($_POST['poke_hub_pokemon_assets_base_url'])) {
-        $pokemon_assets_base_url = esc_url_raw(wp_unslash($_POST['poke_hub_pokemon_assets_base_url']));
-        update_option('poke_hub_pokemon_assets_base_url', $pokemon_assets_base_url);
     }
 
     if (isset($_POST['poke_hub_pokemon_assets_fallback_base_url'])) {
@@ -257,6 +250,20 @@ foreach ($messages as $msg) {
                     placeholder="https://pokemon.me5rine-lab.com/">
                 <p class="description">
                     <?php _e('Base URL for all assets (common bucket). Example: https://pokemon.me5rine-lab.com/', 'poke-hub'); ?>
+                </p>
+            </td>
+        </tr>
+
+        <tr valign="top">
+            <th scope="row"><?php _e('Pokémon assets fallback base URL', 'poke-hub'); ?></th>
+            <td>
+                <input type="url"
+                    name="poke_hub_pokemon_assets_fallback_base_url"
+                    value="<?php echo esc_attr($pokemon_assets_fallback_url); ?>"
+                    class="regular-text"
+                    placeholder="https://backup.example.com/pokemon-go/pokemon/">
+                <p class="description">
+                    <?php _e('Backup source used when a Pokémon image is missing on the primary source (same filename/key expected). Leave empty to disable fallback.', 'poke-hub'); ?>
                 </p>
             </td>
         </tr>

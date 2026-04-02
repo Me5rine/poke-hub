@@ -349,7 +349,7 @@ function poke_hub_pokedle_ajax_submit_guess() {
         // Récupérer les informations du Pokémon mystère pour les indices
         $mystery_pokemon = poke_hub_games_get_pokemon_by_id($daily_pokemon_id);
         if ($mystery_pokemon) {
-            $mystery_types = poke_hub_games_get_pokemon_types($daily_pokemon_id);
+            $mystery_types = pokehub_get_pokemon_types_for_display($daily_pokemon_id);
             $mystery_gen = poke_hub_games_get_pokemon_generation($daily_pokemon_id);
             $mystery_stage = poke_hub_games_get_pokemon_evolution_stage($daily_pokemon_id);
             $mystery_height = poke_hub_games_get_pokemon_height($daily_pokemon_id);

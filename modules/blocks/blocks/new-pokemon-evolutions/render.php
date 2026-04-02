@@ -58,9 +58,10 @@ if (empty($pokemon_ids)) {
 }
 
 // Vérifier que les fonctions nécessaires sont disponibles
-if (!function_exists('pokehub_get_pokemon_data_by_id') || 
+if (!function_exists('pokehub_get_pokemon_data_by_id') ||
     !function_exists('poke_hub_pokemon_get_image_sources') ||
-    !function_exists('pokehub_get_table')) {
+    !function_exists('pokehub_get_table') ||
+    !function_exists('pokehub_get_pokemon_types_for_display')) {
     return '';
 }
 
@@ -580,12 +581,13 @@ ob_start();
      * Fonction récursive pour afficher un nœud d'évolution et ses branches
      */
     if (!function_exists('pokehub_render_evolution_node')) {
-    function pokehub_render_evolution_node($node, $is_first = false) {
+    function pokehub_render_evolution_node($node, $is_first = false, array $meta_genders = []) {
         if (!$node || !isset($node['pokemon'])) {
             return;
         }
         
         $pokemon = $node['pokemon'];
+        $pokemon_row_id = (int) ($pokemon['id'] ?? 0);
         $evolution = isset($node['evolution']) ? $node['evolution'] : null;
         $evolutions = isset($node['evolutions']) && is_array($node['evolutions']) ? $node['evolutions'] : [];
         
@@ -621,8 +623,8 @@ ob_start();
         }
         
         // Vérifier si un genre est forcé dans les postmeta pour ce pokémon (priorité sur les requirements d'évolution)
-        if (!empty($meta_pokemon_genders) && isset($meta_pokemon_genders[$pokemon_id])) {
-            $forced_gender = $meta_pokemon_genders[$pokemon_id];
+        if ($pokemon_row_id > 0 && !empty($meta_genders) && isset($meta_genders[$pokemon_row_id])) {
+            $forced_gender = $meta_genders[$pokemon_row_id];
             if (in_array($forced_gender, ['male', 'female'], true)) {
                 $gender_for_image = $forced_gender;
             }
@@ -639,6 +641,10 @@ ob_start();
         $image_url = !empty($image_sources['primary']) ? $image_sources['primary'] : $image_sources['fallback'];
         
         $pokemon_name = !empty($pokemon['name_fr']) ? $pokemon['name_fr'] : (!empty($pokemon['name_en']) ? $pokemon['name_en'] : 'Pokémon #' . $pokemon['id']);
+
+        $pokemon_types = $pokemon_row_id > 0
+            ? pokehub_get_pokemon_types_for_display($pokemon_row_id)
+            : [];
         ?>
         
         <?php if (!$is_first) : ?>
@@ -656,6 +662,32 @@ ob_start();
         
         <div class="pokehub-evolution-node<?php echo count($evolutions) > 1 ? ' has-branches' : ''; ?>">
             <div class="pokehub-evolution-pokemon">
+                <?php if (!empty($pokemon_types)) : ?>
+                    <div class="pokehub-evolution-pokemon-types" role="list">
+                        <?php foreach ($pokemon_types as $ptype) :
+                            $type_label = '';
+                            if (!empty($ptype['name_fr'])) {
+                                $type_label = (string) $ptype['name_fr'];
+                            } elseif (!empty($ptype['name_en'])) {
+                                $type_label = (string) $ptype['name_en'];
+                            } elseif (!empty($ptype['slug'])) {
+                                $type_label = (string) $ptype['slug'];
+                            }
+                            $type_color = isset($ptype['color']) ? trim((string) $ptype['color']) : '';
+                            $type_icon  = isset($ptype['icon']) ? trim((string) $ptype['icon']) : '';
+                            $pill_style = $type_color !== '' ? '--pokehub-type-pill-color: ' . esc_attr($type_color) . ';' : '';
+                            ?>
+                            <span class="pokehub-type-pill" role="listitem" <?php echo $pill_style !== '' ? ' style="' . $pill_style . '"' : ''; ?> title="<?php echo esc_attr($type_label); ?>">
+                                <?php if ($type_icon !== '') : ?>
+                                    <img src="<?php echo esc_url($type_icon); ?>" alt="" class="pokehub-type-pill-icon" width="18" height="18" loading="lazy" decoding="async" />
+                                <?php endif; ?>
+                                <?php if ($type_label !== '') : ?>
+                                    <span class="pokehub-type-pill-label"><?php echo esc_html($type_label); ?></span>
+                                <?php endif; ?>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
                 <?php if ($image_url) : ?>
                     <div class="pokehub-evolution-pokemon-image">
                         <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($pokemon_name); ?>" loading="lazy" onerror="this.style.display='none';" />
@@ -678,14 +710,14 @@ ob_start();
                                         <?php echo esc_html(pokehub_format_evolution_conditions($branch['evolution'])); ?>
                                     </div>
                                 <?php endif; ?>
-                                <?php pokehub_render_evolution_node($branch, true); ?>
+                                <?php pokehub_render_evolution_node($branch, true, $meta_genders); ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 <?php else : ?>
                     <!-- Une seule évolution : continuer en ligne -->
                     <?php foreach ($evolutions as $branch) : ?>
-                        <?php pokehub_render_evolution_node($branch, false); ?>
+                        <?php pokehub_render_evolution_node($branch, false, $meta_genders); ?>
                     <?php endforeach; ?>
                 <?php endif; ?>
             <?php endif; ?>
@@ -696,7 +728,7 @@ ob_start();
     
     foreach ($evolution_lines as $line) : ?>
         <div class="pokehub-evolution-line">
-            <?php pokehub_render_evolution_node($line, true); ?>
+            <?php pokehub_render_evolution_node($line, true, $meta_pokemon_genders); ?>
         </div>
     <?php endforeach; ?>
 </div>

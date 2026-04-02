@@ -487,6 +487,75 @@ function pokehub_get_pokemon_type_color(int $pokemon_id): string {
 }
 
 /**
+ * Récupère les types d'un Pokémon pour l'affichage public (icône, couleur, libellés).
+ * Gère les tables locales ou distantes comme pokehub_get_pokemon_type_color().
+ *
+ * @param int $pokemon_id ID du Pokémon
+ * @return array<int, array{id:int|string, slug:string, name_fr:string, name_en:string, color:string, icon:string}>
+ */
+function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
+    if (!function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    global $wpdb;
+
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0 || !isset($wpdb) || !is_object($wpdb)) {
+        return [];
+    }
+
+    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
+    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
+
+    $use_remote = false;
+    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
+        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
+            $actual_prefix = poke_hub_pokemon_get_table_prefix();
+            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
+                $use_remote = true;
+            }
+        }
+    }
+
+    if ($use_remote) {
+        $types_table      = pokehub_get_table('remote_pokemon_types');
+        $type_links_table = pokehub_get_table('remote_pokemon_type_links');
+    } else {
+        $types_table      = pokehub_get_table('pokemon_types');
+        $type_links_table = pokehub_get_table('pokemon_type_links');
+    }
+
+    if (!$types_table || !$type_links_table) {
+        return [];
+    }
+
+    $types = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT t.id, t.slug, t.name_fr, t.name_en, t.color, t.icon
+             FROM {$types_table} t
+             INNER JOIN {$type_links_table} ptl ON t.id = ptl.type_id
+             WHERE ptl.pokemon_id = %d
+             ORDER BY ptl.slot ASC",
+            $pokemon_id
+        ),
+        ARRAY_A
+    );
+
+    if (empty($types) || !is_array($types)) {
+        return [];
+    }
+
+    foreach ($types as &$t) {
+        $t['color'] = isset($t['color']) ? trim((string) $t['color']) : '';
+        $t['icon']  = isset($t['icon']) ? trim((string) $t['icon']) : '';
+    }
+    unset($t);
+
+    return $types;
+}
+
+/**
  * Vérifie si un Pokémon peut être shiny ("chromatique" dans l'UI).
  *
  * Règle Pokémon GO (changement récent) :
@@ -692,49 +761,27 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
  */
 
 /**
- * URL de base principale des assets Pokémon (définie dans les settings).
+ * URL de base principale des sprites Pokémon : bucket commun + chemin « Pokémon » (réglages Sources).
  */
 function poke_hub_pokemon_get_assets_base_url() {
-    // Une seule source : si les réglages "généraux" Pokémon sont configurés,
-    // on les utilise pour construire l'URL des sprites.
     $bucket = trim((string) get_option('poke_hub_assets_bucket_base_url', ''));
     $path_pokemon = (string) get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/');
-    if ($bucket !== '') {
-        $bucket = rtrim($bucket, '/');
-        $path_pokemon = '/' . ltrim($path_pokemon, '/');
-        $dir = $bucket . rtrim($path_pokemon, '/');
-        return $dir;
+    if ($bucket === '') {
+        return '';
     }
 
-    // Compatibilité rétro : si le bucket générique n'est pas configuré,
-    // on utilise l'option dédiée (ou constante) si présente.
-    $opt = trim((string) get_option('poke_hub_pokemon_assets_base_url', ''));
-    if ($opt !== '') {
-        return rtrim($opt, '/');
-    }
+    $bucket       = rtrim($bucket, '/');
+    $path_pokemon = '/' . ltrim($path_pokemon, '/');
 
-    if (defined('POKE_HUB_POKEMON_ASSETS_BASE_URL')) {
-        return rtrim(POKE_HUB_POKEMON_ASSETS_BASE_URL, '/');
-    }
-
-    return '';
+    return $bucket . rtrim($path_pokemon, '/');
 }
 
 /**
- * URL de base fallback des assets Pokémon.
+ * URL de base de secours : même arborescence / mêmes noms de fichiers que la source principale.
  */
 function poke_hub_pokemon_get_assets_fallback_base_url() {
     $opt = trim((string) get_option('poke_hub_pokemon_assets_fallback_base_url', ''));
-    if ($opt !== '') {
-        return rtrim($opt, '/');
-    }
-
-    if (defined('POKE_HUB_POKEMON_ASSETS_FALLBACK_BASE_URL')) {
-        return rtrim(POKE_HUB_POKEMON_ASSETS_FALLBACK_BASE_URL, '/');
-    }
-
-    // Pas de fallback configuré
-    return '';
+    return $opt !== '' ? rtrim($opt, '/') : '';
 }
 
 /**
@@ -794,7 +841,8 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         'variant' => 'sprite', // si un jour tu veux des sous-dossiers
     ]);
 
-    $base_url     = poke_hub_pokemon_get_assets_base_url();
+    $base_url          = poke_hub_pokemon_get_assets_base_url();
+    $fallback_base_url = poke_hub_pokemon_get_assets_fallback_base_url();
 
     $slug = isset($pokemon->slug) ? $pokemon->slug : '';
     if ($slug === '') {
@@ -814,10 +862,13 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         $primary = $base_url . '/' . ltrim($path, '/');
     }
 
-    // Important : on ne veut qu'une seule source d'image.
-    // On conserve la clé "fallback" pour compatibilité (codes existants),
-    // mais elle pointe vers la même URL que "primary".
-    $fallback = $primary;
+    // Fallback explicite : même clé/fichier, mais sur une base URL secondaire.
+    // Si aucun fallback n'est configuré, on garde la compatibilité avec primary.
+    if ($fallback_base_url !== '') {
+        $fallback = $fallback_base_url . '/' . ltrim($path, '/');
+    } else {
+        $fallback = $primary;
+    }
 
     $sources = [
         'primary'  => $primary,
