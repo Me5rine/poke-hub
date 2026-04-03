@@ -146,15 +146,22 @@ ob_start();
             continue;
         }
         
-        $habitat_icon_url = pokehub_get_habitat_icon_url($habitat_slug);
+        $habitat_icon_html = (function_exists('poke_hub_render_bucket_raster_img'))
+            ? poke_hub_render_bucket_raster_img(
+                'habitats',
+                $habitat_slug,
+                [
+                    'alt'   => $habitat_name,
+                    'class' => 'pokehub-habitat-icon',
+                ]
+            )
+            : '';
         $schedule_text = pokehub_format_habitat_schedule($schedule);
     ?>
         <div class="pokehub-habitat-item">
             <div class="pokehub-habitat-header">
-                <?php if ($habitat_icon_url) : ?>
-                    <img src="<?php echo esc_url($habitat_icon_url); ?>" 
-                         alt="<?php echo esc_attr($habitat_name); ?>"
-                         class="pokehub-habitat-icon">
+                <?php if ($habitat_icon_html !== '') : ?>
+                    <?php echo $habitat_icon_html; ?>
                 <?php endif; ?>
                 <h3 class="pokehub-habitat-title"><?php echo esc_html($habitat_name); ?></h3>
             </div>

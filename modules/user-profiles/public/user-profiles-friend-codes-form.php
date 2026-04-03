@@ -210,14 +210,14 @@ function poke_hub_render_friend_code_form($args = []) {
                                     <?php echo $args['require_pattern'] ? 'required' : ''; ?>>
                                 <option value=""><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
                                 <?php foreach ($args['scatterbug_patterns'] as $value => $label) : ?>
-                                    <?php 
-                                    $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
-                                        ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                    <?php
+                                    $raster_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                                        ? poke_hub_get_raster_option_data_attr('vivillon', (string) $value)
                                         : '';
                                     ?>
-                                    <option value="<?php echo esc_attr($value); ?>" 
+                                    <option value="<?php echo esc_attr($value); ?>"
                                             <?php selected($selected_pattern, $value); ?>
-                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
+                                            <?php echo $raster_attr; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -233,14 +233,14 @@ function poke_hub_render_friend_code_form($args = []) {
                             <select name="team" id="team" class="me5rine-lab-form-select">
                                 <option value=""><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
                                 <?php foreach ($args['teams'] as $value => $label) : ?>
-                                    <?php 
-                                    $icon_url = function_exists('poke_hub_get_team_icon_url') 
-                                        ? poke_hub_get_team_icon_url($value) 
+                                    <?php
+                                    $raster_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                                        ? poke_hub_get_raster_option_data_attr('teams', (string) $value)
                                         : '';
                                     ?>
-                                    <option value="<?php echo esc_attr($value); ?>" 
+                                    <option value="<?php echo esc_attr($value); ?>"
                                             <?php selected($selected_team, $value); ?>
-                                            <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
+                                            <?php echo $raster_attr; ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

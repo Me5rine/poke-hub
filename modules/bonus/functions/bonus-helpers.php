@@ -69,10 +69,13 @@ function pokehub_get_bonus_data($bonus_id) {
             $image_slug = !empty($row->image_slug) ? (string) $row->image_slug : $slug;
             $image_url  = '';
             $image_tag  = '';
-            if (!empty($image_slug) && function_exists('poke_hub_get_bonus_icon_url')) {
-                $image_url = poke_hub_get_bonus_icon_url($image_slug);
-                if (!empty($image_url)) {
-                    $image_tag = '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($row->title) . '" />';
+            if (!empty($image_slug) && function_exists('poke_hub_get_raster_asset_url_chain')) {
+                $chain = poke_hub_get_raster_asset_url_chain('bonus', $image_slug);
+                if ($chain !== []) {
+                    $image_url = $chain[0];
+                }
+                if ($chain !== [] && function_exists('poke_hub_render_bucket_raster_img')) {
+                    $image_tag = poke_hub_render_bucket_raster_img('bonus', $image_slug, ['alt' => (string) $row->title]);
                 }
             }
             $description = wpautop((string) $row->description);
@@ -99,10 +102,13 @@ function pokehub_get_bonus_data($bonus_id) {
     $image_url = '';
     $image_tag = '';
     
-    if (!empty($bonus_slug) && function_exists('poke_hub_get_bonus_icon_url')) {
-        $image_url = poke_hub_get_bonus_icon_url($bonus_slug);
-        if (!empty($image_url)) {
-            $image_tag = '<img src="' . esc_url($image_url) . '" alt="' . esc_attr(get_the_title($bonus_id)) . '" />';
+    if (!empty($bonus_slug) && function_exists('poke_hub_get_raster_asset_url_chain')) {
+        $chain = poke_hub_get_raster_asset_url_chain('bonus', $bonus_slug);
+        if ($chain !== []) {
+            $image_url = $chain[0];
+        }
+        if ($chain !== [] && function_exists('poke_hub_render_bucket_raster_img')) {
+            $image_tag = poke_hub_render_bucket_raster_img('bonus', $bonus_slug, ['alt' => get_the_title($bonus_id)]);
         }
     }
     

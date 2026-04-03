@@ -623,7 +623,7 @@ window.pokeHubFriendCodesLoaded = true;
                         $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                     }
                     // Check if this select has icons
-                    var hasIcons = $patternSelect.find('option[data-icon]').length > 0;
+                    var hasIcons = $patternSelect.find('option[data-ph-raster], option[data-icon]').length > 0;
                     var select2Config = {
                         width: '100%',
                         allowClear: true,
@@ -641,6 +641,9 @@ window.pokeHubFriendCodesLoaded = true;
                                 return data.text;
                             }
                             var $option = $patternSelect.find('option[value="' + data.id + '"]');
+                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                return window.pokeHubSpanWithSelectIcon(data.text, $option);
+                            }
                             var iconUrl = $option.attr('data-icon');
                             if (iconUrl) {
                                 return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
@@ -652,6 +655,9 @@ window.pokeHubFriendCodesLoaded = true;
                                 return data.text;
                             }
                             var $option = $patternSelect.find('option[value="' + data.id + '"]');
+                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                return window.pokeHubSpanWithSelectIcon(data.text, $option);
+                            }
                             var iconUrl = $option.attr('data-icon');
                             if (iconUrl) {
                                 return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
@@ -1192,7 +1198,7 @@ window.pokeHubFriendCodesLoaded = true;
                     if (isCountrySelect2) {
                         var isCountryOpen = $countrySelect.data('select2') && $countrySelect.data('select2').isOpen();
                         // Check if this select has icons
-                        var hasCountryIcons = $countrySelect.find('option[data-icon]').length > 0;
+                        var hasCountryIcons = $countrySelect.find('option[data-ph-raster], option[data-icon]').length > 0;
                         var countrySelect2Config = {
                             width: '100%',
                             allowClear: true,
@@ -1207,6 +1213,9 @@ window.pokeHubFriendCodesLoaded = true;
                                     return data.text;
                                 }
                                 var $option = $countrySelect.find('option[value="' + data.id + '"]');
+                                if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                    return window.pokeHubSpanWithSelectIcon(data.text, $option);
+                                }
                                 var iconUrl = $option.attr('data-icon');
                                 if (iconUrl) {
                                     return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
@@ -1218,6 +1227,9 @@ window.pokeHubFriendCodesLoaded = true;
                                     return data.text;
                                 }
                                 var $option = $countrySelect.find('option[value="' + data.id + '"]');
+                                if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                    return window.pokeHubSpanWithSelectIcon(data.text, $option);
+                                }
                                 var iconUrl = $option.attr('data-icon');
                                 if (iconUrl) {
                                     return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');

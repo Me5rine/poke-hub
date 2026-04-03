@@ -270,7 +270,12 @@ foreach ($messages as $msg) {
     </table>
 
     <h3><?php _e('Image Sources', 'poke-hub'); ?></h3>
-    <p class="description"><?php _e('Configure the paths for different asset types. SVG files are used for: types, weathers, icons, bonus, collection-challenges. PNG files (slug.png) are used for all others.', 'poke-hub'); ?></p>
+    <p class="description">
+        <?php _e('Configure the folder path for each asset family (relative to the bucket base URL above).', 'poke-hub'); ?>
+        <?php _e('SVG (vector): types, weathers, icons, collection challenges — one file per slug/name, extension .svg.', 'poke-hub'); ?>
+        <?php _e('Raster with automatic format fallback: for bonus, habitats, candies (and XL), mega energies, teams and Vivillon patterns, the front-end tries .webp, then .png, then .jpg with the same base name (only one format is required on the CDN).', 'poke-hub'); ?>
+        <?php _e('Other folders below still use a single PNG per slug (slug.png) in the current code — they are not part of the WebP → PNG → JPG fallback.', 'poke-hub'); ?>
+    </p>
     
     <table class="form-table">
         <tbody>
@@ -300,7 +305,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/bonus/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('SVG: slug.svg', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -314,7 +319,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/candies/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: {slug}-candy.png, {slug}-xl-candy.png (e.g. pikachu-candy.png, pikachu-xl-candy.png)', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: {slug}-candy and {slug}-xl-candy (e.g. pikachu-candy.webp or .png)', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -356,7 +361,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/habitats/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -384,7 +389,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/mega-energies/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -443,7 +448,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/teams/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg (e.g. in profile selects)', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -471,7 +476,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/vivillon/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png (patterns)', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg (patterns, e.g. in profile selects)', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

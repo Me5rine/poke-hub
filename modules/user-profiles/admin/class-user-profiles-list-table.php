@@ -378,10 +378,9 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             echo '<select name="filter_team" id="filter-by-team" style="float: none;">';
             echo '<option value="">' . esc_html__('All teams', 'poke-hub') . '</option>';
             foreach ($teams as $value => $label) {
-                $icon_url = function_exists('poke_hub_get_team_icon_url') 
-                    ? poke_hub_get_team_icon_url($value) 
+                $icon_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                    ? poke_hub_get_raster_option_data_attr('teams', (string) $value)
                     : '';
-                $icon_attr = !empty($icon_url) ? ' data-icon="' . esc_url($icon_url) . '"' : '';
                 printf(
                     '<option value="%s"%s%s>%s</option>',
                     esc_attr($value),
@@ -399,10 +398,9 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             echo '<select name="filter_scatterbug_pattern" id="filter-by-scatterbug-pattern" style="float: none;">';
             echo '<option value="">' . esc_html__('All patterns', 'poke-hub') . '</option>';
             foreach ($scatterbug_patterns as $value => $label) {
-                $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
-                    ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                $icon_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                    ? poke_hub_get_raster_option_data_attr('vivillon', (string) $value)
                     : '';
-                $icon_attr = !empty($icon_url) ? ' data-icon="' . esc_url($icon_url) . '"' : '';
                 printf(
                     '<option value="%s"%s%s>%s</option>',
                     esc_attr($value),

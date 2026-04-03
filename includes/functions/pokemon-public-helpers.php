@@ -2290,6 +2290,108 @@ function poke_hub_get_asset_url(string $asset_type, string $slug, string $extens
 }
 
 /**
+ * URLs raster pour un même stem de fichier : WebP, PNG, JPG (ordre de repli côté navigateur).
+ *
+ * @return array{webp: string, png: string, jpg: string}
+ */
+function poke_hub_get_raster_asset_variant_urls(string $asset_type, string $slug): array {
+    return [
+        'webp' => poke_hub_get_asset_url($asset_type, $slug, 'webp'),
+        'png'  => poke_hub_get_asset_url($asset_type, $slug, 'png'),
+        'jpg'  => poke_hub_get_asset_url($asset_type, $slug, 'jpg'),
+    ];
+}
+
+/**
+ * Chaîne d’URLs uniques pour repli WebP → PNG → JPG (sans HEAD serveur).
+ *
+ * @return string[]
+ */
+function poke_hub_get_raster_asset_url_chain(string $asset_type, string $slug): array {
+    $slug = trim((string) $slug);
+    if ($slug === '') {
+        return [];
+    }
+
+    $u = poke_hub_get_raster_asset_variant_urls($asset_type, $slug);
+    $out = [];
+    foreach (['webp', 'png', 'jpg'] as $k) {
+        $url = isset($u[$k]) ? trim((string) $u[$k]) : '';
+        if ($url !== '' && !in_array($url, $out, true)) {
+            $out[] = $url;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Attribut data-ph-raster pour &lt;option&gt; ou balises custom (JSON de la chaîne).
+ */
+function poke_hub_get_raster_option_data_attr(string $asset_type, string $slug): string {
+    $chain = poke_hub_get_raster_asset_url_chain($asset_type, $slug);
+    if ($chain === []) {
+        return '';
+    }
+
+    return ' data-ph-raster="' . esc_attr(wp_json_encode($chain)) . '"';
+}
+
+/**
+ * Balise &lt;img&gt; bucket avec repli de format (attribut data-ph-raster + script global).
+ *
+ * @param array<string, mixed> $args alt, class, width, height, loading, decoding
+ */
+function poke_hub_render_bucket_raster_img(string $asset_type, string $slug, array $args = []): string {
+    $chain = poke_hub_get_raster_asset_url_chain($asset_type, $slug);
+    if ($chain === []) {
+        return '';
+    }
+
+    $args = wp_parse_args(
+        $args,
+        [
+            'alt'      => '',
+            'class'    => '',
+            'width'    => null,
+            'height'   => null,
+            'loading'  => 'lazy',
+            'decoding' => 'async',
+        ]
+    );
+
+    $html = '<img src="' . esc_url($chain[0]) . '" alt="' . esc_attr((string) $args['alt']) . '" data-ph-raster="' . esc_attr(wp_json_encode($chain)) . '"';
+
+    $class = trim((string) $args['class']);
+    if ($class !== '') {
+        $html .= ' class="' . esc_attr($class) . '"';
+    }
+
+    $w = $args['width'];
+    $h = $args['height'];
+    if ($w !== null && $w !== '') {
+        $html .= ' width="' . (int) $w . '"';
+    }
+    if ($h !== null && $h !== '') {
+        $html .= ' height="' . (int) $h . '"';
+    }
+
+    $loading = sanitize_key((string) $args['loading']);
+    if ($loading !== '') {
+        $html .= ' loading="' . esc_attr($loading) . '"';
+    }
+
+    $decoding = sanitize_key((string) $args['decoding']);
+    if ($decoding !== '') {
+        $html .= ' decoding="' . esc_attr($decoding) . '"';
+    }
+
+    $html .= ' />';
+
+    return $html;
+}
+
+/**
  * Récupère l'URL de l'icône d'un habitat
  *
  * @param string $slug Slug de l'habitat
@@ -2361,13 +2463,14 @@ function pokehub_pokemon_candy_reward_allowed_html(): array {
             'aria-hidden' => true,
         ],
         'img'  => [
-            'src'      => true,
-            'alt'      => true,
-            'class'    => true,
-            'width'    => true,
-            'height'   => true,
-            'loading'  => true,
-            'decoding' => true,
+            'src'            => true,
+            'alt'            => true,
+            'class'          => true,
+            'width'          => true,
+            'height'         => true,
+            'loading'        => true,
+            'decoding'       => true,
+            'data-ph-raster' => true,
         ],
     ];
 }
@@ -2444,11 +2547,14 @@ function pokehub_render_pokemon_candy_reward_html(int $pokemon_id, int $quantity
 
     $slug = (string) $pdata['slug'];
     if ($kind === 'mega_energy') {
-        $url = poke_hub_get_pokemon_mega_energy_image_url($slug);
+        $raster_slug = $slug;
+        $raster_type = 'mega_energies';
     } elseif ($kind === 'xl_candy') {
-        $url = poke_hub_get_pokemon_xl_candy_image_url($slug);
+        $raster_slug = $slug . '-xl-candy';
+        $raster_type = 'candies';
     } else {
-        $url = poke_hub_get_pokemon_candy_image_url($slug);
+        $raster_slug = $slug . '-candy';
+        $raster_type = 'candies';
     }
 
     $name_fr = isset($pdata['name_fr']) ? (string) $pdata['name_fr'] : '';
@@ -2524,17 +2630,29 @@ function pokehub_render_pokemon_candy_reward_html(int $pokemon_id, int $quantity
     $size    = (int) $args['img_size'];
     $size    = $size > 0 ? $size : 40;
 
-    if ($url !== '') {
+    $img_tag = function_exists('poke_hub_render_bucket_raster_img')
+        ? poke_hub_render_bucket_raster_img(
+            $raster_type,
+            $raster_slug,
+            [
+                'class'    => 'pokehub-pokemon-candy-img',
+                'width'    => $size,
+                'height'   => $size,
+                'loading'  => 'lazy',
+                'decoding' => 'async',
+            ]
+        )
+        : '';
+
+    if ($img_tag !== '') {
         $inner = sprintf(
             '<span class="%s" role="group" aria-label="%s">'
-            . '<img src="%s" alt="" class="pokehub-pokemon-candy-img" width="%d" height="%d" loading="lazy" decoding="async" />'
+            . '%s'
             . '<span class="pokehub-pokemon-candy-qty" aria-hidden="true">×%s</span>'
             . '</span>',
             esc_attr($classes),
             esc_attr($label),
-            esc_url($url),
-            $size,
-            $size,
+            $img_tag,
             esc_html((string) $qty)
         );
     } else {

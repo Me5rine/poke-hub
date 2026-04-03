@@ -117,14 +117,14 @@ $profile['reasons'] = array_map('strval', $profile['reasons']);
                         <select name="team" id="team" class="me5rine-lab-form-select<?php echo empty($profile['team']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                             <option value=""<?php echo empty($profile['team']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a team --', 'poke-hub'); ?></option>
                             <?php foreach ($teams as $value => $label) : ?>
-                                <?php 
-                                $icon_url = function_exists('poke_hub_get_team_icon_url') 
-                                    ? poke_hub_get_team_icon_url($value) 
+                                <?php
+                                $raster_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                                    ? poke_hub_get_raster_option_data_attr('teams', (string) $value)
                                     : '';
                                 ?>
-                                <option value="<?php echo esc_attr($value); ?>" 
+                                <option value="<?php echo esc_attr($value); ?>"
                                         <?php selected($profile['team'] ?? '', $value); ?>
-                                        <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
+                                        <?php echo $raster_attr; ?>>
                                     <?php echo esc_html($label); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -173,14 +173,14 @@ $profile['reasons'] = array_map('strval', $profile['reasons']);
                         <select name="scatterbug_pattern" id="scatterbug_pattern" class="me5rine-lab-form-select<?php echo empty($profile['scatterbug_pattern']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                             <option value=""<?php echo empty($profile['scatterbug_pattern']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a pattern --', 'poke-hub'); ?></option>
                             <?php foreach ($scatterbug_patterns as $value => $label) : ?>
-                                <?php 
-                                $icon_url = function_exists('poke_hub_get_vivillon_pattern_icon_url') 
-                                    ? poke_hub_get_vivillon_pattern_icon_url($value) 
+                                <?php
+                                $raster_attr = function_exists('poke_hub_get_raster_option_data_attr')
+                                    ? poke_hub_get_raster_option_data_attr('vivillon', (string) $value)
                                     : '';
                                 ?>
-                                <option value="<?php echo esc_attr($value); ?>" 
+                                <option value="<?php echo esc_attr($value); ?>"
                                         <?php selected($profile['scatterbug_pattern'] ?? '', $value); ?>
-                                        <?php if (!empty($icon_url)) : ?>data-icon="<?php echo esc_url($icon_url); ?>"<?php endif; ?>>
+                                        <?php echo $raster_attr; ?>>
                                     <?php echo esc_html($label); ?>
                                 </option>
                             <?php endforeach; ?>

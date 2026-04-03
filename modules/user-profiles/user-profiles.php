@@ -69,7 +69,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
     wp_enqueue_script(
         'pokehub-user-profiles-admin-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-admin.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );
@@ -81,7 +81,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
     ]);
 
     // Initialize Select2 for profile form selects (admin)
-    wp_add_inline_script('select2', "
+    wp_add_inline_script('pokehub-user-profiles-admin-script', "
     jQuery(document).ready(function($) {
         if (typeof $.fn.select2 !== 'undefined') {
             // Only target <select> elements, not table headers
@@ -98,21 +98,21 @@ function poke_hub_user_profiles_admin_assets($hook) {
                     }
                     // Check if this select has icons (team or scatterbug_pattern)
                     var selectId = \$select.attr('id') || '';
-                    var hasIcons = selectId === 'team' || 
-                                  selectId === 'scatterbug_pattern' || 
-                                  selectId === 'filter_team' || 
+                    var hasIcons = selectId === 'team' ||
+                                  selectId === 'scatterbug_pattern' ||
+                                  selectId === 'filter_team' ||
                                   selectId === 'filter_pattern' ||
                                   selectId === 'filter-by-team' ||
                                   selectId === 'filter-by-scatterbug-pattern' ||
-                                  \$select.find('option[data-icon]').length > 0;
-                    
+                                  \$select.find('option[data-ph-raster], option[data-icon]').length > 0;
+
                     var select2Config = {
                         width: '100%',
                         allowClear: true,
                         placeholder: \$select.find('option[value=\"\"]').text() || (typeof pokeHubUserProfiles !== 'undefined' ? pokeHubUserProfiles.selectPlaceholder : 'Select...'),
                         dropdownParent: \$parent.length ? \$parent : $('body')
                     };
-                    
+
                     // Add icon templates if this select has icons
                     if (hasIcons) {
                         select2Config.templateResult = function(data) {
@@ -120,6 +120,9 @@ function poke_hub_user_profiles_admin_assets($hook) {
                                 return data.text;
                             }
                             var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                return window.pokeHubSpanWithSelectIcon(data.text, \$option);
+                            }
                             var iconUrl = \$option.attr('data-icon');
                             if (iconUrl) {
                                 return $('<span><img src=\"' + iconUrl + '\" style=\"width: 20px; height: 20px; margin-right: 8px; vertical-align: middle;\" />' + data.text + '</span>');
@@ -131,6 +134,9 @@ function poke_hub_user_profiles_admin_assets($hook) {
                                 return data.text;
                             }
                             var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
+                                return window.pokeHubSpanWithSelectIcon(data.text, \$option);
+                            }
                             var iconUrl = \$option.attr('data-icon');
                             if (iconUrl) {
                                 return $('<span><img src=\"' + iconUrl + '\" style=\"width: 20px; height: 20px; margin-right: 8px; vertical-align: middle;\" />' + data.text + '</span>');
@@ -138,7 +144,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
                             return data.text;
                         };
                     }
-                    
+
                     \$select.select2(select2Config);
                 }
             });
@@ -290,7 +296,7 @@ function poke_hub_user_profiles_frontend_assets() {
     wp_enqueue_script(
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );
@@ -411,7 +417,7 @@ function poke_hub_user_profiles_shortcode_assets() {
     wp_enqueue_script(
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );
@@ -491,7 +497,7 @@ function poke_hub_friend_codes_shortcode_assets() {
     wp_enqueue_script(
         'poke-hub-friend-codes',
         POKE_HUB_URL . 'assets/js/user-profiles-friend-codes.js',
-        ['jquery', 'select2', 'poke-hub-country-detection'],
+        ['jquery', 'select2', 'poke-hub-country-detection', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );
@@ -546,7 +552,7 @@ function poke_hub_friend_codes_shortcode_assets() {
     wp_enqueue_script(
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );
