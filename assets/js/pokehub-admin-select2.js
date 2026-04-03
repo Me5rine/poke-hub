@@ -304,7 +304,7 @@ jQuery(function($) {
             var $rewardEditor = $select.closest('.pokehub-quest-reward-editor');
             var rewardType = $rewardEditor.find('.pokehub-reward-type').val();
             var isMegaEnergy = rewardType === 'mega_energy';
-            var isCandy = rewardType === 'candy';
+            var isCandy = rewardType === 'candy' || rewardType === 'xl_candy';
             
             var resourceList = [];
             if (isMegaEnergy && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.mega_pokemon) {
@@ -338,7 +338,7 @@ jQuery(function($) {
             $rewardEditor.find('.pokehub-reward-type').on('change', function() {
                 var rewardType = $(this).val();
                 var isMegaEnergyNow = rewardType === 'mega_energy';
-                var isCandyNow = rewardType === 'candy';
+                var isCandyNow = rewardType === 'candy' || rewardType === 'xl_candy';
                 
                 var newList = [];
                 if (isMegaEnergyNow && typeof pokehubQuestsData !== 'undefined' && pokehubQuestsData.mega_pokemon) {

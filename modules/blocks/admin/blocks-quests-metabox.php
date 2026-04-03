@@ -205,6 +205,7 @@ function pokehub_render_event_quests_metabox($post) {
                 '<option value="stardust"><?php echo esc_js(__('Stardust', 'poke-hub')); ?></option>' +
                 '<option value="xp"><?php echo esc_js(__('XP', 'poke-hub')); ?></option>' +
                 '<option value="candy"><?php echo esc_js(__('Candy', 'poke-hub')); ?></option>' +
+                '<option value="xl_candy"><?php echo esc_js(__('XL Candy', 'poke-hub')); ?></option>' +
                 '<option value="mega_energy"><?php echo esc_js(__('Mega Energy', 'poke-hub')); ?></option>' +
                 '<option value="item"><?php echo esc_js(__('Item', 'poke-hub')); ?></option>' +
                 '</select></label>' +
@@ -354,8 +355,9 @@ function pokehub_render_event_quests_metabox($post) {
             var isStardust = rewardType === 'stardust';
             var isXp = rewardType === 'xp';
             var isCandy = rewardType === 'candy';
+            var isXlCandy = rewardType === 'xl_candy';
             var isMegaEnergy = rewardType === 'mega_energy';
-            var isPokemonResource = isCandy || isMegaEnergy;
+            var isPokemonResource = isCandy || isXlCandy || isMegaEnergy;
             
             rewardEditor.find('.pokehub-reward-pokemon-fields').toggle(isPokemon);
             rewardEditor.find('.pokehub-reward-pokemon-resource-fields').toggle(isPokemonResource);

@@ -214,6 +214,48 @@ if (!function_exists('pokehub_render_research_rewards')) {
                     </div>
                 </div>
             <?php endif; endforeach; ?>
+        <?php elseif (in_array($type, ['candy', 'xl_candy', 'mega_energy'], true) && !empty($reward['pokemon_id'])) : ?>
+            <?php
+            $pokemon_data = function_exists('pokehub_get_pokemon_data_by_id')
+                ? pokehub_get_pokemon_data_by_id((int) $reward['pokemon_id'])
+                : null;
+            if ($pokemon_data) :
+                $pokemon_name = isset($pokemon_data['name_fr']) && $pokemon_data['name_fr'] !== ''
+                    ? (string) $pokemon_data['name_fr']
+                    : (string) ($pokemon_data['name_en'] ?? '');
+                $kind = function_exists('pokehub_candy_resource_kind_from_reward_type')
+                    ? pokehub_candy_resource_kind_from_reward_type($type)
+                    : 'candy';
+                $resource_html = function_exists('pokehub_render_pokemon_candy_reward_html')
+                    ? pokehub_render_pokemon_candy_reward_html(
+                        (int) $reward['pokemon_id'],
+                        $quantity,
+                        $kind
+                    )
+                    : '';
+                $has_img = function_exists('pokehub_pokemon_candy_reward_markup_has_image')
+                    && pokehub_pokemon_candy_reward_markup_has_image($resource_html);
+                $type_label = function_exists('pokehub_candy_resource_label_for_reward_type')
+                    ? pokehub_candy_resource_label_for_reward_type($type)
+                    : __('Candy', 'poke-hub');
+                ?>
+            <div class="pokehub-research-reward pokehub-research-reward-resource">
+                <?php if ($resource_html !== '') : ?>
+                    <div class="pokehub-research-reward-image pokehub-research-reward-image--resource">
+                        <?php echo $resource_html; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($has_img && $pokemon_name !== '') : ?>
+                    <div class="pokehub-research-reward-info">
+                        <div class="pokehub-research-reward-name">
+                            <?php echo esc_html($pokemon_name . ' — ' . $type_label); ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+                <?php
+            endif;
+            ?>
         <?php elseif ($type === 'item' && !empty($reward['item_name'])) : ?>
             <?php
             // Récupérer l'URL de l'icône de l'item
@@ -335,6 +377,44 @@ if (!function_exists('pokehub_render_research_final_rewards')) {
                         </div>
                     </div>
                 <?php endif; endforeach; ?>
+            <?php elseif (in_array($type, ['candy', 'xl_candy', 'mega_energy'], true) && !empty($reward['pokemon_id'])) : ?>
+                <?php
+                $pokemon_data = pokehub_get_pokemon_data_by_id((int) $reward['pokemon_id']);
+                if ($pokemon_data) :
+                    $name_fr = $pokemon_data['name_fr'] ?? '';
+                    $name_en = $pokemon_data['name_en'] ?? '';
+                    $pokemon_name = !empty($name_fr) ? $name_fr : (!empty($name_en) ? $name_en : '');
+                    $kind = function_exists('pokehub_candy_resource_kind_from_reward_type')
+                        ? pokehub_candy_resource_kind_from_reward_type($type)
+                        : 'candy';
+                    $resource_html = function_exists('pokehub_render_pokemon_candy_reward_html')
+                        ? pokehub_render_pokemon_candy_reward_html(
+                            (int) $reward['pokemon_id'],
+                            $quantity,
+                            $kind
+                        )
+                        : '';
+                    $has_img = function_exists('pokehub_pokemon_candy_reward_markup_has_image')
+                        && pokehub_pokemon_candy_reward_markup_has_image($resource_html);
+                    $type_label = function_exists('pokehub_candy_resource_label_for_reward_type')
+                        ? pokehub_candy_resource_label_for_reward_type($type)
+                        : __('Candy', 'poke-hub');
+                    ?>
+                    <div class="pokehub-collection-challenge-reward-item pokehub-collection-challenge-reward-item--resource">
+                        <?php if ($resource_html !== '') : ?>
+                            <div class="pokehub-collection-challenge-reward-image pokehub-collection-challenge-reward-image--resource">
+                                <?php echo $resource_html; ?>
+                            </div>
+                        <?php endif; ?>
+                        <?php if ($has_img && $pokemon_name !== '') : ?>
+                            <div class="pokehub-collection-challenge-reward-info">
+                                <div class="pokehub-collection-challenge-reward-name">
+                                    <?php echo esc_html($pokemon_name . ' — ' . $type_label); ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             <?php elseif ($type === 'item' && !empty($reward['item_name'])) : ?>
                 <?php
                 $item_icon_url = '';
@@ -367,7 +447,7 @@ if (!function_exists('pokehub_render_research_final_rewards')) {
             <?php endif; ?>
         <?php endforeach;
     }
-}
+    }
 
 /**
  * Affiche une étape d'étude spéciale

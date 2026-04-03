@@ -496,21 +496,65 @@ function pokehub_build_evolution_line($pokemon_id) {
 }
 
 /**
+ * Conditions d’évolution : pastille bonbon + texte (sans doubler le coût en bonbons si déjà affiché).
+ */
+if (!function_exists('pokehub_render_evolution_conditions_block')) {
+function pokehub_render_evolution_conditions_block(array $evolution): string {
+    $candy_html = '';
+    if (!empty($evolution['candy_cost']) && (int) $evolution['candy_cost'] > 0
+        && !empty($evolution['base_pokemon_id'])
+        && function_exists('pokehub_render_pokemon_candy_reward_html')) {
+        $candy_html = pokehub_render_pokemon_candy_reward_html(
+            (int) $evolution['base_pokemon_id'],
+            (int) $evolution['candy_cost'],
+            'candy',
+            ['extra_class' => 'pokehub-evolution-candy']
+        );
+    }
+
+    $text = pokehub_format_evolution_conditions($evolution, ['include_candy' => $candy_html === '']);
+
+    $out = '';
+    if ($candy_html !== '') {
+        $out .= $candy_html;
+    }
+    if ($text !== '') {
+        $out .= '<span class="pokehub-evolution-conditions-text">' . esc_html($text) . '</span>';
+    }
+
+    $allowed = function_exists('pokehub_pokemon_candy_reward_allowed_html')
+        ? pokehub_pokemon_candy_reward_allowed_html()
+        : [
+            'span' => ['class' => true, 'role' => true, 'aria-label' => true, 'aria-hidden' => true],
+            'img'  => [
+                'src' => true, 'alt' => true, 'class' => true, 'width' => true,
+                'height' => true, 'loading' => true, 'decoding' => true,
+            ],
+        ];
+
+    return wp_kses($out, $allowed);
+}
+}
+
+/**
  * Formate les conditions d'évolution pour l'affichage
  * 
  * @param array $evolution Données de l'évolution
+ * @param array $args      include_candy : inclure le texte « N candies » (désactiver si affichage image).
  * @return string Texte formaté des conditions
  */
 if (!function_exists('pokehub_format_evolution_conditions')) {
-function pokehub_format_evolution_conditions($evolution) {
+function pokehub_format_evolution_conditions($evolution, array $args = []) {
     if (!$evolution || !is_array($evolution)) {
         return '';
     }
+
+    $args = wp_parse_args($args, ['include_candy' => true]);
     
     $conditions = [];
     
     // Bonbons
-    if (!empty($evolution['candy_cost']) && (int) $evolution['candy_cost'] > 0) {
+    if (!empty($args['include_candy']) && !empty($evolution['candy_cost']) && (int) $evolution['candy_cost'] > 0) {
         $conditions[] = sprintf(__('%d candies', 'poke-hub'), (int) $evolution['candy_cost']);
     }
     
@@ -653,9 +697,14 @@ ob_start();
                     <path d="M 5 10 L 35 10 M 30 5 L 35 10 L 30 15" stroke="currentColor" stroke-width="2" fill="none"/>
                 </svg>
                 <?php if ($evolution) : ?>
+                    <?php
+                    $conds_arrow = pokehub_render_evolution_conditions_block($evolution);
+                    if ($conds_arrow !== '') :
+                        ?>
                     <div class="pokehub-evolution-conditions">
-                        <?php echo esc_html(pokehub_format_evolution_conditions($evolution)); ?>
+                        <?php echo $conds_arrow; ?>
                     </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -715,9 +764,14 @@ ob_start();
                         <?php foreach ($evolutions as $idx => $branch) : ?>
                             <div class="pokehub-evolution-branch branch-<?php echo $idx === 0 ? 'first' : ($idx === count($evolutions) - 1 ? 'last' : 'middle'); ?>">
                                 <?php if ($branch['evolution']) : ?>
+                                    <?php
+                                    $conds_branch = pokehub_render_evolution_conditions_block($branch['evolution']);
+                                    if ($conds_branch !== '') :
+                                        ?>
                                     <div class="pokehub-evolution-branch-conditions">
-                                        <?php echo esc_html(pokehub_format_evolution_conditions($branch['evolution'])); ?>
+                                        <?php echo $conds_branch; ?>
                                     </div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                                 <?php pokehub_render_evolution_node($branch, true, $meta_genders); ?>
                             </div>

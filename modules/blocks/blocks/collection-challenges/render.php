@@ -170,29 +170,43 @@ if (!function_exists('pokehub_render_collection_challenge_rewards')) {
                         <?php
                     }
                 }
-            } elseif (($type === 'candy' || $type === 'mega_energy') && !empty($reward['pokemon_id'])) {
+            } elseif (in_array($type, ['candy', 'xl_candy', 'mega_energy'], true) && !empty($reward['pokemon_id'])) {
                 $pokemon_data = pokehub_get_pokemon_data_by_id((int) $reward['pokemon_id']);
                 if ($pokemon_data) {
                     $name_fr = $pokemon_data['name_fr'] ?? '';
                     $name_en = $pokemon_data['name_en'] ?? '';
                     $pokemon_name = !empty($name_fr) ? $name_fr : (!empty($name_en) ? $name_en : '');
-                    
-                    $pokemon_obj = (object) $pokemon_data;
-                    $pokemon_image_url = poke_hub_pokemon_get_image_url($pokemon_obj, ['shiny' => false]);
-                    
-                    $type_label = $type === 'candy' ? __('Candy', 'poke-hub') : __('Mega Energy', 'poke-hub');
+
+                    $kind = function_exists('pokehub_candy_resource_kind_from_reward_type')
+                        ? pokehub_candy_resource_kind_from_reward_type($type)
+                        : 'candy';
+                    $resource_html = function_exists('pokehub_render_pokemon_candy_reward_html')
+                        ? pokehub_render_pokemon_candy_reward_html(
+                            (int) $reward['pokemon_id'],
+                            $quantity,
+                            $kind
+                        )
+                        : '';
+                    $has_img = function_exists('pokehub_pokemon_candy_reward_markup_has_image')
+                        && pokehub_pokemon_candy_reward_markup_has_image($resource_html);
+
+                    $type_label = function_exists('pokehub_candy_resource_label_for_reward_type')
+                        ? pokehub_candy_resource_label_for_reward_type($type)
+                        : __('Candy', 'poke-hub');
                     ?>
-                    <div class="pokehub-collection-challenge-reward-item">
-                        <?php if ($pokemon_image_url) : ?>
-                            <div class="pokehub-collection-challenge-reward-image">
-                                <img src="<?php echo esc_url($pokemon_image_url); ?>" alt="<?php echo esc_attr($pokemon_name); ?>" />
+                    <div class="pokehub-collection-challenge-reward-item pokehub-collection-challenge-reward-item--resource">
+                        <?php if ($resource_html !== '') : ?>
+                            <div class="pokehub-collection-challenge-reward-image pokehub-collection-challenge-reward-image--resource">
+                                <?php echo $resource_html; ?>
                             </div>
                         <?php endif; ?>
-                        <div class="pokehub-collection-challenge-reward-info">
-                            <div class="pokehub-collection-challenge-reward-name">
-                                <?php echo esc_html($quantity); ?>x <?php echo esc_html($pokemon_name); ?> <?php echo esc_html($type_label); ?>
+                        <?php if ($has_img && $pokemon_name !== '') : ?>
+                            <div class="pokehub-collection-challenge-reward-info">
+                                <div class="pokehub-collection-challenge-reward-name">
+                                    <?php echo esc_html($pokemon_name . ' — ' . $type_label); ?>
+                                </div>
                             </div>
-                        </div>
+                        <?php endif; ?>
                     </div>
                     <?php
                 }

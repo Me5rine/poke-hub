@@ -91,11 +91,18 @@ add_action('init', function() {
     function pokehub_blocks_enqueue_frontend_assets() {
         wp_enqueue_style('pokehub-type-icons');
 
+        wp_enqueue_style(
+            'pokehub-candy-display',
+            POKE_HUB_URL . 'assets/css/poke-hub-candy-display.css',
+            [],
+            POKE_HUB_VERSION
+        );
+
         // CSS pour le bloc new-pokemon-evolutions
         wp_enqueue_style(
             'pokehub-new-pokemon-evolutions-front',
             POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
-            ['pokehub-type-icons'],
+            ['pokehub-type-icons', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
 
@@ -112,7 +119,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-blocks-front-style',
             POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
-            ['poke-hub-global-colors'],
+            ['poke-hub-global-colors', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
 
@@ -138,7 +145,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-collection-challenges-front',
             POKE_HUB_URL . 'assets/css/poke-hub-collection-challenges-front.css',
-            [],
+            ['pokehub-candy-display'],
             POKE_HUB_VERSION
         );
         
@@ -146,7 +153,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-special-research-front',
             POKE_HUB_URL . 'assets/css/poke-hub-special-research-front.css',
-            [],
+            ['pokehub-candy-display'],
             POKE_HUB_VERSION
         );
 

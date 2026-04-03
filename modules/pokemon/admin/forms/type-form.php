@@ -35,12 +35,24 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
 
     $current_slug  = $is_edit ? (string) $edit_row->slug       : '';
     $current_color = $is_edit ? (string) $edit_row->color      : '';
-    $current_icon  = $is_edit ? (string) $edit_row->icon       : '';
     $current_sort  = $is_edit ? (int)    $edit_row->sort_order : 0;
 
     if ($current_color === '') {
         $current_color = '#ffffff';
     }
+
+    $preview_slug = trim((string) $current_slug);
+    if ($preview_slug === '') {
+        if ($current_name_en !== '') {
+            $preview_slug = sanitize_title($current_name_en);
+        } elseif ($current_name_fr !== '') {
+            $preview_slug = sanitize_title($current_name_fr);
+        }
+    }
+
+    $preview_icon_url = ($preview_slug !== '' && function_exists('poke_hub_get_type_icon_url'))
+        ? poke_hub_get_type_icon_url($preview_slug)
+        : '';
 
     $back_url = add_query_arg(
         [
@@ -120,41 +132,36 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                     </div>
                 </div>
 
-                <!-- Icon -->
+                <!-- Icône (fichier SVG dans le bucket Réglages → Sources : {slug}.svg) -->
                 <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Icon', 'poke-hub'); ?></label>
-                    <p class="description"><?php esc_html_e('SVG only: choose an SVG in the media library or a URL whose path ends with .svg. The glyph uses the type color (teinte / pastilles).', 'poke-hub'); ?></p>
-                    <div class="pokehub-type-icon-field">
-                        <input type="hidden" class="pokehub-type-icon-url" name="icon" value="<?php echo esc_attr($current_icon); ?>" />
-                        
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <button type="button" class="button button-secondary pokehub-type-icon-select">
-                                <?php esc_html_e('Choose icon from library', 'poke-hub'); ?>
-                            </button>
-                            <button type="button" class="button pokehub-type-icon-remove" <?php disabled(empty($current_icon)); ?>>
-                                <?php esc_html_e('Remove icon', 'poke-hub'); ?>
-                            </button>
-                        </div>
-                        
-                        <div class="pokehub-type-icon-preview-wrap" style="margin-top:10px;">
-                            <div class="pokehub-type-icon-preview-inner"<?php echo $current_icon ? '' : ' style="display:none;"'; ?>>
-                                <div class="pokehub-type-icon-preview-slot">
-                                    <?php
-                                    if ($current_icon && function_exists('pokehub_render_pokemon_type_icon_html')) {
-                                        echo pokehub_render_pokemon_type_icon_html(
-                                            $current_icon,
-                                            [
-                                                'color'       => $current_color,
-                                                'class'       => 'pokehub-type-icon--admin-preview',
-                                                'aria_hidden' => true,
-                                            ]
-                                        );
-                                    }
-                                    ?>
-                                </div>
+                    <p class="description">
+                        <?php esc_html_e('The SVG file is resolved from plugin settings (Sources): path for types + slug + .svg. Only the accent color below is stored here; upload icons to your asset bucket, not the media library.', 'poke-hub'); ?>
+                    </p>
+                    <?php if ($preview_icon_url !== '' && function_exists('pokehub_render_pokemon_type_icon_html')) : ?>
+                        <?php
+                        $preview_html = pokehub_render_pokemon_type_icon_html(
+                            $preview_icon_url,
+                            [
+                                'color'       => $current_color,
+                                'class'       => 'pokehub-type-icon--admin-preview',
+                                'aria_hidden' => true,
+                            ]
+                        );
+                        ?>
+                        <?php if ($preview_html !== '') : ?>
+                            <div class="pokehub-type-icon-admin-readonly-preview" style="margin-top:10px;display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px;">
+                                <?php echo $preview_html; ?>
                             </div>
-                        </div>
-                    </div>
+                        <?php endif; ?>
+                        <p class="description" style="margin-top:8px;">
+                            <code><?php echo esc_html($preview_icon_url); ?></code>
+                        </p>
+                    <?php else : ?>
+                        <p class="description" style="margin-top:8px;color:#646970;">
+                            <?php esc_html_e('Enter a slug (or save once) to preview. Configure the types asset path under Poke Hub settings if the URL is empty.', 'poke-hub'); ?>
+                        </p>
+                    <?php endif; ?>
                 </div>
             </div>
 

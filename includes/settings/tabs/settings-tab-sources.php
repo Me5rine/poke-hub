@@ -314,7 +314,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/candies/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                    <?php _e('PNG: {slug}-candy.png, {slug}-xl-candy.png (e.g. pikachu-candy.png, pikachu-xl-candy.png)', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

@@ -516,7 +516,8 @@
 
 .pokehub-research-reward-stardust,
 .pokehub-research-reward-xp,
-.pokehub-research-reward-item {
+.pokehub-research-reward-item,
+.pokehub-research-reward-resource {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -546,6 +547,18 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+.pokehub-research-reward-image--resource {
+    width: auto;
+    min-width: 2.75rem;
+    height: auto;
+    min-height: 3rem;
+}
+
+.pokehub-research-reward-image--resource .pokehub-pokemon-candy-img {
+    width: 36px;
+    height: 36px;
 }
 
 .pokehub-research-reward-info {

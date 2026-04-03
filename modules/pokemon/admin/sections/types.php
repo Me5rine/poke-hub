@@ -164,22 +164,29 @@ class Poke_Hub_Pokemon_Types_List_Table extends WP_List_Table {
                 return $swatch . '<code>' . esc_html($color) . '</code>';
 
             case 'icon':
-                if (!empty($item->icon) && function_exists('pokehub_render_pokemon_type_icon_html')) {
-                    $tint = trim((string) $item->color);
-                    if ($tint === '') {
-                        $tint = '#1d2327';
-                    }
-                    return sprintf(
-                        '<span class="pokehub-type-icon-list-cell" style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px;">%s</span>',
-                        pokehub_render_pokemon_type_icon_html(
-                            (string) $item->icon,
+                $slug = isset($item->slug) ? trim((string) $item->slug) : '';
+                $tint = trim((string) $item->color);
+                if ($tint === '') {
+                    $tint = '#1d2327';
+                }
+                if ($slug !== '' && function_exists('poke_hub_get_type_icon_url') && function_exists('pokehub_render_pokemon_type_icon_html')) {
+                    $icon_url = poke_hub_get_type_icon_url($slug);
+                    if ($icon_url !== '') {
+                        $html = pokehub_render_pokemon_type_icon_html(
+                            $icon_url,
                             [
                                 'color'       => $tint,
                                 'class'       => 'pokehub-type-icon--admin-list',
                                 'aria_hidden' => true,
                             ]
-                        )
-                    );
+                        );
+                        if ($html !== '') {
+                            return sprintf(
+                                '<span class="pokehub-type-icon-list-cell" style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px;">%s</span>',
+                                $html
+                            );
+                        }
+                    }
                 }
                 return '–';
 
@@ -635,13 +642,7 @@ function poke_hub_pokemon_handle_types_form() {
 
     $slug       = isset($_POST['slug']) ? sanitize_title($_POST['slug']) : '';
     $color      = isset($_POST['color']) ? sanitize_text_field($_POST['color']) : '';
-    $icon = isset($_POST['icon']) ? esc_url_raw(wp_unslash((string) $_POST['icon'])) : '';
     $sort_order = isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0;
-
-    if ($icon !== '' && function_exists('pokehub_type_icon_url_is_empty_or_svg') && !pokehub_type_icon_url_is_empty_or_svg($icon)) {
-        wp_redirect(add_query_arg('ph_msg', 'icon_not_svg', $redirect_base));
-        exit;
-    }
 
     // 🔹 NEW : météos sélectionnées
     $weather_ids = [];
@@ -732,7 +733,7 @@ function poke_hub_pokemon_handle_types_form() {
         'name_en'    => $name_en,
         'name_fr'    => $name_fr,
         'color'      => $color,
-        'icon'       => $icon,
+        'icon'       => '',
         'sort_order' => $sort_order,
     ];
     $format = ['%s', '%s', '%s', '%s', '%s', '%d'];
@@ -1257,8 +1258,6 @@ function poke_hub_pokemon_admin_types_screen() {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Type deleted.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'missing_name') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Name is required.', 'poke-hub') . '</p></div>';
-        } elseif ($msg === 'icon_not_svg') {
-            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Type icon must be an SVG file or a URL whose path ends with .svg', 'poke-hub') . '</p></div>';
         }
     }
     ?>

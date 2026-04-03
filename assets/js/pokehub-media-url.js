@@ -134,7 +134,7 @@
         }
     });
 
-    // 4) Initialisation sur l’admin Poké HUB (Types + Events spéciaux)
+    // 4) Initialisation sur l’admin Poké HUB (événements spéciaux ; couleur formulaire types)
     $(document).ready(function(){
 
         if (typeof pokemonTypesMedia === 'undefined' &&
@@ -142,144 +142,9 @@
             return;
         }
 
-        function pokehubGetTypeFormColor() {
-            const $c = $('#type_color');
-            if (!$c.length) {
-                return '#333333';
-            }
-            return $c.val() || '#333333';
-        }
-
-        function pokehubIsTypeIconSvgUrl(url) {
-            if (!url || typeof url !== 'string') {
-                return false;
-            }
-            const path = url.split(/[?#]/)[0];
-            return /\.svg$/i.test(path);
-        }
-
-        function pokehubAttachmentIsSvg(data) {
-            if (!data) {
-                return false;
-            }
-            const mime = (data.mime || '').toLowerCase();
-            if (mime === 'image/svg+xml') {
-                return true;
-            }
-            return pokehubIsTypeIconSvgUrl(data.url || '');
-        }
-
-        function pokehubTypeIconSvgOnlyMessage() {
-            return (pokemonTypesMedia && pokemonTypesMedia.svgOnly)
-                ? pokemonTypesMedia.svgOnly
-                : 'SVG only.';
-        }
-
-        function pokehubRefreshTypeIconPreview($field) {
-            if (typeof pokehubTypeIconPreview === 'undefined') {
-                return;
-            }
-            const $input = $field.find('.pokehub-type-icon-url');
-            const url = ($input.val() || '').trim();
-            const $inner = $field.find('.pokehub-type-icon-preview-inner');
-            const $slot = $field.find('.pokehub-type-icon-preview-slot');
-            const $removeBtn = $field.find('.pokehub-type-icon-remove');
-            if (!url) {
-                $slot.empty();
-                $inner.hide();
-                $removeBtn.prop('disabled', true);
-                return;
-            }
-            if (!pokehubIsTypeIconSvgUrl(url)) {
-                $slot.empty();
-                $inner.hide();
-                return;
-            }
-            $.post(pokehubTypeIconPreview.ajaxUrl, {
-                action: pokehubTypeIconPreview.action,
-                nonce: pokehubTypeIconPreview.nonce,
-                url: url,
-                color: pokehubGetTypeFormColor()
-            }).done(function (res) {
-                if (res && res.success && res.data && res.data.html) {
-                    $slot.html(res.data.html);
-                    $inner.show();
-                    $removeBtn.prop('disabled', false);
-                }
-            });
-        }
-
         if (typeof $.fn.wpColorPicker !== 'undefined' && $('#type_color').length) {
-            $('#type_color').wpColorPicker({
-                change: function () {
-                    $('.pokehub-type-icon-field').each(function () {
-                        const $f = $(this);
-                        if ($f.find('.pokehub-type-icon-url').val()) {
-                            pokehubRefreshTypeIconPreview($f);
-                        }
-                    });
-                }
-            });
+            $('#type_color').wpColorPicker();
         }
-
-        /**
-         * === TYPES ===
-         * Bouton "Choisir dans la médiathèque" pour les types (icône de type)
-         */
-        $(document).on('click', '.pokehub-type-icon-select', function(e){
-            e.preventDefault();
-
-            const $field   = $(this).closest('.pokehub-type-icon-field');
-            const $input   = $field.find('.pokehub-type-icon-url');
-
-            const frame = new wp.media.view.MediaFrame.PokeHubTypes({
-                title: pokemonTypesMedia.selectTitle || 'Select or Upload Image',
-                button: {
-                    text: pokemonTypesMedia.buttonText || 'Use this image'
-                },
-                multiple: false
-            });
-
-            // Pré-remplir l’onglet URL avec la valeur actuelle
-            frame.on('open', function(){
-                const state = frame.state('pokehub-types-url');
-                if (state) {
-                    state.props.set({
-                        url: $input.val() || ''
-                    });
-                }
-            });
-
-            // Sélection depuis la médiathèque
-            frame.on('select', function(){
-                const attachment = frame.state().get('selection').first();
-                if (!attachment) return;
-
-                const data = attachment.toJSON();
-                if (!pokehubAttachmentIsSvg(data)) {
-                    window.alert(pokehubTypeIconSvgOnlyMessage());
-                    return;
-                }
-                $input.val(data.url || '');
-                pokehubRefreshTypeIconPreview($field);
-            });
-
-            // Insertion via l’onglet URL
-            frame.on('insert', function(state){
-                if (!state || state.id !== 'pokehub-types-url') return;
-                const url = state.props.get('url');
-                if (!url) return;
-                if (!pokehubIsTypeIconSvgUrl(url)) {
-                    window.alert(pokehubTypeIconSvgOnlyMessage());
-                    return;
-                }
-
-                $input.val(url);
-                pokehubRefreshTypeIconPreview($field);
-            });
-
-            frame.open();
-        });
 
         /**
          * === ÉVÉNEMENTS SPÉCIAUX ===
@@ -389,20 +254,6 @@
             );
 
             $(this).hide();
-        });
-
-        // Bouton "Remove image" pour les types
-        $(document).on('click', '.pokehub-type-icon-remove', function(e){
-            e.preventDefault();
-
-            const $field   = $(this).closest('.pokehub-type-icon-field');
-            const $input   = $field.find('.pokehub-type-icon-url');
-
-            $input.val('');
-            $field.find('.pokehub-type-icon-preview-slot').empty();
-            $field.find('.pokehub-type-icon-preview-inner').hide();
-
-            $(this).prop('disabled', true);
         });
 
     });

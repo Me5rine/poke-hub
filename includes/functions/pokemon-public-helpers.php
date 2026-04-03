@@ -491,7 +491,7 @@ function pokehub_get_pokemon_type_color(int $pokemon_id): string {
  * Gère les tables locales ou distantes comme pokehub_get_pokemon_type_color().
  *
  * @param int $pokemon_id ID du Pokémon
- * @return array<int, array{id:int|string, slug:string, name_fr:string, name_en:string, color:string, icon:string}>
+ * @return array<int, array{id:int|string, slug:string, name_fr:string, name_en:string, color:string, icon:string}> icon : URL .svg dérivée du slug (Réglages → Sources), pas de champ BDD.
  */
 function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
     if (!function_exists('pokehub_get_table')) {
@@ -532,7 +532,7 @@ function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
 
     $types = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT t.id, t.slug, t.name_fr, t.name_en, t.color, t.icon
+            "SELECT t.id, t.slug, t.name_fr, t.name_en, t.color
              FROM {$types_table} t
              INNER JOIN {$type_links_table} ptl ON t.id = ptl.type_id
              WHERE ptl.pokemon_id = %d
@@ -548,7 +548,10 @@ function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
 
     foreach ($types as &$t) {
         $t['color'] = isset($t['color']) ? trim((string) $t['color']) : '';
-        $t['icon']  = isset($t['icon']) ? trim((string) $t['icon']) : '';
+        $slug       = isset($t['slug']) ? trim((string) $t['slug']) : '';
+        $t['icon']  = ($slug !== '' && function_exists('poke_hub_get_type_icon_url'))
+            ? poke_hub_get_type_icon_url($slug)
+            : '';
     }
     unset($t);
 
@@ -2244,7 +2247,7 @@ function poke_hub_get_assets_bucket_base_url(): string {
 /**
  * Récupère le chemin spécifique pour un type d'asset
  *
- * @param string $asset_type Type d'asset ('icons', 'habitats', 'bonus', 'types', 'vivillon', 'fallback')
+ * @param string $asset_type Type d'asset ('icons', 'habitats', 'bonus', 'types', 'vivillon', 'teams', 'candies', 'mega_energies', 'fallback')
  * @return string Chemin spécifique
  */
 function poke_hub_get_assets_path(string $asset_type): string {
@@ -2255,6 +2258,8 @@ function poke_hub_get_assets_path(string $asset_type): string {
         'types' => get_option('poke_hub_assets_path_types', '/pokemon-go/types/'),
         'vivillon' => get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/'),
         'teams' => get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/'),
+        'candies' => get_option('poke_hub_assets_path_candies', '/pokemon-go/candies/'),
+        'mega_energies' => get_option('poke_hub_assets_path_mega_energies', '/pokemon-go/mega-energies/'),
         'fallback' => get_option('poke_hub_assets_path_fallback', '/pokemon-go/icons/home/'),
     ];
     
@@ -2305,13 +2310,253 @@ function poke_hub_get_bonus_icon_url(string $slug): string {
 }
 
 /**
+ * URL de l’image bonbon d’une famille (fichier {slug}-candy.png dans le dossier configuré pour les candies).
+ *
+ * @param string $pokemon_slug Slug du Pokémon dont le nom porte le bonbon (souvent l’espèce de base de la lignée).
+ */
+function poke_hub_get_pokemon_candy_image_url(string $pokemon_slug): string {
+    $slug = sanitize_title($pokemon_slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    return poke_hub_get_asset_url('candies', $slug . '-candy', 'png');
+}
+
+/**
+ * URL de l’image bonbon XL ({slug}-xl-candy.png, même dossier « Candies » que les bonbons classiques).
+ */
+function poke_hub_get_pokemon_xl_candy_image_url(string $pokemon_slug): string {
+    $slug = sanitize_title($pokemon_slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    return poke_hub_get_asset_url('candies', $slug . '-xl-candy', 'png');
+}
+
+/**
+ * URL de l’image méga-énergie (slug.png dans le dossier configuré).
+ */
+function poke_hub_get_pokemon_mega_energy_image_url(string $pokemon_slug): string {
+    $slug = sanitize_title($pokemon_slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    return poke_hub_get_asset_url('mega_energies', $slug, 'png');
+}
+
+/**
+ * Balises HTML autorisées pour le rendu bonbon / méga-énergie.
+ *
+ * @return array<string, array<string, bool>>
+ */
+function pokehub_pokemon_candy_reward_allowed_html(): array {
+    return [
+        'span' => [
+            'class'       => true,
+            'role'        => true,
+            'aria-label'  => true,
+            'aria-hidden' => true,
+        ],
+        'img'  => [
+            'src'      => true,
+            'alt'      => true,
+            'class'    => true,
+            'width'    => true,
+            'height'   => true,
+            'loading'  => true,
+            'decoding' => true,
+        ],
+    ];
+}
+
+/**
+ * Indique si le marquage contient une image de ressource (bonbon / méga-énergie).
+ */
+function pokehub_pokemon_candy_reward_markup_has_image(string $html): bool {
+    return $html !== '' && strpos($html, 'pokehub-pokemon-candy-img') !== false;
+}
+
+/**
+ * @return string candy|xl_candy|mega_energy
+ */
+function pokehub_candy_resource_kind_from_reward_type(string $type): string {
+    $type = sanitize_key($type);
+    if ($type === 'mega_energy') {
+        return 'mega_energy';
+    }
+    if ($type === 'xl_candy') {
+        return 'xl_candy';
+    }
+
+    return 'candy';
+}
+
+/**
+ * Libellé court pour l’affichage (traduisible, ex. FR : Bonbon / Bonbon XL).
+ */
+function pokehub_candy_resource_label_for_reward_type(string $type): string {
+    $type = sanitize_key($type);
+    if ($type === 'xl_candy') {
+        /* translators: Pokémon GO XL Candy resource name */
+        return __('XL Candy', 'poke-hub');
+    }
+    if ($type === 'mega_energy') {
+        return __('Mega Energy', 'poke-hub');
+    }
+
+    return __('Candy', 'poke-hub');
+}
+
+/**
+ * Icône asset (bonbon, bonbon XL ou méga-énergie) + quantité ×N ; texte de repli si pas d’URL.
+ *
+ * @param int    $pokemon_id ID du Pokémon associé à la ressource.
+ * @param int    $quantity   Quantité affichée (×N).
+ * @param string $kind       candy|xl_candy|mega_energy
+ * @param array  $args       extra_class, img_size
+ */
+function pokehub_render_pokemon_candy_reward_html(int $pokemon_id, int $quantity, string $kind = 'candy', array $args = []): string {
+    $args = wp_parse_args(
+        $args,
+        [
+            'extra_class' => '',
+            'img_size'    => 40,
+        ]
+    );
+
+    $kind = sanitize_key($kind);
+    if (!in_array($kind, ['candy', 'xl_candy', 'mega_energy'], true)) {
+        $kind = 'candy';
+    }
+    $qty = max(1, $quantity);
+
+    if ($pokemon_id <= 0 || !function_exists('pokehub_get_pokemon_data_by_id')) {
+        return '';
+    }
+
+    $pdata = pokehub_get_pokemon_data_by_id($pokemon_id);
+    if (!$pdata || empty($pdata['slug'])) {
+        return '';
+    }
+
+    $slug = (string) $pdata['slug'];
+    if ($kind === 'mega_energy') {
+        $url = poke_hub_get_pokemon_mega_energy_image_url($slug);
+    } elseif ($kind === 'xl_candy') {
+        $url = poke_hub_get_pokemon_xl_candy_image_url($slug);
+    } else {
+        $url = poke_hub_get_pokemon_candy_image_url($slug);
+    }
+
+    $name_fr = isset($pdata['name_fr']) ? (string) $pdata['name_fr'] : '';
+    $name_en = isset($pdata['name_en']) ? (string) $pdata['name_en'] : '';
+    $pname   = $name_fr !== '' ? $name_fr : ($name_en !== '' ? $name_en : '');
+
+    if ($kind === 'mega_energy') {
+        $label = $pname !== ''
+            ? sprintf(
+                /* translators: 1: mega energy quantity, 2: Pokémon name */
+                __('Mega Energy ×%1$d (%2$s)', 'poke-hub'),
+                $qty,
+                $pname
+            )
+            : sprintf(__('Mega Energy ×%d', 'poke-hub'), $qty);
+        $fallback = $pname !== ''
+            ? sprintf(
+                /* translators: 1: Pokémon name, 2: quantity (formatted) */
+                __('%1$s Mega Energy × %2$s', 'poke-hub'),
+                $pname,
+                number_format_i18n($qty)
+            )
+            : sprintf(
+                /* translators: %s: quantity (formatted) */
+                __('Mega Energy × %s', 'poke-hub'),
+                number_format_i18n($qty)
+            );
+    } elseif ($kind === 'xl_candy') {
+        $label = $pname !== ''
+            ? sprintf(
+                /* translators: 1: XL candy quantity, 2: Pokémon family name */
+                __('Pokémon XL candy ×%1$d (%2$s)', 'poke-hub'),
+                $qty,
+                $pname
+            )
+            : sprintf(__('Pokémon XL candy ×%d', 'poke-hub'), $qty);
+        $fallback = $pname !== ''
+            ? sprintf(
+                /* translators: 1: Pokémon name, 2: quantity (formatted) */
+                __('%1$s XL Candy × %2$s', 'poke-hub'),
+                $pname,
+                number_format_i18n($qty)
+            )
+            : sprintf(
+                /* translators: %s: quantity (formatted) */
+                __('XL Candy × %s', 'poke-hub'),
+                number_format_i18n($qty)
+            );
+    } else {
+        $label = $pname !== ''
+            ? sprintf(
+                /* translators: 1: candy quantity, 2: Pokémon family name */
+                __('Pokémon candy ×%1$d (%2$s)', 'poke-hub'),
+                $qty,
+                $pname
+            )
+            : sprintf(__('Pokémon candy ×%d', 'poke-hub'), $qty);
+        $fallback = $pname !== ''
+            ? sprintf(
+                /* translators: 1: Pokémon name, 2: quantity (formatted) */
+                __('%1$s Candy × %2$s', 'poke-hub'),
+                $pname,
+                number_format_i18n($qty)
+            )
+            : sprintf(
+                /* translators: %s: quantity (formatted) */
+                __('Candy × %s', 'poke-hub'),
+                number_format_i18n($qty)
+            );
+    }
+
+    $classes = trim('pokehub-pokemon-candy ' . (string) $args['extra_class']);
+    $size    = (int) $args['img_size'];
+    $size    = $size > 0 ? $size : 40;
+
+    if ($url !== '') {
+        $inner = sprintf(
+            '<span class="%s" role="group" aria-label="%s">'
+            . '<img src="%s" alt="" class="pokehub-pokemon-candy-img" width="%d" height="%d" loading="lazy" decoding="async" />'
+            . '<span class="pokehub-pokemon-candy-qty" aria-hidden="true">×%s</span>'
+            . '</span>',
+            esc_attr($classes),
+            esc_attr($label),
+            esc_url($url),
+            $size,
+            $size,
+            esc_html((string) $qty)
+        );
+    } else {
+        $inner = sprintf(
+            '<span class="%s pokehub-pokemon-candy--text" role="group" aria-label="%s">%s</span>',
+            esc_attr($classes),
+            esc_attr($label),
+            esc_html($fallback)
+        );
+    }
+
+    return wp_kses($inner, pokehub_pokemon_candy_reward_allowed_html());
+}
+
+/**
  * Récupère l'URL de l'icône d'un type
  *
  * @param string $slug Slug du type
  * @return string URL de l'icône
  */
 function poke_hub_get_type_icon_url(string $slug): string {
-    return poke_hub_get_asset_url('types', $slug);
+    return poke_hub_get_asset_url('types', $slug, 'svg');
 }
 
 /**

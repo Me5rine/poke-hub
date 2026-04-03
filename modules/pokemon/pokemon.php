@@ -63,57 +63,12 @@ function poke_hub_pokemon_admin_assets($hook) {
         'pokehub-media-url',
         'pokemonTypesMedia',
         [
-            'selectTitle' => __('Select or Upload Type Icon', 'poke-hub'),
+            'selectTitle' => __('Select or Upload Image', 'poke-hub'),
             'buttonText'  => __('Use this image', 'poke-hub'),
             'tabUrl'      => __('Insert from URL', 'poke-hub'),
             'inputLabel'  => __('Image URL:', 'poke-hub'),
             'inputDesc'   => __('Enter a direct image URL to use instead of the media library.', 'poke-hub'),
-            'svgOnly'     => __('The type icon must be an SVG (file or URL ending in .svg).', 'poke-hub'),
-        ]
-    );
-
-    wp_localize_script(
-        'pokehub-media-url',
-        'pokehubTypeIconPreview',
-        [
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'action'  => 'pokehub_type_icon_preview',
-            'nonce'   => wp_create_nonce('pokehub_type_icon_preview'),
         ]
     );
 }
-
-/**
- * Prévisualisation AJAX de l’icône type (SVG teinté comme en PHP).
- */
-function poke_hub_ajax_type_icon_preview(): void {
-    check_ajax_referer('pokehub_type_icon_preview', 'nonce');
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'forbidden']);
-    }
-
-    $url = isset($_POST['url']) ? esc_url_raw(wp_unslash($_POST['url'])) : '';
-    $color = isset($_POST['color']) ? sanitize_text_field(wp_unslash($_POST['color'])) : '';
-
-    if ($url === '' || !function_exists('pokehub_render_pokemon_type_icon_html')) {
-        wp_send_json_error(['message' => 'bad_request']);
-    }
-
-    if (function_exists('pokehub_type_icon_url_path_ends_with_svg') && !pokehub_type_icon_url_path_ends_with_svg($url)) {
-        wp_send_json_error(['message' => 'not_svg']);
-    }
-
-    $html = pokehub_render_pokemon_type_icon_html(
-        $url,
-        [
-            'color'       => $color,
-            'class'       => 'pokehub-type-icon--admin-preview',
-            'aria_hidden' => true,
-        ]
-    );
-
-    wp_send_json_success(['html' => $html]);
-}
-add_action('wp_ajax_pokehub_type_icon_preview', 'poke_hub_ajax_type_icon_preview');
 add_action('admin_enqueue_scripts', 'poke_hub_pokemon_admin_assets');

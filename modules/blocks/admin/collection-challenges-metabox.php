@@ -158,6 +158,7 @@ function pokehub_render_collection_challenges_metabox($post) {
                 '<option value="stardust"><?php echo esc_js(__('Stardust', 'poke-hub')); ?></option>' +
                 '<option value="xp"><?php echo esc_js(__('XP', 'poke-hub')); ?></option>' +
                 '<option value="candy"><?php echo esc_js(__('Candy', 'poke-hub')); ?></option>' +
+                '<option value="xl_candy"><?php echo esc_js(__('XL Candy', 'poke-hub')); ?></option>' +
                 '<option value="mega_energy"><?php echo esc_js(__('Mega Energy', 'poke-hub')); ?></option>' +
                 '<option value="item"><?php echo esc_js(__('Item', 'poke-hub')); ?></option>' +
                 '</select></label>' +
@@ -209,7 +210,7 @@ function pokehub_render_collection_challenges_metabox($post) {
                     '<label><?php echo esc_js(__('Quantity', 'poke-hub')); ?>: ' +
                     '<input type="number" name="pokehub_collection_challenges[' + challengeIndex + '][rewards][' + rewardIndex + '][quantity]" value="1" min="1" /></label>'
                 );
-            } else if (type === 'candy' || type === 'mega_energy') {
+            } else if (type === 'candy' || type === 'xl_candy' || type === 'mega_energy') {
                 fieldsContainer.html(
                     '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
                     '<select name="pokehub_collection_challenges[' + challengeIndex + '][rewards][' + rewardIndex + '][pokemon_id]" class="pokehub-select-pokemon-resource" style="width: 100%;"></select></label>' +
@@ -495,6 +496,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                                 <option value="stardust" <?php selected($reward['type'] ?? '', 'stardust'); ?>><?php _e('Stardust', 'poke-hub'); ?></option>
                                 <option value="xp" <?php selected($reward['type'] ?? '', 'xp'); ?>><?php _e('XP', 'poke-hub'); ?></option>
                                 <option value="candy" <?php selected($reward['type'] ?? '', 'candy'); ?>><?php _e('Candy', 'poke-hub'); ?></option>
+                                <option value="xl_candy" <?php selected($reward['type'] ?? '', 'xl_candy'); ?>><?php _e('XL Candy', 'poke-hub'); ?></option>
                                 <option value="mega_energy" <?php selected($reward['type'] ?? '', 'mega_energy'); ?>><?php _e('Mega Energy', 'poke-hub'); ?></option>
                                 <option value="item" <?php selected($reward['type'] ?? '', 'item'); ?>><?php _e('Item', 'poke-hub'); ?></option>
                             </select>
@@ -566,7 +568,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                                     <input type="number" name="pokehub_collection_challenges[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][quantity]" value="<?php echo esc_attr($reward['quantity'] ?? 1); ?>" min="1" />
                                 </label>
                                 <?php
-                            } elseif ($reward_type === 'candy' || $reward_type === 'mega_energy') {
+                            } elseif (in_array($reward_type, ['candy', 'xl_candy', 'mega_energy'], true)) {
                                 $selected_pokemon_id = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
                                 ?>
                                 <label><?php _e('Pokémon', 'poke-hub'); ?>: 

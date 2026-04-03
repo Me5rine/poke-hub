@@ -134,6 +134,9 @@ function pokehub_clean_research_reward(array $reward): array {
         $cleaned_reward['pokemon_ids'] = array_values(array_unique(array_map('intval', array_filter($pokemon_ids, function ($id) {
             return $id !== '' && $id !== null && is_numeric($id) && (int) $id > 0;
         }))));
+    } elseif (in_array($cleaned_reward['type'], ['candy', 'xl_candy', 'mega_energy'], true)) {
+        $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
+        $cleaned_reward['quantity']   = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
     } elseif ($cleaned_reward['type'] === 'item') {
         $cleaned_reward['item_id'] = isset($reward['item_id']) ? (int) $reward['item_id'] : 0;
         if ($cleaned_reward['item_id'] > 0 && function_exists('pokehub_get_item_data_by_id')) {

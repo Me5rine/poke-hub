@@ -59,7 +59,7 @@ function pokehub_save_collection_challenges(int $post_id, array $challenges): vo
                     } else {
                         $cleaned_reward['pokemon_ids'] = [];
                     }
-                } elseif ($cleaned_reward['type'] === 'candy' || $cleaned_reward['type'] === 'mega_energy') {
+                } elseif (in_array($cleaned_reward['type'], ['candy', 'xl_candy', 'mega_energy'], true)) {
                     $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
                     $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
                 } elseif ($cleaned_reward['type'] === 'item') {

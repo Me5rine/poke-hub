@@ -623,7 +623,7 @@ function pokehub_content_normalize_quest_rewards(array $rewards) {
                     }
                 }
             }
-        } elseif ($type === 'candy' || $type === 'mega_energy') {
+        } elseif (in_array($type, ['candy', 'xl_candy', 'mega_energy'], true)) {
             $norm['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
             $norm['quantity']   = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
         } elseif ($type === 'item') {
@@ -786,7 +786,7 @@ function pokehub_quests_clean_from_request(array $quests) {
                         }
                     }
                     $cleaned_reward['pokemon_genders'] = $pokemon_genders;
-                } elseif ($cleaned_reward['type'] === 'candy' || $cleaned_reward['type'] === 'mega_energy') {
+                } elseif (in_array($cleaned_reward['type'], ['candy', 'xl_candy', 'mega_energy'], true)) {
                     $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
                     $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
                 } elseif ($cleaned_reward['type'] === 'item') {

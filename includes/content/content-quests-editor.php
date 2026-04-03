@@ -62,6 +62,7 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                 <option value="stardust" <?php selected($reward['type'] ?? '', 'stardust'); ?>><?php _e('Stardust', 'poke-hub'); ?></option>
                                 <option value="xp" <?php selected($reward['type'] ?? '', 'xp'); ?>><?php _e('XP', 'poke-hub'); ?></option>
                                 <option value="candy" <?php selected($reward['type'] ?? '', 'candy'); ?>><?php _e('Candy', 'poke-hub'); ?></option>
+                                <option value="xl_candy" <?php selected($reward['type'] ?? '', 'xl_candy'); ?>><?php _e('XL Candy', 'poke-hub'); ?></option>
                                 <option value="mega_energy" <?php selected($reward['type'] ?? '', 'mega_energy'); ?>><?php _e('Mega Energy', 'poke-hub'); ?></option>
                                 <option value="item" <?php selected($reward['type'] ?? '', 'item'); ?>><?php _e('Item', 'poke-hub'); ?></option>
                             </select>
@@ -71,7 +72,9 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                         $reward_type = $reward['type'] ?? 'pokemon';
                         $is_pokemon = $reward_type === 'pokemon';
                         $is_candy = $reward_type === 'candy';
+                        $is_xl_candy = $reward_type === 'xl_candy';
                         $is_mega_energy = $reward_type === 'mega_energy';
+                        $is_pokemon_resource_reward = $is_candy || $is_xl_candy || $is_mega_energy;
                         $selected_pokemon_ids = isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])
                             ? array_map('intval', $reward['pokemon_ids'])
                             : (isset($reward['pokemon_id']) ? [(int) $reward['pokemon_id']] : []);
@@ -134,7 +137,7 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                             </div>
                         </div>
 
-                        <div class="pokehub-reward-pokemon-resource-fields" style="display:<?php echo ($is_candy || $is_mega_energy) ? 'block' : 'none'; ?>;">
+                        <div class="pokehub-reward-pokemon-resource-fields" style="display:<?php echo $is_pokemon_resource_reward ? 'block' : 'none'; ?>;">
                             <label><?php _e('Pokémon', 'poke-hub'); ?>:
                                 <select
                                     name="<?php echo esc_attr($name_prefix); ?>[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][pokemon_id]"
@@ -162,22 +165,23 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                     ?>
                                 </select>
                             </label>
-                            <label class="pokehub-reward-quantity-field" style="display:<?php echo ($is_candy || $is_mega_energy) ? 'block' : 'none'; ?>;">
+                            <label class="pokehub-reward-quantity-field" style="display:<?php echo $is_pokemon_resource_reward ? 'block' : 'none'; ?>;">
                                 <?php _e('Quantity', 'poke-hub'); ?>:
                                 <input type="number" name="<?php echo esc_attr($name_prefix); ?>[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][quantity]" value="<?php echo esc_attr($reward['quantity'] ?? 1); ?>" min="1" />
                             </label>
                         </div>
 
-                        <div class="pokehub-reward-other-fields" style="display:<?php echo ($is_pokemon || $is_candy || $is_mega_energy) ? 'none' : 'block'; ?>;">
+                        <div class="pokehub-reward-other-fields" style="display:<?php echo ($is_pokemon || $is_pokemon_resource_reward) ? 'none' : 'block'; ?>;">
                             <?php
                             $reward_type = $reward['type'] ?? '';
                             $is_stardust = $reward_type === 'stardust';
                             $is_xp = $reward_type === 'xp';
                             $is_item = $reward_type === 'item';
                             $is_candy_reward = $reward_type === 'candy';
+                            $is_xl_candy_reward = $reward_type === 'xl_candy';
                             $is_mega_energy_reward = $reward_type === 'mega_energy';
                             ?>
-                            <label class="pokehub-reward-quantity-field" style="display:<?php echo ($is_stardust || $is_xp || $is_item || $is_candy_reward || $is_mega_energy_reward) ? 'block' : 'none'; ?>;">
+                            <label class="pokehub-reward-quantity-field" style="display:<?php echo ($is_stardust || $is_xp || $is_item || $is_candy_reward || $is_xl_candy_reward || $is_mega_energy_reward) ? 'block' : 'none'; ?>;">
                                 <?php _e('Quantity', 'poke-hub'); ?>:
                                 <input type="number" name="<?php echo esc_attr($name_prefix); ?>[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][quantity]" value="<?php echo esc_attr($reward['quantity'] ?? 1); ?>" min="1" />
                             </label>
