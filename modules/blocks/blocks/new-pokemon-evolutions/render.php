@@ -413,6 +413,88 @@ function pokehub_find_base_pokemon($pokemon_id) {
 }
 
 /**
+ * Indique si le Pokémon racine (bébé GO) utilise la famille de bonbons de son évolution directe
+ * (ex. Pichu → bonbons Pikachu).
+ *
+ * Exception : Togepi, Tyrogue (Debugant), Toxel (Toxizap) sont des bébés dont le bonbon porte
+ * le nom du pré-évolu (Pokémon de base de la lignée) — on ne décale jamais vers la cible.
+ *
+ * @param string $slug Slug du Pokémon racine (forme par défaut).
+ * @return bool
+ */
+if (!function_exists('pokehub_pokemon_slug_uses_parent_line_candy')) {
+function pokehub_pokemon_slug_uses_parent_line_candy(string $slug): bool {
+    $slug = strtolower(trim($slug));
+
+    static $candy_named_after_baby = null;
+    if ($candy_named_after_baby === null) {
+        $candy_named_after_baby = array_flip(['togepi', 'tyrogue', 'toxel']);
+    }
+    if (isset($candy_named_after_baby[$slug])) {
+        return false;
+    }
+
+    /**
+     * Forcer le comportement par slug (true/false). null = liste intégrée.
+     *
+     * @param bool|null $use_parent null par défaut.
+     * @param string    $slug       Slug normalisé en minuscules.
+     */
+    $forced = apply_filters('pokehub_pokemon_slug_uses_parent_line_candy', null, $slug);
+    if ($forced === true) {
+        return true;
+    }
+    if ($forced === false) {
+        return false;
+    }
+
+    static $babies = null;
+    if ($babies === null) {
+        $babies = array_flip([
+            'pichu', 'cleffa', 'igglybuff', 'smoochum', 'elekid', 'magby',
+            'azurill', 'wynaut', 'budew', 'chingling', 'bonsly', 'mime-jr',
+            'happiny', 'munchlax', 'riolu', 'mantyke',
+        ]);
+    }
+
+    return isset($babies[$slug]);
+}
+}
+
+/**
+ * ID du Pokémon à utiliser pour l’affichage des bonbons (asset {slug}-candy) à partir du prédécesseur immédiat d’une évolution.
+ * Toujours la racine de la lignée, sauf bébés GO (bonbons de la première évolution).
+ *
+ * @param int $evolving_from_id base_pokemon_id de la ligne d’évolution (celui qui consomme les bonbons).
+ * @return int
+ */
+if (!function_exists('pokehub_resolve_candy_display_pokemon_id')) {
+function pokehub_resolve_candy_display_pokemon_id(int $evolving_from_id): int {
+    if ($evolving_from_id <= 0) {
+        return $evolving_from_id;
+    }
+
+    $base = pokehub_find_base_pokemon($evolving_from_id);
+    if (!$base || empty($base['id'])) {
+        return $evolving_from_id;
+    }
+
+    $root_id = (int) $base['id'];
+    $slug    = isset($base['slug']) ? (string) $base['slug'] : '';
+
+    if ($slug !== '' && pokehub_pokemon_slug_uses_parent_line_candy($slug)) {
+        $form_id = isset($base['form_variant_id']) ? (int) $base['form_variant_id'] : 0;
+        $outs    = pokehub_get_pokemon_evolutions_out($root_id, $form_id);
+        if (!empty($outs[0]['target_id'])) {
+            return (int) $outs[0]['target_id'];
+        }
+    }
+
+    return $root_id;
+}
+}
+
+/**
  * Construit récursivement la structure d'évolution d'un Pokémon avec ses branches
  * 
  * @param int $pokemon_id ID du Pokémon
@@ -504,8 +586,9 @@ function pokehub_render_evolution_conditions_block(array $evolution): string {
     if (!empty($evolution['candy_cost']) && (int) $evolution['candy_cost'] > 0
         && !empty($evolution['base_pokemon_id'])
         && function_exists('pokehub_render_pokemon_candy_reward_html')) {
-        $candy_html = pokehub_render_pokemon_candy_reward_html(
-            (int) $evolution['base_pokemon_id'],
+        $candy_pokemon_id = pokehub_resolve_candy_display_pokemon_id((int) $evolution['base_pokemon_id']);
+        $candy_html       = pokehub_render_pokemon_candy_reward_html(
+            $candy_pokemon_id,
             (int) $evolution['candy_cost'],
             'candy',
             ['extra_class' => 'pokehub-evolution-candy']
@@ -726,7 +809,16 @@ ob_start();
                             $type_icon  = isset($ptype['icon']) ? trim((string) $ptype['icon']) : '';
                             $pill_style = $type_color !== '' ? '--pokehub-type-pill-color: ' . esc_attr($type_color) . ';' : '';
                             ?>
-                            <span class="pokehub-type-pill" role="listitem" <?php echo $pill_style !== '' ? ' style="' . $pill_style . '"' : ''; ?> title="<?php echo esc_attr($type_label); ?>">
+                            <span
+                                class="pokehub-type-pill pokehub-type-pill--evolution-slider"
+                                role="listitem"
+                                tabindex="0"
+                                <?php echo $pill_style !== '' ? ' style="' . $pill_style . '"' : ''; ?>
+                                <?php if ($type_label !== '') : ?>
+                                    aria-label="<?php echo esc_attr($type_label); ?>"
+                                    title="<?php echo esc_attr($type_label); ?>"
+                                <?php endif; ?>
+                            >
                                 <?php if ($type_icon !== '' && function_exists('pokehub_render_pokemon_type_icon_html')) : ?>
                                     <?php
                                     echo pokehub_render_pokemon_type_icon_html(
@@ -740,7 +832,9 @@ ob_start();
                                     ?>
                                 <?php endif; ?>
                                 <?php if ($type_label !== '') : ?>
-                                    <span class="pokehub-type-pill-label"><?php echo esc_html($type_label); ?></span>
+                                    <span class="pokehub-type-pill-label-track" aria-hidden="true">
+                                        <span class="pokehub-type-pill-label"><?php echo esc_html($type_label); ?></span>
+                                    </span>
                                 <?php endif; ?>
                             </span>
                         <?php endforeach; ?>
