@@ -142,6 +142,86 @@
             return;
         }
 
+        function pokehubGetTypeFormColor() {
+            const $c = $('#type_color');
+            if (!$c.length) {
+                return '#333333';
+            }
+            return $c.val() || '#333333';
+        }
+
+        function pokehubIsTypeIconSvgUrl(url) {
+            if (!url || typeof url !== 'string') {
+                return false;
+            }
+            const path = url.split(/[?#]/)[0];
+            return /\.svg$/i.test(path);
+        }
+
+        function pokehubAttachmentIsSvg(data) {
+            if (!data) {
+                return false;
+            }
+            const mime = (data.mime || '').toLowerCase();
+            if (mime === 'image/svg+xml') {
+                return true;
+            }
+            return pokehubIsTypeIconSvgUrl(data.url || '');
+        }
+
+        function pokehubTypeIconSvgOnlyMessage() {
+            return (pokemonTypesMedia && pokemonTypesMedia.svgOnly)
+                ? pokemonTypesMedia.svgOnly
+                : 'SVG only.';
+        }
+
+        function pokehubRefreshTypeIconPreview($field) {
+            if (typeof pokehubTypeIconPreview === 'undefined') {
+                return;
+            }
+            const $input = $field.find('.pokehub-type-icon-url');
+            const url = ($input.val() || '').trim();
+            const $inner = $field.find('.pokehub-type-icon-preview-inner');
+            const $slot = $field.find('.pokehub-type-icon-preview-slot');
+            const $removeBtn = $field.find('.pokehub-type-icon-remove');
+            if (!url) {
+                $slot.empty();
+                $inner.hide();
+                $removeBtn.prop('disabled', true);
+                return;
+            }
+            if (!pokehubIsTypeIconSvgUrl(url)) {
+                $slot.empty();
+                $inner.hide();
+                return;
+            }
+            $.post(pokehubTypeIconPreview.ajaxUrl, {
+                action: pokehubTypeIconPreview.action,
+                nonce: pokehubTypeIconPreview.nonce,
+                url: url,
+                color: pokehubGetTypeFormColor()
+            }).done(function (res) {
+                if (res && res.success && res.data && res.data.html) {
+                    $slot.html(res.data.html);
+                    $inner.show();
+                    $removeBtn.prop('disabled', false);
+                }
+            });
+        }
+
+        if (typeof $.fn.wpColorPicker !== 'undefined' && $('#type_color').length) {
+            $('#type_color').wpColorPicker({
+                change: function () {
+                    $('.pokehub-type-icon-field').each(function () {
+                        const $f = $(this);
+                        if ($f.find('.pokehub-type-icon-url').val()) {
+                            pokehubRefreshTypeIconPreview($f);
+                        }
+                    });
+                }
+            });
+        }
+
         /**
          * === TYPES ===
          * Bouton "Choisir dans la médiathèque" pour les types (icône de type)
@@ -151,7 +231,6 @@
 
             const $field   = $(this).closest('.pokehub-type-icon-field');
             const $input   = $field.find('.pokehub-type-icon-url');
-            const $preview = $field.find('.pokehub-type-icon-preview');
 
             const frame = new wp.media.view.MediaFrame.PokeHubTypes({
                 title: pokemonTypesMedia.selectTitle || 'Select or Upload Image',
@@ -177,10 +256,12 @@
                 if (!attachment) return;
 
                 const data = attachment.toJSON();
-                $input.val(data.url);
-                $preview
-                    .attr('src', data.url)
-                    .show();
+                if (!pokehubAttachmentIsSvg(data)) {
+                    window.alert(pokehubTypeIconSvgOnlyMessage());
+                    return;
+                }
+                $input.val(data.url || '');
+                pokehubRefreshTypeIconPreview($field);
             });
 
             // Insertion via l’onglet URL
@@ -188,11 +269,13 @@
                 if (!state || state.id !== 'pokehub-types-url') return;
                 const url = state.props.get('url');
                 if (!url) return;
+                if (!pokehubIsTypeIconSvgUrl(url)) {
+                    window.alert(pokehubTypeIconSvgOnlyMessage());
+                    return;
+                }
 
                 $input.val(url);
-                $preview
-                    .attr('src', url)
-                    .show();
+                pokehubRefreshTypeIconPreview($field);
             });
 
             frame.open();
@@ -314,12 +397,10 @@
 
             const $field   = $(this).closest('.pokehub-type-icon-field');
             const $input   = $field.find('.pokehub-type-icon-url');
-            const $preview = $field.find('.pokehub-type-icon-preview');
 
             $input.val('');
-            $preview
-                .attr('src', '')
-                .hide();
+            $field.find('.pokehub-type-icon-preview-slot').empty();
+            $field.find('.pokehub-type-icon-preview-inner').hide();
 
             $(this).prop('disabled', true);
         });

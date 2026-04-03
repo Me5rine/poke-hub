@@ -678,8 +678,17 @@ ob_start();
                             $pill_style = $type_color !== '' ? '--pokehub-type-pill-color: ' . esc_attr($type_color) . ';' : '';
                             ?>
                             <span class="pokehub-type-pill" role="listitem" <?php echo $pill_style !== '' ? ' style="' . $pill_style . '"' : ''; ?> title="<?php echo esc_attr($type_label); ?>">
-                                <?php if ($type_icon !== '') : ?>
-                                    <img src="<?php echo esc_url($type_icon); ?>" alt="" class="pokehub-type-pill-icon" width="18" height="18" loading="lazy" decoding="async" />
+                                <?php if ($type_icon !== '' && function_exists('pokehub_render_pokemon_type_icon_html')) : ?>
+                                    <?php
+                                    echo pokehub_render_pokemon_type_icon_html(
+                                        $type_icon,
+                                        [
+                                            'color'       => '#ffffff',
+                                            'class'       => 'pokehub-type-pill-icon',
+                                            'aria_hidden' => true,
+                                        ]
+                                    );
+                                    ?>
                                 <?php endif; ?>
                                 <?php if ($type_label !== '') : ?>
                                     <span class="pokehub-type-pill-label"><?php echo esc_html($type_label); ?></span>

@@ -107,7 +107,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                             <label for="type_color"><?php esc_html_e('Color', 'poke-hub'); ?></label>
                             <input type="text" id="type_color" name="color" value="<?php echo esc_attr($current_color); ?>" 
                                    class="pokehub-color-field" style="max-width: 150px;" />
-                            <p class="description"><?php esc_html_e('Background color (hex).', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Used for UI chips and to tint the SVG icon (glyph color).', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col">
@@ -123,6 +123,7 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                 <!-- Icon -->
                 <div class="admin-lab-form-group">
                     <label><?php esc_html_e('Icon', 'poke-hub'); ?></label>
+                    <p class="description"><?php esc_html_e('SVG only: choose an SVG in the media library or a URL whose path ends with .svg. The glyph uses the type color (teinte / pastilles).', 'poke-hub'); ?></p>
                     <div class="pokehub-type-icon-field">
                         <input type="hidden" class="pokehub-type-icon-url" name="icon" value="<?php echo esc_attr($current_icon); ?>" />
                         
@@ -131,15 +132,27 @@ function poke_hub_pokemon_types_edit_form($edit_row = null, array $all_weathers 
                                 <?php esc_html_e('Choose icon from library', 'poke-hub'); ?>
                             </button>
                             <button type="button" class="button pokehub-type-icon-remove" <?php disabled(empty($current_icon)); ?>>
-                                <?php esc_html_e('Remove image', 'poke-hub'); ?>
+                                <?php esc_html_e('Remove icon', 'poke-hub'); ?>
                             </button>
                         </div>
                         
                         <div class="pokehub-type-icon-preview-wrap" style="margin-top:10px;">
-                            <img class="pokehub-type-icon-preview"
-                                 src="<?php echo $current_icon ? esc_url($current_icon) : ''; ?>"
-                                 alt=""
-                                 style="max-width:64px;height:auto;border:1px solid #c3c4c7;padding:8px;border-radius:4px;background:#fff;<?php echo $current_icon ? '' : 'display:none;'; ?>" />
+                            <div class="pokehub-type-icon-preview-inner"<?php echo $current_icon ? '' : ' style="display:none;"'; ?>>
+                                <div class="pokehub-type-icon-preview-slot">
+                                    <?php
+                                    if ($current_icon && function_exists('pokehub_render_pokemon_type_icon_html')) {
+                                        echo pokehub_render_pokemon_type_icon_html(
+                                            $current_icon,
+                                            [
+                                                'color'       => $current_color,
+                                                'class'       => 'pokehub-type-icon--admin-preview',
+                                                'aria_hidden' => true,
+                                            ]
+                                        );
+                                    }
+                                    ?>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

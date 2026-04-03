@@ -89,11 +89,13 @@ add_action('init', function() {
      * Enqueue des assets front-end pour les blocs
      */
     function pokehub_blocks_enqueue_frontend_assets() {
+        wp_enqueue_style('pokehub-type-icons');
+
         // CSS pour le bloc new-pokemon-evolutions
         wp_enqueue_style(
             'pokehub-new-pokemon-evolutions-front',
             POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
-            [],
+            ['pokehub-type-icons'],
             POKE_HUB_VERSION
         );
 

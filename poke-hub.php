@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.0.18
+Version: 2.0.2
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -424,6 +424,10 @@ function poke_hub_load_pokemon_public_helpers() {
     if (file_exists($pokemon_public_helpers_path)) {
         require_once $pokemon_public_helpers_path;
     }
+    $type_icon_svg_path = POKE_HUB_INCLUDES_DIR . 'functions/pokehub-type-icon-svg.php';
+    if (file_exists($type_icon_svg_path)) {
+        require_once $type_icon_svg_path;
+    }
 }
 add_action('plugins_loaded', 'poke_hub_load_pokemon_public_helpers', 15);
 
@@ -502,7 +506,9 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         [],
         POKE_HUB_VERSION
     );
-    
+
+    wp_enqueue_style('pokehub-type-icons');
+
     // Charger admin-unified.css ensuite
     wp_enqueue_style(
         'poke-hub-admin-unified',
