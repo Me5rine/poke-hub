@@ -6,13 +6,6 @@
     margin: 2rem 0;
 }
 
-.pokehub-new-pokemon-evolutions-block-wrapper .pokehub-block-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 1.5rem;
-    color: #333;
-}
-
 .pokehub-evolution-line {
     display: flex;
     flex-direction: row;
@@ -77,6 +70,23 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
     outline: none;
+}
+
+/*
+ * Renfort (mobile / thèmes / Elementor) : règles du type .entry-content span { background: none }
+ * annulent la pastille alors que le libellé peut rester visible → impression de « texte brut » sans rond ni icône.
+ */
+.pokehub-new-pokemon-evolutions-block-wrapper .pokehub-evolution-pokemon-types > .pokehub-type-pill {
+    display: inline-flex !important;
+    background: var(--pokehub-type-pill-color, #6b7280) !important;
+    background-color: var(--pokehub-type-pill-color, #6b7280) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff;
+    border-radius: 999px !important;
+}
+
+.pokehub-new-pokemon-evolutions-block-wrapper .pokehub-evolution-pokemon-types .pokehub-type-pill .pokehub-type-pill-icon {
+    display: inline-flex !important;
 }
 
 /* Pastille ronde repliée ; 0fr→1fr + max-width (pas d’animation de hauteur = évite le “rebond” à la fermeture) */
@@ -207,6 +217,34 @@
     }
 
     .pokehub-evolution-pokemon-types .pokehub-type-pill--evolution-slider:hover .pokehub-type-pill-label {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/*
+ * Tactile : pas de survol fiable — sans règle dédiée, la pastille reste repliée (icône seule)
+ * et le libellé peut sembler absent ou mal intégré. On affiche toujours la capsule complète.
+ */
+@media (hover: none), (pointer: coarse) {
+    .pokehub-evolution-pokemon-types .pokehub-type-pill--evolution-slider {
+        max-width: min(7.5rem, 100%);
+        width: max-content;
+        height: auto;
+        min-height: var(--pokehub-type-pill-diameter);
+        padding: 0.18rem 0.42rem 0.18rem 0.12rem;
+    }
+
+    .pokehub-evolution-pokemon-types .pokehub-type-pill--evolution-slider .pokehub-type-pill-label-track {
+        flex: 1 1 auto;
+        width: auto;
+        max-width: 6.25rem;
+        min-width: 0;
+        margin-left: -0.12rem;
+        grid-template-columns: 1fr;
+    }
+
+    .pokehub-evolution-pokemon-types .pokehub-type-pill--evolution-slider .pokehub-type-pill-label {
         opacity: 1;
         transform: translate3d(0, 0, 0);
     }

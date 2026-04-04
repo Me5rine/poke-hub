@@ -6,14 +6,7 @@
     margin: 2rem 0;
 }
 
-.pokehub-block-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #dc3545;
-    margin-bottom: 2rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* Titre h2 : voir `poke-hub-blocks-front.css` (.pokehub-special-research-block-wrapper .pokehub-block-title) */
 
 /* Liste des études */
 .pokehub-special-research-list {

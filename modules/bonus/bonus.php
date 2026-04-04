@@ -20,9 +20,11 @@ define('POKE_HUB_BONUS_URL', POKE_HUB_URL . 'modules/bonus/');
  * Chargement des fonctionnalités du module Bonus
  * (à créer si ce n'est pas déjà fait)
  */
-require_once POKE_HUB_BONUS_PATH . '/functions/bonus-cpt.php';       // CPT pokehub_bonus (site principal)
 require_once POKE_HUB_BONUS_PATH . '/functions/bonus-helpers.php';   // Helpers de récupération et rendu visuel
 require_once POKE_HUB_BONUS_PATH . '/functions/bonus-shortcodes.php'; // Shortcodes
+if (is_admin()) {
+    require_once POKE_HUB_BONUS_PATH . '/admin/bonus-types-admin.php';
+}
 // Metabox bonus : chargée par le module Blocks uniquement (bloc bonus ne dépend pas du module Bonus)
 
 /**

@@ -3,13 +3,13 @@
 ## Vue d’ensemble
 
 - **Types de bonus** : une seule source de vérité, sur le **site principal** (même principe que les Pokémon).
-- **Bloc et metabox bonus** : ils ne dépendent **pas** du module Bonus. Tout est chargé par le **module Blocks** uniquement (helpers + metabox). Le module Bonus reste optionnel (CPT pour créer les types de bonus sur le site principal, shortcodes, filtre `the_content`).
+- **Bloc et metabox bonus** : ils ne dépendent **pas** du module Bonus. Tout est chargé par le **module Blocks** uniquement (helpers + metabox). Le module Bonus reste optionnel (écran d’admin catalogue, shortcodes, filtre `the_content`).
 
 ## Source de vérité des types de bonus
 
-- Le **catalogue** des types de bonus (liste pour les selects, affichage) est stocké dans la table **`pokehub_bonus_types`**.
+- Le **catalogue** des types de bonus (liste pour les selects, affichage) est stocké dans la table **`{prefix}pokehub_bonus_types`** (clé interne `bonus_types` côté code).
 - **Site principal** (préfixe Pokémon vide ou identique au préfixe local) : lecture/écriture dans la table **locale** `bonus_types` (préfixe WordPress courant).
-- **Sites distants** (préfixe Pokémon configuré dans Réglages > Sources) : lecture dans la table **distante** `remote_bonus_types` (même préfixe que les tables Pokémon du site principal). On ne crée pas les types de bonus sur le distant, on les sélectionne depuis le site principal.
+- **Sites distants** (préfixe Pokémon configuré dans Réglages > Sources) : lecture dans la table **distante** `remote_bonus_types` (même préfixe que les tables Pokémon du site principal). On ne crée pas les types de bonus sur le distant depuis cet écran ; on les sélectionne depuis le site principal.
 
 Les helpers utilisés pour choisir la table sont dans `includes/functions/pokehub-helpers.php` (toujours chargé) :
 
@@ -20,8 +20,8 @@ Les helpers utilisés pour choisir la table sont dans `includes/functions/pokehu
 
 - Les **bonus associés à un article** (post) sont stockés dans les tables **`content_bonus`** et **`content_bonus_entries`** (scope **`content_source`**).
 - Ces tables utilisent le **même préfixe** que les tables Pokémon (Réglages > Poké HUB > Sources > **Pokémon table prefix (remote)**). Une seule base pour les Pokémon et tous les contenus (bonus par article, quêtes, habitats, œufs, etc.).
-- Chaque entrée contient un **`bonus_id`** (référence vers un type du site principal) et une **description** éventuelle.
-- En résumé : on crée les **types** de bonus sur le site principal ; les associations article ↔ bonus (IDs + description) sont enregistrées dans les tables de contenu, sur la même base que les Pokémon (site principal si le préfixe est configuré sur les sites distants).
+- Chaque entrée contient un **`bonus_id`** (référence vers un type du catalogue) et une **description** éventuelle.
+- En résumé : on crée les **types** de bonus sur le site principal (table catalogue) ; les associations article ↔ bonus (IDs + description) sont enregistrées dans les tables de contenu, sur la même base que les Pokémon (site principal si le préfixe est configuré sur les sites distants).
 
 ## Module Blocks : tout pour le bloc bonus
 
@@ -38,17 +38,16 @@ Aucune activation du **module Bonus** n’est nécessaire pour utiliser le bloc 
 
 Quand le **module Bonus** est activé (en plus du module Blocks), il apporte :
 
-- **CPT `pokehub_bonus`** sur le site principal : création/édition des types de bonus (titre, slug, description, image).
-- **Sync CPT → table** : à chaque enregistrement d’un bonus, la table `pokehub_bonus_types` est mise à jour (pour que les sites distants et le bloc lisent les bons libellés/images).
+- **Écran Poké HUB > Bonus** (`poke-hub-bonus-types`) sur le site principal : CRUD sur la table catalogue (titre, slug, image slug optionnel, description, ordre). Aperçu de l’icône via l’URL construite à partir des réglages Sources (bucket + chemin bonus).
 - **Menu Bonus** dans l’admin Poké HUB (uniquement sur le site principal ; masqué sur les sites distants).
 - **Shortcodes** et filtre **`the_content`** pour afficher les bonus dans le contenu (selon la config du module).
 
-Sur un **site distant**, le menu Bonus et l’UI du CPT sont masqués ; la liste des bonus dans la metabox et dans le bloc vient bien du site principal via `remote_bonus_types`.
+Sur un **site distant**, le menu Bonus et l’édition du catalogue sont masqués ; la liste des bonus dans la metabox et dans le bloc vient du site principal via `remote_bonus_types`.
 
-## Table `pokehub_bonus_types`
+## Table catalogue (`bonus_types` / `remote_bonus_types`)
 
-- **Création** : la table est créée lorsque le module **Bonus** ou le module **Blocks** est actif (`includes/pokehub-db.php`, `createBonusTypesTable()`).
-- **Colonnes** : `id` (PK, = post_id du CPT sur le site principal), `title`, `slug`, `description`, `image_slug`, `sort_order`, `created_at`, `updated_at`.
+- **Création** : la table locale `bonus_types` est créée lorsque le module **Bonus** ou le module **Blocks** est actif (`includes/pokehub-db.php`, `createBonusTypesTable()`). Une migration (`migrateBonusTypesTableSchema`) aligne le schéma existant : `id` AUTO_INCREMENT, `slug` unique.
+- **Colonnes** : `id` (PK AUTO_INCREMENT), `title`, `slug` (unique), `description`, `image_slug`, `sort_order`, `created_at`, `updated_at`.
 - **Mapping** (dans `pokehub-helpers.php`) :
   - `bonus_types` → table locale (site principal).
   - `remote_bonus_types` → scope `remote_pokemon`, même préfixe que les tables Pokémon (lecture sur le site principal depuis un site distant).
@@ -60,7 +59,7 @@ Sur un **site distant**, le menu Bonus et l’UI du CPT sont masqués ; la liste
 | Bloc Bonus                      | **Blocks** seul   | Enregistré et fonctionnel avec uniquement le module Blocks. |
 | Metabox Bonus                   | **Blocks** seul   | Chargée par le module Blocks. |
 | Liste des types de bonus        | Préfixe Pokémon   | Site principal → table locale ; site distant → table du site principal (`remote_bonus_types`). |
-| Création des types de bonus     | Module **Bonus**  | CPT + sync vers `pokehub_bonus_types` sur le site principal. |
+| Création / édition des types    | Module **Bonus**  | Page admin `poke-hub-bonus-types` (table catalogue). |
 | Données par article (bonus + description) | Même base que Pokémon | Tables `content_bonus` / `content_bonus_entries` (préfixe Sources = Pokémon et tous les contenus). |
 
 Voir aussi : [blocks/README.md](./blocks/README.md), [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md).

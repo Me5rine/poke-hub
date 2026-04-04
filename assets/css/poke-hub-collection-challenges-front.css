@@ -1,19 +1,12 @@
 /* CSS pour le bloc Défis de Collection - Front-end
    S'appuie sur les classes et variables du système CSS (FRONT_CSS.md, POKEHUB_CSS_CLASSES.md).
-   Utilise me5rine-lab-title-large, me5rine-lab-card, variables --me5rine-lab-* et --admin-lab-*. */
+   Titre h2 du bloc : `poke-hub-blocks-front.css` (Field Research). Cartes : me5rine-lab-*, --admin-lab-*. */
 
 .pokehub-collection-challenges-block-wrapper {
     margin: var(--me5rine-lab-spacing-lg, 1.5rem) 0;
 }
 
-/* Titre du bloc : style thème (me5rine-lab-title-large appliqué en PHP) */
-.pokehub-collection-challenges-block-wrapper .me5rine-lab-title-large.pokehub-block-title,
-.pokehub-collection-challenges-block-wrapper .pokehub-block-title {
-    font-size: 24px;
-    font-weight: 600;
-    margin-bottom: var(--me5rine-lab-spacing-lg, 1.5rem);
-    color: var(--me5rine-lab-text, #11161E);
-}
+/* Titre h2 du bloc : unifié avec Field Research dans `poke-hub-blocks-front.css` */
 
 .pokehub-collection-challenges-list {
     display: flex;

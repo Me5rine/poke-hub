@@ -388,28 +388,22 @@ Le module fournit le shortcode `[poke_hub_events]` pour afficher les événement
 
 ### Module Bonus
 
-Le module Bonus gère les bonus disponibles dans Pokémon GO via un Custom Post Type WordPress.
+Le module Bonus gère le **catalogue des types de bonus** dans la table SQL `bonus_types` (aperçu des icônes depuis le bucket configuré dans Réglages > Sources).
 
 #### Fonctionnalités principales
 
-##### 1. Custom Post Type
+##### 1. Catalogue (table)
 
-- **CPT** : `pokehub_bonus`
-- **Visibilité** : Privé (pas de pages publiques)
-- **Support** : Titre, contenu, image à la une
-- **Menu** : Intégré dans le menu Poké HUB
+- **Stockage** : table `{prefix}pokehub_bonus_types` (id auto, slug unique, titre, description, image_slug, ordre)
+- **Admin** : page Poké HUB > Bonus (`poke-hub-bonus-types`) sur le site principal
+- **Icônes** : chemins construits avec `poke_hub_assets_bucket_base_url` et le chemin bonus (WebP / PNG / JPG)
 
-##### 2. Métadonnées
+##### 2. Contenu et affichage
 
-- **Images** : Image à la une pour chaque bonus
-- **Descriptions** : Contenu riche via l'éditeur WordPress
-- **Slugs** : Génération automatique de slugs
-
-##### 3. Association aux événements
-
-- **Metabox** : Metabox sur les posts/événements pour associer des bonus
-- **Module Events** : Intégration avec le module Events
-- **Affichage** : Affichage des bonus sur les pages d'événements
+- **Descriptions** : éditeur WordPress sur l’écran catalogue
+- **Metabox** (module Blocks) : association des bonus aux articles / événements
+- **Module Events** : intégration avec les événements
+- **Affichage** : bonus sur les pages d'événements (bloc, shortcodes, filtre `the_content`)
 
 #### Interface d'administration
 
@@ -1430,9 +1424,9 @@ poke-hub/
 │   ├── bonus/                       # Module Bonus
 │   │   ├── bonus.php                # Fichier principal
 │   │   ├── admin/                   # Interface admin
-│   │   │   └── bonus-metabox.php
+│   │   │   ├── bonus-metabox.php
+│   │   │   └── bonus-types-admin.php
 │   │   └── functions/               # Fonctions du module
-│   │       ├── bonus-cpt.php        # Custom Post Type
 │   │       ├── bonus-helpers.php    # Helpers
 │   │       └── bonus-shortcodes.php # Shortcodes
 │   ├── events/                      # Module Events

@@ -8,48 +8,29 @@ if (!defined('ABSPATH')) { exit; }
  */
 function pokehub_get_all_bonuses_for_select(): array {
     $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
-    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, title FROM {$table} ORDER BY sort_order ASC, title ASC",
-            OBJECT_K
-        );
-        if (is_array($rows)) {
-            $out = [];
-            foreach ($rows as $row) {
-                $out[] = [
-                    'id'    => (int) $row->id,
-                    'label' => (string) $row->title,
-                ];
-            }
-            return $out;
-        }
+    if ($table === '' || !function_exists('pokehub_table_exists') || !pokehub_table_exists($table)) {
+        return [];
     }
-
-    // Fallback : CPT (site principal sans table encore migrée)
-    $posts = get_posts([
-        'post_type'        => 'pokehub_bonus',
-        'post_status'      => 'publish',
-        'numberposts'      => -1,
-        'orderby'          => 'title',
-        'order'            => 'ASC',
-        'suppress_filters' => false,
-    ]);
-    if (empty($posts)) {
+    global $wpdb;
+    $rows = $wpdb->get_results(
+        "SELECT id, title FROM {$table} ORDER BY sort_order ASC, title ASC",
+        OBJECT_K
+    );
+    if (!is_array($rows)) {
         return [];
     }
     $out = [];
-    foreach ($posts as $post) {
+    foreach ($rows as $row) {
         $out[] = [
-            'id'    => (int) $post->ID,
-            'label' => $post->post_title,
+            'id'    => (int) $row->id,
+            'label' => (string) $row->title,
         ];
     }
     return $out;
 }
 
 /**
- * Récupère les infos d’un bonus à partir de son ID.
+ * Récupère les infos d’un bonus à partir de son ID (table bonus_types uniquement).
  */
 function pokehub_get_bonus_data($bonus_id) {
     $bonus_id = (int) $bonus_id;
@@ -58,78 +39,45 @@ function pokehub_get_bonus_data($bonus_id) {
     }
 
     $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
-    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
-        global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, title, slug, description, image_slug FROM {$table} WHERE id = %d",
-            $bonus_id
-        ));
-        if ($row) {
-            $slug       = (string) $row->slug;
-            $image_slug = !empty($row->image_slug) ? (string) $row->image_slug : $slug;
-            $image_url  = '';
-            $image_tag  = '';
-            if (!empty($image_slug) && function_exists('poke_hub_get_raster_asset_url_chain')) {
-                $chain = poke_hub_get_raster_asset_url_chain('bonus', $image_slug);
-                if ($chain !== []) {
-                    $image_url = $chain[0];
-                }
-                if ($chain !== [] && function_exists('poke_hub_render_bucket_raster_img')) {
-                    $image_tag = poke_hub_render_bucket_raster_img('bonus', $image_slug, ['alt' => (string) $row->title]);
-                }
-            }
-            $description = wpautop((string) $row->description);
-            $description = apply_filters('pokehub_bonus_description', $description, (object) ['ID' => $bonus_id]);
-
-            return [
-                'ID'          => (int) $row->id,
-                'title'       => (string) $row->title,
-                'slug'        => $slug,
-                'image_url'   => $image_url,
-                'image_html'  => $image_tag,
-                'description' => $description,
-            ];
-        }
-    }
-
-    $post = get_post($bonus_id);
-    if (!$post || $post->post_type !== 'pokehub_bonus') {
+    if ($table === '' || !function_exists('pokehub_table_exists') || !pokehub_table_exists($table)) {
         return null;
     }
 
-    // Utiliser le système S3 pour les images de bonus
-    $bonus_slug = $post->post_name;
-    $image_url = '';
-    $image_tag = '';
-    
-    if (!empty($bonus_slug) && function_exists('poke_hub_get_raster_asset_url_chain')) {
-        $chain = poke_hub_get_raster_asset_url_chain('bonus', $bonus_slug);
+    global $wpdb;
+    $row = $wpdb->get_row($wpdb->prepare(
+        "SELECT id, title, slug, description, image_slug FROM {$table} WHERE id = %d",
+        $bonus_id
+    ));
+    if (!$row) {
+        return null;
+    }
+
+    $slug       = (string) $row->slug;
+    $image_slug = !empty($row->image_slug) ? (string) $row->image_slug : $slug;
+    $image_url  = '';
+    $image_tag  = '';
+    if ($image_slug !== '' && function_exists('poke_hub_get_raster_asset_url_chain')) {
+        $chain = poke_hub_get_raster_asset_url_chain('bonus', $image_slug);
         if ($chain !== []) {
             $image_url = $chain[0];
         }
         if ($chain !== [] && function_exists('poke_hub_render_bucket_raster_img')) {
-            $image_tag = poke_hub_render_bucket_raster_img('bonus', $bonus_slug, ['alt' => get_the_title($bonus_id)]);
+            $image_tag = poke_hub_render_bucket_raster_img('bonus', $image_slug, ['alt' => (string) $row->title]);
         }
     }
-    
-    // Fallback sur l'image WordPress si pas d'image S3
-    if (empty($image_url)) {
-        $image_id  = get_post_thumbnail_id($bonus_id);
-        $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'medium') : '';
-        $image_tag = $image_id ? get_the_post_thumbnail($bonus_id, 'medium') : '';
-    }
 
-    // ⚠️ NE PAS utiliser the_content ici, ça déclenche notre filtre the_content et boucle.
-    $raw_description = $post->post_content;
-
-    // On peut quand même mettre un peu de mise en forme de base
-    $description = wpautop($raw_description);
-    $description = apply_filters('pokehub_bonus_description', $description, $post);
+    $description = wpautop((string) $row->description);
+    $ctx = (object) [
+        'id'    => (int) $row->id,
+        'title' => (string) $row->title,
+        'slug'  => $slug,
+    ];
+    $description = apply_filters('pokehub_bonus_description', $description, $ctx);
 
     return [
-        'ID'          => $bonus_id,
-        'title'       => get_the_title($bonus_id),
-        'slug'        => $post->post_name,
+        'ID'          => (int) $row->id,
+        'title'       => (string) $row->title,
+        'slug'        => $slug,
         'image_url'   => $image_url,
         'image_html'  => $image_tag,
         'description' => $description,
@@ -137,7 +85,7 @@ function pokehub_get_bonus_data($bonus_id) {
 }
 
 /**
- * Récupère un bonus par slug (pratique plus tard, dans des shortcodes ou config).
+ * Récupère un bonus par slug.
  */
 function pokehub_get_bonus_by_slug($slug) {
     $slug = is_string($slug) ? trim($slug) : '';
@@ -145,21 +93,18 @@ function pokehub_get_bonus_by_slug($slug) {
         return null;
     }
     $table = function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : '';
-    if ($table !== '' && function_exists('pokehub_table_exists') && pokehub_table_exists($table)) {
-        global $wpdb;
-        $id = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$table} WHERE slug = %s LIMIT 1",
-            $slug
-        ));
-        if ($id > 0) {
-            return pokehub_get_bonus_data($id);
-        }
-    }
-    $post = get_page_by_path($slug, OBJECT, 'pokehub_bonus');
-    if (!$post) {
+    if ($table === '' || !function_exists('pokehub_table_exists') || !pokehub_table_exists($table)) {
         return null;
     }
-    return pokehub_get_bonus_data($post->ID);
+    global $wpdb;
+    $id = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$table} WHERE slug = %s LIMIT 1",
+        $slug
+    ));
+    if ($id <= 0) {
+        return null;
+    }
+    return pokehub_get_bonus_data($id);
 }
 
 /**
@@ -203,6 +148,7 @@ function pokehub_render_post_bonuses($post_id = null) {
         echo '<article class="pokehub-event-bonus">';
             if (!empty($bonus['image_html'])) {
                 echo '<div class="pokehub-event-bonus-image">';
+                    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- balise img générée par poke_hub_render_bucket_raster_img
                     echo $bonus['image_html'];
                 echo '</div>';
             }
@@ -280,7 +226,7 @@ if (function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('b
 
 /**
  * Rendu visuel des bonus (cartes avec badges)
- * 
+ *
  * @param array $bonuses Liste des bonus
  * @param string $layout Layout ('cards' par défaut)
  * @return string HTML
@@ -293,38 +239,44 @@ function pokehub_render_bonuses_visual($bonuses, $layout = 'cards') {
     ob_start();
     ?>
     <div class="pokehub-bonuses-grid">
-        <?php foreach ($bonuses as $bonus) : 
+        <?php foreach ($bonuses as $bonus) :
             // Extraire le ratio du titre ou de la description (ex: "1/2", "1/4")
             $ratio = '';
             $title = $bonus['title'] ?? '';
             $description = $bonus['event_description'] ?? ($bonus['description'] ?? '');
-            
+
             // Chercher un pattern comme "1/2", "1/4", etc. dans le titre ou la description
             if (preg_match('/(\d+\/\d+)/', $title . ' ' . $description, $matches)) {
                 $ratio = $matches[1];
             }
-            
+
             $image_url = $bonus['image_url'] ?? '';
+            $image_html = $bonus['image_html'] ?? '';
             $bonus_title = $bonus['title'] ?? '';
             $bonus_description = $bonus['event_description'] ?? ($bonus['description'] ?? '');
         ?>
             <div class="pokehub-bonus-card">
                 <div class="pokehub-bonus-card-inner">
-                    <?php if ($image_url) : ?>
+                    <?php if ($image_html || $image_url) : ?>
                         <div class="pokehub-bonus-image-wrapper">
-                            <img 
-                                src="<?php echo esc_url($image_url); ?>" 
+                            <?php if ($image_html) : ?>
+                                <?php // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- img depuis poke_hub_render_bucket_raster_img (repli data-ph-raster)
+                                echo $image_html; ?>
+                            <?php else : ?>
+                            <img
+                                src="<?php echo esc_url($image_url); ?>"
                                 alt="<?php echo esc_attr($bonus_title); ?>"
                                 class="pokehub-bonus-image"
                                 loading="lazy"
                                 onerror="this.style.display='none';"
                             />
+                            <?php endif; ?>
                             <?php if ($ratio) : ?>
                                 <span class="pokehub-bonus-badge" title="<?php echo esc_attr($ratio); ?>"><?php echo esc_html($ratio); ?></span>
                             <?php endif; ?>
                         </div>
                     <?php endif; ?>
-                    
+
                     <?php if (!empty($bonus_description)) : ?>
                         <div class="pokehub-bonus-description">
                             <?php echo wp_kses_post($bonus_description); ?>

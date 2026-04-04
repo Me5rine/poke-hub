@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.0.5
+Version: 2.0.6
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -134,13 +134,14 @@ function poke_hub_admin_menu_bonus() {
     if (function_exists('pokehub_bonus_use_remote_source') && pokehub_bonus_use_remote_source()) {
         return;
     }
-    if (in_array('bonus', $active_modules, true)) {
+    if (in_array('bonus', $active_modules, true) && function_exists('pokehub_render_bonus_types_admin_page')) {
         add_submenu_page(
             'poke-hub',
             __('Bonus', 'poke-hub'),
             __('Bonus', 'poke-hub'),
             'manage_options',
-            'edit.php?post_type=pokehub_bonus'
+            'poke-hub-bonus-types',
+            'pokehub_render_bonus_types_admin_page'
         );
     }
 }
@@ -295,6 +296,7 @@ function poke_hub_admin_pages() {
         'poke-hub-events',
         'poke-hub-user-profiles',
         'poke-hub-games',
+        'poke-hub-bonus-types',
     ];
 }
 
@@ -312,35 +314,11 @@ function poke_hub_submenu_groups() {
 add_action( 'load-poke-hub_page_poke-hub-pokemon', 'poke_hub_pokemon_screen_options' );
 
 /**
- * Écrans liés au CPT Bonus (pokehub_bonus)
+ * Écrans admin Bonus (catalogue bonus_types).
  */
 function poke_hub_is_bonus_related() {
-    global $pagenow;
-
-    // Liste des bonus
-    if ($pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'pokehub_bonus') {
-        return true;
-    }
-
-    // Édition / création d’un bonus
-    if ($pagenow === 'post.php' && isset($_GET['post']) && get_post_type((int) $_GET['post']) === 'pokehub_bonus') {
-        return true;
-    }
-    if ($pagenow === 'post-new.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'pokehub_bonus') {
-        return true;
-    }
-
-    // Si plus tard tu ajoutes des taxos pour les bonus, tu pourras les gérer ici :
-    /*
-    if ($pagenow === 'edit-tags.php' && isset($_GET['taxonomy']) && in_array($_GET['taxonomy'], ['bonus_taxo_slug'], true)) {
-        return true;
-    }
-    if ($pagenow === 'term.php' && isset($_GET['taxonomy']) && in_array($_GET['taxonomy'], ['bonus_taxo_slug'], true)) {
-        return true;
-    }
-    */
-
-    return false;
+    $page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
+    return ($page === 'poke-hub-bonus-types');
 }
 
 add_filter('parent_file', function ($parent_file) {
@@ -373,9 +351,9 @@ add_filter('submenu_file', function ($submenu_file) {
         }
     }
 
-    // Écrans liés au CPT Bonus → on surligne le sous-menu Bonus
+    // Écran catalogue Bonus → surligner le sous-menu Bonus
     if (poke_hub_is_bonus_related()) {
-        $submenu_file = 'edit.php?post_type=pokehub_bonus';
+        $submenu_file = 'poke-hub-bonus-types';
     }
 
     return $submenu_file;
@@ -488,6 +466,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-events',
         'poke-hub-user-profiles',
         'poke-hub-games',
+        'poke-hub-bonus-types',
     ];
     
     $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';

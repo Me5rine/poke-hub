@@ -32,8 +32,12 @@ function poke_hub_events_assets() {
         [],
         POKE_HUB_VERSION
     );
-    // CSS principal + Select2
-    wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', ['poke-hub-global-colors'], POKE_HUB_VERSION);
+    // CSS principal + Select2 (après les titres de blocs si le module Blocks est actif)
+    $events_css_deps = ['poke-hub-global-colors'];
+    if (wp_style_is('pokehub-blocks-front-style', 'registered')) {
+        $events_css_deps[] = 'pokehub-blocks-front-style';
+    }
+    wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', $events_css_deps, POKE_HUB_VERSION);
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
 
     // CSS pour les pages d'événements spéciaux individuels

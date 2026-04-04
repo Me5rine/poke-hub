@@ -292,23 +292,10 @@ add_action('admin_init', function () {
         }
     }
 
-    // Migration unique : remplir bonus_types à partir du CPT pokehub_bonus (site principal uniquement)
-    if (in_array('bonus', $active_modules, true) && function_exists('pokehub_bonus_use_remote_source') && !pokehub_bonus_use_remote_source()) {
-        $bonus_types_table = pokehub_get_table('bonus_types');
-        if ($bonus_types_table && ($wpdb->get_var("SHOW TABLES LIKE '{$bonus_types_table}'") === $bonus_types_table)) {
-            if (!get_option('pokehub_bonus_types_cpt_synced', false)) {
-                $posts = get_posts([
-                    'post_type'      => 'pokehub_bonus',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1,
-                ]);
-                foreach ($posts as $post) {
-                    if (function_exists('pokehub_sync_bonus_cpt_to_table')) {
-                        pokehub_sync_bonus_cpt_to_table($post->ID);
-                    }
-                }
-                update_option('pokehub_bonus_types_cpt_synced', true);
-            }
+    // Schéma catalogue bonus_types : AUTO_INCREMENT + slug unique (table effective locale ou distante)
+    if (in_array('bonus', $active_modules, true) || in_array('blocks', $active_modules, true)) {
+        if (class_exists('Pokehub_DB')) {
+            Pokehub_DB::getInstance()->migrateBonusTypesTableSchema();
         }
     }
 });

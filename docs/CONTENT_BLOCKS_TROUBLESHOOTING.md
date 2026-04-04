@@ -20,7 +20,7 @@ Les modules **Events** et **Bonus** doivent être activés dans les paramètres 
 
 #### Pour les bonus :
 - Les bonus doivent être associés au post via la metabox "Bonus de l'événement"
-- Les bonus doivent exister dans le CPT `pokehub_bonus`
+- Les types de bonus doivent exister dans la table catalogue `bonus_types` (site principal) ou être visibles via le préfixe distant
 
 ### 3. Post types autorisés
 

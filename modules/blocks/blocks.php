@@ -99,13 +99,6 @@ add_action('init', function() {
         );
 
         // CSS pour le bloc new-pokemon-evolutions
-        wp_enqueue_style(
-            'pokehub-new-pokemon-evolutions-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
-            ['pokehub-type-icons', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
-
         // Variables de couleur (thème / Elementor) — nécessaire pour quêtes dépliées, etc.
         wp_enqueue_style(
             'poke-hub-global-colors',
@@ -114,12 +107,19 @@ add_action('init', function() {
             POKE_HUB_VERSION
         );
 
-        // Styles front des blocs (dates / quests / habitats / wild / etc.).
-        // Déplacés dans un fichier dédié pour éviter une dépendance au module "events".
+        // Styles front des blocs (dates / quests / habitats / wild / titres unifiés Field Research).
+        // Chargé avant les CSS par bloc pour que les surcharges locales restent possibles.
         wp_enqueue_style(
             'pokehub-blocks-front-style',
             POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
             ['poke-hub-global-colors', 'pokehub-candy-display'],
+            POKE_HUB_VERSION
+        );
+
+        wp_enqueue_style(
+            'pokehub-new-pokemon-evolutions-front',
+            POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
+            ['pokehub-blocks-front-style', 'pokehub-type-icons', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
 
@@ -137,7 +137,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-bonus-style',
             POKE_HUB_URL . 'assets/css/poke-hub-bonus-front.css',
-            [],
+            ['pokehub-blocks-front-style'],
             POKE_HUB_VERSION
         );
         
@@ -145,7 +145,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-collection-challenges-front',
             POKE_HUB_URL . 'assets/css/poke-hub-collection-challenges-front.css',
-            ['pokehub-candy-display'],
+            ['pokehub-blocks-front-style', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
         
@@ -153,7 +153,7 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-special-research-front',
             POKE_HUB_URL . 'assets/css/poke-hub-special-research-front.css',
-            ['pokehub-candy-display'],
+            ['pokehub-blocks-front-style', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
 
@@ -161,11 +161,43 @@ add_action('init', function() {
         wp_enqueue_style(
             'pokehub-eggs-front',
             POKE_HUB_URL . 'assets/css/poke-hub-eggs-front.css',
-            [],
+            ['pokehub-blocks-front-style'],
             POKE_HUB_VERSION
         );
     }
     add_action('wp_enqueue_scripts', 'pokehub_blocks_enqueue_frontend_assets');
+
+    /**
+     * Éditeur Gutenberg : titres principaux des blocs = même CSS que le front (Field Research).
+     * Nécessaire pour l’aperçu des blocs dynamiques (ServerSideRender).
+     */
+    add_action('enqueue_block_editor_assets', function () {
+        wp_enqueue_style(
+            'poke-hub-global-colors',
+            POKE_HUB_URL . 'assets/css/global-colors.css',
+            [],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style(
+            'pokehub-blocks-front-style',
+            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
+            ['poke-hub-global-colors'],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style('pokehub-type-icons');
+        wp_enqueue_style(
+            'pokehub-candy-display',
+            POKE_HUB_URL . 'assets/css/poke-hub-candy-display.css',
+            [],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style(
+            'pokehub-new-pokemon-evolutions-front',
+            POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
+            ['pokehub-blocks-front-style', 'pokehub-type-icons', 'pokehub-candy-display'],
+            POKE_HUB_VERSION
+        );
+    });
     
     /**
      * Endpoint REST API pour récupérer les Pokémon (recherche par nom ou par IDs pour présélection).

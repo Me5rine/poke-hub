@@ -1349,7 +1349,6 @@ class Pokehub_DB {
     /**
      * Table catalogue des types de bonus (source de vérité sur le site principal).
      * Sur les sites distants, on lit cette table via le même préfixe que les tables Pokémon (remote_pokemon).
-     * L'id correspond au post_id du CPT pokehub_bonus sur le site principal pour garder les mêmes IDs.
      */
     private function createBonusTypesTable() {
         global $wpdb;
@@ -1363,7 +1362,7 @@ class Pokehub_DB {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $sql = "CREATE TABLE {$table} (
-            id BIGINT UNSIGNED NOT NULL,
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             title VARCHAR(255) NOT NULL DEFAULT '',
             slug VARCHAR(191) NOT NULL DEFAULT '',
             description LONGTEXT NULL,
@@ -1371,12 +1370,54 @@ class Pokehub_DB {
             sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY slug (slug),
+            PRIMARY KEY  (id),
+            UNIQUE KEY slug (slug),
             KEY sort_order (sort_order)
         ) {$charset_collate};";
 
         dbDelta($sql);
+        $this->migrateBonusTypesTableSchema();
+    }
+
+    /**
+     * Met à jour les installations existantes : id AUTO_INCREMENT, index slug unique.
+     * Utilise la table catalogue effective (locale ou distante selon pokehub_get_bonus_types_table()).
+     */
+    public function migrateBonusTypesTableSchema(): void {
+        global $wpdb;
+
+        $table = '';
+        if (function_exists('pokehub_get_bonus_types_table')) {
+            $table = pokehub_get_bonus_types_table();
+        } elseif (function_exists('pokehub_get_table')) {
+            $table = pokehub_get_table('bonus_types');
+        }
+        if ($table === '' || $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+            return;
+        }
+
+        $col = $wpdb->get_row("SHOW COLUMNS FROM `{$table}` LIKE 'id'", ARRAY_A);
+        if ($col && stripos((string) ($col['Extra'] ?? ''), 'auto_increment') === false) {
+            $max = (int) $wpdb->get_var("SELECT MAX(id) FROM `{$table}`");
+            $next = max(1, $max + 1);
+            $wpdb->query("ALTER TABLE `{$table}` MODIFY `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT");
+            $wpdb->query($wpdb->prepare("ALTER TABLE `{$table}` AUTO_INCREMENT = %d", $next));
+        }
+
+        $indexes = $wpdb->get_results("SHOW INDEX FROM `{$table}` WHERE Column_name = 'slug'", ARRAY_A);
+        $has_unique = false;
+        foreach ((array) $indexes as $idx) {
+            if (isset($idx['Non_unique']) && (int) $idx['Non_unique'] === 0) {
+                $has_unique = true;
+                break;
+            }
+        }
+        if (!$has_unique) {
+            if (!empty($indexes)) {
+                $wpdb->query("ALTER TABLE `{$table}` DROP INDEX `slug`");
+            }
+            $wpdb->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `slug` (`slug`)");
+        }
     }
 
     /**

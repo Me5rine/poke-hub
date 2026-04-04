@@ -68,30 +68,16 @@ if ( ! empty( $tables ) ) {
 }
 
 /**
- * 4. Supprimer les posts du CPT "pokehub_bonus"
- *    (lié au sous-menu Bonus si le module est actif)
+ * 4. Ancien CPT pokehub_bonus (retiré) : nettoyer d’éventuels posts résiduels en base.
  */
-if ( post_type_exists( 'pokehub_bonus' ) ) {
-    $bonus_ids = get_posts(
-        [
-            'post_type'      => 'pokehub_bonus',
-            'post_status'    => 'any',
-            'numberposts'    => -1,
-            'fields'         => 'ids',
-            'no_found_rows'  => true,
-            'update_post_term_cache' => false,
-            'update_post_meta_cache' => false,
-        ]
-    );
-
-    if ( ! empty( $bonus_ids ) ) {
-        foreach ( $bonus_ids as $post_id ) {
-            wp_delete_post( $post_id, true );
-        }
+$orphan_bonus_posts = $wpdb->get_col(
+    "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'pokehub_bonus'"
+);
+if ( ! empty( $orphan_bonus_posts ) ) {
+    foreach ( $orphan_bonus_posts as $post_id ) {
+        wp_delete_post( (int) $post_id, true );
     }
 }
-
-// (Éventuellement plus tard : suppression de taxonomies custom liées au CPT)
 
 /**
  * 5. Optionnel : tu peux ajouter ici d’autres nettoyages spécifiques

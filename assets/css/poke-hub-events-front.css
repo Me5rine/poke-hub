@@ -176,25 +176,18 @@
     text-transform: uppercase;
 }
 
-/* ===== Titres de blocs unifiés ===== */
-.pokehub-block-title,
-.pokehub-event-dates-block-wrapper .pokehub-block-title,
-.pokehub-event-quests-block-wrapper .pokehub-block-title,
-.pokehub-wild-pokemon-block-wrapper .pokehub-block-title,
-.pokehub-habitats-block-wrapper .pokehub-block-title,
-.pokehub-bonus-block-wrapper .pokehub-block-title {
+/* ===== Titres principaux des blocs (identique à poke-hub-blocks-front.css) ===== */
+[class*="wp-block-pokehub-"] .pokehub-block-title,
+[class*="pokehub-"][class*="block-wrapper"] .pokehub-block-title {
     font-size: 1.5rem !important;
     font-weight: 700 !important;
-    color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322)) !important;
+    color: #b91c1c !important;
     margin-bottom: 1rem !important;
     margin-top: 0 !important;
-    text-align: center !important;
-}
-
-/* Field Research (article) : titre & alignement comme la maquette référence */
-.pokehub-event-quests-block-wrapper .pokehub-block-title {
-    color: #b91c1c !important;
     text-align: left !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    line-height: 1.25 !important;
 }
 
 /* ===== Bloc dates d'événement ===== */

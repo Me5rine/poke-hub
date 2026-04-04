@@ -5,7 +5,8 @@
     margin: 1.5em 0;
 }
 
-.pokehub-eggs-block-title {
+/* Titre du bloc Gutenberg : `poke-hub-blocks-front.css` (.pokehub-eggs-block-wrapper .pokehub-block-title) */
+.pokehub-all-eggs-page .pokehub-page-title.pokehub-eggs-block-title {
     margin-bottom: 1rem;
     font-size: 1.5rem;
 }
