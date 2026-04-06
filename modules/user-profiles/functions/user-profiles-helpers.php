@@ -169,6 +169,7 @@ function poke_hub_get_user_profile_by_id($profile_id) {
         'reasons'            => $reasons,
         'user_id'            => $wp_user_id,
         'discord_id'         => $discord_id_value,
+        'anonymous_ip'       => isset($row['anonymous_ip']) ? trim((string) $row['anonymous_ip']) : '',
     ];
     
     return $profile;

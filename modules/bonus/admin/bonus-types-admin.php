@@ -67,17 +67,16 @@ function pokehub_bonus_types_admin_handle_requests(): void {
     }
 
     $id = isset($_POST['bonus_type_id']) ? (int) $_POST['bonus_type_id'] : 0;
-    $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+    $title_en = isset($_POST['title_en']) ? sanitize_text_field(wp_unslash($_POST['title_en'])) : '';
+    $title_fr = isset($_POST['title_fr']) ? sanitize_text_field(wp_unslash($_POST['title_fr'])) : '';
+    $slug_manual = isset($_POST['slug_manual']) && (string) wp_unslash($_POST['slug_manual']) === '1';
     $slug_raw = isset($_POST['slug']) ? sanitize_title(wp_unslash($_POST['slug'])) : '';
-    if ($slug_raw === '' && $title !== '') {
-        $slug_raw = sanitize_title($title);
+    if (!$slug_manual || $slug_raw === '') {
+        $slug_raw = sanitize_title($title_en);
     }
-    $image_slug = isset($_POST['image_slug']) ? trim((string) wp_unslash($_POST['image_slug'])) : '';
-    $image_slug = $image_slug !== '' ? sanitize_title($image_slug) : '';
     $description = isset($_POST['description']) ? wp_kses_post(wp_unslash($_POST['description'])) : '';
-    $sort_order = isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0;
 
-    if ($title === '' || $slug_raw === '') {
+    if ($title_en === '' || $title_fr === '' || $slug_raw === '') {
         wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'missing', 'edit' => $id > 0 ? $id : 'new']));
         exit;
     }
@@ -94,20 +93,19 @@ function pokehub_bonus_types_admin_handle_requests(): void {
     }
 
     $data = [
-        'title'       => $title,
-        'slug'        => $slug_raw,
-        'description' => $description,
-        'image_slug'  => $image_slug !== '' ? $image_slug : '',
-        'sort_order'  => $sort_order,
+        'title_en'      => $title_en,
+        'title_fr'      => $title_fr,
+        'slug'          => $slug_raw,
+        'description'   => $description,
     ];
 
     if ($id > 0) {
-        $wpdb->update($table, $data, ['id' => $id], ['%s', '%s', '%s', '%s', '%d'], ['%d']);
+        $wpdb->update($table, $data, ['id' => $id], ['%s', '%s', '%s', '%s'], ['%d']);
         wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'updated', 'edit' => $id]));
         exit;
     }
 
-    $wpdb->insert($table, $data, ['%s', '%s', '%s', '%s', '%d']);
+    $wpdb->insert($table, $data, ['%s', '%s', '%s', '%s']);
     $new_id = (int) $wpdb->insert_id;
     if ($new_id <= 0) {
         wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'error']));
@@ -144,7 +142,7 @@ function pokehub_render_bonus_types_admin_page(): void {
         'created'   => ['success', __('Bonus type saved.', 'poke-hub')],
         'updated'   => ['success', __('Bonus type updated.', 'poke-hub')],
         'deleted'   => ['success', __('Bonus type deleted.', 'poke-hub')],
-        'missing'   => ['error', __('Title and slug are required.', 'poke-hub')],
+        'missing'   => ['error', __('English name, French name and slug are required.', 'poke-hub')],
         'duplicate' => ['error', __('This slug is already in use.', 'poke-hub')],
         'nonce'     => ['error', __('Security check failed.', 'poke-hub')],
         'error'     => ['error', __('Could not save.', 'poke-hub')],
@@ -191,7 +189,10 @@ function pokehub_render_bonus_types_admin_page(): void {
 
         <style>
             .pokehub-bonus-types-admin .column-icon { width: 64px; text-align: center; }
-            .pokehub-bonus-types-admin .column-icon img { max-width: 48px; max-height: 48px; height: auto; vertical-align: middle; object-fit: contain; }
+            .pokehub-bonus-types-admin .column-icon img,
+            .pokehub-bonus-types-admin .column-icon .pokehub-bonus-icon-wrap { max-width: 48px; max-height: 48px; vertical-align: middle; }
+            .pokehub-bonus-types-admin .column-icon img { height: auto; object-fit: contain; }
+            .pokehub-bonus-types-admin .column-icon .pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg { max-width: 48px; max-height: 48px; width: auto; height: auto; }
             .pokehub-bonus-types-admin .pokehub-bonus-type-form { max-width: 720px; margin-top: 1em; }
             .pokehub-bonus-types-admin .pokehub-bonus-type-form .description { color: #646970; }
             .pokehub-bonus-types-admin table.widefat td { vertical-align: middle; }
@@ -199,12 +200,12 @@ function pokehub_render_bonus_types_admin_page(): void {
 
         <?php if ($row || $is_new) : ?>
             <?php
-            $f_title = $row ? (string) $row->title : '';
+            $f_title_en = $row ? (string) ($row->title_en ?? '') : '';
+            $f_title_fr = $row ? (string) ($row->title_fr ?? '') : '';
             $f_slug = $row ? (string) $row->slug : '';
-            $f_image_slug = $row && $row->image_slug !== null && $row->image_slug !== '' ? (string) $row->image_slug : '';
             $f_description = $row ? (string) $row->description : '';
-            $f_sort = $row ? (int) $row->sort_order : 0;
-            $preview_slug = $f_image_slug !== '' ? $f_image_slug : $f_slug;
+            $preview_slug = $f_slug;
+            $preview_alt = $f_title_fr !== '' ? $f_title_fr : ($f_title_en !== '' ? $f_title_en : $preview_slug);
             ?>
             <h2><?php echo $edit_id > 0 ? esc_html__('Edit bonus type', 'poke-hub') : esc_html__('New bonus type', 'poke-hub'); ?></h2>
             <p><a href="<?php echo esc_url(pokehub_bonus_types_admin_url()); ?>">&larr; <?php echo esc_html__('Back to list', 'poke-hub'); ?></a></p>
@@ -216,49 +217,52 @@ function pokehub_render_bonus_types_admin_page(): void {
 
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th scope="row"><label for="pokehub_bonus_title"><?php echo esc_html__('Title', 'poke-hub'); ?></label></th>
-                        <td><input name="title" id="pokehub_bonus_title" type="text" class="regular-text" value="<?php echo esc_attr($f_title); ?>" required /></td>
+                        <th scope="row"><label for="pokehub_bonus_title_en"><?php echo esc_html__('Name (English)', 'poke-hub'); ?></label></th>
+                        <td>
+                            <input name="title_en" id="pokehub_bonus_title_en" type="text" class="regular-text" value="<?php echo esc_attr($f_title_en); ?>" required autocomplete="off" />
+                            <p class="description"><?php echo esc_html__('Used to build the default slug (URL-safe). You can still edit the slug below.', 'poke-hub'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="pokehub_bonus_title_fr"><?php echo esc_html__('Name (French)', 'poke-hub'); ?></label></th>
+                        <td><input name="title_fr" id="pokehub_bonus_title_fr" type="text" class="regular-text" value="<?php echo esc_attr($f_title_fr); ?>" required autocomplete="off" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="pokehub_bonus_slug"><?php echo esc_html__('Slug', 'poke-hub'); ?></label></th>
                         <td>
-                            <input name="slug" id="pokehub_bonus_slug" type="text" class="regular-text" value="<?php echo esc_attr($f_slug); ?>" required />
-                            <p class="description"><?php echo esc_html__('URL-safe identifier. Used as default image file name on the assets bucket if image slug is empty.', 'poke-hub'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="pokehub_bonus_image_slug"><?php echo esc_html__('Image slug (optional)', 'poke-hub'); ?></label></th>
-                        <td>
-                            <input name="image_slug" id="pokehub_bonus_image_slug" type="text" class="regular-text" value="<?php echo esc_attr($f_image_slug); ?>" />
-                            <p class="description"><?php echo esc_html__('Override file base name on the CDN (same path as in Settings > Sources). Leave empty to use the slug.', 'poke-hub'); ?></p>
+                            <input type="hidden" name="slug_manual" id="pokehub_bonus_slug_manual" value="<?php echo $edit_id > 0 ? '1' : '0'; ?>" />
+                            <input name="slug" id="pokehub_bonus_slug" type="text" class="regular-text" value="<?php echo esc_attr($f_slug); ?>" required autocomplete="off" />
+                            <p class="description"><?php echo esc_html__('Generated from the English name for new bonuses; you can change it manually. Same value is used as the image file base name on the assets bucket (see Settings > Sources).', 'poke-hub'); ?></p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><?php echo esc_html__('Preview (bucket)', 'poke-hub'); ?></th>
                         <td>
                             <?php
-                            if ($preview_slug !== '' && function_exists('poke_hub_render_bucket_raster_img')) {
-                                echo wp_kses_post(poke_hub_render_bucket_raster_img('bonus', $preview_slug, [
-                                    'alt'   => $f_title !== '' ? $f_title : $preview_slug,
-                                    'class' => 'pokehub-bonus-type-preview-img',
-                                    'width' => 64,
-                                    'height'=> 64,
-                                ]));
+                            if ($preview_slug !== '' && function_exists('poke_hub_render_bonus_asset_markup')) {
+                                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- markup contrôlé (SVG sanitisé ou img raster)
+                                echo poke_hub_render_bonus_asset_markup($preview_slug, [
+                                    'alt'       => $preview_alt,
+                                    'icon_size' => 64,
+                                    'class'     => 'pokehub-bonus-type-preview',
+                                ]);
                             } else {
-                                echo '<em>' . esc_html__('Save a slug to preview.', 'poke-hub') . '</em>';
+                                echo '<em>' . esc_html__('Enter a slug to preview the asset from the bucket.', 'poke-hub') . '</em>';
+                            }
+                            if ($preview_slug !== '' && function_exists('poke_hub_get_asset_url')) {
+                                $svg_preview = poke_hub_get_asset_url('bonus', $preview_slug, 'svg');
+                                if ($svg_preview !== '') {
+                                    echo '<p class="description"><strong>SVG</strong> <code>' . esc_html($svg_preview) . '</code></p>';
+                                }
                             }
                             if ($preview_slug !== '' && function_exists('poke_hub_get_raster_asset_url_chain')) {
                                 $chain = poke_hub_get_raster_asset_url_chain('bonus', $preview_slug);
                                 if ($chain !== []) {
-                                    echo '<p class="description"><code>' . esc_html($chain[0]) . '</code></p>';
+                                    echo '<p class="description"><strong>Raster</strong> <code>' . esc_html($chain[0]) . '</code></p>';
                                 }
                             }
                             ?>
                         </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="pokehub_bonus_sort"><?php echo esc_html__('Sort order', 'poke-hub'); ?></label></th>
-                        <td><input name="sort_order" id="pokehub_bonus_sort" type="number" class="small-text" value="<?php echo esc_attr((string) $f_sort); ?>" /></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="pokehub_bonus_description"><?php echo esc_html__('Description', 'poke-hub'); ?></label></th>
@@ -280,48 +284,71 @@ function pokehub_render_bonus_types_admin_page(): void {
                 </table>
                 <?php submit_button($edit_id > 0 ? __('Update', 'poke-hub') : __('Add bonus type', 'poke-hub')); ?>
             </form>
+            <?php if ($edit_id === 0) : ?>
+                <script>
+                (function () {
+                    var en = document.getElementById('pokehub_bonus_title_en');
+                    var slug = document.getElementById('pokehub_bonus_slug');
+                    var manual = document.getElementById('pokehub_bonus_slug_manual');
+                    if (!en || !slug || !manual) { return; }
+                    function slugify(str) {
+                        if (!str) { return ''; }
+                        try {
+                            str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        } catch (e) { /* ignore */ }
+                        return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                    }
+                    en.addEventListener('input', function () {
+                        if (manual.value === '1') { return; }
+                        slug.value = slugify(en.value);
+                    });
+                    slug.addEventListener('input', function () { manual.value = '1'; });
+                })();
+                </script>
+            <?php endif; ?>
         <?php else : ?>
             <?php
-            $items = $wpdb->get_results("SELECT * FROM {$table} ORDER BY sort_order ASC, title ASC");
+            $items = $wpdb->get_results("SELECT * FROM {$table} ORDER BY id DESC");
             ?>
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
                         <th scope="col" class="column-icon"><?php echo esc_html__('Icon', 'poke-hub'); ?></th>
-                        <th scope="col"><?php echo esc_html__('Title', 'poke-hub'); ?></th>
+                        <th scope="col"><?php echo esc_html__('Name (French)', 'poke-hub'); ?></th>
+                        <th scope="col"><?php echo esc_html__('Name (English)', 'poke-hub'); ?></th>
                         <th scope="col"><?php echo esc_html__('Slug', 'poke-hub'); ?></th>
-                        <th scope="col"><?php echo esc_html__('Image slug', 'poke-hub'); ?></th>
-                        <th scope="col"><?php echo esc_html__('Order', 'poke-hub'); ?></th>
                         <th scope="col"><?php echo esc_html__('Actions', 'poke-hub'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($items)) : ?>
-                        <tr><td colspan="6"><?php echo esc_html__('No bonus types yet.', 'poke-hub'); ?></td></tr>
+                        <tr><td colspan="5"><?php echo esc_html__('No bonus types yet.', 'poke-hub'); ?></td></tr>
                     <?php else : ?>
                         <?php foreach ($items as $item) : ?>
                             <?php
-                            $img_slug = ($item->image_slug !== null && $item->image_slug !== '') ? (string) $item->image_slug : (string) $item->slug;
+                            $img_slug = (string) $item->slug;
+                            $list_title_fr = isset($item->title_fr) ? (string) $item->title_fr : '';
+                            $list_title_en = isset($item->title_en) ? (string) $item->title_en : '';
+                            $list_alt = $list_title_fr !== '' ? $list_title_fr : $list_title_en;
                             ?>
                             <tr>
                                 <td class="column-icon">
                                     <?php
-                                    if ($img_slug !== '' && function_exists('poke_hub_render_bucket_raster_img')) {
-                                        echo wp_kses_post(poke_hub_render_bucket_raster_img('bonus', $img_slug, [
-                                            'alt'   => (string) $item->title,
-                                            'class' => 'pokehub-bonus-type-list-icon',
-                                            'width' => 48,
-                                            'height'=> 48,
-                                        ]));
+                                    if ($img_slug !== '' && function_exists('poke_hub_render_bonus_asset_markup')) {
+                                        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                                        echo poke_hub_render_bonus_asset_markup($img_slug, [
+                                            'alt'       => $list_alt,
+                                            'icon_size' => 48,
+                                            'class'     => 'pokehub-bonus-type-list-icon',
+                                        ]);
                                     } else {
                                         echo '&mdash;';
                                     }
                                     ?>
                                 </td>
-                                <td><strong><?php echo esc_html((string) $item->title); ?></strong></td>
+                                <td><strong><?php echo esc_html($list_title_fr); ?></strong></td>
+                                <td><?php echo esc_html($list_title_en); ?></td>
                                 <td><code><?php echo esc_html((string) $item->slug); ?></code></td>
-                                <td><?php echo $item->image_slug !== null && $item->image_slug !== '' ? '<code>' . esc_html((string) $item->image_slug) . '</code>' : '&mdash;'; ?></td>
-                                <td><?php echo esc_html((string) (int) $item->sort_order); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url(pokehub_bonus_types_admin_url(['edit' => (int) $item->id])); ?>"><?php echo esc_html__('Edit', 'poke-hub'); ?></a>
                                     |

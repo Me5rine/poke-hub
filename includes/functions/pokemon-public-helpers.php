@@ -2392,6 +2392,72 @@ function poke_hub_render_bucket_raster_img(string $asset_type, string $slug, arr
 }
 
 /**
+ * Rendu visuel d’un bonus sur le bucket : **SVG inline** en priorité (mode icône), repli &lt;img&gt; raster WebP/PNG/JPG.
+ *
+ * @param array<string, mixed> $args alt (libellé accessible), class (classes sur le conteneur), icon_size (côté en px, défaut 80), loading, decoding (raster uniquement).
+ */
+function poke_hub_render_bonus_asset_markup(string $slug, array $args = []): string {
+    $slug = trim((string) $slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    $args = wp_parse_args(
+        $args,
+        [
+            'alt'       => '',
+            'class'     => '',
+            'icon_size' => 80,
+            'loading'   => 'lazy',
+            'decoding'  => 'async',
+        ]
+    );
+
+    $alt       = (string) $args['alt'];
+    $extra_cls = trim((string) $args['class']);
+    $size      = max(16, (int) $args['icon_size']);
+
+    $svg_url = poke_hub_get_asset_url('bonus', $slug, 'svg');
+    if ($svg_url !== '' && function_exists('pokehub_render_inline_svg_from_url')) {
+        $svg_inner = pokehub_render_inline_svg_from_url(
+            $svg_url,
+            [
+                'class'       => 'pokehub-bonus-icon pokehub-bonus-icon--svg',
+                'aria_hidden' => true,
+            ]
+        );
+        if ($svg_inner !== '') {
+            $wrap_class = trim('pokehub-bonus-icon-wrap ' . $extra_cls);
+            $label      = $alt !== '' ? $alt : $slug;
+            $style      = sprintf('width:%dpx;height:%dpx;max-width:100%%;', $size, $size);
+
+            return sprintf(
+                '<span class="%s" role="img" aria-label="%s" style="%s">%s</span>',
+                esc_attr($wrap_class),
+                esc_attr($label),
+                esc_attr($style),
+                $svg_inner
+            );
+        }
+    }
+
+    $raster_class = trim('pokehub-bonus-icon pokehub-bonus-icon--raster ' . $extra_cls);
+
+    return poke_hub_render_bucket_raster_img(
+        'bonus',
+        $slug,
+        [
+            'alt'      => $alt,
+            'class'    => $raster_class,
+            'width'    => $size,
+            'height'   => $size,
+            'loading'  => (string) $args['loading'],
+            'decoding' => (string) $args['decoding'],
+        ]
+    );
+}
+
+/**
  * Récupère l'URL de l'icône d'un habitat
  *
  * @param string $slug Slug de l'habitat
@@ -2402,13 +2468,13 @@ function poke_hub_get_habitat_icon_url(string $slug): string {
 }
 
 /**
- * Récupère l'URL de l'icône d'un bonus
+ * Récupère l’URL préférée de l’icône d’un bonus (fichier .svg sur le bucket).
  *
  * @param string $slug Slug du bonus
- * @return string URL de l'icône
+ * @return string URL de l’icône
  */
 function poke_hub_get_bonus_icon_url(string $slug): string {
-    return poke_hub_get_asset_url('bonus', $slug);
+    return poke_hub_get_asset_url('bonus', $slug, 'svg');
 }
 
 /**
@@ -2665,16 +2731,6 @@ function pokehub_render_pokemon_candy_reward_html(int $pokemon_id, int $quantity
     }
 
     return wp_kses($inner, pokehub_pokemon_candy_reward_allowed_html());
-}
-
-/**
- * Récupère l'URL de l'icône d'un type
- *
- * @param string $slug Slug du type
- * @return string URL de l'icône
- */
-function poke_hub_get_type_icon_url(string $slug): string {
-    return poke_hub_get_asset_url('types', $slug, 'svg');
 }
 
 /**

@@ -141,7 +141,7 @@ function poke_hub_render_friend_code_form($args = []) {
             </div>
         <?php endif; ?>
         
-        <form method="post" action="">
+        <form method="post" action=""<?php echo $args['is_logged_in'] ? '' : ' data-poke-hub-require-pogo-username="1"'; ?>>
             <?php wp_nonce_field($nonce_action, $nonce_name); ?>
             
             <!-- Row 1: Friend Code (full width) -->
@@ -167,11 +167,13 @@ function poke_hub_render_friend_code_form($args = []) {
             <div class="me5rine-lab-form-row me5rine-lab-form-col-gap">
                 <div class="me5rine-lab-form-col">
                     <div class="me5rine-lab-form-field">
-                        <label class="me5rine-lab-form-label" for="pokemon_go_username"><?php esc_html_e('Pokémon GO Username', 'poke-hub'); ?></label>
+                        <label class="me5rine-lab-form-label" for="pokemon_go_username"><?php esc_html_e('Pokémon GO Username', 'poke-hub'); ?><?php if (!$args['is_logged_in']) : ?> <span class="user-profiles-friend-code-form-required">*</span><?php endif; ?></label>
                         <input type="text" 
                                name="pokemon_go_username" 
                                id="pokemon_go_username" 
                                class="me5rine-lab-form-input" 
+                               <?php echo $args['is_logged_in'] ? '' : 'required '; ?>
+                               maxlength="191"
                                value="<?php echo esc_attr($pokemon_go_username_value); ?>">
                     </div>
                 </div>

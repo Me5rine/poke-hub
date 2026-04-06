@@ -1363,16 +1363,14 @@ class Pokehub_DB {
 
         $sql = "CREATE TABLE {$table} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            title VARCHAR(255) NOT NULL DEFAULT '',
+            title_en VARCHAR(255) NOT NULL DEFAULT '',
+            title_fr VARCHAR(255) NOT NULL DEFAULT '',
             slug VARCHAR(191) NOT NULL DEFAULT '',
             description LONGTEXT NULL,
-            image_slug VARCHAR(191) NULL DEFAULT NULL,
-            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
-            UNIQUE KEY slug (slug),
-            KEY sort_order (sort_order)
+            UNIQUE KEY slug (slug)
         ) {$charset_collate};";
 
         dbDelta($sql);
@@ -1418,6 +1416,71 @@ class Pokehub_DB {
             }
             $wpdb->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `slug` (`slug`)");
         }
+
+        // Ancienne colonne unique `title` → title_en + title_fr
+        $has_title = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'title'",
+            $wpdb->dbname,
+            $table
+        ));
+        $has_title_fr = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'title_fr'",
+            $wpdb->dbname,
+            $table
+        ));
+        if (!empty($has_title)) {
+            $has_title_en_col = $wpdb->get_var($wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'title_en'",
+                $wpdb->dbname,
+                $table
+            ));
+            if (empty($has_title_en_col)) {
+                $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `title_en` VARCHAR(255) NOT NULL DEFAULT '' AFTER `id`");
+            }
+            if (empty($has_title_fr)) {
+                $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `title_fr` VARCHAR(255) NOT NULL DEFAULT '' AFTER `title_en`");
+            }
+            $wpdb->query("UPDATE `{$table}` SET `title_en` = `title`, `title_fr` = `title`");
+            $wpdb->query("ALTER TABLE `{$table}` DROP COLUMN `title`");
+        } else {
+            $has_title_en = $wpdb->get_var($wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'title_en'",
+                $wpdb->dbname,
+                $table
+            ));
+            if (empty($has_title_fr)) {
+                if (empty($has_title_en)) {
+                    $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `title_en` VARCHAR(255) NOT NULL DEFAULT '' AFTER `id`");
+                }
+                $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `title_fr` VARCHAR(255) NOT NULL DEFAULT '' AFTER `title_en`");
+            } elseif (empty($has_title_en)) {
+                $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `title_en` VARCHAR(255) NOT NULL DEFAULT '' AFTER `id`");
+            }
+        }
+
+        // Plus de tri manuel : retirer sort_order si présent
+        $has_sort = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'sort_order'",
+            $wpdb->dbname,
+            $table
+        ));
+        if (!empty($has_sort)) {
+            $sort_indexes = $wpdb->get_results($wpdb->prepare("SHOW INDEX FROM `{$table}` WHERE Key_name = %s", 'sort_order'), ARRAY_A);
+            if (is_array($sort_indexes) && $sort_indexes !== []) {
+                $wpdb->query("ALTER TABLE `{$table}` DROP INDEX `sort_order`");
+            }
+            $wpdb->query("ALTER TABLE `{$table}` DROP COLUMN `sort_order`");
+        }
+
+        // Un seul slug : plus de image_slug (fichier image = même identifiant que le slug)
+        $has_image_slug = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'image_slug'",
+            $wpdb->dbname,
+            $table
+        ));
+        if (!empty($has_image_slug)) {
+            $wpdb->query("ALTER TABLE `{$table}` DROP COLUMN `image_slug`");
+        }
     }
 
     /**
@@ -1450,12 +1513,14 @@ class Pokehub_DB {
             country VARCHAR(191) NULL DEFAULT NULL,
             country_custom VARCHAR(191) NULL DEFAULT NULL,
             reasons LONGTEXT NULL,
+            anonymous_ip VARCHAR(45) NULL DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY user_id (user_id),
             KEY discord_id (discord_id),
-            KEY profile_type (profile_type)
+            KEY profile_type (profile_type),
+            KEY anonymous_ip (anonymous_ip)
         ) {$charset_collate};";
 
         dbDelta($sql_user_profiles);
@@ -1468,6 +1533,9 @@ class Pokehub_DB {
         
         // Migration: add country_custom column if it doesn't exist (for custom countries like "Hawaï")
         $this->migrateUserProfilesAddCountryCustomColumn($user_profiles_table);
+        
+        // Migration: add anonymous_ip for rate limiting / ownership of anonymous friend code rows
+        $this->migrateUserProfilesAddAnonymousIpColumn($user_profiles_table);
     }
     
     /**
@@ -1561,6 +1629,37 @@ class Pokehub_DB {
         $this->migrateUserProfilesAddCountryColumn($table_name);
         $this->migrateUserProfilesAddProfileTypeColumn($table_name);
         $this->migrateUserProfilesAddCountryCustomColumn($table_name);
+        $this->migrateUserProfilesAddAnonymousIpColumn($table_name);
+    }
+    
+    /**
+     * Migration: add anonymous_ip column to user_profiles (public friend code submissions without WP user).
+     *
+     * @param string $table_name Name of the user_profiles table
+     */
+    private function migrateUserProfilesAddAnonymousIpColumn($table_name) {
+        global $wpdb;
+
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+
+        $column_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = %s 
+                 AND TABLE_NAME = %s 
+                 AND COLUMN_NAME = 'anonymous_ip'",
+                DB_NAME,
+                $table_name
+            )
+        );
+
+        if (empty($column_exists) || (int) $column_exists === 0) {
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN anonymous_ip VARCHAR(45) NULL DEFAULT NULL AFTER reasons");
+            $wpdb->query("ALTER TABLE {$table_name} ADD KEY anonymous_ip (anonymous_ip)");
+        }
     }
     
     /**

@@ -68,7 +68,10 @@ add_shortcode('poke_hub_friend_codes', function ($atts) {
             $pending_link_data = $form_data; // Store data to resubmit with link confirmation
         } else {
             $form_message = $result['message'];
-            $form_message_type = 'error';
+            $form_message_type = !empty($result['message_type']) ? sanitize_key($result['message_type']) : 'error';
+            if (!in_array($form_message_type, ['error', 'warning', 'success', 'info'], true)) {
+                $form_message_type = 'error';
+            }
         }
     }
     

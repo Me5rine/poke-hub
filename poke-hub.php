@@ -393,18 +393,23 @@ function poke_hub_plugin_activation() {
 register_activation_hook(__FILE__, 'poke_hub_plugin_activation');
 
 /**
- * Chargement des helpers Pokémon publics même si le module n'est pas actif.
- * Les sources Pokémon (préfixe, images) doivent être disponibles à l'activation du plugin.
- * Ces helpers contiennent uniquement les fonctions publiques utilisées par d'autres modules.
+ * Chargement des helpers globaux (non conditionnés aux modules) :
+ * - pokehub-inline-svg.php : moteur SVG inline (bonus, etc.)
+ * - pokemon-public-helpers.php : bucket, assets, Pokémon partagés
+ * - pokehub-pokemon-type-icon.php : URL + rendu des icônes de types Pokémon + CSS `pokehub-type-icons`
  */
 function poke_hub_load_pokemon_public_helpers() {
+    $inline_svg = POKE_HUB_INCLUDES_DIR . 'functions/pokehub-inline-svg.php';
+    if (file_exists($inline_svg)) {
+        require_once $inline_svg;
+    }
     $pokemon_public_helpers_path = POKE_HUB_INCLUDES_DIR . 'functions/pokemon-public-helpers.php';
     if (file_exists($pokemon_public_helpers_path)) {
         require_once $pokemon_public_helpers_path;
     }
-    $type_icon_svg_path = POKE_HUB_INCLUDES_DIR . 'functions/pokehub-type-icon-svg.php';
-    if (file_exists($type_icon_svg_path)) {
-        require_once $type_icon_svg_path;
+    $pokemon_type_icon = POKE_HUB_INCLUDES_DIR . 'functions/pokehub-pokemon-type-icon.php';
+    if (file_exists($pokemon_type_icon)) {
+        require_once $pokemon_type_icon;
     }
 }
 add_action('plugins_loaded', 'poke_hub_load_pokemon_public_helpers', 15);

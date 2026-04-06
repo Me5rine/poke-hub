@@ -39,6 +39,7 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             'xp'                  => __('XP', 'poke-hub'),
             'country'             => __('Country', 'poke-hub'),
             'pokemon_go_username' => __('Pokémon GO Username', 'poke-hub'),
+            'anonymous_ip'       => __('Last IP (anonymous)', 'poke-hub'),
             'scatterbug_pattern'  => __('Scatterbug Pattern', 'poke-hub'),
             'updated_at'          => __('Last Updated', 'poke-hub'),
         ];
@@ -301,6 +302,10 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
                 return isset($profile_type_labels[$profile_type]) 
                     ? esc_html($profile_type_labels[$profile_type]) 
                     : esc_html($profile_type);
+
+            case 'anonymous_ip':
+                $anon_ip = isset($item->anonymous_ip) ? trim((string) $item->anonymous_ip) : '';
+                return $anon_ip !== '' ? '<code>' . esc_html($anon_ip) . '</code>' : esc_html($empty_dash);
 
             case 'country':
                 // Prioritize country_custom for display, then table country, then usermeta

@@ -1,6 +1,7 @@
 <?php
 /**
- * Icônes de types Pokémon en SVG inline : teinte via la couleur admin (currentColor).
+ * SVG inline depuis une URL : fetch, sanitisation wp_kses, pas de &lt;img&gt;.
+ * Helper global (chargé avec le plugin, indépendant des modules).
  *
  * @package PokeHub
  */
@@ -14,7 +15,7 @@ if (!defined('ABSPATH')) {
  *
  * @return array<string, array<string, bool>>
  */
-function pokehub_type_icon_get_kses_allowed_svg(): array {
+function pokehub_inline_svg_get_kses_allowed(): array {
     $a = [
         'class'               => true,
         'id'                  => true,
@@ -97,7 +98,7 @@ function pokehub_type_icon_get_kses_allowed_svg(): array {
 /**
  * Retire les fragments dangereux avant wp_kses.
  */
-function pokehub_type_icon_strip_unsafe_fragments(string $svg): string {
+function pokehub_inline_svg_strip_unsafe_fragments(string $svg): string {
     $svg = preg_replace('/<\?xml[^>]*\?>\s*/i', '', $svg);
     $svg = preg_replace('/<!DOCTYPE[^>]*>/i', '', $svg);
     $svg = preg_replace('/<\?.*?\?>/s', '', $svg);
@@ -106,13 +107,14 @@ function pokehub_type_icon_strip_unsafe_fragments(string $svg): string {
     $svg = preg_replace('#<foreignObject\b[^>]*>.*?</foreignObject>#is', '', $svg);
     $svg = preg_replace('/\s(on[a-z]+\s*=\s*(["\'])(?:(?!\2).)*\2)/i', '', $svg);
     $svg = preg_replace('/\s(on[a-z]+\s*=\s*[^\s>]+)/i', '', $svg);
+
     return (string) $svg;
 }
 
 /**
  * Extrait le premier fragment <svg>...</svg>.
  */
-function pokehub_type_icon_extract_svg_markup(string $body): ?string {
+function pokehub_inline_svg_extract_markup(string $body): ?string {
     $body = trim($body);
     if ($body === '' || stripos($body, '<svg') === false) {
         return null;
@@ -128,14 +130,14 @@ function pokehub_type_icon_extract_svg_markup(string $body): ?string {
     if (preg_match('/^<svg\b[^>]*>/i', $body)) {
         return $body;
     }
+
     return null;
 }
 
 /**
- * Indique si une URL peut être chargée par HTTP(S) pour une icône (bucket externe inclus).
- * Seuls les schémas http et https avec un hôte sont acceptés.
+ * Indique si une URL peut être chargée par HTTP(S) (bucket externe inclus).
  */
-function pokehub_type_icon_is_fetch_host_allowed(string $url): bool {
+function pokehub_inline_svg_is_fetch_host_allowed(string $url): bool {
     $url = trim($url);
     if ($url === '') {
         return false;
@@ -150,21 +152,21 @@ function pokehub_type_icon_is_fetch_host_allowed(string $url): bool {
 }
 
 /**
- * URL publique HTTP(S) pointant vers un chemin .svg (hors résolution locale).
+ * URL HTTP(S) publique vers un .svg (hors résolution fichier local).
  */
-function pokehub_type_icon_is_remote_http_svg_url(string $url): bool {
-    if (!pokehub_type_icon_url_path_ends_with_svg($url)) {
+function pokehub_inline_svg_is_remote_http_url(string $url): bool {
+    if (!pokehub_inline_svg_url_path_ends_with_svg($url)) {
         return false;
     }
 
-    return pokehub_type_icon_is_fetch_host_allowed($url)
-        && pokehub_type_icon_resolve_local_file_from_url($url) === null;
+    return pokehub_inline_svg_is_fetch_host_allowed($url)
+        && pokehub_inline_svg_resolve_local_file_from_url($url) === null;
 }
 
 /**
  * Vérifie que le chemin fichier reste sous le répertoire d’upload.
  */
-function pokehub_type_icon_is_path_under_uploads(string $abspath): bool {
+function pokehub_inline_svg_is_path_under_uploads(string $abspath): bool {
     $upload = wp_upload_dir();
     if (empty($upload['basedir'])) {
         return false;
@@ -176,11 +178,10 @@ function pokehub_type_icon_is_path_under_uploads(string $abspath): bool {
 }
 
 /**
- * Résout une URL vers un fichier local sur ce serveur (même si l’hôte de l’URL
- * diffère de home_url(), ex. poke-hub.local enregistré vs localhost en visite).
- * Sécurité : le chemin résolu doit rester sous uploads / wp-content / ABSPATH, sans « .. ».
+ * Résout une URL vers un fichier local sur ce serveur.
+ * Sécurité : chemin sous uploads / wp-content / ABSPATH, sans « .. ».
  */
-function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
+function pokehub_inline_svg_resolve_local_file_from_url(string $url): ?string {
     $url = esc_url_raw(trim($url));
     if ($url === '') {
         return null;
@@ -192,7 +193,6 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
 
     $url_path = rawurldecode((string) $parsed['path']);
 
-    // 1) uploads : préfixe issu de upload[baseurl] (indépendant du host de l’URL).
     $upload = wp_upload_dir();
     if (empty($upload['error']) && !empty($upload['basedir'])) {
         $bu      = wp_parse_url($upload['baseurl']);
@@ -208,7 +208,6 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
             }
         }
 
-        // URL enregistrée sans préfixe de sous-dossier (ex. /wp-content/uploads/... alors que le site est /dev/).
         if (!is_multisite() && preg_match('#/wp-content/uploads/(.+)$#i', $url_path, $m)) {
             $tail = $m[1];
             if ($tail !== '' && strpos($tail, '..') === false) {
@@ -221,7 +220,6 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
         }
     }
 
-    // 2) wp-content (chemin relatif sous WP_CONTENT_DIR).
     $cu      = wp_parse_url(content_url());
     $cu_path = isset($cu['path']) ? untrailingslashit((string) $cu['path']) : '';
     if ($cu_path !== '' && strpos($url_path, $cu_path) === 0) {
@@ -235,7 +233,6 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
         }
     }
 
-    // 3) Fallback ABSPATH + chemin (sous-répertoire WordPress dans l’URL).
     $path      = $url_path;
     $home_path = (string) wp_parse_url(home_url(), PHP_URL_PATH);
     $home_path = untrailingslashit($home_path ?: '/');
@@ -251,7 +248,6 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
         }
     }
 
-    // 4) Pièce jointe en médiathèque (plusieurs variantes d’URL).
     if (function_exists('attachment_url_to_postid') && function_exists('get_attached_file')) {
         $path_for_url = (string) $parsed['path'];
         $host_part    = isset($parsed['host']) ? (string) $parsed['host'] : '';
@@ -298,22 +294,23 @@ function pokehub_type_icon_resolve_local_file_from_url(string $url): ?string {
 }
 
 /**
- * Charge le corps brut (SVG ou page HTML contenant un svg).
+ * Charge le corps brut (SVG ou page contenant un svg).
  */
-function pokehub_type_icon_fetch_raw_body(string $url): ?string {
+function pokehub_inline_svg_fetch_raw_body(string $url): ?string {
     $max = 524288; // 512 Ko
 
-    $local = pokehub_type_icon_resolve_local_file_from_url($url);
+    $local = pokehub_inline_svg_resolve_local_file_from_url($url);
     if ($local !== null) {
         $size = @filesize($local);
         if ($size !== false && $size > $max) {
             return null;
         }
         $raw = @file_get_contents($local);
+
         return is_string($raw) ? $raw : null;
     }
 
-    if (!pokehub_type_icon_is_fetch_host_allowed($url)) {
+    if (!pokehub_inline_svg_is_fetch_host_allowed($url)) {
         return null;
     }
 
@@ -323,6 +320,8 @@ function pokehub_type_icon_fetch_raw_body(string $url): ?string {
     if ($host === 'localhost' || ($hlen > 6 && substr($host, -6) === '.local')) {
         $sslverify = false;
     }
+    $sslverify = (bool) apply_filters('pokehub_inline_svg_remote_sslverify', $sslverify, $url);
+    /** @deprecated 2.0.7 Utiliser {@see pokehub_inline_svg_remote_sslverify} */
     $sslverify = (bool) apply_filters('pokehub_type_icon_remote_sslverify', $sslverify, $url);
 
     $resp = wp_remote_get(
@@ -343,25 +342,27 @@ function pokehub_type_icon_fetch_raw_body(string $url): ?string {
     if (strlen($body) > $max) {
         return null;
     }
+
     return $body;
 }
 
 /**
  * Sanitize un fragment SVG pour affichage inline.
  */
-function pokehub_type_icon_sanitize_svg_markup(string $svg): string {
-    $svg = pokehub_type_icon_strip_unsafe_fragments($svg);
-    return wp_kses($svg, pokehub_type_icon_get_kses_allowed_svg());
+function pokehub_inline_svg_sanitize_markup(string $svg): string {
+    $svg = pokehub_inline_svg_strip_unsafe_fragments($svg);
+
+    return wp_kses($svg, pokehub_inline_svg_get_kses_allowed());
 }
 
 /**
- * URL d’icône pointant vers un fichier .svg dans le dossier d’uploads (fichiers ajoutés en admin).
+ * URL vers un .svg dans les uploads (fichiers ajoutés en admin).
  */
-function pokehub_type_icon_is_trusted_upload_svg_url(string $url): bool {
-    if (!pokehub_type_icon_url_path_ends_with_svg($url)) {
+function pokehub_inline_svg_is_trusted_upload_svg_url(string $url): bool {
+    if (!pokehub_inline_svg_url_path_ends_with_svg($url)) {
         return false;
     }
-    $path = pokehub_type_icon_resolve_local_file_from_url($url);
+    $path = pokehub_inline_svg_resolve_local_file_from_url($url);
     if ($path === null) {
         return false;
     }
@@ -369,24 +370,23 @@ function pokehub_type_icon_is_trusted_upload_svg_url(string $url): bool {
         return false;
     }
 
-    return pokehub_type_icon_is_path_under_uploads($path);
+    return pokehub_inline_svg_is_path_under_uploads($path);
 }
 
 /**
- * Sanitize SVG ; si wp_kses vide tout le markup (balises export Illustrator/Inkscape),
- * on conserve le SVG nettoyé uniquement pour les fichiers .svg dans uploads.
+ * Sanitize SVG pour sortie ; repli si wp_kses vide tout le markup.
  */
-function pokehub_type_icon_sanitize_svg_for_output(string $fragment, string $icon_url): string {
-    $stripped = pokehub_type_icon_strip_unsafe_fragments($fragment);
-    $safe     = wp_kses($stripped, pokehub_type_icon_get_kses_allowed_svg());
+function pokehub_inline_svg_sanitize_for_output(string $fragment, string $source_url): string {
+    $stripped = pokehub_inline_svg_strip_unsafe_fragments($fragment);
+    $safe     = wp_kses($stripped, pokehub_inline_svg_get_kses_allowed());
     if ($safe !== '' && stripos($safe, '<svg') !== false) {
         return $safe;
     }
     if ($stripped !== '' && stripos($stripped, '<svg') !== false) {
-        if (pokehub_type_icon_is_trusted_upload_svg_url($icon_url)) {
+        if (pokehub_inline_svg_is_trusted_upload_svg_url($source_url)) {
             return $stripped;
         }
-        if (pokehub_type_icon_is_remote_http_svg_url($icon_url)) {
+        if (pokehub_inline_svg_is_remote_http_url($source_url)) {
             return $stripped;
         }
     }
@@ -395,21 +395,21 @@ function pokehub_type_icon_sanitize_svg_for_output(string $fragment, string $ico
 }
 
 /**
- * Indique si l’URL d’icône de type est vide ou pointe vers un fichier .svg (chemin, insensible à la casse).
+ * URL vide ou chemin se terminant par .svg.
  */
-function pokehub_type_icon_url_is_empty_or_svg(string $url): bool {
+function pokehub_inline_svg_url_is_empty_or_svg(string $url): bool {
     $url = trim($url);
     if ($url === '') {
         return true;
     }
 
-    return pokehub_type_icon_url_path_ends_with_svg($url);
+    return pokehub_inline_svg_url_path_ends_with_svg($url);
 }
 
 /**
- * L’URL doit se terminer par .svg avant ? ou #.
+ * Le chemin d’URL se termine par .svg (avant ? ou #).
  */
-function pokehub_type_icon_url_path_ends_with_svg(string $url): bool {
+function pokehub_inline_svg_url_path_ends_with_svg(string $url): bool {
     $url  = trim($url);
     $path = (string) wp_parse_url($url, PHP_URL_PATH);
     if ($path === '') {
@@ -421,46 +421,45 @@ function pokehub_type_icon_url_path_ends_with_svg(string $url): bool {
 }
 
 /**
- * Icône de type Pokémon : **uniquement** SVG en markup inline (currentColor). Pas de &lt;img&gt;.
+ * SVG inline depuis une URL (.svg) : fetch, nettoyage, &lt;span&gt; + SVG.
  *
- * @param string $icon_url URL .svg (média ou externe autorisée côté fetch).
- * @param array  $args Voir doc précédente.
+ * @param array $args class (span), color (currentColor), aria_hidden (bool). class défaut : pokehub-inline-svg.
  */
-function pokehub_render_pokemon_type_icon_html(string $icon_url, array $args = []): string {
-    $icon_url = trim($icon_url);
-    if ($icon_url === '') {
+function pokehub_render_inline_svg_from_url(string $svg_url, array $args = []): string {
+    $svg_url = trim($svg_url);
+    if ($svg_url === '') {
         return '';
     }
 
-    if (!pokehub_type_icon_url_path_ends_with_svg($icon_url)) {
+    if (!pokehub_inline_svg_url_path_ends_with_svg($svg_url)) {
         return '';
     }
 
     $args = wp_parse_args(
         $args,
         [
+            'class'       => 'pokehub-inline-svg',
             'color'       => '',
-            'class'       => '',
             'aria_hidden' => true,
         ]
     );
 
-    $raw = pokehub_type_icon_fetch_raw_body($icon_url);
+    $raw = pokehub_inline_svg_fetch_raw_body($svg_url);
     if ($raw === null || $raw === '') {
         return '';
     }
 
-    $fragment = pokehub_type_icon_extract_svg_markup($raw);
+    $fragment = pokehub_inline_svg_extract_markup($raw);
     if ($fragment === null) {
         return '';
     }
 
-    $safe = pokehub_type_icon_sanitize_svg_for_output($fragment, $icon_url);
+    $safe = pokehub_inline_svg_sanitize_for_output($fragment, $svg_url);
     if ($safe === '' || stripos($safe, '<svg') === false) {
         return '';
     }
 
-    $classes = trim('pokehub-type-icon pokehub-type-icon--inline-svg pokehub-type-icon--tinted ' . (string) $args['class']);
+    $classes = trim((string) $args['class']);
     $style   = '';
     if ((string) $args['color'] !== '') {
         $style = 'color:' . esc_attr((string) $args['color']) . ';';
@@ -475,19 +474,3 @@ function pokehub_render_pokemon_type_icon_html(string $icon_url, array $args = [
         $safe
     );
 }
-
-add_action(
-    'init',
-    static function (): void {
-        if (!defined('POKE_HUB_URL') || !defined('POKE_HUB_VERSION')) {
-            return;
-        }
-        wp_register_style(
-            'pokehub-type-icons',
-            POKE_HUB_URL . 'assets/css/poke-hub-type-icons.css',
-            [],
-            POKE_HUB_VERSION
-        );
-    },
-    20
-);

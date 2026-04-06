@@ -281,6 +281,7 @@ function poke_hub_user_profiles_frontend_assets() {
     // Localize script for translations, validation and filtering
     wp_localize_script('pokehub-user-profiles-um-script', 'pokeHubFriendCodes', [
         'friendCodeError' => __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'),
+        'usernameRequired' => __('Pokémon GO username is required.', 'poke-hub'),
         'selectPlaceholder' => __('Select...', 'poke-hub'),
         'selectDefault' => __('-- Select --', 'poke-hub'),
         'vivillonMapping' => $vivillon_mapping, // country => patterns
@@ -387,6 +388,7 @@ function poke_hub_user_profiles_shortcode_assets() {
     // Localize script for validation and filtering
     wp_localize_script('pokehub-user-profiles-um-script', 'pokeHubFriendCodes', [
         'friendCodeError' => __('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'),
+        'usernameRequired' => __('Pokémon GO username is required.', 'poke-hub'),
         'selectPlaceholder' => __('Select...', 'poke-hub'),
         'selectDefault' => __('-- Select --', 'poke-hub'),
         'vivillonMapping' => $vivillon_mapping, // country => patterns
@@ -537,6 +539,7 @@ function poke_hub_friend_codes_shortcode_assets() {
         'copyError' => __('Error copying to clipboard', 'poke-hub'),
         'friendCodeNotFound' => __('Unable to find friend code to copy.', 'poke-hub'),
         'friendCodeInvalidLength' => __('Friend code must contain exactly 12 digits.', 'poke-hub'),
+        'usernameRequired' => __('Pokémon GO username is required.', 'poke-hub'),
         'selectPlaceholder' => __('Select...', 'poke-hub'),
         'selectDefault' => __('-- Select --', 'poke-hub'),
         'vivillonMapping' => $vivillon_mapping, // country => patterns

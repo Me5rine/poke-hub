@@ -57,56 +57,138 @@ function poke_hub_get_client_ip() {
 }
 
 /**
- * Check if anonymous user can add or update a friend code (1 time every 2 days limit)
- * Uses cookie-based tracking since we don't have IP column
- * This limitation applies to BOTH additions and updates to encourage registration
+ * Normalize Pokémon GO trainer name for case-insensitive comparisons (anonymous public forms).
  *
- * @param string $ip_address IP address (not used for cookie tracking, but kept for future use)
+ * @param string $username Raw stored or submitted username
+ * @return string Normalized string (empty if only whitespace)
+ */
+function poke_hub_normalize_public_pogo_username($username) {
+    $username = trim(sanitize_text_field((string) $username));
+    if ($username === '') {
+        return '';
+    }
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($username, 'UTF-8');
+    }
+    return strtolower($username);
+}
+
+/**
+ * Whether the client IP may modify an anonymous row (legacy rows with no IP are claimable once).
+ *
+ * @param array  $row Anonymous profile row (expects anonymous_ip key)
+ * @param string $ip  Current client IP
+ */
+function poke_hub_anonymous_ip_allows_profile_update(array $row, $ip) {
+    $stored = isset($row['anonymous_ip']) ? trim((string) $row['anonymous_ip']) : '';
+    if ($stored === '') {
+        return true;
+    }
+    return $stored === $ip;
+}
+
+/**
+ * Rules for anonymous update when the row is matched by friend code (same listing).
+ * - Same IP as stored (or no IP yet): always allowed.
+ * - Different IP but same Pokémon GO username as stored: allowed (e.g. 4G → Wi‑Fi) to update friend code, etc.
+ * - Different IP and different username than stored: not allowed (must log in to rename).
+ * - Stored username empty, different IP: not allowed until same network or login.
+ *
+ * @param array  $row               Profile row
+ * @param string $ip                Client IP
+ * @param string $username_trimmed  Submitted username (trimmed)
+ * @return array{ok: bool, message?: string, message_type?: string}
+ */
+function poke_hub_anonymous_row_by_code_submission_gate(array $row, $ip, $username_trimmed) {
+    $stored_norm = poke_hub_normalize_public_pogo_username($row['pokemon_go_username'] ?? '');
+    $submit_norm = poke_hub_normalize_public_pogo_username($username_trimmed);
+    $ip_ok = poke_hub_anonymous_ip_allows_profile_update($row, $ip);
+
+    if ($stored_norm !== '' && $submit_norm !== $stored_norm) {
+        if ($ip_ok) {
+            return ['ok' => true];
+        }
+        return [
+            'ok' => false,
+            'message' => __('To change your Pokémon GO username, please log in. You can still update your friend code from another network if you keep the same username shown on your listing.', 'poke-hub'),
+            'message_type' => 'warning',
+        ];
+    }
+
+    if (!$ip_ok && $stored_norm !== '' && $submit_norm === $stored_norm) {
+        return ['ok' => true];
+    }
+
+    if (!$ip_ok) {
+        return [
+            'ok' => false,
+            'message' => __('This friend code was added from a different network. Log in to update it, or use the same connection as when you registered.', 'poke-hub'),
+            'message_type' => 'error',
+        ];
+    }
+
+    return ['ok' => true];
+}
+
+/**
+ * True if this row was updated less than 48 hours ago (anonymous throttle).
+ *
+ * @param array $row Profile row with updated_at
+ */
+function poke_hub_anonymous_friend_code_rate_window_blocked(array $row) {
+    if (empty($row['updated_at'])) {
+        return false;
+    }
+    $ts = strtotime($row['updated_at']);
+    if ($ts === false) {
+        return false;
+    }
+    return (time() - $ts) < (48 * 60 * 60);
+}
+
+/**
+ * Check if anonymous user can create a brand-new public profile row (cookie + IP quota).
+ * Updates to an already-owned row bypass this via $bypass_cookie_and_ip_quota.
+ *
+ * @param string $ip_address                    Client IP
+ * @param bool   $bypass_cookie_and_ip_quota    When true, allow (verified returning owner path)
  * @return bool True if allowed, false if rate limited
  */
-function poke_hub_can_anonymous_add_friend_code($ip_address = null) {
-    // Check cookie first (more reliable than IP)
+function poke_hub_can_anonymous_add_friend_code($ip_address = null, $bypass_cookie_and_ip_quota = false) {
+    if ($bypass_cookie_and_ip_quota) {
+        return true;
+    }
+
     $cookie_name = 'poke_hub_friend_code_last_add';
     $last_add_timestamp = isset($_COOKIE[$cookie_name]) ? (int) $_COOKIE[$cookie_name] : 0;
-    
-    // If last add/update was less than 48 hours (2 days) ago, deny
+
     $time_since_last = time() - $last_add_timestamp;
     if ($time_since_last < (48 * 60 * 60)) {
         return false;
     }
-    
-    // Also check database as backup (in case cookie was cleared)
-    // This is less reliable but provides a safety net
+
     global $wpdb;
     $table_name = pokehub_get_table('user_profiles');
-    
-    if (!empty($table_name)) {
+
+    if (!empty($table_name) && !empty($ip_address)) {
         $two_days_ago = date('Y-m-d H:i:s', strtotime('-48 hours'));
-        
-        // Check if this specific friend code was added/updated recently
-        // This prevents duplicate submissions
-        $friend_code_to_check = isset($_POST['friend_code']) ? trim(sanitize_text_field($_POST['friend_code'])) : '';
-        if (!empty($friend_code_to_check)) {
-            $cleaned = preg_replace('/[^0-9]/', '', $friend_code_to_check);
-            if (strlen($cleaned) === 12) {
-                // Check both created_at and updated_at to catch updates
-                $existing = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$table_name} 
-                    WHERE user_id IS NULL 
-                    AND friend_code = %s 
-                    AND (created_at >= %s OR updated_at >= %s)",
-                    $cleaned,
-                    $two_days_ago,
-                    $two_days_ago
-                ));
-                
-                if ((int) $existing > 0) {
-                    return false;
-                }
-            }
+        $count_ip = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table_name} 
+            WHERE user_id IS NULL 
+            AND profile_type = 'anonymous' 
+            AND anonymous_ip IS NOT NULL 
+            AND anonymous_ip != '' 
+            AND anonymous_ip = %s 
+            AND created_at >= %s",
+            $ip_address,
+            $two_days_ago
+        ));
+
+        if ((int) $count_ip >= 1) {
+            return false;
         }
     }
-    
+
     return true;
 }
 
@@ -375,59 +457,165 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
     $existing_by_user = null;
     $existing_by_code = null;
     $existing_by_code_with_user = null;
-    
-    if (!$is_logged_in) {
-        // For anonymous users, check if this exact friend code already exists (update scenario)
-        $existing_by_code = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, user_id, created_at, updated_at FROM {$table_name} WHERE friend_code = %s LIMIT 1",
-            $friend_code
-        ), ARRAY_A);
+    $row_by_code = null;
+    $ip_address = null;
+
+    $discord_id_from_data = isset($data['discord_id']) && !empty($data['discord_id'])
+        ? sanitize_text_field($data['discord_id'])
+        : null;
+
+    $is_anonymous_web_submission = !$is_logged_in && empty($discord_id_from_data);
+
+    $pokemon_go_username_input = isset($data['pokemon_go_username'])
+        ? trim(sanitize_text_field($data['pokemon_go_username']))
+        : '';
+
+    if ($is_anonymous_web_submission) {
+        if ($pokemon_go_username_input === '') {
+            return [
+                'success' => false,
+                'message' => __('Pokémon GO username is required.', 'poke-hub'),
+                'profile_id' => null,
+            ];
+        }
+        if (strlen($pokemon_go_username_input) > 191) {
+            return [
+                'success' => false,
+                'message' => __('Pokémon GO username is too long.', 'poke-hub'),
+                'profile_id' => null,
+            ];
+        }
     }
-    
-    // Check rate limiting for anonymous users - applies to BOTH additions AND updates
-    // This encourages users to register for unlimited updates
-    if (!$is_logged_in) {
+
+    if ($is_anonymous_web_submission) {
+        $row_by_code = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, user_id, friend_code, pokemon_go_username, anonymous_ip, discord_id, profile_type, updated_at, created_at
+                FROM {$table_name} WHERE friend_code = %s LIMIT 1",
+                $friend_code
+            ),
+            ARRAY_A
+        );
+        $existing_by_code = $row_by_code;
         $ip_address = poke_hub_get_client_ip();
-        
-        // Check if this exact friend code was already added/updated in the last 2 days
-        $two_days_ago = date('Y-m-d H:i:s', strtotime('-48 hours'));
-        $existing_recent = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$table_name} 
-            WHERE user_id IS NULL 
-            AND friend_code = %s 
-            AND (created_at >= %s OR updated_at >= %s)
-            LIMIT 1",
-            $friend_code,
-            $two_days_ago,
-            $two_days_ago
-        ));
-        
-        if ($existing_recent) {
+
+        if ($row_by_code && !empty($row_by_code['user_id'])) {
             return [
                 'success' => false,
-                'message' => __('You have already added or updated this friend code recently. You can update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'),
+                'message' => __('This friend code is already used. Log in to link it to your account if it is yours.', 'poke-hub'),
                 'profile_id' => null,
             ];
         }
-        
-        // Check rate limiting (1 every 2 days per IP) - applies to both additions and updates
-        if (!poke_hub_can_anonymous_add_friend_code($ip_address)) {
+
+        $p_username_norm = poke_hub_normalize_public_pogo_username($pokemon_go_username_input);
+
+        $row_by_pseudo = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, user_id, friend_code, pokemon_go_username, anonymous_ip, discord_id, profile_type, updated_at, created_at
+                FROM {$table_name}
+                WHERE user_id IS NULL
+                AND (discord_id IS NULL OR discord_id = '')
+                AND profile_type = %s
+                AND TRIM(pokemon_go_username) != ''
+                AND LOWER(TRIM(pokemon_go_username)) = LOWER(%s)
+                ORDER BY updated_at DESC
+                LIMIT 1",
+                'anonymous',
+                $pokemon_go_username_input
+            ),
+            ARRAY_A
+        );
+
+        if ($row_by_code && $row_by_pseudo && (int) $row_by_code['id'] !== (int) $row_by_pseudo['id']) {
             return [
                 'success' => false,
-                'message' => __('You can only add or update your friend code once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'),
+                'message' => __('This friend code and Pokémon GO username belong to different listings. Please check your details or log in to manage your profile.', 'poke-hub'),
                 'profile_id' => null,
             ];
+        }
+
+        $target_row = null;
+
+        if ($row_by_code && empty($row_by_code['user_id'])) {
+            if (!empty($row_by_code['discord_id'])) {
+                return [
+                    'success' => false,
+                    'message' => __('This friend code is already used.', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+            }
+            $gate = poke_hub_anonymous_row_by_code_submission_gate($row_by_code, $ip_address, $pokemon_go_username_input);
+            if (empty($gate['ok'])) {
+                $out = [
+                    'success' => false,
+                    'message' => isset($gate['message']) ? $gate['message'] : __('This friend code cannot be updated from this connection.', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+                if (!empty($gate['message_type'])) {
+                    $out['message_type'] = $gate['message_type'];
+                }
+                return $out;
+            }
+            $target_row = $row_by_code;
+        } elseif ($row_by_pseudo) {
+            // Same Pokémon GO username as an existing anonymous row: allow friend code update even after IP change (e.g. mobile data ↔ Wi‑Fi).
+            $other_fc = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT id, user_id FROM {$table_name} WHERE friend_code = %s AND id != %d LIMIT 1",
+                    $friend_code,
+                    (int) $row_by_pseudo['id']
+                ),
+                ARRAY_A
+            );
+            if ($other_fc) {
+                if (!empty($other_fc['user_id'])) {
+                    return [
+                        'success' => false,
+                        'message' => __('This friend code is already used by another member. Log in to link it if it is yours.', 'poke-hub'),
+                        'profile_id' => null,
+                    ];
+                }
+                return [
+                    'success' => false,
+                    'message' => __('This friend code is already listed under another profile.', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+            }
+            $target_row = $row_by_pseudo;
+        }
+
+        if ($target_row) {
+            if (poke_hub_anonymous_friend_code_rate_window_blocked($target_row)) {
+                return [
+                    'success' => false,
+                    'message' => __('You have already updated this listing recently. You can change it once every 2 days. Log in for unlimited updates and more features!', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+            }
+            $existing_by_user = [
+                'id' => (int) $target_row['id'],
+            ];
+        } else {
+            if (!poke_hub_can_anonymous_add_friend_code($ip_address, false)) {
+                return [
+                    'success' => false,
+                    'message' => __('You can only add a new friend code once every 2 days from this network. Log in for unlimited updates and more features!', 'poke-hub'),
+                    'profile_id' => null,
+                ];
+            }
         }
     }
-    
+
     $profile_data = [
         'friend_code' => $friend_code,
         'friend_code_public' => 1,
-        'pokemon_go_username' => isset($data['pokemon_go_username']) ? sanitize_text_field($data['pokemon_go_username']) : '',
+        'pokemon_go_username' => $is_anonymous_web_submission
+            ? $pokemon_go_username_input
+            : (isset($data['pokemon_go_username']) ? sanitize_text_field($data['pokemon_go_username']) : ''),
         'scatterbug_pattern' => isset($data['scatterbug_pattern']) ? sanitize_text_field($data['scatterbug_pattern']) : '',
         'team' => isset($data['team']) ? sanitize_text_field($data['team']) : '',
     ];
-    
+
     // Determine profile_type based on available identifiers
     // classic: has user_id (WordPress user)
     // discord: has discord_id but no user_id (Discord bot only)
@@ -436,13 +624,10 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         $profile_data['profile_type'] = 'classic';
         $profile_data['user_id'] = $user_id;
     } else {
-        // No user_id - check if discord_id exists (from $data)
-        $discord_id_from_data = isset($data['discord_id']) && !empty($data['discord_id']) ? sanitize_text_field($data['discord_id']) : null;
         if ($discord_id_from_data) {
             $profile_data['profile_type'] = 'discord';
             $profile_data['discord_id'] = $discord_id_from_data;
         } else {
-            // Neither user_id nor discord_id = anonymous
             $profile_data['profile_type'] = 'anonymous';
         }
     }
@@ -467,13 +652,11 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             $profile_data['country'] = $country;
         }
     }
-    
-    if (!$user_id && !isset($profile_data['discord_id'])) {
-        // For anonymous users, we track by IP and friend code
-        // The rate limiting function checks by IP and date
-        $ip_address = poke_hub_get_client_ip();
+
+    if ($is_anonymous_web_submission && !empty($ip_address)) {
+        $profile_data['anonymous_ip'] = $ip_address;
     }
-    
+
     // Continue checking if profile exists (for logged-in users)
     if ($user_id) {
         // For logged in users, check if they already have a profile
@@ -600,19 +783,12 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             ];
         }
     } else {
-        // For anonymous users, we already checked $existing_by_code above
-        // If code exists and is linked to a user, prevent duplicate
-        if ($existing_by_code && !empty($existing_by_code['user_id'])) {
+        if ($row_by_code && !empty($row_by_code['user_id'])) {
             return [
                 'success' => false,
                 'message' => __('This friend code is already used. Log in to link it to your account if it is yours.', 'poke-hub'),
                 'profile_id' => null,
             ];
-        }
-        
-        // If this is an update (code exists and is anonymous), set existing_by_user for update logic
-        if ($existing_by_code && empty($existing_by_code['user_id'])) {
-            $existing_by_user = $existing_by_code;
         }
     }
     
@@ -726,10 +902,16 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 'friend_code_public' => 1, // Always set to public for friend codes page
                 'profile_type' => $profile_type_for_update, // Always update profile_type to ensure correctness
             ];
+
+            if ($is_anonymous_web_submission && !empty($ip_address)) {
+                $update_data['anonymous_ip'] = $ip_address;
+            }
             
             // pokemon_go_username: only preserve if NOT provided in form (allows deletion if provided empty)
             $username_provided = array_key_exists('pokemon_go_username', $data);
-            if ($username_provided) {
+            if ($is_anonymous_web_submission) {
+                $update_data['pokemon_go_username'] = $pokemon_go_username_input;
+            } elseif ($username_provided) {
                 $update_data['pokemon_go_username'] = sanitize_text_field($data['pokemon_go_username']);
             } elseif ($existing_row && !empty($existing_row['pokemon_go_username'])) {
                 // Preserve existing value only if NOT provided in form

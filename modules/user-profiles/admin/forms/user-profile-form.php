@@ -254,6 +254,14 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
             <?php if (!empty($profile['discord_id'])) : ?>
                 <strong><?php _e('Discord ID:', 'poke-hub'); ?></strong> <?php echo esc_html($profile['discord_id']); ?><br>
             <?php endif; ?>
+            <?php if ($profile_type === 'anonymous') : ?>
+                <strong><?php _e('Last submitted IP:', 'poke-hub'); ?></strong>
+                <?php
+                $anon_ip_display = !empty($profile['anonymous_ip']) ? $profile['anonymous_ip'] : '';
+                echo $anon_ip_display !== '' ? '<code>' . esc_html($anon_ip_display) . '</code>' : esc_html('—');
+                ?>
+                <span class="description"><?php _e('(read-only, set on last public form submission)', 'poke-hub'); ?></span><br>
+            <?php endif; ?>
             <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
         </p>
 

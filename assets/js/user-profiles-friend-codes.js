@@ -977,6 +977,35 @@ window.pokeHubFriendCodesLoaded = true;
             $friendCodeInput.addClass('error').focus();
             return false;
         }
+
+        if ($form.attr('data-poke-hub-require-pogo-username') === '1') {
+            var $usernameInput = $form.find('#pokemon_go_username');
+            var usernameVal = $.trim($usernameInput.val() || '');
+            if (!usernameVal) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                var $formBlockUser = $form.closest('.me5rine-lab-form-block');
+                if ($formBlockUser.length > 0) {
+                    var usernameMsg = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.usernameRequired)
+                        ? pokeHubFriendCodes.usernameRequired
+                        : 'Pokémon GO username is required.';
+                    var $usernameError = $('<div class="me5rine-lab-form-message me5rine-lab-form-message-error"><p>' + usernameMsg + '</p></div>');
+                    $formBlockUser.find('h3').first().after($usernameError);
+                    setTimeout(function() {
+                        var uOff = $usernameError.offset();
+                        if (uOff && uOff.top !== undefined) {
+                            var hh = $(window).width() <= 768 ? 95 : ($(window).width() <= 1024 ? 123 : 129);
+                            $('html, body').animate({
+                                scrollTop: uOff.top - hh - 20
+                            }, 500);
+                        }
+                    }, 100);
+                }
+                $usernameInput.addClass('error').focus();
+                return false;
+            }
+            $usernameInput.removeClass('error');
+        }
         
         // Validate vivillon country/pattern combination
         var $countrySelect = $form.find('#country');
