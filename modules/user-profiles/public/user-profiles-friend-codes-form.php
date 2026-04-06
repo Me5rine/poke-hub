@@ -55,8 +55,13 @@ function poke_hub_render_friend_code_form($args = []) {
             ? __('Update My Vivillon Friend Code', 'poke-hub')
             : __('Add My Vivillon Friend Code', 'poke-hub');
     } else {
-        $title = __('Add My Friend Code', 'poke-hub');
-        $button_text = __('Add My Friend Code', 'poke-hub');
+        $has_friend_code = $args['is_logged_in'] && !empty($args['existing_profile']['friend_code']);
+        $title = $has_friend_code
+            ? __('Update My Friend Code', 'poke-hub')
+            : __('Add My Friend Code', 'poke-hub');
+        $button_text = $has_friend_code
+            ? __('Update My Friend Code', 'poke-hub')
+            : __('Add My Friend Code', 'poke-hub');
     }
     
     // Get selected values from POST or existing profile

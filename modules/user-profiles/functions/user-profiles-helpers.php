@@ -274,6 +274,7 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
             'reasons'             => [],
             'user_id'             => $wp_user_id,
             'discord_id'          => $discord_id_value,
+            'anonymous_ip'        => '',
         ];
     }
 
@@ -317,6 +318,7 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
     }
 
     $profile = [
+        'id'                  => (int) $row['id'],
         'team'                => $row['team'] ?: '',
         'friend_code'         => $row['friend_code'] ?: '',
         'friend_code_public'  => !empty($row['friend_code_public']),
@@ -328,6 +330,7 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
         'user_id'             => !empty($row['user_id']) ? (int) $row['user_id'] : null,
         'discord_id'          => !empty($row['discord_id']) ? $row['discord_id'] : null,
         'profile_type'        => isset($row['profile_type']) ? $row['profile_type'] : 'classic',
+        'anonymous_ip'        => isset($row['anonymous_ip']) ? trim((string) $row['anonymous_ip']) : '',
     ];
 
     return $profile;
@@ -566,6 +569,16 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
     }
     if ($discord_id_value !== null) {
         $data['discord_id'] = $discord_id_value;
+    }
+
+    $client_ip_for_profile = '';
+    if (function_exists('poke_hub_get_client_ip')) {
+        $client_ip_for_profile = poke_hub_get_client_ip();
+    } elseif (isset($_SERVER['REMOTE_ADDR'])) {
+        $client_ip_for_profile = trim(sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR'])));
+    }
+    if ($client_ip_for_profile !== '' && $client_ip_for_profile !== '0.0.0.0') {
+        $data['anonymous_ip'] = $client_ip_for_profile;
     }
 
     if ($existing_row) {

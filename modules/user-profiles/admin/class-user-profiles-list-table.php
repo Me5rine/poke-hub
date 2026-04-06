@@ -39,7 +39,7 @@ class PokeHub_User_Profiles_List_Table extends WP_List_Table {
             'xp'                  => __('XP', 'poke-hub'),
             'country'             => __('Country', 'poke-hub'),
             'pokemon_go_username' => __('Pokémon GO Username', 'poke-hub'),
-            'anonymous_ip'       => __('Last IP (anonymous)', 'poke-hub'),
+            'anonymous_ip'       => __('Last IP', 'poke-hub'),
             'scatterbug_pattern'  => __('Scatterbug Pattern', 'poke-hub'),
             'updated_at'          => __('Last Updated', 'poke-hub'),
         ];
