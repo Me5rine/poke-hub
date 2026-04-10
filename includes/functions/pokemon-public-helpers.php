@@ -871,30 +871,69 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
     $base_url          = poke_hub_pokemon_get_assets_base_url();
     $fallback_base_url = poke_hub_pokemon_get_assets_fallback_base_url();
 
-    $slug = isset($pokemon->slug) ? $pokemon->slug : '';
-    if ($slug === '') {
-        $slug = sprintf('%03d', (int) $pokemon->dex_number);
+    // Slug / dex : supporter tableau ou objet. Un slug stocké à 0 (int) ou "0" (chaîne) est invalide :
+    // sanitize_title le garde en "0" → URL …/0.png (souvent vu sur formes Méga si données partielles / import).
+    $slug             = '';
+    $dex_for_fallback = 0;
+    if (is_array($pokemon)) {
+        if (array_key_exists('slug', $pokemon)) {
+            $slug = $pokemon['slug'];
+        }
+        if (isset($pokemon['dex_number'])) {
+            $dex_for_fallback = (int) $pokemon['dex_number'];
+        }
+    } elseif (is_object($pokemon)) {
+        if (isset($pokemon->slug)) {
+            $slug = $pokemon->slug;
+        }
+        if (isset($pokemon->dex_number)) {
+            $dex_for_fallback = (int) $pokemon->dex_number;
+        }
     }
 
-    $key  = poke_hub_pokemon_build_image_key_from_slug($slug, $args);
-
-    // Si tu rajoutes des sous-dossiers par variant, adapte ici :
-    // $path = 'sprites/' . $key . '.png';
-    $path = $key . '.png';
+    $slug = trim((string) $slug);
+    if ($slug === '' || $slug === '0') {
+        $slug = '';
+    }
+    if ($slug === '' && $dex_for_fallback > 0) {
+        $slug = sprintf('%03d', $dex_for_fallback);
+    }
+    if ($slug === '' && $pokemon_id_for_gender > 0 && function_exists('pokehub_get_pokemon_data_by_id')) {
+        $resolved = pokehub_get_pokemon_data_by_id($pokemon_id_for_gender);
+        if (is_array($resolved)) {
+            $s2 = isset($resolved['slug']) ? trim((string) $resolved['slug']) : '';
+            $d2 = isset($resolved['dex_number']) ? (int) $resolved['dex_number'] : 0;
+            if ($s2 !== '' && $s2 !== '0') {
+                $slug = $s2;
+            } elseif ($d2 > 0) {
+                $slug = sprintf('%03d', $d2);
+            }
+        }
+    }
 
     $primary  = '';
     $fallback = '';
 
-    if ($base_url !== '') {
-        $primary = $base_url . '/' . ltrim($path, '/');
-    }
+    if ($slug !== '') {
+        $key = poke_hub_pokemon_build_image_key_from_slug($slug, $args);
+        // Si la clé reste vide ou "0", ne pas fabriquer …/0.png ni …/.png
+        if ($key !== '' && $key !== '0') {
+            // Si tu rajoutes des sous-dossiers par variant, adapte ici :
+            // $path = 'sprites/' . $key . '.png';
+            $path = $key . '.png';
 
-    // Fallback explicite : même clé/fichier, mais sur une base URL secondaire.
-    // Si aucun fallback n'est configuré, on garde la compatibilité avec primary.
-    if ($fallback_base_url !== '') {
-        $fallback = $fallback_base_url . '/' . ltrim($path, '/');
-    } else {
-        $fallback = $primary;
+            if ($base_url !== '') {
+                $primary = $base_url . '/' . ltrim($path, '/');
+            }
+
+            // Fallback explicite : même clé/fichier, mais sur une base URL secondaire.
+            // Si aucun fallback n'est configuré, on garde la compatibilité avec primary.
+            if ($fallback_base_url !== '') {
+                $fallback = $fallback_base_url . '/' . ltrim($path, '/');
+            } else {
+                $fallback = $primary;
+            }
+        }
     }
 
     $sources = [
