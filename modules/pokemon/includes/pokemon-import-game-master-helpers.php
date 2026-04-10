@@ -242,6 +242,171 @@ function poke_hub_pokemon_get_i18n_names( $category, $slug, $default_en ) {
 }
 
 /**
+ * Conserve les entrées de extra['names'] déjà en base lorsque l’import n’apporte rien
+ * pour cette langue (chaîne vide). Évite d’effacer DE, IT, ES, JA, KO, etc. ajoutés
+ * via l’admin Traduction ou un filtre, au re-import Game Master.
+ *
+ * @param array<string, string>  $import_names   Noms issus de poke_hub_pokemon_get_i18n_names().
+ * @param array<string, mixed>   $existing_extra JSON décodé de la ligne existante (colonne extra).
+ * @return array<string, string>
+ */
+function poke_hub_pokemon_gm_merge_extra_names_with_existing( array $import_names, array $existing_extra ): array {
+    if ( empty( $existing_extra['names'] ) || ! is_array( $existing_extra['names'] ) ) {
+        return $import_names;
+    }
+
+    $out = $import_names;
+    foreach ( $existing_extra['names'] as $lang => $old_val ) {
+        $lang = (string) $lang;
+        if ( $lang === '' ) {
+            continue;
+        }
+        $old_val = trim( (string) $old_val );
+        if ( $old_val === '' ) {
+            continue;
+        }
+        $incoming = isset( $out[ $lang ] ) ? trim( (string) $out[ $lang ] ) : '';
+        if ( $incoming === '' ) {
+            $out[ $lang ] = $old_val;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Tableaux « liste » (0..n-1) : fusionnés comme un bloc (source Game Master), pas élément par élément.
+ *
+ * @param array<mixed> $arr
+ */
+function poke_hub_pokemon_gm_is_list_array( array $arr ): bool {
+    if ( function_exists( 'array_is_list' ) ) {
+        return array_is_list( $arr );
+    }
+    if ( $arr === [] ) {
+        return true;
+    }
+    $i = 0;
+    foreach ( $arr as $k => $_v ) {
+        if ( $k !== $i ) {
+            return false;
+        }
+        ++$i;
+    }
+    return true;
+}
+
+/**
+ * Fusion récursive extra JSON : conserve les sous-clés / branches absentes de l’import.
+ * Les tableaux liste (moves, etc.) sont remplacés entièrement par la valeur importée.
+ *
+ * @param array<string, mixed> $existing
+ * @param array<string, mixed> $import
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_deep_merge_extra( array $existing, array $import ): array {
+    $out = $existing;
+    foreach ( $import as $k => $v ) {
+        if (
+            is_array( $v )
+            && isset( $out[ $k ] )
+            && is_array( $out[ $k ] )
+            && ! poke_hub_pokemon_gm_is_list_array( $v )
+            && ! poke_hub_pokemon_gm_is_list_array( $out[ $k ] )
+        ) {
+            $out[ $k ] = poke_hub_pokemon_gm_deep_merge_extra( $out[ $k ], $v );
+        } else {
+            $out[ $k ] = $v;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Tri récursif des clés pour comparer deux JSON sémantiquement (ordre des clés indifférent).
+ *
+ * @param array<string, mixed> $arr
+ */
+function poke_hub_pokemon_gm_ksort_recursive( array &$arr ): void {
+    ksort( $arr );
+    foreach ( $arr as &$v ) {
+        if ( is_array( $v ) && ! poke_hub_pokemon_gm_is_list_array( $v ) ) {
+            poke_hub_pokemon_gm_ksort_recursive( $v );
+        }
+    }
+    unset( $v );
+}
+
+/**
+ * Chaîne JSON normalisée pour comparaison (extra en base vs extra calculé).
+ */
+function poke_hub_pokemon_gm_json_normalize_for_compare( $json ): string {
+    if ( $json === null || $json === '' ) {
+        return '';
+    }
+    $a = json_decode( (string) $json, true );
+    if ( ! is_array( $a ) ) {
+        return (string) $json;
+    }
+    poke_hub_pokemon_gm_ksort_recursive( $a );
+    return (string) wp_json_encode( $a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+}
+
+/**
+ * Garde uniquement les colonnes dont la valeur diffère de la ligne existante (UPDATE ciblé).
+ *
+ * @param array<string, mixed> $data
+ * @param object                 $row Objet stdClass depuis $wpdb->get_row.
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_wpdb_data_only_changed_columns( array $data, $row ): array {
+    if ( ! is_object( $row ) ) {
+        return $data;
+    }
+
+    $float_keys = [ 'dodge_probability', 'attack_probability' ];
+    $out        = [];
+
+    foreach ( $data as $key => $new_val ) {
+        if ( ! property_exists( $row, $key ) ) {
+            $out[ $key ] = $new_val;
+            continue;
+        }
+        $old_val = $row->$key;
+
+        if ( $key === 'extra' ) {
+            if ( poke_hub_pokemon_gm_json_normalize_for_compare( $new_val ) !== poke_hub_pokemon_gm_json_normalize_for_compare( $old_val ) ) {
+                $out[ $key ] = $new_val;
+            }
+            continue;
+        }
+
+        if ( in_array( $key, $float_keys, true ) ) {
+            if ( abs( (float) $new_val - (float) $old_val ) >= 0.000001 ) {
+                $out[ $key ] = $new_val;
+            }
+            continue;
+        }
+
+        if ( (string) $new_val !== (string) $old_val ) {
+            $out[ $key ] = $new_val;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Formats %wpdb pour une ligne attacks (colonnes string uniquement dans l’import GM).
+ *
+ * @param array<string, mixed> $data
+ * @return string[]
+ */
+function poke_hub_pokemon_gm_wpdb_format_attack_row( array $data ): array {
+    return array_fill( 0, count( $data ), '%s' );
+}
+
+/**
  * Récupère un variant global (pokemon_form_variants) par form_slug.
  *
  * @param string $form_slug
