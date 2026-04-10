@@ -20,10 +20,11 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
    - Retourne une chaîne vide si le bucket n'est pas renseigné
 
 2. **`poke_hub_pokemon_get_assets_fallback_base_url()`**
-   - URL de base de secours (même clés de fichiers que la source principale)
+   - URL de base de secours (même clés de fichiers que la source principale, ex. `pikachu.png`)
    - Option WordPress : `poke_hub_pokemon_assets_fallback_base_url`
    - Retourne une chaîne vide si l'option n'est pas renseignée
-   - Un script front peut basculer automatiquement de la principale vers le fallback si l'image HTTP échoue
+
+   **Bascule automatique (navigateur)** : si la source principale et le fallback sont tous deux configurés et différents, le plugin charge `assets/js/pokehub-pokemon-image-fallback.js` (front et admin). Un écouteur en phase de capture sur l’événement `error` des `<img>` : si l’URL commence par la base principale, elle est remplacée par la même ressource relative sur la base fallback (une seule tentative par image, marquée via l’attribut `data-pokehub-fallback-applied`).
 
 3. **`poke_hub_pokemon_build_image_key_from_slug($slug, array $args = [])`**
    - Construit une clé d'image à partir du slug du Pokémon
@@ -62,6 +63,19 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
      ```
    - Applique le filtre `poke_hub_pokemon_image_sources` pour personnalisation
 
+## SVG inline (types Pokémon, bonus)
+
+Les fichiers **`.svg`** sur le bucket (chemins **types** et **bonus** dans Sources) sont affichés en **markup inline** (pas en `<img>`) : fetch, sanitisation, classes CSS. Les fonctions sont dans `includes/functions/` et chargées pour tout le site — voir **[INLINE_SVG.md](./INLINE_SVG.md)**.
+
+- **Types** : `poke_hub_get_type_icon_url()`, `pokehub_render_pokemon_type_icon_html()`.
+- **Bonus** : `poke_hub_render_bonus_asset_markup()` (SVG d’abord, repli raster WebP → PNG → JPG). **Personnalisation visuelle** (couleur des icônes, fond des vignettes) : variables CSS `--pokehub-bonus-icon-*` dans `assets/css/poke-hub-bonus-front.css` — détail [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md).
+
+## Bonbons (assets raster)
+
+Les images **bonbon** et **bonbon XL** utilisent les clés `{slug}-candy` et `{slug}-xl-candy` dans le dossier configuré pour les candies (Réglages > Poké HUB > Sources). Les formats **WebP, PNG et JPG** peuvent être proposés ; un script front peut enchaîner les extensions si l’URL ne répond pas (voir l’aide dans l’admin Sources).
+
+Pour **quel slug** est utilisé sur les lignées d’évolution (famille de bonbons, bébés), voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](./blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
+
 ## Configuration
 
 ### Paramètres dans l'administration
@@ -69,8 +83,10 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
 Les URLs sont configurées dans :
 **Réglages > Poke Hub > Sources** (onglet "Sources")
 
-- **Assets bucket base URL** + chemin **Pokémon** (section Image Sources) : source principale des sprites (`slug.png`, etc.)
-- **Pokémon assets fallback base URL** : URL de secours (même structure de fichiers que la principale)
+- **Assets bucket base URL** + chemin **Pokémon** (section *Image Sources*) : seule source principale des sprites (`{clé}.png`). Sans bucket renseigné, les helpers renvoient une URL vide.
+- **Pokémon assets fallback base URL** (section *Pokémon Sources*) : racine alternative ; les chemins et noms de fichiers doivent correspondre à ceux de la source principale.
+
+Il n’existe plus d’option ni de constante dédiée « URL Pokémon seule » : tout passe par le bucket + le chemin Pokémon. Une ancienne option `poke_hub_pokemon_assets_base_url` éventuellement présente en base n’est plus lue par le plugin ; vous pouvez la supprimer manuellement si besoin.
 
 ## Structure des fichiers images
 
@@ -201,12 +217,7 @@ Exemple : Si `dex_number = 1`, le fichier sera `001.png`
 
 ### 📝 Utilisation dans le code
 
-**Note importante** : Les fonctions helper existent mais ne semblent pas encore être utilisées massivement dans le code. Il serait recommandé de les utiliser dans :
-
-- Les templates d'affichage des Pokémon
-- Les shortcodes Pokémon
-- Les widgets
-- Les pages d'administration
+Les helpers sont utilisés par les blocs (sauvages, quêtes, évolutions, défis de collection, etc.), le module collections, les shortcodes jeux, et d’autres écrans qui affichent des miniatures Pokémon. Pour toute nouvelle intégration, préférer `poke_hub_pokemon_get_image_url()` ou `poke_hub_pokemon_get_image_sources()`.
 
 ## Exemple d'intégration complète
 

@@ -152,3 +152,7 @@ add_filter('poke_hub_pokemon_regional_auto_config', function($config) {
 
 Lors du prochain import Game Master, Torkoal sera automatiquement marqué comme régional avec les pays spécifiés.
 
+## Voir aussi
+
+- **[BIOMES.md](./BIOMES.md)** — biomes Pokémon GO (tables, onglet admin, association sur la fiche Pokémon). Dans l’admin, les champs **biomes** et **régionaux** sont regroupés dans la même section *Regional availability* (biomes en premier, puis bloc *Regional*).
+

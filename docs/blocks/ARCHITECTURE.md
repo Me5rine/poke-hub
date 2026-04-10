@@ -148,5 +148,6 @@ Ces fichiers ne sont plus utilisés et peuvent être supprimés :
 - [WordPress Block Editor Handbook](https://developer.wordpress.org/block-editor/)
 - [BLOCK_TYPES.md](./BLOCK_TYPES.md) - Types de blocs (PHP-only vs JS/React)
 - [QUICK_START.md](./QUICK_START.md) - Guide de création rapide
+- [BLOCK_STYLES_AND_BEHAVIOR.md](./BLOCK_STYLES_AND_BEHAVIOR.md) - Titres `.pokehub-block-title`, CSS front, bonbons (New Pokémon)
 
 

@@ -291,6 +291,10 @@ function pokehub_get_table(string $key): string {
         'backgrounds'               => ['scope' => 'local',  'suffix' => 'pokemon_backgrounds'],
         'pokemon_background_pokemon_links' => ['scope' => 'local',  'suffix' => 'pokemon_background_pokemon_links'],
         'pokemon_background_events' => ['scope' => 'local',  'suffix' => 'pokemon_background_events'],
+        'pokemon_biomes'             => ['scope' => 'local',  'suffix' => 'pokemon_biomes'],
+        'biomes'                     => ['scope' => 'local',  'suffix' => 'pokemon_biomes'],
+        'pokemon_biome_images'       => ['scope' => 'local',  'suffix' => 'pokemon_biome_images'],
+        'pokemon_biome_pokemon_links' => ['scope' => 'local',  'suffix' => 'pokemon_biome_pokemon_links'],
         'pokemon_regional_regions'   => ['scope' => 'local',  'suffix' => 'pokemon_regional_regions'],
         'pokemon_regional_mappings'  => ['scope' => 'local',  'suffix' => 'pokemon_regional_mappings'],
 

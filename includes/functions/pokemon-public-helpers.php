@@ -832,6 +832,9 @@ function poke_hub_pokemon_get_image_url($pokemon, array $args = []) {
 /**
  * Version complète : renvoie primary + fallback (même pattern slug).
  *
+ * Genre des fichiers : si `$pokemon` a un `id` connu, `poke_hub_pokemon_determine_gender( id, args['gender'] )`
+ * applique à la fois le genre forcé (sauvages, habitats, quêtes, évolutions…) et le défaut mâle en cas de dimorphisme.
+ *
  * @return array {
  *   'primary'  => string, // peut être '' si pas de base url
  *   'fallback' => string, // peut être '' si pas configuré
@@ -843,6 +846,27 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         'gender'  => null,
         'variant' => 'sprite', // si un jour tu veux des sous-dossiers
     ]);
+
+    // Genre pour le fichier sprite : une seule mécanique — poke_hub_pokemon_determine_gender().
+    // Genre explicite (sauvages, habitats, méta évolutions, etc.) = 2e argument ; sinon null → défaut mâle si dimorphisme.
+    $pokemon_id_for_gender = 0;
+    if (is_object($pokemon) && isset($pokemon->id)) {
+        $pokemon_id_for_gender = (int) $pokemon->id;
+    } elseif (is_array($pokemon) && isset($pokemon['id'])) {
+        $pokemon_id_for_gender = (int) $pokemon['id'];
+    }
+
+    $gender_arg = $args['gender'];
+    if ($gender_arg === '') {
+        $gender_arg = null;
+    }
+
+    if ($pokemon_id_for_gender > 0 && function_exists('poke_hub_pokemon_determine_gender')) {
+        $resolved = poke_hub_pokemon_determine_gender($pokemon_id_for_gender, $gender_arg);
+        if ($resolved !== null) {
+            $args['gender'] = $resolved;
+        }
+    }
 
     $base_url          = poke_hub_pokemon_get_assets_base_url();
     $fallback_base_url = poke_hub_pokemon_get_assets_fallback_base_url();
@@ -891,11 +915,11 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
  */
 
 /**
- * Détermine le genre à utiliser pour l'affichage d'un Pokémon
- * 
- * @param int $pokemon_id ID du Pokémon
- * @param string|null $forced_gender Genre forcé (male, female, ou null)
- * @return string|null 'male', 'female', ou null
+ * Genre à utiliser pour les sprites (et tout appelant qui s’aligne sur la même règle).
+ *
+ * @param int               $pokemon_id    ID du Pokémon en base.
+ * @param string|null       $forced_gender male|female = priorité contenu (sauvages, habitats, quêtes, évolutions…), null = défaut.
+ * @return string|null male, female, ou null (pas de suffixe genre sur le fichier).
  */
 function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
     $pokemon_id = (int) $pokemon_id;
@@ -948,8 +972,9 @@ function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
  * @param int|array|object $pokemon ID du Pokémon, ou données du Pokémon (array/object)
  * @param array $args {
  *     Arguments optionnels
- *     @type array $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
- *     @type bool  $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ *     @type array         $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
+ *     @type bool          $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ *     @type string|null   $gender           male|female si imposé par le contenu ; sinon null (résolu dans poke_hub_pokemon_get_image_sources).
  * }
  * @return array {
  *     Informations sur le shiny
@@ -964,6 +989,7 @@ function poke_hub_pokemon_get_shiny_info($pokemon, array $args = []) {
     $args = wp_parse_args($args, [
         'forced_shiny_ids' => [],
         'force_shiny'      => false,
+        'gender'           => null,
     ]);
     
     // Récupérer l'ID du Pokémon
@@ -997,11 +1023,10 @@ function poke_hub_pokemon_get_shiny_info($pokemon, array $args = []) {
     // Déterminer si l'icône shiny doit être affichée
     $should_show_shiny = $is_shiny_forced || $is_shiny_available;
     
-    // Déterminer le genre à utiliser
-    $gender = $args['gender'] ?? null;
-    if ($gender === null) {
-        // Si aucun genre n'est spécifié, déterminer automatiquement
-        $gender = poke_hub_pokemon_determine_gender($pokemon_id);
+    // Image : le genre (défaut dimorphisme / mâle) est entièrement géré dans poke_hub_pokemon_get_image_sources().
+    $image_gender = $args['gender'];
+    if ($image_gender === '') {
+        $image_gender = null;
     }
     
     // Récupérer l'image (TOUJOURS normale, même si shiny forcé)
@@ -1014,7 +1039,7 @@ function poke_hub_pokemon_get_shiny_info($pokemon, array $args = []) {
             // Toujours utiliser l'image normale (shiny = false), mais avec le genre si nécessaire
             $image_sources = poke_hub_pokemon_get_image_sources($pokemon_obj, [
                 'shiny' => false,
-                'gender' => $gender,
+                'gender' => $image_gender,
             ]);
             $image_url = !empty($image_sources['primary']) ? $image_sources['primary'] : $image_sources['fallback'];
         }
@@ -1121,8 +1146,9 @@ function poke_hub_pokemon_get_regional_info($pokemon) {
  * @param int|array|object $pokemon ID du Pokémon, ou données du Pokémon (array/object)
  * @param array $args {
  *     Arguments optionnels
- *     @type array $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
- *     @type bool  $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ *     @type array         $forced_shiny_ids Liste des IDs de Pokémon avec shiny forcé (par défaut: [])
+ *     @type bool          $force_shiny      Forcer le shiny pour ce Pokémon spécifique (par défaut: false)
+ *     @type string|null   $gender           Voir poke_hub_pokemon_get_shiny_info().
  * }
  * @return array {
  *     Informations complètes pour l'affichage
@@ -2694,7 +2720,7 @@ function pokehub_render_pokemon_candy_reward_html(int $pokemon_id, int $quantity
 
     $classes = trim('pokehub-pokemon-candy ' . (string) $args['extra_class']);
     $size    = (int) $args['img_size'];
-    $size    = $size > 0 ? $size : 40;
+    $size    = $size > 0 ? $size : 30;
 
     $img_tag = function_exists('poke_hub_render_bucket_raster_img')
         ? poke_hub_render_bucket_raster_img(

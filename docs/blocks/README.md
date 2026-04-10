@@ -10,6 +10,7 @@ Index de la documentation du module Blocs et liste des blocs disponibles.
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | Architecture, structure des fichiers, règles d’organisation |
 | **[BLOCK_TYPES.md](./BLOCK_TYPES.md)** | Types de blocs (PHP dynamique vs JavaScript/React) |
 | **[QUICK_START.md](./QUICK_START.md)** | Créer un nouveau bloc (PHP ou JS) |
+| **[BLOCK_STYLES_AND_BEHAVIOR.md](./BLOCK_STYLES_AND_BEHAVIOR.md)** | Titres unifiés (Field Research), CSS, bonbons / New Pokémon |
 
 Voir aussi :
 - **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)** — Bonus : source de vérité (site principal), bloc et metabox (module Blocks uniquement)
@@ -31,6 +32,7 @@ Tous les blocs sont dans la catégorie **Poké HUB** dans l’éditeur. Ils sont
 | `pokehub/bonus` | Bonus | **Aucun** | Cartes de bonus (auto ou liste d’IDs). Tout (helpers + metabox) est chargé par le module Blocks ; aucune dépendance au module Bonus. Types de bonus : site principal (local ou distant selon préfixe Pokémon). |
 | `pokehub/wild-pokemon` | Wild Pokémon | events | Liste des Pokémon dans la nature (shiny, rare, régional) |
 | `pokehub/habitats` | Habitats | events | Habitats avec Pokémon et horaires |
+| `pokehub/day-pokemon-hours` | Day Pokémon Hours | events | Pokémon par jour avec horaires (ex. featured hours) |
 | `pokehub/new-pokemon-evolutions` | New Pokémon - Evolution Lines | events | Lignées d’évolution et conditions |
 | `pokehub/collection-challenges` | Collection Challenges | events | Défis de collection (tables de contenu) |
 | `pokehub/special-research` | Special Research | events | Études ponctuelles / spéciales / magistrales |
@@ -46,6 +48,6 @@ L’enregistrement est géré dans `modules/blocks/functions/blocks-register.php
 - **Rendu / données** : selon le bloc — events, bonus, pokemon, ou helpers dans `modules/blocks/functions/`
 - **Meta boxes** : `modules/blocks/admin/` (Collection Challenges, Études spéciales). La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif.
 
-Pour la source de vérité des types de bonus (site principal, local/distant), voir **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)**.
+Pour la source de vérité des types de bonus (site principal, local/distant), le rendu SVG/raster et les **variables CSS des vignettes** (`--pokehub-bonus-icon-*` dans `poke-hub-bonus-front.css`), voir **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)** et **[POKEHUB_CSS_CLASSES.md](../POKEHUB_CSS_CLASSES.md)**.
 
 Pour le détail des attributs et exemples d’utilisation, voir **[CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md)**.

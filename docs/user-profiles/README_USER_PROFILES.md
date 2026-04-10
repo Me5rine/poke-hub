@@ -18,6 +18,8 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
   - Keycloak pour le pseudo/nickname
 - Gestion du changement d'email : redirection automatique vers le profil avec notification
 - Templates réutilisables pour optimiser le code
+- **Codes amis publics** : pseudo obligatoire pour les visiteurs non connectés, contrôle IP / pseudo, mise à jour de la fiche par pseudo ou par code, notices d’erreur ou d’avertissement selon le cas
+- **Dernière IP** : enregistrée à chaque sauvegarde de profil (colonne `anonymous_ip`) ; visible en admin (liste + fiche d’édition)
 
 ## Documentation
 
@@ -28,6 +30,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`CUSTOMIZATION.md`** → Comment personnaliser les listes (équipes, raisons) via les filtres WordPress
 - **`SYNCHRONIZATION.md`** → Synchronisation avec subscription_accounts et Keycloak
 - **`README_DATA_CENTRALIZATION.md`** → Architecture de centralisation des données
+- **`FRIEND_CODES_PUBLIC_AND_IP.md`** → Codes amis en public (non connectés), colonne IP, admin, boutons Add/Update
 
 ### 🎨 Documentation Générique (CSS)
 

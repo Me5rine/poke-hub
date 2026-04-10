@@ -15,7 +15,7 @@ Les dates d'événement s'affichent automatiquement avec des indicateurs visuels
 ### 2. Bonus visuels en cartes
 
 Les bonus s'affichent automatiquement sous forme de cartes modernes avec :
-- Icônes des bonus
+- Icônes des bonus (fichier **`{slug}.svg`** sur le bucket en priorité, SVG inline ; repli raster — voir [INLINE_SVG.md](./INLINE_SVG.md) et [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md))
 - Badges de ratio (ex: "1/2", "1/4") détectés automatiquement
 - Design sombre et moderne
 
@@ -99,13 +99,20 @@ Affiche les habitats avec leurs Pokémon et horaires (données événement).
 
 #### Bloc "New Pokémon - Evolution Lines" (`pokehub/new-pokemon-evolutions`)
 
-Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons, objets, etc.).
+Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons, objets, etc.).  
+**Bonbons** : l’icône / le libellé suivent la **famille de bonbons** (racine de lignée + règles bébés GO), pas uniquement l’espèce précédente dans la chaîne — voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 
 **Attributs :**
 - `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
 - `pokemonIds` (array) : IDs de Pokémon à afficher (si pas en auto)
 
-**Styles :** `assets/css/poke-hub-new-pokemon-evolutions-front.css`
+**Styles :** `assets/css/poke-hub-new-pokemon-evolutions-front.css` (détail des titres : feuille commune `poke-hub-blocks-front.css`, voir doc ci-dessus).
+
+#### Bloc « Day Pokémon Hours » (`pokehub/day-pokemon-hours`)
+
+Affiche les Pokémon par jour avec horaires (données metabox **Featured Pokémon Hours**).
+
+**Attributs :** `contentType` (ex. `featured_hours`), `title` (titre du bloc, optionnel) — voir `block.json`.
 
 #### Bloc "Pokémon Eggs" (`pokehub/eggs`)
 
@@ -142,13 +149,20 @@ Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, qu
 
 ## 🎨 Styles CSS
 
-Les styles sont chargés par le module Blocks :
-- **Dates / Quêtes / Habitats / Wild** : `assets/css/poke-hub-events-front.css` (et assets liés aux événements)
-- **Bonus** : `assets/css/poke-hub-bonus-front.css`
+Les styles sont chargés par le module **Blocks** (`modules/blocks/blocks.php`).
+
+- **Base commune (titres de tous les blocs `pokehub/*`, alignés sur Field Research)** : `assets/css/poke-hub-blocks-front.css` — voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
+- **Pages / module Événements** : `assets/css/poke-hub-events-front.css` (reprend les titres + layout dates, quêtes, wild, habitats, etc.).
+- **Bonus** : `assets/css/poke-hub-bonus-front.css` (grille cartes, shortcode, bonus d’événement ; variables `--pokehub-bonus-icon-color`, `--pokehub-bonus-icon-bg`, `--pokehub-bonus-icon-radius` pour le thème — voir [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md))
 - **Pokémon Eggs** : `assets/css/poke-hub-eggs-front.css`
 - **New Pokémon - Evolution Lines** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
 - **Collection Challenges** : `assets/css/poke-hub-collection-challenges-front.css`
 - **Special Research** : `assets/css/poke-hub-special-research-front.css`
+- **Icônes types / bonbons** : `pokehub-type-icons`, `poke-hub-candy-display.css` (selon contexte)
+
+### Titres principaux (`.pokehub-block-title`)
+
+Tous les blocs listés ci-dessus utilisent la même charte pour le **titre de section** (couleur, uppercase, alignement). Détail technique : [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 
 ### Classes CSS disponibles
 
@@ -168,16 +182,23 @@ Les styles sont chargés par le module Blocks :
 
 #### Bonus
 ```css
-.pokehub-bonuses-visual           /* Conteneur principal */
-.pokehub-bonus-card               /* Carte de bonus */
-.pokehub-bonus-card-inner         /* Contenu de la carte */
-.pokehub-bonus-card-header        /* En-tête */
-.pokehub-bonus-card-title         /* Titre du bonus */
-.pokehub-bonus-card-icon-wrapper  /* Conteneur de l'icône */
-.pokehub-bonus-card-icon          /* Icône du bonus */
-.pokehub-bonus-card-badge         /* Badge de ratio */
-.pokehub-bonus-card-description   /* Description */
+.pokehub-bonus-block-wrapper      /* Wrapper du bloc Gutenberg Bonus (+ h2.pokehub-block-title) */
+.pokehub-bonuses-grid             /* Grille des cartes bonus */
+.pokehub-bonus-card               /* Carte */
+.pokehub-bonus-card-inner         /* Contenu interne de la carte */
+.pokehub-bonus-image-wrapper      /* Zone icône + badge ratio */
+.pokehub-bonus-icon-wrap          /* Pastille icône (SVG inline ou img) */
+.pokehub-bonus-icon--svg          /* Conteneur du SVG inline */
+.pokehub-bonus-image              /* Image raster si pas de SVG inline */
+.pokehub-bonus-badge              /* Badge ratio (ex. 1/2) */
+.pokehub-bonus-description        /* Texte sous l’icône */
+.pokehub-bonuses-shortcode        /* Shortcode [pokehub-bonus] */
+.pokehub-bonus-item               /* Ligne shortcode */
+.pokehub-event-bonuses            /* Liste bonus injectés (the_content / helper) */
+.pokehub-event-bonus              /* Une ligne événement */
 ```
+
+Référence détaillée et variables de thème : [POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md), [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md).
 
 ## 🔧 Personnalisation
 
@@ -219,7 +240,7 @@ Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nat
 
 **Même préfixe que la source Pokémon :** ces tables utilisent le scope **`content_source`** : elles sont lues/écrites avec le **même préfixe** que les tables Pokémon. Le réglage à utiliser est **Réglages > Poké HUB > Sources > Pokémon table prefix (remote)** — il sert explicitement aux Pokémon et à tous les contenus (quêtes, bonus, habitats, œufs, etc.). Une seule base pour tout. Sur un site distant, renseigner ce préfixe avec celui du site principal pour que les blocs sauvegardent et affichent les données depuis le site principal.
 
-**Blocs indépendants du module Pokémon :** les blocs (œufs, quêtes, défis de collection, bonus, etc.) ne dépendent plus du module Pokémon pour être enregistrés ; ils ne requièrent que le module **Events** (ou **Bonus** pour le bloc bonus). Ils restent utilisables en mode remote dès que le module Blocks et Events sont actifs.
+**Blocs indépendants du module Pokémon :** les blocs (œufs, quêtes, défis de collection, bonus, etc.) ne dépendent plus du module Pokémon pour être enregistrés ; ils requièrent en général le module **Events** (le bloc **Bonus** n’exige que le module **Blocks**). Utilisables en mode remote dès que la configuration Sources / préfixe est correcte.
 
 **Metaboxes chargées par le module Blocks :** pour que les blocs restent configurables même sans activer tous les modules, le module Blocks charge lui-même les metaboxes nécessaires lorsque les modules dédiés sont inactifs : metabox **Bonus** (si module Bonus inactif), metabox **Eggs** (si module Eggs inactif). La metabox **Collection Challenges** est toujours gérée par le module Blocks et enregistre ses assets (Select2) si besoin.
 
@@ -228,6 +249,7 @@ Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nat
 - **Liste complète des blocs** et dépendances : [docs/blocks/README.md](blocks/README.md)
 - **Architecture du module Blocs** : [docs/blocks/ARCHITECTURE.md](blocks/ARCHITECTURE.md)
 - **Créer un nouveau bloc** : [docs/blocks/QUICK_START.md](blocks/QUICK_START.md)
+- **Titres, CSS front, bonbons (New Pokémon)** : [docs/blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md)
 - **Dépannage** : [docs/BLOCKS_TROUBLESHOOTING.md](BLOCKS_TROUBLESHOOTING.md)
 
 

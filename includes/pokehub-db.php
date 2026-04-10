@@ -94,6 +94,7 @@ class Pokehub_DB {
      * - pokemon_type_resistance_links
      * - pokemon_regional_regions (ensembles de pays géographiques)
      * - pokemon_regional_mappings (mapping pattern Vivillon => pays/régions)
+     * - pokemon_biomes, pokemon_biome_images, pokemon_biome_pokemon_links
      */
     private function createPokemonTables() {
         global $wpdb;
@@ -120,6 +121,9 @@ class Pokehub_DB {
         $backgrounds_table     = pokehub_get_table('pokemon_backgrounds');
         $background_pokemon_links = pokehub_get_table('pokemon_background_pokemon_links');
         $background_events_table = pokehub_get_table('pokemon_background_events');
+        $biomes_table                 = pokehub_get_table('pokemon_biomes');
+        $biome_images_table           = pokehub_get_table('pokemon_biome_images');
+        $biome_pokemon_links_table    = pokehub_get_table('pokemon_biome_pokemon_links');
         $form_variant_events_table = pokehub_get_table('pokemon_form_variant_events');
         $pokemon_events_table = pokehub_get_table('pokemon_pokemon_events');
         $regional_regions_table = pokehub_get_table('pokemon_regional_regions');
@@ -529,6 +533,42 @@ class Pokehub_DB {
             UNIQUE KEY background_event (background_id, event_type, event_id)
         ) {$charset_collate};";
 
+        // Biomes (habitats en jeu : plusieurs fonds, plusieurs Pokémon par biome)
+        $sql_biomes = "CREATE TABLE {$biomes_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(191) NOT NULL,
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
+            description LONGTEXT NULL,
+            extra LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug),
+            KEY name_en (name_en(191)),
+            KEY name_fr (name_fr(191))
+        ) {$charset_collate};";
+
+        $sql_biome_images = "CREATE TABLE {$biome_images_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            biome_id BIGINT(20) UNSIGNED NOT NULL,
+            image_url TEXT NOT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY biome_id (biome_id),
+            KEY sort_order (sort_order)
+        ) {$charset_collate};";
+
+        $sql_biome_pokemon_links = "CREATE TABLE {$biome_pokemon_links_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            biome_id BIGINT(20) UNSIGNED NOT NULL,
+            pokemon_id BIGINT(20) UNSIGNED NOT NULL,
+            PRIMARY KEY (id),
+            KEY biome_id (biome_id),
+            KEY pokemon_id (pokemon_id),
+            UNIQUE KEY biome_pokemon (biome_id, pokemon_id)
+        ) {$charset_collate};";
+
         dbDelta($sql_pokemon);
         dbDelta($sql_types);
         dbDelta($sql_regions);
@@ -551,6 +591,9 @@ class Pokehub_DB {
         dbDelta($sql_backgrounds);
         dbDelta($sql_background_pokemon_links);
         dbDelta($sql_background_events);
+        dbDelta($sql_biomes);
+        dbDelta($sql_biome_images);
+        dbDelta($sql_biome_pokemon_links);
 
         // Migration : copier event_id/event_type des backgrounds vers pokemon_background_events (une seule fois)
         $migrated = get_option('pokehub_background_events_migrated', false);

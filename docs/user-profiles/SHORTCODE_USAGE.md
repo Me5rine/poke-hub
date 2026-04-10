@@ -138,8 +138,16 @@ echo do_shortcode('[poke_hub_friend_codes]');
 - Copy friend code to clipboard with one click
 - QR code display for easy scanning
 - Pagination support
-- Add/edit form for logged-in users
-- Anonymous users can add one friend code per day (rate limited)
+- Add/update form: logged-in users see **Update My Friend Code** when they already have a friend code saved; otherwise **Add My Friend Code**
+- **Anonymous (not logged in)**:
+  - **Pokémon GO username is required** (browser + JS + server validation)
+  - New public row: cookie + **at most one new anonymous profile per IP per 48 hours** (among rows with a stored IP)
+  - Updates to the **same listing** (matched by friend code or by same username): **48 hours** between updates on that row
+  - **Same username, different IP** (e.g. mobile ↔ Wi‑Fi): still allowed to update friend code; stored IP is refreshed
+  - **Username change** from a **different** IP than stored: blocked with a **warning** notice; login required to rename
+- Server may return `message_type` (`error`, `warning`, etc.) for the same notice styles as elsewhere (`me5rine-lab-form-message-*`)
+
+See **`FRIEND_CODES_PUBLIC_AND_IP.md`** (same folder) for full detail (French).
 
 ### URL Parameters
 
@@ -173,8 +181,8 @@ echo do_shortcode('[poke_hub_vivillon]');
 - Copy friend code to clipboard
 - QR code display
 - Pagination support
-- Add/edit form for logged-in users (pattern is required)
-- Anonymous users can add one friend code per day
+- Add/update form for logged-in users (pattern is required); same **Add / Update** labelling as friend codes when a code already exists
+- **Anonymous** users: same rules as `[poke_hub_friend_codes]` (required username, IP / rate limits, notices) — see **`FRIEND_CODES_PUBLIC_AND_IP.md`**
 
 ### URL Parameters
 

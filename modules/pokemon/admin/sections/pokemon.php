@@ -44,6 +44,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             'variant_group'     => isset($_GET['filter_variant_group']) ? sanitize_text_field(wp_unslash($_GET['filter_variant_group'])) : '',
             'regional'          => isset($_GET['filter_regional']) ? sanitize_text_field(wp_unslash($_GET['filter_regional'])) : '',
             'event_costumed'    => isset($_GET['filter_event_costumed']) ? sanitize_text_field(wp_unslash($_GET['filter_event_costumed'])) : '',
+            'biome_id'          => isset($_GET['filter_biome_id']) ? (int) $_GET['filter_biome_id'] : 0,
         ];
     }
 
@@ -536,6 +537,31 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                 </option>
             </select>
 
+            <?php
+            $biomes_table_nav = pokehub_get_table('pokemon_biomes');
+            $biomes_for_filter = [];
+            if ($biomes_table_nav) {
+                $biomes_for_filter = $wpdb->get_results(
+                    "SELECT id, name_fr, name_en FROM {$biomes_table_nav} ORDER BY name_fr ASC, name_en ASC"
+                );
+            }
+            ?>
+            <label class="screen-reader-text" for="filter_biome_id">
+                <?php esc_html_e('Filter by biome', 'poke-hub'); ?>
+            </label>
+            <select name="filter_biome_id" id="filter_biome_id">
+                <option value="0"><?php esc_html_e('All biomes', 'poke-hub'); ?></option>
+                <?php foreach ($biomes_for_filter as $b) : ?>
+                    <?php
+                    $bid = (int) $b->id;
+                    $blab = !empty($b->name_fr) ? (string) $b->name_fr : (string) $b->name_en;
+                    ?>
+                    <option value="<?php echo $bid; ?>" <?php selected($this->filters['biome_id'], $bid); ?>>
+                        <?php echo esc_html($blab); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
             <?php submit_button(__('Filter'), '', 'filter_action', false); ?>
         </div>
         <?php
@@ -685,6 +711,16 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             $join .= " INNER JOIN {$table_type_rel} AS ptr ON ptr.pokemon_id = p.id";
             $where_parts[] = 'ptr.type_id = %d';
             $params[]      = $this->filters['type_id'];
+        }
+
+        // Filtre : biome (table pokemon_biome_pokemon_links)
+        if ($this->filters['biome_id'] > 0) {
+            $table_biome_rel = pokehub_get_table('pokemon_biome_pokemon_links');
+            if ($table_biome_rel) {
+                $join .= " INNER JOIN {$table_biome_rel} AS pbio ON pbio.pokemon_id = p.id";
+                $where_parts[] = 'pbio.biome_id = %d';
+                $params[]      = $this->filters['biome_id'];
+            }
         }
 
         $where_sql = 'WHERE ' . implode(' AND ', $where_parts);
@@ -981,6 +1017,15 @@ function poke_hub_pokemon_handle_pokemon_delete() {
     if ($table_pokemon_type_links) {
         $wpdb->delete(
             $table_pokemon_type_links,
+            ['pokemon_id' => $id],
+            ['%d']
+        );
+    }
+
+    $table_pokemon_biome_links = pokehub_get_table('pokemon_biome_pokemon_links');
+    if ($table_pokemon_biome_links) {
+        $wpdb->delete(
+            $table_pokemon_biome_links,
             ['pokemon_id' => $id],
             ['%d']
         );
@@ -1609,6 +1654,10 @@ function poke_hub_pokemon_handle_pokemon_form() {
         ? wp_unslash($_POST['pokemon_event_links'])
         : [];
 
+    $pokemon_biome_ids = (isset($_POST['pokemon_biome_ids']) && is_array($_POST['pokemon_biome_ids']))
+        ? array_map('intval', $_POST['pokemon_biome_ids'])
+        : [];
+
     // On s’assure d’avoir un slug
     if ($slug === '') {
         $base = $name_en !== '' ? $name_en : $name_fr;
@@ -1892,6 +1941,10 @@ function poke_hub_pokemon_handle_pokemon_form() {
             }
         }
 
+        if ($pokemon_id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_biome_links')) {
+            poke_hub_pokemon_sync_pokemon_biome_links($pokemon_id, $pokemon_biome_ids);
+        }
+
         wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
         exit;
     }
@@ -1947,6 +2000,10 @@ function poke_hub_pokemon_handle_pokemon_form() {
                 ], ['%d', '%s', '%d']);
             }
         }
+    }
+
+    if ($id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_biome_links')) {
+        poke_hub_pokemon_sync_pokemon_biome_links($id, $pokemon_biome_ids);
     }
 
     wp_redirect(add_query_arg('ph_msg', 'updated', $redirect_base));

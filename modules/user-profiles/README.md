@@ -2,7 +2,8 @@
 
 Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 
-> 📖 **Documentation complète** : Voir `docs/user-profiles/` à la racine du plugin
+> 📖 **Documentation complète** : Voir `docs/user-profiles/` à la racine du plugin  
+> Codes amis publics + IP : `docs/user-profiles/FRIEND_CODES_PUBLIC_AND_IP.md`
 
 ## Fichiers de Documentation
 
@@ -13,6 +14,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`CUSTOMIZATION.md`** - Personnalisation des listes
 - **`README_DATA_CENTRALIZATION.md`** - Architecture de centralisation
 - **`COUNTRIES-STORAGE-FORMAT.md`** - Format de stockage des pays en base de données
+- **`FRIEND_CODES_PUBLIC_AND_IP.md`** - Codes amis publics, IP, visiteurs non connectés
 
 ### Documentation Générique (`docs/` - racine)
 

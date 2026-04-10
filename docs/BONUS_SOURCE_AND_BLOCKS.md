@@ -38,16 +38,41 @@ Aucune activation du **module Bonus** n’est nécessaire pour utiliser le bloc 
 
 Quand le **module Bonus** est activé (en plus du module Blocks), il apporte :
 
-- **Écran Poké HUB > Bonus** (`poke-hub-bonus-types`) sur le site principal : CRUD sur la table catalogue (titre, slug, image slug optionnel, description, ordre). Aperçu de l’icône via l’URL construite à partir des réglages Sources (bucket + chemin bonus).
+- **Écran Poké HUB > Bonus** (`poke-hub-bonus-types`) sur le site principal : CRUD sur la table catalogue :
+  - **Nom (anglais)** et **Nom (français)** (`title_en`, `title_fr`) ;
+  - **Slug** : généré à partir du nom anglais pour les nouveaux bonus (surcharge manuelle possible) ; **un seul slug** sert à la fois d’identifiant et de **nom de fichier** sur le bucket (pas de champ « image slug » séparé) ;
+  - **Description** (éditeur) ;
+  - **Aperçu** : même logique que le front (voir ci-dessous).
+- Pas de **tri manuel** : la liste admin est ordonnée par `id` décroissant.
 - **Menu Bonus** dans l’admin Poké HUB (uniquement sur le site principal ; masqué sur les sites distants).
 - **Shortcodes** et filtre **`the_content`** pour afficher les bonus dans le contenu (selon la config du module).
 
 Sur un **site distant**, le menu Bonus et l’édition du catalogue sont masqués ; la liste des bonus dans la metabox et dans le bloc vient du site principal via `remote_bonus_types`.
 
+## Affichage des icônes (bucket)
+
+- **Priorité au fichier `{slug}.svg`** dans le dossier bonus configuré (Réglages > Sources). Rendu **inline** via les helpers globaux : `poke_hub_render_bonus_asset_markup()` → `pokehub_render_inline_svg_from_url()` (voir [INLINE_SVG.md](./INLINE_SVG.md)).
+- **Repli** si le SVG est absent ou invalide : images **raster** WebP → PNG → JPG (`poke_hub_render_bucket_raster_img( 'bonus', … )`).
+
+Les champs retournés par `pokehub_get_bonus_data()` incluent notamment `title` (libellé d’affichage : français si renseigné, sinon anglais), `title_en`, `title_fr`, `slug`, `image_html`, `image_url` (URL `.svg` préférée si configurée, sinon première URL raster).
+
+## Thème / CSS — vignettes et couleur des SVG (sans réglage admin)
+
+Comme pour les **icônes de types Pokémon**, la couleur des bonus n’est **pas** configurable dans l’admin : tout se fait par **CSS du thème** (ou surcharges).
+
+- Fichier plugin : `assets/css/poke-hub-bonus-front.css`.
+- **Variables** (définies sur `:root` dans ce fichier, à surcharger dans le thème) :
+  - `--pokehub-bonus-icon-color` — couleur principale des icônes (défaut : variables Admin Lab / texte accent).
+  - `--pokehub-bonus-icon-bg` — fond discret derrière l’icône (`color-mix` à partir de la couleur ci-dessus).
+  - `--pokehub-bonus-icon-radius` — rayon des pastilles (cartes).
+- Les SVG **inline** produits par `poke_hub_render_bonus_asset_markup()` sont teintés via **`currentColor`** sur les formes (`path`, `circle`, etc.) : les fichiers SVG du bucket doivent être **monochromes** (ou majoritairement une seule teinte) pour un rendu uniforme. Les images **raster** (`<img>`) ne sont pas recolorées de la même façon ; une légère harmonisation peut être appliquée par filtres CSS.
+
+Liste des classes et lien avec ce document : [POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md) (section Module Bonus).
+
 ## Table catalogue (`bonus_types` / `remote_bonus_types`)
 
-- **Création** : la table locale `bonus_types` est créée lorsque le module **Bonus** ou le module **Blocks** est actif (`includes/pokehub-db.php`, `createBonusTypesTable()`). Une migration (`migrateBonusTypesTableSchema`) aligne le schéma existant : `id` AUTO_INCREMENT, `slug` unique.
-- **Colonnes** : `id` (PK AUTO_INCREMENT), `title`, `slug` (unique), `description`, `image_slug`, `sort_order`, `created_at`, `updated_at`.
+- **Création** : la table locale `bonus_types` est créée lorsque le module **Bonus** ou le module **Blocks** est actif (`includes/pokehub-db.php`, `createBonusTypesTable()`). La migration `migrateBonusTypesTableSchema()` aligne les installations existantes (AUTO_INCREMENT, slug unique, colonnes `title_en` / `title_fr`, suppression des colonnes obsolètes `title`, `image_slug`, `sort_order` si présentes).
+- **Colonnes (cible)** : `id` (PK AUTO_INCREMENT), `title_en`, `title_fr`, `slug` (unique), `description`, `created_at`, `updated_at`.
 - **Mapping** (dans `pokehub-helpers.php`) :
   - `bonus_types` → table locale (site principal).
   - `remote_bonus_types` → scope `remote_pokemon`, même préfixe que les tables Pokémon (lecture sur le site principal depuis un site distant).
@@ -62,4 +87,4 @@ Sur un **site distant**, le menu Bonus et l’édition du catalogue sont masqué
 | Création / édition des types    | Module **Bonus**  | Page admin `poke-hub-bonus-types` (table catalogue). |
 | Données par article (bonus + description) | Même base que Pokémon | Tables `content_bonus` / `content_bonus_entries` (préfixe Sources = Pokémon et tous les contenus). |
 
-Voir aussi : [blocks/README.md](./blocks/README.md), [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md).
+Voir aussi : [blocks/README.md](./blocks/README.md), [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md), [INLINE_SVG.md](./INLINE_SVG.md).

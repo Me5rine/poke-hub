@@ -9,6 +9,7 @@ Ce guide explique comment organiser le code dans le plugin Poké HUB pour mainte
 ```
 poke-hub/
 ├── includes/              # Code partagé entre modules
+│   ├── functions/        # Helpers globaux (toujours chargés avec le plugin, hors modules) : ex. pokehub-inline-svg.php, pokehub-pokemon-type-icon.php, pokemon-public-helpers.php — voir docs/INLINE_SVG.md
 │   ├── settings/         # Gestion des paramètres (modules : source unique dans settings-modules.php)
 │   ├── content/          # Helpers tables de contenu (content_eggs, content_quests, etc.) + éditeur quêtes partagé
 │   └── ...

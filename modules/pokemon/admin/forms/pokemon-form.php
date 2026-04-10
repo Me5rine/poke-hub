@@ -400,6 +400,19 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         }
     }
 
+    // Biomes (habitats en jeu)
+    $all_biomes = [];
+    $biomes_table = pokehub_get_table('pokemon_biomes');
+    if ($biomes_table) {
+        $all_biomes = $wpdb->get_results(
+            "SELECT id, slug, name_fr, name_en FROM {$biomes_table} ORDER BY name_fr ASC, name_en ASC, slug ASC"
+        );
+    }
+    $current_biome_ids = [];
+    if ($is_edit && function_exists('poke_hub_pokemon_get_pokemon_biome_ids')) {
+        $current_biome_ids = poke_hub_pokemon_get_pokemon_biome_ids((int) $edit_row->id);
+    }
+
     $back_url = add_query_arg(
         [
             'page'       => 'poke-hub-pokemon',
@@ -571,6 +584,71 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <textarea name="about" id="about" rows="4" style="width: 100%;"><?php echo esc_textarea($about); ?></textarea>
             </div>
         </div>
+
+        <?php
+        $show_sprite_preview = function_exists('poke_hub_pokemon_get_image_url')
+            && (($slug !== '') || ($dex_number > 0));
+        if ($show_sprite_preview) :
+            $preview_pokemon = (object) [
+                'id'         => ($is_edit && isset($edit_row->id)) ? (int) $edit_row->id : 0,
+                'slug'       => $slug,
+                'dex_number' => (int) $dex_number,
+            ];
+            ?>
+        <!-- Section: sprite preview (assets Pokémon) -->
+        <div class="admin-lab-form-section pokehub-pokemon-sprite-preview-section">
+            <h2><?php esc_html_e('Sprite preview', 'poke-hub'); ?></h2>
+            <p class="description">
+                <?php esc_html_e('Preview of sprites from your configured Pokémon asset base URL: normal and shiny. If gender dimorphism is enabled, male and female variants are shown.', 'poke-hub'); ?>
+            </p>
+            <div class="pokehub-pokemon-sprite-preview-grid" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
+                <?php
+                $preview_cells = [];
+                if ($has_gender_dimorphism) {
+                    $preview_cells[] = [
+                        'label' => __('Normal (male)', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false, 'gender' => 'male']),
+                    ];
+                    $preview_cells[] = [
+                        'label' => __('Normal (female)', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false, 'gender' => 'female']),
+                    ];
+                    $preview_cells[] = [
+                        'label' => __('Shiny (male)', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true, 'gender' => 'male']),
+                    ];
+                    $preview_cells[] = [
+                        'label' => __('Shiny (female)', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true, 'gender' => 'female']),
+                    ];
+                } else {
+                    $preview_cells[] = [
+                        'label' => __('Normal', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false]),
+                    ];
+                    $preview_cells[] = [
+                        'label' => __('Shiny', 'poke-hub'),
+                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true]),
+                    ];
+                }
+                foreach ($preview_cells as $cell) :
+                    ?>
+                <div class="pokehub-pokemon-sprite-preview-item" style="text-align:center;max-width:120px;">
+                    <div style="font-weight:600;margin-bottom:8px;font-size:12px;line-height:1.3;"><?php echo esc_html($cell['label']); ?></div>
+                    <?php if (!empty($cell['url'])) : ?>
+                        <img src="<?php echo esc_url($cell['url']); ?>" alt="" width="96" height="96" style="width:96px;height:96px;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;" loading="lazy" />
+                    <?php else : ?>
+                        <p class="description" style="margin:0;"><?php esc_html_e('No asset base URL configured.', 'poke-hub'); ?></p>
+                    <?php endif; ?>
+                </div>
+                    <?php
+                endforeach;
+                ?>
+            </div>
+        </div>
+            <?php
+        endif;
+        ?>
 
         <!-- Section: Localization -->
         <div class="admin-lab-form-section">
@@ -876,10 +954,38 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </div>
         </div>
 
-        <!-- Section: Regional Availability -->
+        <!-- Section: Regional Availability (biomes + geographic regionality) -->
         <div class="admin-lab-form-section">
             <h2><?php esc_html_e('Regional availability', 'poke-hub'); ?></h2>
-            
+
+            <h3><?php esc_html_e('Biomes', 'poke-hub'); ?></h3>
+            <div class="admin-lab-form-group" style="max-width: 640px;">
+                <label for="pokemon_biome_ids" class="screen-reader-text"><?php esc_html_e('Biomes', 'poke-hub'); ?></label>
+                <select name="pokemon_biome_ids[]" id="pokemon_biome_ids" class="pokehub-pokemon-select" multiple="multiple" style="width: 100%;" aria-describedby="pokehub-pokemon-biomes-desc">
+                    <?php foreach ($all_biomes as $biome) : ?>
+                        <?php
+                        $b_id = (int) $biome->id;
+                        $b_fr = isset($biome->name_fr) ? (string) $biome->name_fr : '';
+                        $b_en = isset($biome->name_en) ? (string) $biome->name_en : '';
+                        $b_label = $b_fr !== '' ? $b_fr : $b_en;
+                        if ($b_fr !== '' && $b_en !== '' && $b_fr !== $b_en) {
+                            $b_label = $b_fr . ' (' . $b_en . ')';
+                        }
+                        ?>
+                        <option value="<?php echo $b_id; ?>"
+                                data-name-fr="<?php echo esc_attr($b_fr); ?>"
+                                data-name-en="<?php echo esc_attr($b_en); ?>"
+                                data-label="<?php echo esc_attr($b_label); ?>"
+                                <?php selected(in_array($b_id, $current_biome_ids, true)); ?>>
+                            <?php echo esc_html($b_label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description" id="pokehub-pokemon-biomes-desc"><?php esc_html_e('Wild biomes where this species can appear (Pokémon GO). You can select several.', 'poke-hub'); ?></p>
+            </div>
+
+            <h3 style="margin-top: 1.75em; padding-top: 1.25em; border-top: 1px solid #c3c4c7;"><?php esc_html_e('Regional', 'poke-hub'); ?></h3>
+
             <div class="admin-lab-form-row">
                 <div class="admin-lab-form-col-50">
                     <div class="admin-lab-form-group">
@@ -2310,6 +2416,28 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
 
 <script>
 jQuery(function($) {
+    var biomeMatcher = window.pokehubMultilingualMatcher || function(params, data) {
+        if (!params.term || params.term.trim() === '') return data;
+        var term = params.term.toLowerCase().trim();
+        var text = (data.text || '').toLowerCase();
+        if (text.indexOf(term) !== -1) return data;
+        if (data.element) {
+            var el = data.element;
+            var nameFr = (el.getAttribute && el.getAttribute('data-name-fr') || '').toLowerCase();
+            var nameEn = (el.getAttribute && el.getAttribute('data-name-en') || '').toLowerCase();
+            if (nameFr && nameFr.indexOf(term) !== -1) return data;
+            if (nameEn && nameEn.indexOf(term) !== -1) return data;
+        }
+        return null;
+    };
+    if ($.fn.select2 && $('#pokemon_biome_ids').length) {
+        $('#pokemon_biome_ids').select2({
+            placeholder: '<?php echo esc_js(__('Search biomes…', 'poke-hub')); ?>',
+            allowClear: true,
+            width: '100%',
+            matcher: biomeMatcher
+        });
+    }
     // Afficher/masquer la section Event Association selon la case "Event or costumed"
     $(document).on('change', 'input[name="is_event_costumed"]', function() {
         $('#pokehub-pokemon-event-association-wrap').toggle(this.checked);

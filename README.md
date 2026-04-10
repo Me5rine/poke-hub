@@ -107,8 +107,8 @@ Accédez à **Poké HUB** > **Settings** > **Sources** pour configurer :
 
 #### Sources Pokémon
 
-- **URL de base des assets Pokémon** : URL de base pour charger les images/sprites des Pokémon depuis votre CDN/bucket
-- **URL de fallback** : URL de secours si la source principale est indisponible
+- **Assets bucket base URL** + chemin **Pokémon** (*Image Sources*) : URL de base des sprites Pokémon (PNG, même convention de noms que dans le code)
+- **Pokémon assets fallback base URL** : racine de secours si une image manque sur le bucket principal (même arborescence relative / mêmes noms de fichiers)
 
 ---
 
@@ -330,7 +330,7 @@ Le module Events gère les événements spéciaux de Pokémon GO, avec support p
 
 ##### 4. Bonus d'événement
 
-- **Association** : Lier des bonus (CPT) aux événements
+- **Association** : Lier des bonus (types du catalogue `bonus_types`) aux événements
 - **Descriptions** : Descriptions spécifiques par événement
 - **Affichage** : Affichage des bonus sur les pages d'événements
 
@@ -388,30 +388,29 @@ Le module fournit le shortcode `[poke_hub_events]` pour afficher les événement
 
 ### Module Bonus
 
-Le module Bonus gère le **catalogue des types de bonus** dans la table SQL `bonus_types` (aperçu des icônes depuis le bucket configuré dans Réglages > Sources).
+Le module Bonus gère le **catalogue des types de bonus** dans la table SQL `bonus_types` (icônes depuis le bucket configuré dans Réglages > Sources). Détail : [docs/BONUS_SOURCE_AND_BLOCKS.md](docs/BONUS_SOURCE_AND_BLOCKS.md).
 
 #### Fonctionnalités principales
 
 ##### 1. Catalogue (table)
 
-- **Stockage** : table `{prefix}pokehub_bonus_types` (id auto, slug unique, titre, description, image_slug, ordre)
+- **Stockage** : table `{prefix}pokehub_bonus_types` — `title_en`, `title_fr`, `slug` (unique, fichier image = même slug), `description`, horodatages
 - **Admin** : page Poké HUB > Bonus (`poke-hub-bonus-types`) sur le site principal
-- **Icônes** : chemins construits avec `poke_hub_assets_bucket_base_url` et le chemin bonus (WebP / PNG / JPG)
+- **Icônes** : **`{slug}.svg` en priorité** (SVG inline, helpers globaux — voir [docs/INLINE_SVG.md](docs/INLINE_SVG.md)) ; repli raster WebP / PNG / JPG
 
 ##### 2. Contenu et affichage
 
 - **Descriptions** : éditeur WordPress sur l’écran catalogue
 - **Metabox** (module Blocks) : association des bonus aux articles / événements
 - **Module Events** : intégration avec les événements
-- **Affichage** : bonus sur les pages d'événements (bloc, shortcodes, filtre `the_content`)
+- **Affichage** : bonus sur les pages d'événements (bloc, shortcodes, filtre `the_content`) ; **style des vignettes / couleur des SVG** : variables CSS `--pokehub-bonus-icon-*` dans `assets/css/poke-hub-bonus-front.css` (surcharge thème — voir `docs/BONUS_SOURCE_AND_BLOCKS.md`)
 
 #### Interface d'administration
 
 Accédez à **Poké HUB** > **Bonus** pour :
 
-- **Liste des bonus** : Interface WordPress standard pour les CPT
-- **Création/Édition** : Éditeur WordPress classique
-- **Métadonnées** : Gestion des images et descriptions
+- **Liste des types de bonus** : tableau (icône, noms FR/EN, slug, actions)
+- **Création / édition** : noms anglais et français, slug (auto ou manuel), aperçu bucket, description
 
 #### Shortcodes
 
@@ -452,10 +451,10 @@ Le module inclut un système complet de gestion des codes amis publics avec supp
 
 ##### Fonctionnalités des codes amis
 
-- **Formulaire d'ajout** : Les utilisateurs peuvent ajouter leur code ami public
+- **Formulaire d'ajout / mise à jour** : Les utilisateurs peuvent publier ou mettre à jour leur code ami ; connectés avec un code déjà enregistré : libellés **Update My Friend Code** (titre + bouton)
 - **Gestion des utilisateurs** :
-  - Utilisateurs non connectés : 1 code par jour
-  - Utilisateurs connectés : Ajout illimité
+  - **Non connectés** : pseudo Pokémon GO **obligatoire** ; contrôle par **IP** et par **pseudo** (mise à jour de la fiche existante, pas de doublons abusifs) ; nouvelle fiche : cookie + **au plus une création par IP sur 48 h** ; entre deux mêmes fiches : **48 h** ; changement de pseudo sans la même IP : connexion requise (notice warning)
+  - **Connectés** : pas de ces limites sur ce flux ; **dernière IP** enregistrée à chaque sauvegarde de profil (colonne `anonymous_ip`)
   - Pré-remplissage automatique depuis le profil utilisateur
 - **Affichage public** : Liste publique des codes amis disponibles
 - **Filtres** : Filtrage par pays et motif Prismillon (Scatterbug Pattern)
@@ -979,7 +978,7 @@ Liens Événements ↔ Bonus.
 **Colonnes** :
 - `id` : ID unique
 - `event_id` : ID de l'événement
-- `bonus_id` : ID du bonus (post ID du CPT)
+- `bonus_id` : ID du type de bonus dans la table catalogue (`bonus_types`)
 - `description` : Description spécifique
 
 #### Table : `{prefix}_pokehub_special_event_pokemon_attacks`
@@ -1003,25 +1002,30 @@ Profils utilisateur Pokémon GO et codes amis publics.
 - `id` : ID unique
 - `user_id` : ID WordPress utilisateur (NULL pour utilisateurs anonymes)
 - `discord_id` : ID Discord (optionnel)
+- `profile_type` : `classic` | `discord` | `anonymous`
 - `team` : Équipe (`mystic`, `valor`, `instinct`)
 - `friend_code` : Code ami (12 chiffres)
 - `friend_code_public` : Code ami public (booléen, `1` = visible publiquement)
 - `xp` : Points d'expérience
 - `pokemon_go_username` : Pseudo Pokémon GO
 - `scatterbug_pattern` : Motif Prismillon (Scatterbug Pattern)
-- `country` : Pays (pour utilisateurs anonymes uniquement)
+- `country` : Pays (surtout anonymes en table ; connectés : source UM usermeta)
+- `country_custom` : Libellé pays « custom » (ex. région affichée) si applicable
 - `reasons` : Raisons JSON (tableau de valeurs)
+- `anonymous_ip` : **Dernière IP** enregistrée lors de la dernière sauvegarde du profil depuis une requête HTTP (tous types de profils ; nom historique de colonne)
 - `created_at` : Date de création
 - `updated_at` : Date de mise à jour
 
 **Index** :
 - `user_id` : Recherche par utilisateur WordPress
 - `discord_id` : Recherche par ID Discord
+- `anonymous_ip` : Filtrage / affichage admin
 
 **Notes** :
 - Les codes amis publics sont ceux avec `friend_code_public = 1`
 - Pour les utilisateurs connectés, le `country` est stocké dans Ultimate Member usermeta (pas dans cette table)
 - Pour les utilisateurs anonymes, le `country` est stocké directement dans cette table
+- Détail des règles codes amis publics (non connectés) et IP : `docs/user-profiles/FRIEND_CODES_PUBLIC_AND_IP.md`
 
 ### Fonction helper
 

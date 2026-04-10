@@ -24,8 +24,10 @@ modules/blocks/
     ├── wild-pokemon/            # Pokémon Sauvages
     ├── habitats/                # Habitats
     ├── new-pokemon-evolutions/  # New Pokemon
+    ├── day-pokemon-hours/       # Day Pokémon Hours
     ├── collection-challenges/   # Défis de Collection
-    └── special-research/        # Études Spéciales
+    ├── special-research/        # Études Spéciales
+    └── eggs/                    # Pokémon Eggs
 ```
 
 ## 📚 Documentation
@@ -36,8 +38,9 @@ Toute la documentation se trouve dans `docs/blocks/` :
 - **[ARCHITECTURE.md](../../docs/blocks/ARCHITECTURE.md)** - Architecture complète et règles d'organisation
 - **[BLOCK_TYPES.md](../../docs/blocks/BLOCK_TYPES.md)** - Types de blocs (PHP-only vs JS/React)
 - **[QUICK_START.md](../../docs/blocks/QUICK_START.md)** - Guide de création rapide
+- **[BLOCK_STYLES_AND_BEHAVIOR.md](../../docs/blocks/BLOCK_STYLES_AND_BEHAVIOR.md)** - Titres unifiés, CSS front, bonbons (New Pokémon)
 
-Voir aussi ** [CONTENT_BLOCKS.md](../../docs/CONTENT_BLOCKS.md)** pour l’utilisation des blocs (attributs, exemples, CSS).
+Voir aussi **[CONTENT_BLOCKS.md](../../docs/CONTENT_BLOCKS.md)** pour l’utilisation des blocs (attributs, exemples, CSS).
 
 ## 🎯 Principe de séparation
 

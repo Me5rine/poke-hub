@@ -33,6 +33,8 @@ function poke_hub_pokemon_get_section_label($section) {
             return __('Items', 'poke-hub');
         case 'backgrounds':
             return __('Backgrounds', 'poke-hub');
+        case 'biomes':
+            return __('Biomes', 'poke-hub');
         case 'regional_regions':
             return __('Geographic Regions', 'poke-hub');
         case 'overview':
@@ -54,6 +56,7 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/weathers.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/egg-types.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/backgrounds.php'; // 🔹 NOUVEAU
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/biomes.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regional-regions.php'; // Geographic Regions
 
 /**
@@ -143,6 +146,11 @@ function poke_hub_pokemon_manage_columns($columns) {
 
     if ($current_section === 'backgrounds' && class_exists('Poke_Hub_Pokemon_Backgrounds_List_Table')) {
         $table   = new Poke_Hub_Pokemon_Backgrounds_List_Table();
+        $columns = $table->get_columns();
+    }
+
+    if ($current_section === 'biomes' && class_exists('Poke_Hub_Pokemon_Biomes_List_Table')) {
+        $table   = new Poke_Hub_Pokemon_Biomes_List_Table();
         $columns = $table->get_columns();
     }
 
@@ -536,6 +544,27 @@ function poke_hub_pokemon_admin_ui() {
                 }
                 break;
 
+            case 'biomes':
+                global $wpdb;
+                $edit_row = null;
+
+                if ($action === 'edit' && !empty($_GET['id'])) {
+                    $id    = (int) $_GET['id'];
+                    $table = pokehub_get_table('pokemon_biomes');
+                    if ($table) {
+                        $edit_row = $wpdb->get_row(
+                            $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $id)
+                        );
+                    }
+                }
+
+                if (function_exists('poke_hub_pokemon_biomes_edit_form')) {
+                    poke_hub_pokemon_biomes_edit_form($edit_row);
+                } else {
+                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_biomes_edit_form()</h1></div>';
+                }
+                break;
+
             case 'regional_regions':
                 $edit_data = null;
                 
@@ -721,6 +750,20 @@ function poke_hub_pokemon_admin_ui() {
             ];
             break;
 
+        case 'biomes':
+            $add_button = [
+                'label' => __('Add biome', 'poke-hub'),
+                'url'   => add_query_arg(
+                    [
+                        'page'       => 'poke-hub-pokemon',
+                        'ph_section' => 'biomes',
+                        'action'     => 'add',
+                    ],
+                    admin_url('admin.php')
+                ),
+            ];
+            break;
+
         case 'regional_regions':
             $add_button = [
                 'label' => __('Add Geographic Region', 'poke-hub'),
@@ -753,6 +796,7 @@ function poke_hub_pokemon_admin_ui() {
         'egg_types'     => __('Egg types', 'poke-hub'),
         'items'         => __('Items', 'poke-hub'),
         'backgrounds'   => __('Backgrounds', 'poke-hub'),
+        'biomes'        => __('Biomes', 'poke-hub'),
         'regional_regions' => __('Geographic Regions', 'poke-hub'),
     ];
     ?>
@@ -880,6 +924,14 @@ function poke_hub_pokemon_admin_ui() {
                     }
                     break;
 
+                case 'biomes':
+                    if (function_exists('poke_hub_pokemon_admin_biomes_screen')) {
+                        poke_hub_pokemon_admin_biomes_screen();
+                    } else {
+                        echo '<p>Biomes screen not implemented yet.</p>';
+                    }
+                    break;
+
                 case 'regional_regions':
                     if (function_exists('poke_hub_pokemon_admin_regional_regions_screen')) {
                         poke_hub_pokemon_admin_regional_regions_screen();
@@ -948,7 +1000,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
         );
     }
     
-    if ($section !== 'pokemon' && $section !== 'backgrounds') {
+    if ($section !== 'pokemon' && $section !== 'backgrounds' && $section !== 'biomes') {
         return;
     }
 

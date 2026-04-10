@@ -1,5 +1,12 @@
 /* Styles pour le module Bonus - Poké HUB */
 
+/* Tokens visuels (personnalisables côté thème) */
+:root {
+    --pokehub-bonus-icon-color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+    --pokehub-bonus-icon-bg: color-mix(in srgb, var(--pokehub-bonus-icon-color) 8%, #ffffff);
+    --pokehub-bonus-icon-radius: 16px;
+}
+
 /* Shortcode [pokehub-bonus] */
 .pokehub-bonuses-shortcode {
     display: flex;
@@ -40,6 +47,15 @@
 
 .pokehub-event-bonus-image {
     flex-shrink: 0;
+}
+
+.pokehub-event-bonus-image .pokehub-bonus-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    background: var(--pokehub-bonus-icon-bg);
+    color: var(--pokehub-bonus-icon-color);
+    padding: 10px;
 }
 
 .pokehub-event-bonus-content {
@@ -118,6 +134,15 @@
     flex-shrink: 0;
 }
 
+.pokehub-bonus-image-wrapper .pokehub-bonus-icon-wrap {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--pokehub-bonus-icon-radius);
+    background: var(--pokehub-bonus-icon-bg);
+    color: var(--pokehub-bonus-icon-color);
+    padding: 14px;
+}
+
 /* SVG prioritaire : icône inline dans le bucket bonus */
 .pokehub-bonus-icon-wrap {
     display: inline-flex;
@@ -144,12 +169,30 @@
     object-fit: contain;
 }
 
+/* Uniformisation couleur pour SVG inline (icônes monochromes). */
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg path,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg circle,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg rect,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg polygon,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg ellipse,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg line,
+.pokehub-bonus-icon-wrap .pokehub-bonus-icon--svg svg polyline {
+    fill: currentColor !important;
+    stroke: currentColor !important;
+}
+
 .pokehub-bonus-image {
     width: 100%;
     height: 100%;
     object-fit: contain;
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
+}
+
+/* Légère harmonisation quand on a un <img> (raster ou svg externe non inline). */
+.pokehub-bonus-image-wrapper .pokehub-bonus-image {
+    filter: saturate(0.95) contrast(1.02);
 }
 
 .pokehub-bonus-name {
