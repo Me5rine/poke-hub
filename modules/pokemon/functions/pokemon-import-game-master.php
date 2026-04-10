@@ -508,21 +508,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     }
     // Si $row existe et name_fr est vide, on ne met pas name_fr dans $data pour ne pas écraser
 
-    $format = [];
-    foreach ($data as $key => $value) {
-        if ($key === 'dex_number' || $key === 'form_variant_id' || $key === 'is_default' || 
-            $key === 'generation_id' || $key === 'base_atk' || $key === 'base_def' || 
-            $key === 'base_sta' || $key === 'is_tradable' || $key === 'is_transferable' || 
-            $key === 'has_shadow' || $key === 'has_purified' || 
-            $key === 'shadow_purification_stardust' || $key === 'shadow_purification_candy' || 
-            $key === 'buddy_walked_mega_energy_award') {
-            $format[] = '%d';
-        } elseif ($key === 'dodge_probability' || $key === 'attack_probability') {
-            $format[] = '%f';
-        } else {
-            $format[] = '%s';
-        }
-    }
+    $format = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $data );
 
     if ( $row ) {
         $wpdb->update(
@@ -1000,13 +986,23 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 ],
             ];
 
-            // Ligne Méga / Primo existante ?
+            // Ligne Méga / Primo existante ? D’abord par slug attendu ; sinon par dex + variante
+            // (lignes corrompues slug=0 après ancien bug de formats $wpdb ne matchent pas le 1er critère).
             $mega_row = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
                     $mega_slug
                 )
             );
+            if ( ! $mega_row && $mega_variant_id > 0 ) {
+                $mega_row = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT * FROM {$pokemon_table} WHERE dex_number = %d AND form_variant_id = %d AND is_default = 0 LIMIT 1",
+                        $dex_number,
+                        $mega_variant_id
+                    )
+                );
+            }
 
             $mega_data = [
                 'dex_number'      => $dex_number,
@@ -1035,8 +1031,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'extra'          => wp_json_encode( $mega_extra ),
             ];
 
-            // On réutilise le format calculé plus haut (avec name_fr présent)
-            $mega_format = $format;
+            // Ne pas réutiliser $format de la forme de base : l’ordre des colonnes diffère
+            // (ex. sans name_fr sur update) → slug recevait %d et devenait 0 en base.
+            $mega_format = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $mega_data );
 
             if ( $mega_row ) {
                 $wpdb->update(

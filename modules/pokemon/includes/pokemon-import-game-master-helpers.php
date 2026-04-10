@@ -840,6 +840,34 @@ function poke_hub_pokemon_normalize_evolution_branches( array $pokemon_settings 
 }
 
 /**
+ * Formats $wpdb->insert / $wpdb->update pour une ligne de la table pokemon.
+ * À utiliser pour chaque tableau de données distinct (ex. forme de base vs Méga) :
+ * réutiliser le format d’une autre ligne décale les %d/%s et peut forcer slug → 0.
+ *
+ * @param array<string, mixed> $data
+ * @return string[]
+ */
+function poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( array $data ): array {
+    $format = [];
+    foreach ( $data as $key => $value ) {
+        if ( $key === 'dex_number' || $key === 'form_variant_id' || $key === 'is_default'
+            || $key === 'generation_id' || $key === 'base_atk' || $key === 'base_def'
+            || $key === 'base_sta' || $key === 'is_tradable' || $key === 'is_transferable'
+            || $key === 'has_shadow' || $key === 'has_purified'
+            || $key === 'shadow_purification_stardust' || $key === 'shadow_purification_candy'
+            || $key === 'buddy_walked_mega_energy_award' ) {
+            $format[] = '%d';
+        } elseif ( $key === 'dodge_probability' || $key === 'attack_probability' ) {
+            $format[] = '%f';
+        } else {
+            $format[] = '%s';
+        }
+    }
+
+    return $format;
+}
+
+/**
  * Transforme un tempEvoId Niantic en form_slug interne.
  *
  * Exemples :
