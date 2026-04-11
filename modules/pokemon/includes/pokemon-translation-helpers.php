@@ -44,6 +44,32 @@ function poke_hub_tr_has_translation($row, $lang) {
 }
 
 /**
+ * Langues gérées pour les noms officiels (hors EN, stocké en colonne / clé en).
+ *
+ * @return string[]
+ */
+function poke_hub_tr_official_translation_langs() {
+    return ['fr', 'de', 'it', 'es', 'ja', 'ko'];
+}
+
+/**
+ * Indique si un enregistrement doit être candidat au remplissage Bulbapedia (sans mode forcé).
+ * Au moins une langue parmi fr, de, it, es, ja, ko est considérée comme manquante.
+ */
+function poke_hub_tr_row_needs_official_names_refill($row, $force) {
+    if ($force) {
+        return true;
+    }
+    foreach (poke_hub_tr_official_translation_langs() as $lang) {
+        if (!poke_hub_tr_has_translation($row, $lang)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Détecte les traductions manquantes pour les Pokémon.
  * 
  * @param array $filters Filtres optionnels ['lang' => 'fr', 'force_check' => false]

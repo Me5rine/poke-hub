@@ -25,6 +25,12 @@ if (!function_exists('poke_hub_pokemon_fetch_official_names_existing')) {
 }
 
 $messages = [];
+$fetch_type = null;
+$limit_raw = null;
+$limit = null;
+$force = false;
+$start_after_id = 0;
+
 $selected_lang = isset($_GET['lang']) ? sanitize_text_field($_GET['lang']) : 'fr';
 $selected_type = isset($_GET['type']) ? sanitize_text_field($_GET['type']) : 'pokemon';
 
@@ -166,28 +172,38 @@ if (!empty($_POST['poke_hub_fetch_missing_translations'])) {
 
     $force = isset($_POST['fetch_force']) && $_POST['fetch_force'] === '1';
 
+    $start_after_raw = isset($_POST['fetch_start_after_id']) ? trim((string) $_POST['fetch_start_after_id']) : '';
+    $start_after_id = is_numeric($start_after_raw) ? max(0, (int) $start_after_raw) : 0;
+
     if (in_array($fetch_type, $allowed_types, true)) {
         $result = [];
 
         if ($fetch_type === 'pokemon' && function_exists('poke_hub_pokemon_fetch_official_names_existing')) {
-            $result = poke_hub_pokemon_fetch_official_names_existing($limit, $force);
+            $result = poke_hub_pokemon_fetch_official_names_existing($limit, $force, $start_after_id);
         } elseif ($fetch_type === 'attacks' && function_exists('poke_hub_attacks_fetch_existing_official_names')) {
-            $result = poke_hub_attacks_fetch_existing_official_names($limit, $force);
+            $result = poke_hub_attacks_fetch_existing_official_names($limit, $force, $start_after_id);
         } elseif ($fetch_type === 'types' && function_exists('poke_hub_types_fetch_existing_official_names')) {
-            $result = poke_hub_types_fetch_existing_official_names($limit, $force);
+            $result = poke_hub_types_fetch_existing_official_names($limit, $force, $start_after_id);
         }
 
         if (!empty($result)) {
+            $next_id = isset($result['next_start_after_id']) ? (int) $result['next_start_after_id'] : 0;
+            $scanned = isset($result['scanned']) ? (int) $result['scanned'] : 0;
+            $msg = sprintf(
+                __('Fetched translations: %1$d updated, %2$d skipped, %3$d errors, %4$d rows scanned (limit: %5$d). Next start after ID: %6$d.', 'poke-hub'),
+                $result['updated'] ?? 0,
+                $result['skipped'] ?? 0,
+                $result['errors'] ?? 0,
+                $scanned,
+                $limit,
+                $next_id
+            );
+            if (!empty($result['message'])) {
+                $msg .= ' ' . (string) $result['message'];
+            }
             $messages[] = [
                 'type' => 'success',
-                'text' => sprintf(
-                    __('Fetched translations: %d updated, %d skipped, %d errors out of %d items. (Limit requested: %d)', 'poke-hub'),
-                    $result['updated'] ?? 0,
-                    $result['skipped'] ?? 0,
-                    $result['errors'] ?? 0,
-                    $result['total'] ?? 0,
-                    $limit
-                ),
+                'text' => $msg,
             ];
         }
     }
@@ -198,6 +214,7 @@ if (function_exists('poke_hub_trlog_write')) {
         'fetch_type' => $fetch_type ?? null,
         'limit_raw' => $limit_raw ?? null,
         'limit' => $limit ?? null,
+        'start_after_id' => $start_after_id ?? null,
         'force' => $force ?? null,
         'user' => get_current_user_id(),
     ]);
@@ -288,6 +305,9 @@ foreach ($messages as $msg) {
 <div style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin-top: 20px;">
     <h3><?php esc_html_e('Bulk Fetch Missing Translations', 'poke-hub'); ?></h3>
     <p><?php esc_html_e('Fetch missing translations from Bulbapedia in bulk. This will update the database with official names.', 'poke-hub'); ?></p>
+    <p class="description">
+        <?php esc_html_e('Rows are selected when any language among French, German, Italian, Spanish, Japanese, or Korean is missing (not only French). No HTTP call is made if all six are already filled, unless you enable force update.', 'poke-hub'); ?>
+    </p>
 
     <form method="post" action="" style="margin-top: 15px;">
         <?php wp_nonce_field('poke_hub_translation_settings', 'poke_hub_translation_nonce'); ?>
@@ -310,7 +330,17 @@ foreach ($messages as $msg) {
                 <td>
                     <input type="number" id="fetch_limit" name="fetch_limit" value="5" min="1" max="100" class="small-text" />
                     <p class="description">
-                        <?php esc_html_e('Number of items to fetch (1-100 recommended). Bulbapedia has rate limits and can be slow, so start with a small number (5-10).', 'poke-hub'); ?>
+                        <?php esc_html_e('Maximum number of database rows actually updated in this request (1–100 recommended). Use a low value on shared hosting to avoid timeouts or memory errors.', 'poke-hub'); ?>
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <th scope="row"><label for="fetch_start_after_id"><?php esc_html_e('Start after ID', 'poke-hub'); ?></label></th>
+                <td>
+                    <input type="number" id="fetch_start_after_id" name="fetch_start_after_id" value="0" min="0" class="small-text" />
+                    <p class="description">
+                        <?php esc_html_e('Only process rows with an ID greater than this value (resume a long run or skip the beginning of the table). After each run, the success message shows the suggested value for the next batch.', 'poke-hub'); ?>
                     </p>
                 </td>
             </tr>

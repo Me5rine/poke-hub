@@ -27,6 +27,9 @@ if (!defined('ABSPATH')) {
  *  - Bulk updaters:
  *      - updated = lignes réellement modifiées en DB (wpdb->update > 0)
  *      - force = remplace si différent, mais ne compte pas si identique
+ *      - sans force: candidats = au moins une langue (fr/de/it/es/ja/ko) manquante
+ *      - pagination SQL id > start_after_id; pas d’appel HTTP si rien à compléter
+ *      - throttle + wp_raise_memory_limit + suspension des ajouts au cache object
  * ============================================================
  */
 
@@ -40,6 +43,31 @@ if (!defined('POKE_HUB_TRANSLATIONS_DEBUG')) {
 
 function poke_hub_tr_log($message, $context = null) {
     // Pas de sortie logs (error_log désactivé pour la prod).
+}
+
+/**
+ * Pause entre deux allers-retours Bulbapedia en masse (limite charge serveur / rate limit).
+ * Filtre: poke_hub_bulbapedia_bulk_sleep_seconds (float, 0 pour désactiver).
+ */
+function poke_hub_bulbapedia_bulk_throttle() {
+    $sec = (float) apply_filters('poke_hub_bulbapedia_bulk_sleep_seconds', 0.25);
+    if ($sec <= 0) {
+        return;
+    }
+    $usec = (int) min($sec * 1000000, 2000000);
+    if ($usec > 0) {
+        usleep($usec);
+    }
+}
+
+/**
+ * @return int Taille des lots SQL (lecture seule, sans appel HTTP).
+ */
+function poke_hub_bulbapedia_bulk_sql_batch_size($limit) {
+    $limit = max(1, (int) $limit);
+    $default = min(80, max(30, $limit * 2));
+
+    return (int) apply_filters('poke_hub_bulbapedia_bulk_sql_batch_size', $default, $limit);
 }
 
 /* -------------------------------------------------------------------------
@@ -1122,393 +1150,587 @@ function poke_hub_bulbapedia_merge_names_into_extra($extra, $name_en, $name_fr_d
 
 /**
  * Bulk: Pokémon
+ *
+ * @param int  $limit           Nombre max de lignes réellement mises à jour.
+ * @param bool $force           Remplacer les traductions existantes.
+ * @param int  $start_after_id  Ne considérer que les id strictement supérieurs (reprise / offset par id).
+ * @return array{updated:int,skipped:int,errors:int,scanned:int,next_start_after_id:int,message?:string}
  */
-function poke_hub_pokemon_fetch_official_names_existing($limit = 0, $force = false) {
+function poke_hub_pokemon_fetch_official_names_existing($limit = 0, $force = false, $start_after_id = 0) {
     global $wpdb;
 
-    if (function_exists('set_time_limit')) @set_time_limit(0);
+    if (!function_exists('poke_hub_tr_row_needs_official_names_refill')) {
+        return [
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'scanned' => 0,
+            'next_start_after_id' => (int) $start_after_id,
+            'message' => 'Translation helpers not loaded.',
+        ];
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(0);
+    }
     @ignore_user_abort(true);
 
-    if (!function_exists('pokehub_get_table')) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Helper function not found.'];
+    if (function_exists('wp_raise_memory_limit')) {
+        wp_raise_memory_limit('admin');
     }
 
-    $pokemon_table = pokehub_get_table('pokemon');
-    if (!$pokemon_table) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Pokemon table not found.'];
+    $suspend_cache = function_exists('wp_suspend_cache_addition');
+    if ($suspend_cache) {
+        wp_suspend_cache_addition(true);
     }
 
-    $limit = (int) $limit;
-    if ($limit <= 0) $limit = 20;
+    $out = [
+        'updated' => 0,
+        'skipped' => 0,
+        'errors' => 0,
+        'scanned' => 0,
+        'next_start_after_id' => max(0, (int) $start_after_id),
+    ];
 
-    $base_where = "WHERE name_en != ''";
-    if (!$force) {
-        // on met à jour surtout ceux dont le FR est manquant ou égal à EN
-        $base_where .= " AND (name_fr = '' OR name_fr = name_en)";
-    }
+    try {
+        if (!function_exists('pokehub_get_table')) {
+            $out['message'] = 'Helper function not found.';
 
-    $updated = 0;
-    $skipped = 0;
-    $errors  = 0;
-
-    $processed_ids = [];
-    $batch_size = max($limit * 3, 60);
-    $loop_count = 0;
-    $max_loops = 1000;
-
-    while ($updated < $limit && $loop_count < $max_loops) {
-        $loop_count++;
-
-        $where = $base_where;
-        if (!empty($processed_ids)) {
-            $excluded_ids = implode(',', array_map('intval', $processed_ids));
-            $where .= " AND id NOT IN ({$excluded_ids})";
+            return $out;
         }
 
-        $list = $wpdb->get_results(
-            "SELECT id, dex_number, name_en, name_fr, extra
-             FROM {$pokemon_table}
-             {$where}
-             ORDER BY id ASC
-             LIMIT " . (int)$batch_size
-        );
+        $pokemon_table = pokehub_get_table('pokemon');
+        if (!$pokemon_table) {
+            $out['message'] = 'Pokemon table not found.';
 
-        if (empty($list)) break;
+            return $out;
+        }
 
-        foreach ($list as $row) {
-            if ($updated >= $limit) break 2;
+        $limit = (int) $limit;
+        if ($limit <= 0) {
+            $limit = 20;
+        }
 
-            $id = (int) $row->id;
-            $processed_ids[] = $id;
+        $cursor = max(0, (int) $start_after_id);
+        $batch_size = poke_hub_bulbapedia_bulk_sql_batch_size($limit);
+        $max_loops = (int) apply_filters('poke_hub_bulbapedia_bulk_max_loops', 400);
+        $loop_count = 0;
 
-            $name_en = trim((string) $row->name_en);
-            if ($name_en === '') { $skipped++; continue; }
+        while ($out['updated'] < $limit && $loop_count < $max_loops) {
+            $loop_count++;
 
-            if (poke_hub_bulbapedia_is_special_form_name($name_en)) {
-                $skipped++;
-                continue;
-            }
-
-            $official = poke_hub_pokemon_fetch_pokemon_official_names_from_bulbapedia($name_en);
-            if ($official === false || empty($official)) {
-                $errors++;
-                continue;
-            }
-
-            $extra = [];
-            if (!empty($row->extra)) {
-                $decoded = json_decode((string)$row->extra, true);
-                if (is_array($decoded)) $extra = $decoded;
-            }
-
-            list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
-                $extra,
-                $name_en,
-                (string)$row->name_fr,
-                $official,
-                (bool)$force
+            $list = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, dex_number, name_en, name_fr, extra
+                 FROM {$pokemon_table}
+                 WHERE name_en != '' AND id > %d
+                 ORDER BY id ASC
+                 LIMIT %d",
+                    $cursor,
+                    $batch_size
+                )
             );
 
-            // Mirror fr into name_fr
-            $new_name_fr = isset($extra_new['names']['fr']) ? trim((string)$extra_new['names']['fr']) : '';
-            if ($new_name_fr === '' && !empty($official['fr'])) {
-                $new_name_fr = trim((string)$official['fr']);
-                if ($new_name_fr !== '') {
-                    $extra_new['names']['fr'] = $new_name_fr;
+            if (empty($list)) {
+                break;
+            }
+
+            $batch_max_id = $cursor;
+            $prev_id = $cursor;
+
+            foreach ($list as $row) {
+                if ($out['updated'] >= $limit) {
+                    $out['next_start_after_id'] = $prev_id;
+                    break 2;
+                }
+
+                $id = (int) $row->id;
+                $batch_max_id = max($batch_max_id, $id);
+                $out['scanned']++;
+
+                $name_en = trim((string) $row->name_en);
+                if ($name_en === '') {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                if (poke_hub_bulbapedia_is_special_form_name($name_en)) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                if (!poke_hub_tr_row_needs_official_names_refill($row, (bool) $force)) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $official = poke_hub_pokemon_fetch_pokemon_official_names_from_bulbapedia($name_en);
+                poke_hub_bulbapedia_bulk_throttle();
+
+                if ($official === false || empty($official)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $extra = [];
+                if (!empty($row->extra)) {
+                    $decoded = json_decode((string) $row->extra, true);
+                    if (is_array($decoded)) {
+                        $extra = $decoded;
+                    }
+                }
+
+                list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
+                    $extra,
+                    $name_en,
+                    (string) $row->name_fr,
+                    $official,
+                    (bool) $force
+                );
+
+                $new_name_fr = isset($extra_new['names']['fr']) ? trim((string) $extra_new['names']['fr']) : '';
+                if ($new_name_fr === '' && !empty($official['fr'])) {
+                    $new_name_fr = trim((string) $official['fr']);
+                    if ($new_name_fr !== '') {
+                        $extra_new['names']['fr'] = $new_name_fr;
+                        $changed = true;
+                    }
+                }
+
+                $update_data = [
+                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ];
+                $formats = ['%s'];
+
+                if ($new_name_fr !== '' && (string) $row->name_fr !== $new_name_fr) {
+                    $update_data['name_fr'] = $new_name_fr;
+                    $formats[] = '%s';
                     $changed = true;
                 }
+
+                if (!$changed) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $result = $wpdb->update(
+                    $pokemon_table,
+                    $update_data,
+                    ['id' => $id],
+                    $formats,
+                    ['%d']
+                );
+
+                if ($result === false) {
+                    $out['errors']++;
+                } elseif ($result > 0) {
+                    $out['updated']++;
+                } else {
+                    $out['skipped']++;
+                }
+
+                $prev_id = $id;
             }
 
-            $update_data = [
-                'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            ];
-            $formats = ['%s'];
-
-            if ($new_name_fr !== '' && (string)$row->name_fr !== $new_name_fr) {
-                $update_data['name_fr'] = $new_name_fr;
-                $formats[] = '%s';
-                $changed = true;
-            }
-
-            if (!$changed) {
-                $skipped++;
-                continue;
-            }
-
-            $result = $wpdb->update(
-                $pokemon_table,
-                $update_data,
-                ['id' => $id],
-                $formats,
-                ['%d']
-            );
-
-            if ($result === false) $errors++;
-            elseif ($result > 0) $updated++;
-            else $skipped++;
+            $cursor = $batch_max_id;
+            $out['next_start_after_id'] = $cursor;
+        }
+    } finally {
+        if ($suspend_cache) {
+            wp_suspend_cache_addition(false);
         }
     }
 
-    return [
-        'updated' => $updated,
-        'skipped' => $skipped,
-        'errors'  => $errors,
-        'total'   => count($processed_ids),
-    ];
+    return $out;
 }
 
 /**
  * Bulk: Attacks/Moves
+ *
+ * @param int $start_after_id Ne considérer que les id strictement supérieurs.
+ * @return array{updated:int,skipped:int,errors:int,scanned:int,next_start_after_id:int,message?:string}
  */
-function poke_hub_attacks_fetch_existing_official_names($limit = 0, $force = false) {
+function poke_hub_attacks_fetch_existing_official_names($limit = 0, $force = false, $start_after_id = 0) {
     global $wpdb;
 
-    if (function_exists('set_time_limit')) @set_time_limit(0);
+    if (!function_exists('poke_hub_tr_row_needs_official_names_refill')) {
+        return [
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'scanned' => 0,
+            'next_start_after_id' => (int) $start_after_id,
+            'message' => 'Translation helpers not loaded.',
+        ];
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(0);
+    }
     @ignore_user_abort(true);
 
-    if (!function_exists('pokehub_get_table')) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Helper function not found.'];
+    if (function_exists('wp_raise_memory_limit')) {
+        wp_raise_memory_limit('admin');
     }
 
-    $attacks_table = pokehub_get_table('attacks');
-    if (!$attacks_table) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Attacks table not found.'];
+    $suspend_cache = function_exists('wp_suspend_cache_addition');
+    if ($suspend_cache) {
+        wp_suspend_cache_addition(true);
     }
 
-    $limit = (int) $limit;
-    if ($limit <= 0) $limit = 20;
+    $out = [
+        'updated' => 0,
+        'skipped' => 0,
+        'errors' => 0,
+        'scanned' => 0,
+        'next_start_after_id' => max(0, (int) $start_after_id),
+    ];
 
-    $base_where = "WHERE name_en != ''";
-    if (!$force) {
-        $base_where .= " AND (name_fr = '' OR name_fr = name_en)";
-    }
+    try {
+        if (!function_exists('pokehub_get_table')) {
+            $out['message'] = 'Helper function not found.';
 
-    $updated = 0;
-    $skipped = 0;
-    $errors  = 0;
-
-    $processed_ids = [];
-    $batch_size = max($limit * 3, 60);
-    $loop_count = 0;
-    $max_loops = 1000;
-
-    while ($updated < $limit && $loop_count < $max_loops) {
-        $loop_count++;
-
-        $where = $base_where;
-        if (!empty($processed_ids)) {
-            $excluded_ids = implode(',', array_map('intval', $processed_ids));
-            $where .= " AND id NOT IN ({$excluded_ids})";
+            return $out;
         }
 
-        $list = $wpdb->get_results(
-            "SELECT id, name_en, name_fr, extra
-             FROM {$attacks_table}
-             {$where}
-             ORDER BY id ASC
-             LIMIT " . (int)$batch_size
-        );
+        $attacks_table = pokehub_get_table('attacks');
+        if (!$attacks_table) {
+            $out['message'] = 'Attacks table not found.';
 
-        if (empty($list)) break;
+            return $out;
+        }
 
-        foreach ($list as $row) {
-            if ($updated >= $limit) break 2;
+        $limit = (int) $limit;
+        if ($limit <= 0) {
+            $limit = 20;
+        }
 
-            $id = (int) $row->id;
-            $processed_ids[] = $id;
+        $cursor = max(0, (int) $start_after_id);
+        $batch_size = poke_hub_bulbapedia_bulk_sql_batch_size($limit);
+        $max_loops = (int) apply_filters('poke_hub_bulbapedia_bulk_max_loops', 400);
+        $loop_count = 0;
 
-            $name_en = trim((string) $row->name_en);
-            if ($name_en === '') { $skipped++; continue; }
+        while ($out['updated'] < $limit && $loop_count < $max_loops) {
+            $loop_count++;
 
-            $official = poke_hub_pokemon_fetch_move_official_names_from_bulbapedia($name_en);
-            if ($official === false || empty($official)) {
-                $errors++;
-                continue;
-            }
-
-            $extra = [];
-            if (!empty($row->extra)) {
-                $decoded = json_decode((string)$row->extra, true);
-                if (is_array($decoded)) $extra = $decoded;
-            }
-
-            list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
-                $extra,
-                $name_en,
-                (string)$row->name_fr,
-                $official,
-                (bool)$force
+            $list = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, name_en, name_fr, extra
+                 FROM {$attacks_table}
+                 WHERE name_en != '' AND id > %d
+                 ORDER BY id ASC
+                 LIMIT %d",
+                    $cursor,
+                    $batch_size
+                )
             );
 
-            // Mirror fr into name_fr
-            $new_name_fr = isset($extra_new['names']['fr']) ? trim((string)$extra_new['names']['fr']) : '';
-            if ($new_name_fr === '' && !empty($official['fr'])) {
-                $new_name_fr = trim((string)$official['fr']);
-                if ($new_name_fr !== '') {
-                    $extra_new['names']['fr'] = $new_name_fr;
+            if (empty($list)) {
+                break;
+            }
+
+            $batch_max_id = $cursor;
+            $prev_id = $cursor;
+
+            foreach ($list as $row) {
+                if ($out['updated'] >= $limit) {
+                    $out['next_start_after_id'] = $prev_id;
+                    break 2;
+                }
+
+                $id = (int) $row->id;
+                $batch_max_id = max($batch_max_id, $id);
+                $out['scanned']++;
+
+                $name_en = trim((string) $row->name_en);
+                if ($name_en === '') {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                if (!poke_hub_tr_row_needs_official_names_refill($row, (bool) $force)) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $official = poke_hub_pokemon_fetch_move_official_names_from_bulbapedia($name_en);
+                poke_hub_bulbapedia_bulk_throttle();
+
+                if ($official === false || empty($official)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $extra = [];
+                if (!empty($row->extra)) {
+                    $decoded = json_decode((string) $row->extra, true);
+                    if (is_array($decoded)) {
+                        $extra = $decoded;
+                    }
+                }
+
+                list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
+                    $extra,
+                    $name_en,
+                    (string) $row->name_fr,
+                    $official,
+                    (bool) $force
+                );
+
+                $new_name_fr = isset($extra_new['names']['fr']) ? trim((string) $extra_new['names']['fr']) : '';
+                if ($new_name_fr === '' && !empty($official['fr'])) {
+                    $new_name_fr = trim((string) $official['fr']);
+                    if ($new_name_fr !== '') {
+                        $extra_new['names']['fr'] = $new_name_fr;
+                        $changed = true;
+                    }
+                }
+
+                $update_data = [
+                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ];
+                $formats = ['%s'];
+
+                if ($new_name_fr !== '' && (string) $row->name_fr !== $new_name_fr) {
+                    $update_data['name_fr'] = $new_name_fr;
+                    $formats[] = '%s';
                     $changed = true;
                 }
+
+                if (!$changed) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $result = $wpdb->update(
+                    $attacks_table,
+                    $update_data,
+                    ['id' => $id],
+                    $formats,
+                    ['%d']
+                );
+
+                if ($result === false) {
+                    $out['errors']++;
+                } elseif ($result > 0) {
+                    $out['updated']++;
+                } else {
+                    $out['skipped']++;
+                }
+
+                $prev_id = $id;
             }
 
-            $update_data = [
-                'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            ];
-            $formats = ['%s'];
-
-            if ($new_name_fr !== '' && (string)$row->name_fr !== $new_name_fr) {
-                $update_data['name_fr'] = $new_name_fr;
-                $formats[] = '%s';
-                $changed = true;
-            }
-
-            if (!$changed) { $skipped++; continue; }
-
-            $result = $wpdb->update(
-                $attacks_table,
-                $update_data,
-                ['id' => $id],
-                $formats,
-                ['%d']
-            );
-
-            if ($result === false) $errors++;
-            elseif ($result > 0) $updated++;
-            else $skipped++;
+            $cursor = $batch_max_id;
+            $out['next_start_after_id'] = $cursor;
+        }
+    } finally {
+        if ($suspend_cache) {
+            wp_suspend_cache_addition(false);
         }
     }
 
-    return [
-        'updated' => $updated,
-        'skipped' => $skipped,
-        'errors'  => $errors,
-        'total'   => count($processed_ids),
-    ];
+    return $out;
 }
 
 /**
  * Bulk: Types
+ *
+ * @param int $start_after_id Ne considérer que les id strictement supérieurs.
+ * @return array{updated:int,skipped:int,errors:int,scanned:int,next_start_after_id:int,message?:string}
  */
-function poke_hub_types_fetch_existing_official_names($limit = 0, $force = false) {
+function poke_hub_types_fetch_existing_official_names($limit = 0, $force = false, $start_after_id = 0) {
     global $wpdb;
 
-    if (function_exists('set_time_limit')) @set_time_limit(0);
+    if (!function_exists('poke_hub_tr_row_needs_official_names_refill')) {
+        return [
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'scanned' => 0,
+            'next_start_after_id' => (int) $start_after_id,
+            'message' => 'Translation helpers not loaded.',
+        ];
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(0);
+    }
     @ignore_user_abort(true);
 
-    if (!function_exists('pokehub_get_table')) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Helper function not found.'];
+    if (function_exists('wp_raise_memory_limit')) {
+        wp_raise_memory_limit('admin');
     }
 
-    $types_table = pokehub_get_table('pokemon_types');
-    if (!$types_table) {
-        return ['updated' => 0, 'skipped' => 0, 'errors' => 0, 'total' => 0, 'message' => 'Types table not found.'];
+    $suspend_cache = function_exists('wp_suspend_cache_addition');
+    if ($suspend_cache) {
+        wp_suspend_cache_addition(true);
     }
 
-    $limit = (int) $limit;
-    if ($limit <= 0) $limit = 20;
+    $out = [
+        'updated' => 0,
+        'skipped' => 0,
+        'errors' => 0,
+        'scanned' => 0,
+        'next_start_after_id' => max(0, (int) $start_after_id),
+    ];
 
-    $base_where = "WHERE name_en != ''";
-    if (!$force) {
-        $base_where .= " AND (name_fr = '' OR name_fr = name_en)";
-    }
+    try {
+        if (!function_exists('pokehub_get_table')) {
+            $out['message'] = 'Helper function not found.';
 
-    $updated = 0;
-    $skipped = 0;
-    $errors  = 0;
-
-    $processed_ids = [];
-    $batch_size = max($limit * 3, 60);
-    $loop_count = 0;
-    $max_loops = 1000;
-
-    while ($updated < $limit && $loop_count < $max_loops) {
-        $loop_count++;
-
-        $where = $base_where;
-        if (!empty($processed_ids)) {
-            $excluded_ids = implode(',', array_map('intval', $processed_ids));
-            $where .= " AND id NOT IN ({$excluded_ids})";
+            return $out;
         }
 
-        $list = $wpdb->get_results(
-            "SELECT id, name_en, name_fr, slug, extra
-             FROM {$types_table}
-             {$where}
-             ORDER BY id ASC
-             LIMIT " . (int)$batch_size
-        );
+        $types_table = pokehub_get_table('pokemon_types');
+        if (!$types_table) {
+            $out['message'] = 'Types table not found.';
 
-        if (empty($list)) break;
+            return $out;
+        }
 
-        foreach ($list as $row) {
-            if ($updated >= $limit) break 2;
+        $limit = (int) $limit;
+        if ($limit <= 0) {
+            $limit = 20;
+        }
 
-            $id = (int) $row->id;
-            $processed_ids[] = $id;
+        $cursor = max(0, (int) $start_after_id);
+        $batch_size = poke_hub_bulbapedia_bulk_sql_batch_size($limit);
+        $max_loops = (int) apply_filters('poke_hub_bulbapedia_bulk_max_loops', 400);
+        $loop_count = 0;
 
-            $name_en = trim((string) $row->name_en);
-            if ($name_en === '') { $skipped++; continue; }
+        while ($out['updated'] < $limit && $loop_count < $max_loops) {
+            $loop_count++;
 
-            $official = poke_hub_pokemon_fetch_type_official_names_from_bulbapedia($name_en);
-            if ($official === false || empty($official)) {
-                $errors++;
-                continue;
-            }
-
-            $extra = [];
-            if (!empty($row->extra)) {
-                $decoded = json_decode((string)$row->extra, true);
-                if (is_array($decoded)) $extra = $decoded;
-            }
-
-            list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
-                $extra,
-                $name_en,
-                (string)$row->name_fr,
-                $official,
-                (bool)$force
+            $list = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, name_en, name_fr, slug, extra
+                 FROM {$types_table}
+                 WHERE name_en != '' AND id > %d
+                 ORDER BY id ASC
+                 LIMIT %d",
+                    $cursor,
+                    $batch_size
+                )
             );
 
-            // Mirror fr into name_fr
-            $new_name_fr = isset($extra_new['names']['fr']) ? trim((string)$extra_new['names']['fr']) : '';
-            if ($new_name_fr === '' && !empty($official['fr'])) {
-                $new_name_fr = trim((string)$official['fr']);
-                if ($new_name_fr !== '') {
-                    $extra_new['names']['fr'] = $new_name_fr;
+            if (empty($list)) {
+                break;
+            }
+
+            $batch_max_id = $cursor;
+            $prev_id = $cursor;
+
+            foreach ($list as $row) {
+                if ($out['updated'] >= $limit) {
+                    $out['next_start_after_id'] = $prev_id;
+                    break 2;
+                }
+
+                $id = (int) $row->id;
+                $batch_max_id = max($batch_max_id, $id);
+                $out['scanned']++;
+
+                $name_en = trim((string) $row->name_en);
+                if ($name_en === '') {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                if (!poke_hub_tr_row_needs_official_names_refill($row, (bool) $force)) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $official = poke_hub_pokemon_fetch_type_official_names_from_bulbapedia($name_en);
+                poke_hub_bulbapedia_bulk_throttle();
+
+                if ($official === false || empty($official)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $extra = [];
+                if (!empty($row->extra)) {
+                    $decoded = json_decode((string) $row->extra, true);
+                    if (is_array($decoded)) {
+                        $extra = $decoded;
+                    }
+                }
+
+                list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
+                    $extra,
+                    $name_en,
+                    (string) $row->name_fr,
+                    $official,
+                    (bool) $force
+                );
+
+                $new_name_fr = isset($extra_new['names']['fr']) ? trim((string) $extra_new['names']['fr']) : '';
+                if ($new_name_fr === '' && !empty($official['fr'])) {
+                    $new_name_fr = trim((string) $official['fr']);
+                    if ($new_name_fr !== '') {
+                        $extra_new['names']['fr'] = $new_name_fr;
+                        $changed = true;
+                    }
+                }
+
+                $update_data = [
+                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ];
+                $formats = ['%s'];
+
+                if ($new_name_fr !== '' && (string) $row->name_fr !== $new_name_fr) {
+                    $update_data['name_fr'] = $new_name_fr;
+                    $formats[] = '%s';
                     $changed = true;
                 }
+
+                if (!$changed) {
+                    $out['skipped']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
+                $result = $wpdb->update(
+                    $types_table,
+                    $update_data,
+                    ['id' => $id],
+                    $formats,
+                    ['%d']
+                );
+
+                if ($result === false) {
+                    $out['errors']++;
+                } elseif ($result > 0) {
+                    $out['updated']++;
+                } else {
+                    $out['skipped']++;
+                }
+
+                $prev_id = $id;
             }
 
-            $update_data = [
-                'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            ];
-            $formats = ['%s'];
-
-            if ($new_name_fr !== '' && (string)$row->name_fr !== $new_name_fr) {
-                $update_data['name_fr'] = $new_name_fr;
-                $formats[] = '%s';
-                $changed = true;
-            }
-
-            if (!$changed) { $skipped++; continue; }
-
-            $result = $wpdb->update(
-                $types_table,
-                $update_data,
-                ['id' => $id],
-                $formats,
-                ['%d']
-            );
-
-            if ($result === false) $errors++;
-            elseif ($result > 0) $updated++;
-            else $skipped++;
+            $cursor = $batch_max_id;
+            $out['next_start_after_id'] = $cursor;
+        }
+    } finally {
+        if ($suspend_cache) {
+            wp_suspend_cache_addition(false);
         }
     }
 
-    return [
-        'updated' => $updated,
-        'skipped' => $skipped,
-        'errors'  => $errors,
-        'total'   => count($processed_ids),
-    ];
+    return $out;
 }
