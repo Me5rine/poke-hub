@@ -197,17 +197,23 @@ if (!function_exists('pokehub_save_day_pokemon_hours')) {
             pokehub_content_save_day_pokemon_hours_quests('post', (int) $post_id, $quest_sets);
         }
 
-        // "Heure vedette" : utiliser le système "événement classique" (événements enfants liés)
-        if (!empty($featured_sets) && function_exists('pokehub_content_save_day_pokemon_hours_featured_hours_classic_events')) {
+        // Spotlight / featured : special_events si les tables existent, sinon table content_day_pokemon_hours.
+        $spotlight_tables_ok = function_exists('pokehub_get_table')
+            && (string) pokehub_get_table('special_events') !== ''
+            && (string) pokehub_get_table('special_event_pokemon') !== '';
+
+        // Toujours appeler quand les tables existent : $featured_sets peut être vide (suppression de tous les créneaux / du type).
+        if ($spotlight_tables_ok && function_exists('pokehub_content_save_day_pokemon_hours_featured_hours_classic_events')) {
             pokehub_content_save_day_pokemon_hours_featured_hours_classic_events('post', (int) $post_id, $featured_sets);
-        } elseif (function_exists('pokehub_content_save_day_pokemon_hours') && !empty($featured_sets)) {
-            // Fallback : si le système classique n'est pas dispo, sauvegarder quand même.
-            pokehub_content_save_day_pokemon_hours('post', (int) $post_id, $featured_sets);
         }
 
-        // Les autres content_types (encens, leurres, heure vedette, etc.) restent dans la table dédiée.
+        $content_table_sets = $other_sets;
+        if (!$spotlight_tables_ok && !empty($featured_sets)) {
+            $content_table_sets = array_merge($featured_sets, $other_sets);
+        }
+
         if (function_exists('pokehub_content_save_day_pokemon_hours')) {
-            pokehub_content_save_day_pokemon_hours('post', (int) $post_id, $other_sets);
+            pokehub_content_save_day_pokemon_hours('post', (int) $post_id, $content_table_sets);
         }
     }
 }

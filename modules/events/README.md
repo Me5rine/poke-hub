@@ -10,7 +10,7 @@ Toute la documentation se trouve dans `docs/events/` :
 
 - **`README-ROUTING.md`** - Documentation du système de routing
 - **`INTEGRATION-ELEMENTOR.md`** - Intégration avec Elementor
-- **`EVENEMENTS-DISTANTS.md`** - Gestion des événements distants
+- **`EVENEMENTS-DISTANTS.md`** - Sources d’événements (local / distant / SQL), routing, Spotlight Day Hours
 
 ## Structure du Module
 

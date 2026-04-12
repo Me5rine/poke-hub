@@ -205,6 +205,8 @@ function poke_hub_global_get_table_prefix(): string {
  *  - Tables locales PokéHub :
  *      pokehub_get_table('pokemon');
  *      pokehub_get_table('pokemon_types');
+ *
+ *  - Special events (même préfixe que la source Pokémon / tables content_*) :
  *      pokehub_get_table('special_events');
  *      pokehub_get_table('special_event_pokemon');
  *
@@ -298,11 +300,13 @@ function pokehub_get_table(string $key): string {
         'pokemon_regional_regions'   => ['scope' => 'local',  'suffix' => 'pokemon_regional_regions'],
         'pokemon_regional_mappings'  => ['scope' => 'local',  'suffix' => 'pokemon_regional_mappings'],
 
-        // ==== Tables locales Events spéciaux ====
-        'special_events'                => ['scope' => 'local', 'suffix' => 'special_events'],
-        'special_event_pokemon'         => ['scope' => 'local', 'suffix' => 'special_event_pokemon'],
-        'special_event_pokemon_attacks' => ['scope' => 'local', 'suffix' => 'special_event_pokemon_attacks'],
-        'special_event_bonus'           => ['scope' => 'local', 'suffix' => 'special_event_bonus'],
+        // ==== Tables Events spéciaux (même préfixe que la source Pokémon / contenu) ====
+        // Comme content_* : si "Pokémon table prefix (remote)" est défini, lecture/écriture sous ce préfixe
+        // (pas de second jeu de tables sous le seul préfixe WP du site courant).
+        'special_events'                => ['scope' => 'content_source', 'suffix' => 'special_events'],
+        'special_event_pokemon'         => ['scope' => 'content_source', 'suffix' => 'special_event_pokemon'],
+        'special_event_pokemon_attacks' => ['scope' => 'content_source', 'suffix' => 'special_event_pokemon_attacks'],
+        'special_event_bonus'           => ['scope' => 'content_source', 'suffix' => 'special_event_bonus'],
 
         // ==== Tables de contenu communes (post, special_event, global_pool) ====
         // scope content_source = même préfixe que la "source Pokémon" (Réglages > Sources) pour que
@@ -372,12 +376,6 @@ function pokehub_get_table(string $key): string {
         'remote_term_relationships' => ['scope' => 'remote', 'suffix' => 'term_relationships'],
         'remote_as3cf_items'        => ['scope' => 'remote', 'suffix' => 'as3cf_items'],
 
-        // ==== Tables distantes Events spéciaux ====
-        'remote_special_events'                => ['scope' => 'remote', 'suffix' => 'pokehub_special_events'],
-        'remote_special_event_pokemon'         => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_pokemon'],
-        'remote_special_event_pokemon_attacks' => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_pokemon_attacks'],
-        'remote_special_event_bonus'           => ['scope' => 'remote', 'suffix' => 'pokehub_special_event_bonus'],
-
         // ==== Tables distantes Pokémon ====
         'remote_pokemon'                    => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon'],
         'remote_pokemon_types'              => ['scope' => 'remote_pokemon', 'suffix' => 'pokehub_pokemon_types'],
@@ -424,7 +422,6 @@ function pokehub_get_table(string $key): string {
          * Exemple :
          *  - "remote_pokemon"  => déjà dans le mapping → scope remote_pokemon
          *  - "remote_posts"     => scope remote, suffix "posts"
-         *  - "remote_special_event_pokemon" => scope remote (car pas dans le mapping)
          *  - "my_custom"        => scope local, suffix "my_custom"
          */
         if (strpos($key, 'remote_') === 0) {

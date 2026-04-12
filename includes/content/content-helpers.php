@@ -487,6 +487,43 @@ function pokehub_content_get_day_schedule_quest_header_ids_for_source(string $so
 }
 
 /**
+ * Clé JSON dans chaque récompense créée par la métabox Day Pokémon Hours (quêtes par jour).
+ * Permet de purger / filtrer sans confondre avec les Field Research (même table content_quests).
+ */
+function pokehub_content_day_quest_reward_marker_key(): string {
+    return '_pokehub_day_hours';
+}
+
+/**
+ * IDs d'en-têtes content_quests liés à la métabox : présence du marqueur dans content_quest_lines.rewards.
+ *
+ * @return int[]
+ */
+function pokehub_content_get_day_quest_ids_with_hours_marker(int $post_id): array {
+    global $wpdb;
+    if ($post_id <= 0 || !function_exists('pokehub_get_table')) {
+        return [];
+    }
+    $quests_tbl = pokehub_get_table('content_quests');
+    $lines_tbl = pokehub_get_table('content_quest_lines');
+    if (!$quests_tbl || !$lines_tbl) {
+        return [];
+    }
+    $needle = '%' . $wpdb->esc_like('"' . pokehub_content_day_quest_reward_marker_key() . '"') . '%';
+    $col = $wpdb->get_col(
+        $wpdb->prepare(
+            "SELECT DISTINCT cq.id FROM {$quests_tbl} cq
+             INNER JOIN {$lines_tbl} ql ON ql.content_quest_id = cq.id
+             WHERE cq.source_type = 'post' AND cq.source_id = %d
+               AND ql.rewards LIKE %s",
+            $post_id,
+            $needle
+        )
+    );
+    return array_values(array_filter(array_map('intval', (array) $col)));
+}
+
+/**
  * Récupère la ligne content_quests pour une source.
  */
 function pokehub_content_get_quests_row($source_type, $source_id) {
@@ -1856,6 +1893,21 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
     $quests_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quests') : '';
     $quest_lines_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quest_lines') : '';
     if ($quests_tbl && $quest_lines_tbl) {
+        $day_quest_meta_ids = [];
+        $day_quest_marked_map = [];
+        if ((string) $source_type === 'post' && $source_id > 0) {
+            if (function_exists('pokehub_content_get_day_schedule_quest_header_ids_for_source')) {
+                $day_quest_meta_ids = pokehub_content_get_day_schedule_quest_header_ids_for_source('post', $source_id);
+            }
+            if (function_exists('pokehub_content_get_day_quest_ids_with_hours_marker')) {
+                foreach (pokehub_content_get_day_quest_ids_with_hours_marker($source_id) as $mid) {
+                    if ($mid > 0) {
+                        $day_quest_marked_map[$mid] = true;
+                    }
+                }
+            }
+        }
+
         $quest_rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d ORDER BY start_ts ASC, id ASC",
             $source_type,
@@ -1868,6 +1920,14 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
             $end_ts = (int) ($qr['end_ts'] ?? 0);
             if ($qid <= 0 || $start_ts <= 0 || $end_ts <= 0) {
                 continue;
+            }
+
+            if ((string) $source_type === 'post' && $source_id > 0) {
+                $in_meta = in_array($qid, $day_quest_meta_ids, true);
+                $in_marker = isset($day_quest_marked_map[$qid]);
+                if (!$in_meta && !$in_marker) {
+                    continue;
+                }
             }
 
             $st_parts = $format_local_parts($start_ts);
@@ -2011,6 +2071,25 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                 'content_type' => $ct,
                 'days' => $days,
             ];
+        }
+    }
+
+    // 5) Heures vedette (featured_hours) : même source que le bloc front — special_events si les tables existent.
+    // Sinon la section 4 ci-dessus (content_day_pokemon_hours) reste la seule source pour ce type.
+    if ($source_type === 'post' && $source_id > 0
+        && function_exists('pokehub_get_table')
+        && function_exists('pokehub_content_get_featured_hours_classic_events_entries_for_parent')) {
+        $se_tbl = (string) pokehub_get_table('special_events');
+        $sep_tbl = (string) pokehub_get_table('special_event_pokemon');
+        if ($se_tbl !== '' && $sep_tbl !== '') {
+            $out = array_values(array_filter($out, static function ($set) {
+                return (($set['content_type'] ?? '') !== 'featured_hours');
+            }));
+            $spotlight_days = pokehub_content_get_featured_hours_classic_events_entries_for_parent($source_id);
+            array_unshift($out, [
+                'content_type' => 'featured_hours',
+                'days' => $spotlight_days,
+            ]);
         }
     }
 
@@ -2573,22 +2652,28 @@ function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int 
         }
     };
 
-    // Ne supprimer que les en-têtes créés par cette métabox (méta), pas les Field Research (même table).
-    $stored_day_ids = pokehub_content_get_day_schedule_quest_header_ids_for_source($source_type, $source_id);
-    $ids_to_purge   = [];
-    if (!empty($stored_day_ids)) {
-        $placeholders = implode(',', array_fill(0, count($stored_day_ids), '%d'));
-        $sql          = $wpdb->prepare(
-            "SELECT id FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d AND id IN ({$placeholders})",
-            array_merge([$source_type, $source_id], $stored_day_ids)
-        );
-        foreach ((array) $wpdb->get_col($sql) as $col) {
-            $qid = (int) $col;
-            if ($qid > 0) {
-                $ids_to_purge[] = $qid;
+    // Supprimer les en-têtes gérés par cette métabox : méta + marqueur JSON (orphelins si méta vide / désynchronisée).
+    $ids_to_purge = [];
+    if ((string) $source_type === 'post' && $source_id > 0) {
+        $from_meta = [];
+        $stored_day_ids = pokehub_content_get_day_schedule_quest_header_ids_for_source($source_type, $source_id);
+        if (!empty($stored_day_ids)) {
+            $placeholders = implode(',', array_fill(0, count($stored_day_ids), '%d'));
+            $sql = $wpdb->prepare(
+                "SELECT id FROM {$quests_tbl} WHERE source_type = %s AND source_id = %d AND id IN ({$placeholders})",
+                array_merge([$source_type, $source_id], $stored_day_ids)
+            );
+            foreach ((array) $wpdb->get_col($sql) as $col) {
+                $qid = (int) $col;
+                if ($qid > 0) {
+                    $from_meta[] = $qid;
+                }
             }
         }
-        $ids_to_purge = array_values(array_unique($ids_to_purge));
+        $from_marker = function_exists('pokehub_content_get_day_quest_ids_with_hours_marker')
+            ? pokehub_content_get_day_quest_ids_with_hours_marker($source_id)
+            : [];
+        $ids_to_purge = array_values(array_unique(array_merge($from_meta, $from_marker)));
     } elseif ($source_type !== 'post') {
         // Comportement historique si un appelant externe utilise un autre source_type.
         $quest_ids = $wpdb->get_results($wpdb->prepare(
@@ -2654,12 +2739,14 @@ function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int 
             $quest_id = (int) $wpdb->insert_id;
             if ($quest_id <= 0) continue;
 
-            // Une line unique (task vide) contenant tous les Pokémon récompensés.
+            // Une line unique (task vide) contenant tous les Pokémon récompensés (+ marqueur métabox pour purge fiable).
+            $marker_key = pokehub_content_day_quest_reward_marker_key();
             $rewards = [[
                 'type' => 'pokemon',
                 'pokemon_ids' => $pokemon_ids,
                 'force_shiny' => false,
                 'pokemon_genders' => [],
+                $marker_key => true,
             ]];
 
             $wpdb->insert($quest_lines_tbl, [
@@ -2677,6 +2764,133 @@ function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int 
 
     if ($source_type === 'post' && $source_id > 0 && function_exists('update_post_meta')) {
         update_post_meta((int) $source_id, pokehub_content_day_schedule_quest_meta_key(), $new_day_quest_ids);
+    }
+}
+
+if (!function_exists('pokehub_special_events_has_content_source_columns')) {
+    /**
+     * Indique si la table special_events expose content_source_* (liaison stable vers un post).
+     * Ne met en cache que le positif : après migration admin la même requête doit revoir la colonne.
+     */
+    function pokehub_special_events_has_content_source_columns(): bool {
+        static $cached_yes = false;
+        if ($cached_yes) {
+            return true;
+        }
+        global $wpdb;
+        $table = function_exists('pokehub_get_table') ? pokehub_get_table('special_events') : '';
+        if ($table === '' || $wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
+            return false;
+        }
+        $n = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                DB_NAME,
+                $table,
+                'content_source_type'
+            )
+        );
+        if ($n > 0) {
+            $cached_yes = true;
+        }
+        return $n > 0;
+    }
+}
+
+if (!function_exists('pokehub_spotlight_event_type_candidate_slugs')) {
+    /**
+     * Slugs candidats pour le type d'événement Spotlight (ordre = priorité de résolution).
+     */
+    function pokehub_spotlight_event_type_candidate_slugs(): array {
+        return [
+            'pokemon-spotlight-hour',
+            'pokemon_spotlight_hour',
+            'spotlight-hour',
+            'spotlight_hour',
+            'spotlighthour',
+            'spotlighthourly',
+        ];
+    }
+}
+
+if (!function_exists('pokehub_resolve_spotlight_event_type_slug')) {
+    /**
+     * Résout le slug de type enregistré en base (premier candidat trouvé), sinon le canonique Pokémon GO.
+     */
+    function pokehub_resolve_spotlight_event_type_slug(): string {
+        foreach (pokehub_spotlight_event_type_candidate_slugs() as $slug) {
+            if (function_exists('poke_hub_events_get_event_type_by_slug')) {
+                $obj = poke_hub_events_get_event_type_by_slug((string) $slug);
+                if ($obj && !empty($obj->slug)) {
+                    return (string) $obj->slug;
+                }
+            }
+        }
+        return 'pokemon-spotlight-hour';
+    }
+}
+
+if (!function_exists('pokehub_spotlight_event_type_slugs_for_query')) {
+    /**
+     * Liste des valeurs event_type à considérer comme Spotlight (requêtes IN / nettoyage).
+     */
+    function pokehub_spotlight_event_type_slugs_for_query(): array {
+        $out = [];
+        foreach (pokehub_spotlight_event_type_candidate_slugs() as $cand) {
+            $out[] = $cand;
+            if (function_exists('poke_hub_events_get_event_type_by_slug')) {
+                $obj = poke_hub_events_get_event_type_by_slug((string) $cand);
+                if ($obj && !empty($obj->slug)) {
+                    $out[] = (string) $obj->slug;
+                }
+            }
+        }
+        $resolved = pokehub_resolve_spotlight_event_type_slug();
+        if ($resolved !== '') {
+            $out[] = $resolved;
+        }
+        $out = array_values(array_unique(array_filter(array_map('strval', $out))));
+        return $out;
+    }
+}
+
+if (!function_exists('pokehub_spotlight_sql_parent_scope')) {
+    /**
+     * Fragment WHERE + arguments pour $wpdb->prepare : événements Spotlight liés à un post parent.
+     *
+     * @return array{0: string, 1: array<int, mixed>}
+     */
+    function pokehub_spotlight_sql_parent_scope(int $parent_post_id): array {
+        global $wpdb;
+        $slugs = pokehub_spotlight_event_type_slugs_for_query();
+        if (empty($slugs)) {
+            $slugs = ['pokemon-spotlight-hour'];
+        }
+
+        if (pokehub_special_events_has_content_source_columns()) {
+            $in_types = implode(',', array_fill(0, count($slugs), '%s'));
+            $legacy = [];
+            $args = $slugs;
+            foreach ($slugs as $t) {
+                $legacy[] = '( (content_source_type IS NULL OR content_source_type = \'\' OR content_source_id IS NULL OR content_source_id = 0) AND event_type = %s AND slug LIKE %s )';
+                $args[] = $t;
+                $args[] = $wpdb->esc_like(sanitize_title($t . '-' . $parent_post_id . '-')) . '%';
+            }
+            $args[] = 'post';
+            $args[] = (int) $parent_post_id;
+            $sql = "event_type IN ({$in_types}) AND (" . implode(' OR ', $legacy) . ' OR (content_source_type = %s AND content_source_id = %d))';
+            return [$sql, $args];
+        }
+
+        $parts = [];
+        $args = [];
+        foreach ($slugs as $t) {
+            $parts[] = '(event_type = %s AND slug LIKE %s)';
+            $args[] = $t;
+            $args[] = $wpdb->esc_like(sanitize_title($t . '-' . $parent_post_id . '-')) . '%';
+        }
+        $sql = '(' . implode(' OR ', $parts) . ')';
+        return [$sql, $args];
     }
 }
 
@@ -2698,17 +2912,30 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
         return;
     }
 
-    // Flag anti-cascade : ce hook déclenche des wp_insert_post, qui vont relancer save_post.
-    // On désactive la sync de dates pendant toute la génération.
-    $GLOBALS['pokehub_skip_content_sync'] = true;
-
     global $wpdb;
     $source_type = (string) $source_type;
     $parent_id   = (int) $source_id;
     if ($parent_id <= 0) {
-        unset($GLOBALS['pokehub_skip_content_sync']);
         return;
     }
+
+    $events_tbl_early = function_exists('pokehub_get_table') ? pokehub_get_table('special_events') : '';
+    $event_pokemon_tbl_early = function_exists('pokehub_get_table') ? pokehub_get_table('special_event_pokemon') : '';
+    if (!$events_tbl_early || !$event_pokemon_tbl_early) {
+        // Pas de tables événements : ne rien détruire ici — la metabox repasse sur content_day_pokemon_hours.
+        return;
+    }
+
+    if (!function_exists('pokehub_generate_unique_event_slug')) {
+        $slug_helper = (defined('POKE_HUB_MODULES_DIR') ? POKE_HUB_MODULES_DIR : '') . 'events/functions/events-admin-helpers.php';
+        if (is_readable($slug_helper)) {
+            require_once $slug_helper;
+        }
+    }
+
+    // Flag anti-cascade : ce hook déclenche des wp_insert_post, qui vont relancer save_post.
+    // On désactive la sync de dates pendant toute la génération.
+    $GLOBALS['pokehub_skip_content_sync'] = true;
 
     $parent_post_type = function_exists('get_post_type') ? (string) get_post_type($parent_id) : 'post';
     if ($parent_post_type === '') {
@@ -2740,18 +2967,9 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
         }
     }
 
-    // 2) Résoudre le slug event_type (si possible)
-    $spotlight_event_type_slug = 'spotlight-hour';
-    $candidate_slugs = ['spotlight-hour', 'spotlight_hour', 'spotlighthour', 'spotlighthourly'];
-    if (function_exists('poke_hub_events_get_event_type_by_slug')) {
-        foreach ($candidate_slugs as $slug) {
-            $obj = poke_hub_events_get_event_type_by_slug((string) $slug);
-            if ($obj && !empty($obj->slug)) {
-                $spotlight_event_type_slug = (string) $obj->slug;
-                break;
-            }
-        }
-    }
+    $spotlight_event_type_slug = function_exists('pokehub_resolve_spotlight_event_type_slug')
+        ? pokehub_resolve_spotlight_event_type_slug()
+        : 'pokemon-spotlight-hour';
 
     // 3) Création des special_events + écriture dans special_event_pokemon
     $tz = wp_timezone();
@@ -2769,23 +2987,39 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
 
     $pokemon_data_fn = function_exists('pokehub_get_pokemon_data_by_id') ? 'pokehub_get_pokemon_data_by_id' : null;
 
-    $events_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('special_events') : '';
-    $event_pokemon_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('special_event_pokemon') : '';
-    if (!$events_tbl || !$event_pokemon_tbl) {
-        unset($GLOBALS['pokehub_skip_content_sync']);
-        return;
-    }
+    $events_tbl = $events_tbl_early;
+    $event_pokemon_tbl = $event_pokemon_tbl_early;
 
     // Nettoyage : supprimer les special_events spotlight déjà créés pour ce parent
-    // (on utilise un préfixe de slug déterministe, construit plus bas).
-    $slug_prefix = sanitize_title($spotlight_event_type_slug . '-' . $parent_id . '-');
-    $existing_event_ids = $wpdb->get_col($wpdb->prepare(
-        "SELECT id FROM {$events_tbl}
-         WHERE event_type = %s
-           AND slug LIKE %s",
-        $spotlight_event_type_slug,
-        $wpdb->esc_like($slug_prefix) . '%'
-    ));
+    // (liaison stable content_source_* si disponible, sinon préfixe de slug hérité).
+    list($scope_sql, $scope_args) = pokehub_spotlight_sql_parent_scope((int) $parent_id);
+    $sql_existing = "SELECT id, slug, title, start_ts, end_ts FROM {$events_tbl} WHERE {$scope_sql}";
+    $existing_rows = $wpdb->get_results(
+        call_user_func_array([$wpdb, 'prepare'], array_merge([$sql_existing], $scope_args)),
+        ARRAY_A
+    );
+
+    $preserved_titles_by_slug = [];
+    $preserved_titles_by_slot = [];
+    $existing_event_ids = [];
+    if (!empty($existing_rows) && is_array($existing_rows)) {
+        foreach ($existing_rows as $row) {
+            $eid = (int) ($row['id'] ?? 0);
+            if ($eid > 0) {
+                $existing_event_ids[] = $eid;
+            }
+            $slug_key = isset($row['slug']) ? (string) $row['slug'] : '';
+            $title_prev = isset($row['title']) ? trim((string) $row['title']) : '';
+            if ($slug_key !== '' && $title_prev !== '') {
+                $preserved_titles_by_slug[$slug_key] = $title_prev;
+            }
+            $sts = (int) ($row['start_ts'] ?? 0);
+            $ets = (int) ($row['end_ts'] ?? 0);
+            if ($sts > 0 && $ets > 0 && $title_prev !== '') {
+                $preserved_titles_by_slot[$sts . '|' . $ets] = $title_prev;
+            }
+        }
+    }
 
     if (!empty($existing_event_ids) && is_array($existing_event_ids)) {
         // Nettoyage des lignes dépendantes (pas de FK garanties).
@@ -2879,45 +3113,85 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
         }
 
         $title_pid = (int) $pokemon_ids[0];
-        $display_name = '';
+        $name_en = '';
+        $name_fr = '';
+        $poke_slug = '';
         if ($pokemon_data_fn && $title_pid > 0) {
             $p = call_user_func($pokemon_data_fn, $title_pid);
             if (is_array($p)) {
-                $name_fr = isset($p['name_fr']) ? (string) $p['name_fr'] : '';
-                $name_en = isset($p['name_en']) ? (string) $p['name_en'] : '';
-                $display_name = $name_fr !== '' ? $name_fr : $name_en;
-                if ($display_name === '' && !empty($p['name'])) {
-                    $display_name = (string) $p['name'];
+                $name_en = isset($p['name_en']) ? trim((string) $p['name_en']) : '';
+                $name_fr = isset($p['name_fr']) ? trim((string) $p['name_fr']) : '';
+                $poke_slug = isset($p['slug']) ? trim((string) $p['slug']) : '';
+                if ($name_en === '' && $name_fr !== '') {
+                    $name_en = $name_fr;
+                }
+                if ($name_fr === '' && $name_en !== '') {
+                    $name_fr = $name_en;
+                }
+                if ($name_en === '' && !empty($p['name'])) {
+                    $name_en = trim((string) $p['name']);
+                }
+                if ($name_fr === '' && $name_en !== '') {
+                    $name_fr = $name_en;
                 }
             }
         }
-        if ($display_name === '' && $title_pid > 0) {
-            $display_name = '#' . $title_pid;
+        if ($name_en === '' && $title_pid > 0) {
+            $name_en = '#' . $title_pid;
+        }
+        if ($name_fr === '') {
+            $name_fr = $name_en;
         }
 
-        $slug_date = str_replace('-', '', $slot_date);
-        $slug_start = str_replace(':', '-', $slot_st);
-        $slug_end = str_replace(':', '-', $slot_et);
-        $event_slug = sanitize_title($spotlight_event_type_slug . '-' . $parent_id . '-' . $slug_date . '-' . $slug_start . '-' . $slug_end);
+        // Titres : EN "Mareep Spotlight Hour" ; FR "Heure vedette {nom FR}" ; slug : mareep-spotlight-hour, …
+        $event_title_en = $name_en !== '' ? $name_en . ' Spotlight Hour' : 'Spotlight Hour';
+        $fr_name = $name_fr !== '' ? $name_fr : $name_en;
+        $event_title_fr = $fr_name !== '' ? 'Heure vedette ' . $fr_name : $event_title_en;
+        $event_title = $event_title_en;
 
-        $event_title = sprintf(
-            /* translators: 1 = pokemon name, 2 = date */
-            __('Spotlight: %1$s (%2$s)', 'poke-hub'),
-            $display_name !== '' ? $display_name : '#',
-            $slot_date
-        );
+        $slug_core = $poke_slug !== '' ? $poke_slug : $name_en;
+        $slug_core = sanitize_title($slug_core);
+        if ($slug_core === '') {
+            $slug_core = $title_pid > 0 ? 'pokemon-' . $title_pid : 'spotlight';
+        }
+        $slug_base = $slug_core . '-spotlight-hour';
+        $event_slug = function_exists('pokehub_generate_unique_event_slug')
+            ? pokehub_generate_unique_event_slug($slug_base, 0)
+            : sanitize_title($slug_base);
 
-        $wpdb->insert($events_tbl, [
+        $slot_ts_key = (int) $start_ts . '|' . (int) $end_ts;
+        if (isset($preserved_titles_by_slot[$slot_ts_key])) {
+            $preserved = (string) $preserved_titles_by_slot[$slot_ts_key];
+            $event_title = $preserved;
+            $event_title_en = $preserved;
+            $event_title_fr = $preserved;
+        } elseif (isset($preserved_titles_by_slug[$event_slug])) {
+            $preserved = (string) $preserved_titles_by_slug[$event_slug];
+            $event_title = $preserved;
+            $event_title_en = $preserved;
+            $event_title_fr = $preserved;
+        }
+
+        $insert_row = [
             'slug' => (string) $event_slug,
             'title' => (string) $event_title,
-            'title_en' => null,
-            'title_fr' => null,
+            'title_en' => (string) $event_title_en,
+            'title_fr' => (string) $event_title_fr,
             'description' => null,
             'event_type' => (string) $spotlight_event_type_slug,
             'start_ts' => (int) $start_ts,
             'end_ts' => (int) $end_ts,
-            'mode' => 'fixed',
-        ], ['%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s']);
+            // Timestamps construits dans wp_timezone() : même sémantique que le mode « local » du formulaire admin.
+            'mode' => 'local',
+        ];
+        $insert_formats = ['%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s'];
+        if (function_exists('pokehub_special_events_has_content_source_columns') && pokehub_special_events_has_content_source_columns()) {
+            $insert_row['content_source_type'] = 'post';
+            $insert_row['content_source_id'] = (int) $parent_id;
+            $insert_formats[] = '%s';
+            $insert_formats[] = '%d';
+        }
+        $wpdb->insert($events_tbl, $insert_row, $insert_formats);
 
         $event_id = (int) $wpdb->insert_id;
         if ($event_id <= 0) continue;
@@ -2939,8 +3213,8 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
 
 function pokehub_content_get_featured_hours_classic_events_entries_for_parent(int $parent_post_id): array {
 /**
- * Lit l'affichage "featured_hours" (Spotlight) depuis nos `special_events`/`special_event_pokemon`
- * liés au parent via un préfixe de slug déterministe.
+ * Lit l'affichage "featured_hours" (Spotlight) depuis `special_events` / `special_event_pokemon`.
+ * Liaison au post : colonnes content_source_* si présentes, sinon préfixe de slug (rétrocompatibilité).
  *
  * @param int $parent_post_id
  * @return array[] ['date','end_date','start_time','end_time','pokemon_ids']
@@ -2960,29 +3234,12 @@ function pokehub_content_get_featured_hours_classic_events_entries_for_parent(in
         return [];
     }
 
-    // Résoudre le slug event_type Spotlight (même logique que dans le writer).
-    $spotlight_event_type_slug = 'spotlight-hour';
-    $candidate_slugs = ['spotlight-hour', 'spotlight_hour', 'spotlighthour', 'spotlighthourly'];
-    if (function_exists('poke_hub_events_get_event_type_by_slug')) {
-        foreach ($candidate_slugs as $slug) {
-            $obj = poke_hub_events_get_event_type_by_slug((string) $slug);
-            if ($obj && !empty($obj->slug)) {
-                $spotlight_event_type_slug = (string) $obj->slug;
-                break;
-            }
-        }
-    }
-
-        $slug_prefix = sanitize_title($spotlight_event_type_slug . '-' . (int) $parent_post_id . '-');
-    $rows = $wpdb->get_results($wpdb->prepare(
-        "SELECT id, start_ts, end_ts
-         FROM {$events_tbl}
-         WHERE event_type = %s
-           AND slug LIKE %s
-         ORDER BY start_ts ASC, id ASC",
-        $spotlight_event_type_slug,
-        $wpdb->esc_like($slug_prefix) . '%'
-    ), ARRAY_A);
+    list($scope_sql, $scope_args) = pokehub_spotlight_sql_parent_scope((int) $parent_post_id);
+    $sql_rows = "SELECT id, start_ts, end_ts FROM {$events_tbl} WHERE {$scope_sql} ORDER BY start_ts ASC, id ASC";
+    $rows = $wpdb->get_results(
+        call_user_func_array([$wpdb, 'prepare'], array_merge([$sql_rows], $scope_args)),
+        ARRAY_A
+    );
 
     if (empty($rows) || !is_array($rows)) {
         // Fallback : si $parent_post_id correspond directement à l'ID d'un special event

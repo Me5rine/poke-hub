@@ -46,11 +46,26 @@ function poke_hub_events_compute_status_from_ts(int $start_ts, int $end_ts): str
  * - image_id       (int)
  * - image_url      (string)
  * - url            (string)  → lien vers l'article / la page
- * - source         (string)  → 'remote_post', 'local_post', 'special_local', 'special_remote', ...
+ * - source         (string)  → 'local_event' | 'remote_event' | 'special_event' (anciennes valeurs mappées ci‑dessous)
  *
  * @param array $raw
  * @return object
  */
+function poke_hub_events_normalize_event_source(string $source): string {
+    static $legacy = [
+        'local_post'     => 'local_event',
+        'remote_post'    => 'remote_event',
+        'special'        => 'special_event',
+        'special_local'  => 'special_event',
+        'special_remote' => 'special_event',
+    ];
+    $source = trim($source);
+    if ($source === '') {
+        return 'unknown';
+    }
+    return $legacy[$source] ?? $source;
+}
+
 function poke_hub_events_normalize_event(array $raw): object {
 
     $start_ts = isset($raw['start_ts']) ? (int) $raw['start_ts'] : 0;
@@ -84,6 +99,7 @@ function poke_hub_events_normalize_event(array $raw): object {
 
     $url    = !empty($raw['url'])    ? (string) $raw['url']    : '';
     $source = !empty($raw['source']) ? (string) $raw['source'] : 'unknown';
+    $source = poke_hub_events_normalize_event_source($source);
 
     return (object) [
         'id'               => isset($raw['id']) ? (int) $raw['id'] : 0,
@@ -1722,7 +1738,7 @@ function poke_hub_special_event_normalize_row(array $row): object {
 
     return (object) [
         'id'               => (int) $row['id'],
-        'source'           => 'special',
+        'source'           => 'special_event',
 
         'event_type'       => $etype,
         'event_type_slug'  => $etype,
@@ -1952,164 +1968,16 @@ function poke_hub_special_events_query(array $args = []): array {
 }
 
 /**
- * Variante de poke_hub_special_events_query() pour la table distante
- * "remote_special_events" (même schéma que special_events, mais
- * préfixe JV Actu via pokehub_get_table('remote_special_events')).
+ * @deprecated Alias de poke_hub_special_events_query() (compatibilité d’anciennes intégrations).
  *
  * @param array $args
  * @return object[]
  */
 function poke_hub_special_events_query_remote(array $args = []): array {
-    global $wpdb;
-
-    $defaults = [
-        'status'      => null,   // 'current'|'upcoming'|'past'|'all'|null
-        'event_type'  => null,
-        'start_after' => null,
-        'end_before'  => null,
-        'order'       => 'asc',
-    ];
-    $args = wp_parse_args($args, $defaults);
-
-    $order = strtolower((string) $args['order']);
-    if (!in_array($order, ['asc', 'desc'], true)) {
-        $order = 'asc';
-    }
-
-    // 🔹 Table distante
-    $table = pokehub_get_table('remote_special_events');
-    if (!$table) {
+    if (!function_exists('poke_hub_special_events_query')) {
         return [];
     }
-
-    if (function_exists('pokehub_table_exists') && !pokehub_table_exists($table)) {
-        return [];
-    }
-
-    $rows = $wpdb->get_results("SELECT * FROM {$table}", ARRAY_A);
-    if (!$rows) {
-        return [];
-    }
-
-    $events = [];
-
-    foreach ($rows as $row) {
-        $base = poke_hub_special_event_normalize_row($row);
-        // Tag spécifique pour les distants
-        $base->source = 'special_remote';
-
-        // Filtre event_type (sur le type "brut")
-        // Peut être un tableau ou une chaîne
-        if (!empty($args['event_type'])) {
-            $filter_types = is_array($args['event_type']) 
-                ? array_map('sanitize_title', array_filter($args['event_type'], 'is_string'))
-                : [sanitize_title($args['event_type'])];
-            
-            if (!empty($filter_types) && !in_array($base->event_type, $filter_types, true)) {
-                continue;
-            }
-        }
-
-        $recurring = !empty($row['recurring']) ? '1' : '0';
-
-        // 🔸 Pas récurrent → comportement simple
-        if ($recurring !== '1') {
-            $status = $base->status;
-
-            if ($args['status'] && 'all' !== $args['status'] && $status !== $args['status']) {
-                continue;
-            }
-
-            if ($args['start_after'] && $base->end_ts < $args['start_after']) {
-                continue;
-            }
-            if ($args['end_before'] && $base->start_ts > $args['end_before']) {
-                continue;
-            }
-
-            $events[] = $base;
-            continue;
-        }
-
-        // 🔁 Récurrent → on génère les occurrences
-        $mode              = !empty($row['mode']) ? $row['mode'] : 'local';
-        $freq              = !empty($row['recurring_freq']) ? $row['recurring_freq'] : 'weekly';
-        $interval          = !empty($row['recurring_interval']) ? (int) $row['recurring_interval'] : 1;
-        $window_end_ts_raw = isset($row['recurring_window_end_ts']) ? (int) $row['recurring_window_end_ts'] : 0;
-
-        if ($interval < 1) {
-            $interval = 1;
-        }
-
-        $meta = [
-            'recurring'     => '1',
-            'mode'          => $mode,
-            'freq'          => $freq,
-            'interval'      => $interval,
-            'window_end_ts' => $window_end_ts_raw ?: null,
-        ];
-
-        $occurrences = poke_hub_events_generate_occurrences_for_meta(
-            $base->start_ts,
-            $base->end_ts,
-            $meta,
-            100
-        );
-
-        if (!$occurrences) {
-            // Fallback : comme non récurrent
-            $status = poke_hub_events_compute_status_from_ts($base->start_ts, $base->end_ts);
-
-            if ($args['status'] && 'all' !== $args['status'] && $status !== $args['status']) {
-                continue;
-            }
-
-            $base->status = $status;
-            $events[]     = $base;
-            continue;
-        }
-
-        foreach ($occurrences as $occ) {
-            $st_ts = (int) $occ['start_ts'];
-            $en_ts = (int) $occ['end_ts'];
-
-            $status = poke_hub_events_compute_status_from_ts($st_ts, $en_ts);
-
-            if ($args['status'] && 'all' !== $args['status'] && $status !== $args['status']) {
-                continue;
-            }
-
-            if ($args['start_after'] && $en_ts < $args['start_after']) {
-                continue;
-            }
-            if ($args['end_before'] && $st_ts > $args['end_before']) {
-                continue;
-            }
-
-            $clone = clone $base;
-            $clone->start_ts         = $st_ts;
-            $clone->end_ts           = $en_ts;
-            $clone->status           = $status;
-            $clone->recurring        = true;
-            $clone->occurrence_index = $occ['index'];
-
-            $events[] = $clone;
-        }
-    }
-
-    // 🔹 Tri chrono comme pour les remote events
-    usort($events, function ($a, $b) {
-        if ($a->start_ts === $b->start_ts) {
-            return 0;
-        }
-        return ($a->start_ts < $b->start_ts) ? -1 : 1;
-    });
-
-    if ('desc' === $order) {
-        $events = array_reverse($events);
-    }
-
-    return $events;
+    return poke_hub_special_events_query($args);
 }
 
 /**
@@ -2320,7 +2188,7 @@ function poke_hub_events_get_local_posts_by_status(string $status, array $args =
             'image_id'         => $image_id,
             'image_url'        => $image_url,
             'url'              => get_permalink($row->ID),
-            'source'           => 'local_post',
+            'source'           => 'local_event',
         ];
 
         $event = poke_hub_events_normalize_event($raw);
@@ -2329,13 +2197,6 @@ function poke_hub_events_get_local_posts_by_status(string $status, array $args =
         if (function_exists('poke_hub_events_enrich_type_from_remote')) {
             $event = poke_hub_events_enrich_type_from_remote($event);
         }
-
-        // Filtre par status si $status ≠ 'all'
-        if ($status !== 'all' && $event->status !== $status) {
-            continue;
-        }
-
-        $events[] = $event;
 
         // Filtre par status si $status ≠ 'all'
         if ($status !== 'all' && $event->status !== $status) {
@@ -2416,7 +2277,7 @@ function poke_hub_special_events_get_local(string $status, array $args = []): ar
             'remote_url'       => !empty($row->slug) && function_exists('poke_hub_special_event_get_url')
                 ? poke_hub_special_event_get_url($row->slug)
                 : '',
-            'source'           => 'special_local',
+            'source'           => 'special_event',
         ];
 
         $event = poke_hub_events_normalize_event($raw);
@@ -2437,8 +2298,7 @@ function poke_hub_special_events_get_local(string $status, array $args = []): ar
 }
 
 /**
- * Special events distants, en s'appuyant sur poke_hub_special_events_query_remote()
- * (qui gère aussi la récurrence + event_type + couleur + image).
+ * @deprecated Ne fusionne plus une seconde source : délègue à poke_hub_special_events_query().
  *
  * @param string $status current|upcoming|past|all
  * @param array  $args
@@ -2454,30 +2314,19 @@ function poke_hub_special_events_get_remote(string $status, array $args = []): a
         'status'     => ($status === 'all') ? null : $status,
         'event_type' => $args['event_type'] ?? null,
         'order'      => $args['order'] ?? 'asc',
-        // start_after / end_before possibles plus tard
     ];
 
-    if (!function_exists('poke_hub_special_events_query_remote')) {
+    if (!function_exists('poke_hub_special_events_query')) {
         return [];
     }
 
-    $events = poke_hub_special_events_query_remote($query_args);
-
-    // (par sécurité) on garde bien le tag source
-    foreach ($events as $ev) {
-        if (empty($ev->source)) {
-            $ev->source = 'special_remote';
-        }
-    }
-
-    return $events;
+    return poke_hub_special_events_query($query_args);
 }
 
 /**
  * Wrapper central : fusionne toutes les sources d'événements :
- *  - posts distants (+ special events locaux, déjà gérés dans get_by_status)
+ *  - posts distants (+ special events SQL, déjà dans get_by_status)
  *  - posts locaux
- *  - special events distants
  *
  * @param string $status current|upcoming|past|all
  * @param array  $args
@@ -2497,7 +2346,10 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         if (is_array($remote_posts)) {
             foreach ($remote_posts as $ev) {
                 if (is_object($ev) && empty($ev->source)) {
-                    $ev->source = 'remote_post';
+                    $ev->source = 'remote_event';
+                }
+                if (is_object($ev) && !empty($ev->source)) {
+                    $ev->source = poke_hub_events_normalize_event_source((string) $ev->source);
                 }
                 $events[] = $ev;
             }
@@ -2514,18 +2366,8 @@ function poke_hub_events_get_all_sources_by_status(string $status, array $args =
         }
     }
 
-    // Note: Les special events locaux sont déjà inclus dans poke_hub_events_get_by_status
-    // (via poke_hub_special_events_query), donc pas besoin de les ajouter à nouveau ici.
-
-    // 3) Special events distants
-    if (function_exists('poke_hub_special_events_get_remote')) {
-        $special_remote = poke_hub_special_events_get_remote($status, $args);
-        if (is_array($special_remote)) {
-            foreach ($special_remote as $ev) {
-                $events[] = $ev;
-            }
-        }
-    }
+    // Les special events SQL sont déjà inclus dans poke_hub_events_get_by_status
+    // (via poke_hub_special_events_query).
 
     return $events;
 }

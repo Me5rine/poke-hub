@@ -110,9 +110,17 @@ Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons
 
 #### Bloc « Day Pokémon Hours » (`pokehub/day-pokemon-hours`)
 
-Affiche les Pokémon par jour avec horaires (données metabox **Featured Pokémon Hours**).
+Affiche les Pokémon par jour avec horaires (données de la metabox **Day Pokémon Hours** / *Featured Pokémon Hours*).
 
-**Attributs :** `contentType` (ex. `featured_hours`), `title` (titre du bloc, optionnel) — voir `block.json`.
+**Attributs :** `contentType` (défaut `featured_hours` pour les heures vedette / Spotlight), `title` (titre du bloc, optionnel) — voir `block.json`.
+
+**Données « featured » / Spotlight :**
+
+- Si les tables **`special_events`** et **`special_event_pokemon`** existent : les créneaux **featured_hours** sont lus depuis ces tables (liaison **`content_source_type` = `post`** et **`content_source_id`** = ID du post courant, avec rétrocompatibilité sur d’anciens slugs). Type d’événement en base le plus souvent **`pokemon-spotlight-hour`** (résolution dans `pokehub_resolve_spotlight_event_type_slug()`).
+- Sinon : repli sur les tables de contenu **`content_day_pokemon_hours`** / **`content_day_pokemon_hour_entries`** (`source_type` / `source_id` du post, `content_type` = `featured_hours`).
+- À l’enregistrement depuis la metabox : titres **`title_en`** = `{Nom EN} Spotlight Hour`, **`title_fr`** = `Heure vedette {Nom FR}` ; slug = **`{slug-pokemon}-spotlight-hour`** avec unicité via **`pokehub_generate_unique_event_slug()`**.
+
+Fichiers utiles : `modules/blocks/blocks/day-pokemon-hours/render.php`, `modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php`, `includes/content/content-helpers.php` (`pokehub_content_get_featured_hours_classic_events_entries_for_parent`, `pokehub_content_save_day_pokemon_hours_featured_hours_classic_events`).
 
 #### Bloc "Pokémon Eggs" (`pokehub/eggs`)
 

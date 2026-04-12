@@ -13,12 +13,12 @@ Ajoutez `[pokehub_debug_blocks]` dans un article pour voir un diagnostic complet
 Les modules suivants **DOIVENT** être activés dans **Poké HUB → Settings → General** :
 
 - ✅ **Blocks** (obligatoire)
-- ✅ **Events** (requis pour le bloc "Dates d'événement")
-- ✅ **Bonus** (requis pour le bloc "Bonus")
+- ✅ **Events** (requis pour la plupart des blocs listés dans `docs/blocks/README.md`, dont « Dates d’événement »)
+- ⚪ **Bonus** (optionnel pour le bloc « Bonus » — le module **Blocks** suffit ; le module Bonus sert surtout à l’écran catalogue admin)
 
 **Comment activer :**
 1. Allez dans **Poké HUB → Settings → General**
-2. Cochez les cases : **Blocks**, **Events**, **Bonus**
+2. Cochez au minimum : **Blocks**, **Events** (ajoutez **Bonus** si vous gérez le catalogue des types sur ce site)
 3. Cliquez sur **Save Changes**
 
 ### 3. Vider le cache
@@ -51,7 +51,7 @@ Une fois activés, les blocs devraient apparaître :
 2. Vérifiez que ces modules sont cochés :
    - [ ] Blocks
    - [ ] Events
-   - [ ] Bonus
+   - [ ] Bonus (optionnel pour le bloc Bonus)
 3. Si ce n'est pas le cas, cochez-les et sauvegardez
 
 ### Solution 2 : Vider le cache et rafraîchir
@@ -87,7 +87,7 @@ Vérifiez votre version dans **Tableau de bord → Mise à jour**.
 
 - [ ] Module **Blocks** activé
 - [ ] Module **Events** activé
-- [ ] Module **Bonus** activé
+- [ ] Module **Bonus** activé (optionnel pour le bloc Bonus ; requis pour le menu admin catalogue)
 - [ ] Cache vidé (WordPress + navigateur)
 - [ ] Éditeur Gutenberg utilisé (pas classique)
 - [ ] WordPress 5.8+ installé

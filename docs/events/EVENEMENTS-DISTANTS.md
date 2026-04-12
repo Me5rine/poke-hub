@@ -1,230 +1,65 @@
-# 🌐 Support des événements spéciaux distants
+# Événements : sources local / distant / spéciaux (SQL)
 
-## ✅ Fonctionnalité activée
+Ce document décrit comment le plugin distingue les **trois familles d’événements** dans la liste admin et le calendrier, et comment l’URL **`/pokemon-go/events/{slug}`** fonctionne pour les **événements spéciaux SQL** uniquement.
 
-Le système de routing gère maintenant **automatiquement** les deux types d'événements spéciaux :
+## Trois sources côté liste / calendrier
 
-1. **Événements locaux** (table `{prefix}_pokehub_special_events`)
-2. **Événements distants** (table `{prefix_distant}_pokehub_remote_special_events`)
+Les objets normalisés exposent un champ logique **`source`** (voir `poke_hub_events_normalize_event()` dans `modules/events/functions/events-queries.php`) :
 
-## 🔍 Comment ça marche
+| Valeur `source`   | Origine des données |
+|-------------------|---------------------|
+| **`local_event`** | Article ou contenu WordPress **local** (dates, type, etc.). |
+| **`remote_event`**| Article **distant** (table `remote_posts` + métas, ex. site JV). |
+| **`special_event`**| Ligne dans la table SQL **`special_events`** (préfixe selon les réglages Sources — voir ci‑dessous). |
 
-### Ordre de recherche
+Les anciennes étiquettes **`local_post`**, **`remote_post`**, **`special_local`**, **`special_remote`**, etc. sont **mappées** vers ces trois valeurs pour compatibilité ; ne pas les utiliser dans du nouveau code.
 
-Quand un utilisateur visite `/pokemon-go/events/mon-evenement`, le système :
+Il n’existe **pas** de seconde table type `remote_special_events` : une seule table **`special_events`** (nom complet via `pokehub_get_table('special_events')`), dont le préfixe suit la **source Pokémon / contenu** configurée (même principe que les tables `content_*`).
 
-1. ✅ **Cherche d'abord dans la table locale**
-   - Si trouvé → Affiche l'événement local
-   
-2. 🌐 **Si non trouvé, cherche dans la table distante**
-   - Si trouvé → Affiche l'événement distant
-   
-3. ❌ **Si toujours pas trouvé**
-   - Affiche une page 404
+## Routing `/pokemon-go/events/{slug}`
 
-### Exemple de flux
+Fichier : `modules/events/public/events-front-routing.php`.
 
-```
-Utilisateur visite : /pokemon-go/events/community-day-pikachu
+1. Le slug d’URL est lu depuis la query var `pokehub_special_event`.
+2. Une requête **`SELECT * FROM {special_events} WHERE slug = %s`** est exécutée sur la table résolue par `pokehub_get_table('special_events')`.
+3. Si aucune ligne : **404**.
+4. Si une ligne : affichage du template événement spécial ; l’objet reçoit **`_source = 'local'`** pour l’instant (chemins d’images médias WordPress locaux). Il n’y a **pas** de double recherche « d’abord local puis table distante » pour les spéciaux : tout passe par la **même** table `special_events`, au bon préfixe.
 
-┌─────────────────────────────────────────────┐
-│  1. Recherche dans special_events (local)   │
-│     → Non trouvé                            │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│  2. Recherche dans remote_special_events    │
-│     → Trouvé !                              │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│  3. Affiche l'événement distant             │
-│     avec le bon template                    │
-└─────────────────────────────────────────────┘
-```
+Les **articles d’actualité distants** (JV, etc.) ont leurs **propres permaliens** (posts dans `remote_posts`) ; ils ne sont pas servis par cette route `special_events` sauf configuration de réécriture spécifique ailleurs.
 
-## 🎨 Gestion des images
+## Événements Spotlight (Day Pokémon Hours)
 
-### Images locales vs distantes
+Lorsque la metabox **Day Pokémon Hours** enregistre des créneaux **featured / Spotlight** et que les tables événements existent, le plugin crée des lignes dans **`special_events`** avec notamment :
 
-Le système gère automatiquement les différences :
-
-| Source | Méthode utilisée |
-|--------|------------------|
-| **Local** | `wp_get_attachment_image_url()` |
-| **Distant** | `poke_hub_events_get_remote_attachment_url()` |
-
-### Ordre de priorité pour les images
-
-1. **Image spécifique de l'événement**
-   - `image_url` (URL directe)
-   - `image_id` (ID d'attachment, local ou distant selon la source)
-
-2. **Image par défaut du type d'événement**
-   - Récupérée depuis la taxonomy `event_type` (distante)
+- **`event_type`** : type enregistré en base (souvent `pokemon-spotlight-hour`, résolu via `pokehub_resolve_spotlight_event_type_slug()` dans `includes/content/content-helpers.php`).
+- **`content_source_type`** / **`content_source_id`** : liaison stable au **post WordPress** source (`post` + ID d’article), pour que le bloc **Day Pokémon Hours** retrouve les créneaux même si le **slug** ou les **titres** sont modifiés en admin.
+- **Titres** : `title_en` au format **`{Nom EN} Spotlight Hour`** ; `title_fr` au format **`Heure vedette {Nom FR}`** ; `title` aligné sur `title_en`.
+- **Slug** : base **`{slug-pokemon}-spotlight-hour`**, unicité via **`pokehub_generate_unique_event_slug()`** (suffixe `-1`, `-2`, … comme pour les autres spéciaux).
 
-### Utilisation dans le code
-
-L'URL de l'image est pré-calculée et disponible dans `$event->computed_image_url` :
+La lecture côté bloc combine la liaison **`content_source_*`** et une rétrocompatibilité sur d’anciens préfixes de slug ; détail dans `pokehub_spotlight_sql_parent_scope()`.
 
-```php
-add_action('pokehub_special_event_content', function($event) {
-    // Utiliser l'URL pré-calculée (fonctionne pour local ET distant)
-    if (!empty($event->computed_image_url)) {
-        echo '<img src="' . esc_url($event->computed_image_url) . '">';
-    }
-});
-```
-
-## 🔧 Différences techniques
+## Images (hooks / template)
 
-### Structure de l'objet `$event`
+- Si **`image_url`** est renseignée : utilisée en priorité.
+- Sinon **`image_id`** : URL média locale avec `wp_get_attachment_image_url()` lorsque `_source !== 'remote'` (comportement actuel du routing spécial : `_source` reste `local` pour les lignes SQL servies sur le site courant).
+- Pour les événements **distant** au sens **liste** (`remote_event`), les URLs et images passent par les helpers « remote » (`poke_hub_events_get_remote_attachment_url`, etc.) dans les écrans qui consomment la liste normalisée, pas via cette route SQL seule.
 
-Les deux types d'événements ont la même structure de base, mais comportent un marqueur :
+Préférez, dans les thèmes / hooks, une URL d’image déjà calculée lorsque le module l’expose (ex. champs dérivés du normalizer / rendu liste).
 
-```php
-// Événement local
-$event->_source = 'local';
+## Slugs uniques
 
-// Événement distant
-$event->_source = 'remote';
-```
+Les slugs doivent rester **uniques** dans `special_events` **et** ne pas entrer en collision avec un **`post_name`** dans **`remote_posts`** : `pokehub_generate_unique_event_slug()` vérifie les deux.
 
-### Vérifier la source dans le code
+## Dépannage
 
-```php
-add_action('pokehub_special_event_content', function($event) {
-    $is_remote = !empty($event->_source) && $event->_source === 'remote';
-    
-    if ($is_remote) {
-        echo '<span class="badge">Événement JV Actu</span>';
-    } else {
-        echo '<span class="badge">Événement Me5rine LAB</span>';
-    }
-});
-```
-
-### Attribut HTML
+| Problème | Piste |
+|----------|--------|
+| 404 sur `/pokemon-go/events/mon-slug` | Vérifier qu’une ligne existe dans `special_events` avec ce `slug` (même préfixe que la source configurée). |
+| Spotlight absent du bloc Day Hours | Vérifier `content_source_type` / `content_source_id` sur les lignes ; re-sauver la metabox sur l’article ; vérifier le type `pokemon-spotlight-hour` (ou équivalent en base). |
+| Liste admin incohérente | Vérifier les filtres `source` (`local_event` / `remote_event` / `special_event`). |
 
-Un attribut `data-source` est ajouté au conteneur principal :
+## Voir aussi
 
-```html
-<!-- Événement local -->
-<div class="pokehub-special-event-content" data-source="local">
-    ...
-</div>
-
-<!-- Événement distant -->
-<div class="pokehub-special-event-content" data-source="remote">
-    ...
-</div>
-```
-
-Cela permet de styliser différemment les deux types :
-
-```css
-/* Style spécifique pour les événements distants */
-.pokehub-special-event-content[data-source="remote"] {
-    border-left: 4px solid #ff6b35;
-}
-
-/* Style spécifique pour les événements locaux */
-.pokehub-special-event-content[data-source="local"] {
-    border-left: 4px solid #0073aa;
-}
-```
-
-## 📊 Données disponibles
-
-Tous les champs sont identiques entre local et distant :
-
-```php
-$event->id               // ID de l'événement
-$event->title            // Titre
-$event->slug             // Slug (URL)
-$event->description      // Description HTML
-$event->start_ts         // Timestamp de début
-$event->end_ts           // Timestamp de fin
-$event->event_type       // Slug du type d'événement
-$event->image_id         // ID de l'image
-$event->image_url        // URL directe de l'image
-$event->mode             // 'local' ou 'fixed'
-$event->recurring        // Événement récurrent (0 ou 1)
-
-// Champs calculés
-$event->_source          // 'local' ou 'remote'
-$event->computed_image_url // URL de l'image (calculée automatiquement)
-```
-
-## 🔗 URLs
-
-Les URLs sont identiques pour les deux types :
-
-```
-Local :   /pokemon-go/events/mon-evenement-local
-Distant : /pokemon-go/events/mon-evenement-distant
-```
-
-Aucune différence dans l'URL, c'est totalement transparent pour l'utilisateur !
-
-## ✨ Avantages
-
-| Avantage | Description |
-|----------|-------------|
-| 🔄 **Synchronisation** | Les événements distants sont automatiquement disponibles |
-| 🎯 **URL uniques** | Un seul format d'URL pour tous les événements |
-| 🎨 **Template unifié** | Un seul template pour afficher tous les événements |
-| 🖼️ **Images gérées** | Les images distantes S3/CDN fonctionnent automatiquement |
-| 📱 **Responsive** | Même expérience utilisateur pour tous les événements |
-
-## 🚀 Utilisation
-
-### Aucune action requise !
-
-Le système fonctionne automatiquement dès que :
-
-1. ✅ Vous avez une table `remote_special_events` dans votre base distante
-2. ✅ La configuration de connexion distante est active
-3. ✅ Les événements ont des slugs uniques
-
-### Tester
-
-```
-# Événement local
-https://votre-site.com/pokemon-go/events/spotlight-hour-pikachu
-
-# Événement distant (même format !)
-https://votre-site.com/pokemon-go/events/go-fest-2024
-```
-
-## 💡 Conseils
-
-1. **Slugs uniques** : Assurez-vous que les slugs sont uniques entre locaux et distants
-2. **Priorité locale** : Si un slug existe en local ET distant, le local a la priorité
-3. **Images** : Utilisez toujours `$event->computed_image_url` dans vos hooks pour la compatibilité
-4. **Test** : Testez avec les deux types d'événements pour vérifier le rendu
-
-## 🐛 Dépannage
-
-### Les événements distants ne s'affichent pas
-
-**Vérifiez :**
-1. La table `remote_special_events` existe
-2. La connexion à la base distante fonctionne
-3. Les événements ont bien un `slug` renseigné
-4. Le slug dans l'URL est correct
-
-### Les images distantes ne s'affichent pas
-
-**Vérifiez :**
-1. La table `remote_as3cf_items` est accessible
-2. Les chemins S3/CDN sont corrects
-3. Utilisez `$event->computed_image_url` dans votre code
-
-
-
-
-
-
-
-
+- [README-ROUTING.md](./README-ROUTING.md) — règles de réécriture et fichiers concernés.
+- [CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md) — bloc **Day Pokémon Hours**.
+- [BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md) — préfixe catalogue bonus (même logique « site principal / distant » que les tables Pokémon).

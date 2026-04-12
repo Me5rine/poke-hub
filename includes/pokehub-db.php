@@ -498,7 +498,7 @@ class Pokehub_DB {
             background_type VARCHAR(50) NOT NULL DEFAULT 'special',
             image_url TEXT NULL,
             event_id BIGINT(20) UNSIGNED NULL DEFAULT NULL,
-            event_type VARCHAR(50) NOT NULL DEFAULT '', -- 'local_post', 'remote_post', 'special_local', 'special_remote'
+            event_type VARCHAR(50) NOT NULL DEFAULT '', -- 'local_event', 'remote_event', 'special_event' (libellés logiques)
             extra LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -802,6 +802,9 @@ class Pokehub_DB {
             image_id BIGINT UNSIGNED NULL DEFAULT NULL,
             image_url TEXT NULL,
 
+            content_source_type VARCHAR(20) NULL DEFAULT NULL,
+            content_source_id BIGINT UNSIGNED NULL DEFAULT NULL,
+
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -809,7 +812,8 @@ class Pokehub_DB {
             UNIQUE KEY slug (slug),
             KEY event_type (event_type),
             KEY start_ts (start_ts),
-            KEY end_ts (end_ts)
+            KEY end_ts (end_ts),
+            KEY content_source (content_source_type, content_source_id)
         ) {$charset_collate};";
 
         // 2) Liaison événement ↔ Pokémon
@@ -859,6 +863,9 @@ class Pokehub_DB {
         
         // Migration : ajouter la colonne gender si elle n'existe pas
         $this->migrateSpecialEventPokemonGenderColumn($event_pokemon_table);
+
+        // Liaison stable Spotlight / Day Pokémon Hours (post parent)
+        $this->migrateSpecialEventsContentSourceColumns($events_table);
     }
     
     /**
@@ -924,6 +931,103 @@ class Pokehub_DB {
         $events_table = pokehub_get_table('special_events');
         if ($events_table) {
             $this->migrateSpecialEventsRecurringColumns($events_table);
+        }
+    }
+
+    /**
+     * Ajoute content_source_type / content_source_id sur special_events pour lier les créneaux Spotlight
+     * au post « Day Pokémon Hours » sans dépendre du slug (titres / slug éditables en admin).
+     *
+     * @param string|null $table_name Nom complet de la table (null = résolu via pokehub_get_table)
+     */
+    public function migrateSpecialEventsContentSourceColumns($table_name = null): void {
+        global $wpdb;
+
+        $table_name = $table_name ?: pokehub_get_table('special_events');
+        if (empty($table_name)) {
+            return;
+        }
+
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") !== $table_name) {
+            return;
+        }
+
+        $schema = DB_NAME;
+        $check_col = static function (string $tbl, string $col) use ($wpdb, $schema): bool {
+            $n = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                    $schema,
+                    $tbl,
+                    $col
+                )
+            );
+            return $n > 0;
+        };
+
+        if (!$check_col($table_name, 'content_source_type')) {
+            $wpdb->query("ALTER TABLE `{$table_name}` ADD COLUMN content_source_type VARCHAR(20) NULL DEFAULT NULL AFTER image_url");
+        }
+        if (!$check_col($table_name, 'content_source_id')) {
+            $wpdb->query("ALTER TABLE `{$table_name}` ADD COLUMN content_source_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER content_source_type");
+        }
+
+        $idx = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s',
+                $schema,
+                $table_name,
+                'content_source'
+            )
+        );
+        if ($idx === 0) {
+            $wpdb->query("ALTER TABLE `{$table_name}` ADD KEY content_source (content_source_type, content_source_id)");
+        }
+
+        // Une fois : déduire post parent depuis l’ancien motif de slug (type-parent-yyyymmdd-…)
+        if (!get_option('pokehub_spotlight_content_source_backfill_v1')) {
+            $spotlight_types = ['pokemon-spotlight-hour', 'pokemon_spotlight_hour', 'spotlight-hour', 'spotlight_hour', 'spotlighthour', 'spotlighthourly'];
+            $escaped = array_map('esc_sql', $spotlight_types);
+            $in_list = "'" . implode("','", $escaped) . "'";
+            $orphans = $wpdb->get_results(
+                "SELECT id, slug FROM `{$table_name}` WHERE (content_source_type IS NULL OR content_source_type = '' OR content_source_id IS NULL OR content_source_id = 0) AND event_type IN ({$in_list})",
+                ARRAY_A
+            );
+            foreach ((array) $orphans as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                $slug = (string) ($row['slug'] ?? '');
+                if ($sid <= 0 || $slug === '') {
+                    continue;
+                }
+                if (preg_match('/-(\d+)-(\d{8})-\d/', $slug, $m)) {
+                    $parent_id = (int) $m[1];
+                    if ($parent_id > 0) {
+                        $wpdb->update(
+                            $table_name,
+                            [
+                                'content_source_type' => 'post',
+                                'content_source_id' => $parent_id,
+                            ],
+                            ['id' => $sid],
+                            ['%s', '%d'],
+                            ['%d']
+                        );
+                    }
+                }
+            }
+            update_option('pokehub_spotlight_content_source_backfill_v1', 1, false);
+        }
+
+        // Les créneaux Spotlight (Day Pokémon Hours) sont enregistrés avec des timestamps = fuseau du site ;
+        // mode 'fixed' les affichait/sauvegardait comme UTC dans l’admin → mauvaises heures après édition.
+        if (!get_option('pokehub_spotlight_special_events_mode_local_v1')) {
+            $spotlight_types = ['pokemon-spotlight-hour', 'pokemon_spotlight_hour', 'spotlight-hour', 'spotlight_hour', 'spotlighthour', 'spotlighthourly'];
+            $escaped = array_map('esc_sql', $spotlight_types);
+            $in_list = "'" . implode("','", $escaped) . "'";
+            $wpdb->query(
+                "UPDATE `{$table_name}` SET mode = 'local' WHERE mode = 'fixed' AND event_type IN ({$in_list})"
+            );
+            update_option('pokehub_spotlight_special_events_mode_local_v1', 1, false);
         }
     }
     
@@ -1391,13 +1495,19 @@ class Pokehub_DB {
 
     /**
      * Table catalogue des types de bonus (source de vérité sur le site principal).
-     * Sur les sites distants, on lit cette table via le même préfixe que les tables Pokémon (remote_pokemon).
+     * Nom physique : même règle que pokehub_get_bonus_types_table() (préfixe local ou préfixe Pokémon distant).
      */
     private function createBonusTypesTable() {
         global $wpdb;
 
         $charset_collate = $wpdb->get_charset_collate();
-        $table = pokehub_get_table('bonus_types');
+        $table = '';
+        if (function_exists('pokehub_get_bonus_types_table')) {
+            $table = pokehub_get_bonus_types_table();
+        }
+        if ($table === '') {
+            $table = pokehub_get_table('bonus_types');
+        }
         if (empty($table)) {
             return;
         }

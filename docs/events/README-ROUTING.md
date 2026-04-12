@@ -144,10 +144,12 @@ print_r($wp_rewrite->rules);
 
 ## Notes techniques
 
-- Les événements sont récupérés depuis la table `{prefix}_pokehub_special_events`
-- Le slug doit être unique
-- Le système est compatible avec les thèmes WordPress classiques (utilise `get_header()` et `get_footer()`)
-- Le SEO est géré automatiquement (titre de page modifié via `document_title_parts`)
+- Les événements servis par cette route sont lus dans la table SQL retournée par **`pokehub_get_table('special_events')`** (souvent `{prefix_wp}pokehub_special_events` ; si un **préfixe Pokémon / contenu distant** est configuré, le préfixe peut être celui du site principal, comme pour les autres tables `content_*`).
+- Le **`slug`** doit être **unique** dans `special_events` et ne doit pas entrer en collision avec un `post_name` de **`remote_posts`** ; à la création admin ou depuis la metabox Spotlight, **`pokehub_generate_unique_event_slug()`** (`modules/events/functions/events-admin-helpers.php`) attribue un suffixe numérique si besoin.
+- Colonnes optionnelles **`content_source_type`** / **`content_source_id`** : liaison des créneaux **Spotlight** (Day Pokémon Hours) au **post** source — voir `docs/events/EVENEMENTS-DISTANTS.md`.
+- Dans `special_events`, le champ **`mode`** vaut **`local`** ou **`fixed`** (fenêtre temporelle / récurrence) ; ce n’est pas le même concept que `source` de la liste d’événements (`local_event` / `remote_event` / `special_event`).
+- Le système est compatible avec les thèmes WordPress classiques (utilise `get_header()` et `get_footer()`).
+- Le SEO est géré automatiquement (titre de page modifié via `document_title_parts`).
 
 
 

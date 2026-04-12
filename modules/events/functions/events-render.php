@@ -124,24 +124,17 @@ function poke_hub_events_render_event(object $event): void {
 
     // URL vers l'événement
     $link = '';
-    
-    // Pour les événements spéciaux locaux, utiliser l'URL locale
-    if (!empty($event->source) && ($event->source === 'special_local' || $event->source === 'special')) {
+
+    $src_norm = '';
+    if (!empty($event->source) && function_exists('poke_hub_events_normalize_event_source')) {
+        $src_norm = poke_hub_events_normalize_event_source((string) $event->source);
+    }
+
+    if ($src_norm === 'special_event') {
         if (!empty($event->slug) && function_exists('poke_hub_special_event_get_url')) {
             $link = poke_hub_special_event_get_url($event->slug);
         }
-    }
-    // Pour les événements spéciaux remote, utiliser remote_url s'il existe
-    elseif (!empty($event->source) && $event->source === 'special_remote') {
-        if (!empty($event->remote_url)) {
-            $link = $event->remote_url;
-        } elseif (!empty($event->slug) && function_exists('poke_hub_special_event_get_url')) {
-            // Fallback : utiliser l'URL locale si pas de remote_url
-            $link = poke_hub_special_event_get_url($event->slug);
-        }
-    }
-    // Pour les autres événements (posts), utiliser remote_url
-    elseif (!empty($event->remote_url)) {
+    } elseif (!empty($event->remote_url)) {
         $link = $event->remote_url;
     }
 
@@ -254,12 +247,19 @@ function poke_hub_events_render_event(object $event): void {
             <div class="event-inner-right">
                 <span class="event-status-label event-status-label--<?php echo esc_attr($event->status); ?>">
                     <?php
-                    echo match ($event->status) {
-                        'current'  => esc_html__('Ongoing', 'poke-hub'),
-                        'upcoming' => esc_html__('Upcoming', 'poke-hub'),
-                        'past'     => esc_html__('Ended', 'poke-hub'),
-                        default    => esc_html__('Event', 'poke-hub'),
-                    };
+                    switch ($event->status) {
+                        case 'current':
+                            echo esc_html__('Ongoing', 'poke-hub');
+                            break;
+                        case 'upcoming':
+                            echo esc_html__('Upcoming', 'poke-hub');
+                            break;
+                        case 'past':
+                            echo esc_html__('Ended', 'poke-hub');
+                            break;
+                        default:
+                            echo esc_html__('Event', 'poke-hub');
+                    }
                     ?>
                 </span>
 

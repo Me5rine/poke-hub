@@ -6,10 +6,12 @@ Si rien ne s'affiche en front, suivez ce guide de diagnostic étape par étape.
 
 ### 1. Modules activés
 
-Les modules **Events** et **Bonus** doivent être activés dans les paramètres Poké HUB :
+- **Blocs Gutenberg** : le module **Blocks** doit être actif ; la plupart des blocs listés dans `docs/blocks/README.md` exigent aussi **Events**.
+- **Bonus (bloc + metabox)** : le module **Bonus** n’est **pas** obligatoire — le module **Blocks** charge la metabox et le catalogue est lu sur le site principal (voir [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md)).
+- **Écran d’admin catalogue des types de bonus** (Poké HUB → Bonus) : nécessite le module **Bonus** en plus si vous voulez éditer les types sur le site principal.
 
 1. Allez dans **Poké HUB → Settings → General**
-2. Vérifiez que les cases **Events** et **Bonus** sont cochées
+2. Cochez **Blocks** et **Events** (et **Bonus** seulement si vous en avez besoin pour l’admin catalogue)
 3. Cliquez sur **Save Changes**
 
 ### 2. Données présentes
@@ -20,7 +22,11 @@ Les modules **Events** et **Bonus** doivent être activés dans les paramètres 
 
 #### Pour les bonus :
 - Les bonus doivent être associés au post via la metabox "Bonus de l'événement"
-- Les types de bonus doivent exister dans la table catalogue `bonus_types` (site principal) ou être visibles via le préfixe distant
+- Les types de bonus doivent exister dans la table catalogue effective (`pokehub_get_bonus_types_table()` : locale ou distante selon le préfixe Pokémon — voir [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md))
+
+#### Pour le bloc « Day Pokémon Hours » (featured / Spotlight) :
+- Le module **Events** doit être actif et les tables **`special_events`** / **`special_event_pokemon`** doivent exister (sinon repli sur `content_day_pokemon_hours`).
+- Les créneaux **featured_hours** sont saisis dans la metabox **Day Pokémon Hours** sur l’article ; en mode SQL, la liaison au post utilise **`content_source_type`** / **`content_source_id`**. Voir [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md) et [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md).
 
 ### 3. Post types autorisés
 
@@ -137,8 +143,9 @@ if (!empty($bonuses)) {
 
 ## 📝 Checklist complète
 
-- [ ] Module Events activé dans Poké HUB → Settings
-- [ ] Module Bonus activé dans Poké HUB → Settings
+- [ ] Module **Blocks** activé dans Poké HUB → Settings
+- [ ] Module **Events** activé dans Poké HUB → Settings
+- [ ] Module **Bonus** activé seulement si vous utilisez l’écran catalogue admin (optionnel pour le bloc Bonus)
 - [ ] Meta `_admin_lab_event_start` présente sur le post
 - [ ] Meta `_admin_lab_event_end` présente sur le post
 - [ ] Bonus associés au post via la metabox

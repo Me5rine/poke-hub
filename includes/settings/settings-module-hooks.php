@@ -233,11 +233,11 @@ add_action('admin_init', function () {
         ],
 
         'bonus' => [
-            pokehub_get_table('bonus_types'),
+            function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : pokehub_get_table('bonus_types'),
         ],
-        // Table bonus_types aussi créée/vérifiée quand Blocks est actif (bloc bonus utilisable sans module Bonus)
+        // Table catalogue bonus (locale ou sous le préfixe Pokémon distant) aussi créée/vérifiée quand Blocks est actif
         'blocks' => [
-            pokehub_get_table('bonus_types'),
+            function_exists('pokehub_get_bonus_types_table') ? pokehub_get_bonus_types_table() : pokehub_get_table('bonus_types'),
             // Les blocs "Day Pokémon Hours / Featured Hours" utilisent cette structure.
             // Elle doit donc exister même si seuls les blocs sont activés.
             pokehub_get_table('content_day_pokemon_hours'),
@@ -275,6 +275,7 @@ add_action('admin_init', function () {
         $events_table = pokehub_get_table('special_events');
         if ($events_table && ($wpdb->get_var("SHOW TABLES LIKE '{$events_table}'") === $events_table)) {
             Pokehub_DB::getInstance()->migrateEventsRecurringColumns();
+            Pokehub_DB::getInstance()->migrateSpecialEventsContentSourceColumns($events_table);
         }
         
         // Migration de la colonne gender pour special_event_pokemon

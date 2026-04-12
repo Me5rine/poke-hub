@@ -41,40 +41,20 @@ function pokehub_special_events_setup_query() {
     // Récupérer l'événement depuis la base de données
     global $wpdb;
     
-    // 1. Chercher d'abord dans la table locale
-    $local_table = pokehub_get_table('special_events');
+    $events_table = pokehub_get_table('special_events');
     $event = $wpdb->get_row(
         $wpdb->prepare(
-            "SELECT * FROM {$local_table} WHERE slug = %s LIMIT 1",
+            "SELECT * FROM {$events_table} WHERE slug = %s LIMIT 1",
             $event_slug
         )
     );
-    
-    // 2. Si non trouvé, chercher dans la table distante
-    if (!$event) {
-        $remote_table = pokehub_get_table('remote_special_events');
-        if ($remote_table) {
-            // Vérifier que la table existe
-            if (function_exists('pokehub_table_exists') && pokehub_table_exists($remote_table)) {
-                $event = $wpdb->get_row(
-                    $wpdb->prepare(
-                        "SELECT * FROM {$remote_table} WHERE slug = %s LIMIT 1",
-                        $event_slug
-                    )
-                );
-                
-                // Marquer comme événement distant pour traitement différencié si besoin
-                if ($event) {
-                    $event->_source = 'remote';
-                }
-            }
-        }
-    } else {
+
+    if ($event) {
         $event->_source = 'local';
     }
     
     if (!$event) {
-        // Événement non trouvé (ni local ni distant), retourner une 404
+        // Événement non trouvé dans la table special_events (préfixe source Pokémon)
         global $wp_query;
         $wp_query->set_404();
         status_header(404);

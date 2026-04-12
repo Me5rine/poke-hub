@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
 
 /**
  * Retourne les événements associés à un Pokémon (marqué événement/costumé).
- * Un Pokémon peut être associé à plusieurs événements (local_post, remote_post, special_local, special_remote).
+ * Un Pokémon peut être associé à plusieurs événements (local_event, remote_event, special_event).
  *
  * @param int $pokemon_id ID du Pokémon (pokemon.id)
  * @return array Liste de [ 'event_type' => string, 'event_id' => int ]

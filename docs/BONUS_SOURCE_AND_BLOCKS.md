@@ -71,7 +71,7 @@ Liste des classes et lien avec ce document : [POKEHUB_CSS_CLASSES.md](./POKEHUB_
 
 ## Table catalogue (`bonus_types` / `remote_bonus_types`)
 
-- **Création** : la table locale `bonus_types` est créée lorsque le module **Bonus** ou le module **Blocks** est actif (`includes/pokehub-db.php`, `createBonusTypesTable()`). La migration `migrateBonusTypesTableSchema()` aligne les installations existantes (AUTO_INCREMENT, slug unique, colonnes `title_en` / `title_fr`, suppression des colonnes obsolètes `title`, `image_slug`, `sort_order` si présentes).
+- **Création** : lorsque le module **Bonus** ou **Blocks** est actif, `createBonusTypesTable()` crée la table **catalogue effective** : même règle de préfixe que **`pokehub_get_bonus_types_table()`** — table locale `bonus_types` si le préfixe Pokémon est vide ou égal au préfixe WP du site, sinon table **`remote_bonus_types`** sous le préfixe Pokémon distant (`includes/pokehub-db.php`). La détection « table manquante » dans `settings-module-hooks.php` utilise aussi cette table effective. La migration `migrateBonusTypesTableSchema()` aligne le schéma (AUTO_INCREMENT, slug unique, colonnes `title_en` / `title_fr`, suppression des colonnes obsolètes `title`, `image_slug`, `sort_order` si présentes).
 - **Colonnes (cible)** : `id` (PK AUTO_INCREMENT), `title_en`, `title_fr`, `slug` (unique), `description`, `created_at`, `updated_at`.
 - **Mapping** (dans `pokehub-helpers.php`) :
   - `bonus_types` → table locale (site principal).

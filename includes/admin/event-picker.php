@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Retourne tous les événements pour un picker (tous types : local_post, remote_post, special_local, special_remote).
+ * Retourne tous les événements pour un picker (sources : local_event, remote_event, special_event).
  * Réutilisable pour les fonds, variants de Pokémon, costumes, etc.
  *
  * @return array<object> Liste d'objets avec au minimum id, title, slug, source (event_type)
@@ -22,15 +22,17 @@ function poke_hub_get_events_for_picker(): array {
 /**
  * Libellé court pour un type d'événement (source).
  *
- * @param string $source event_type (local_post, remote_post, special_local, special_remote)
+ * @param string $source local_event | remote_event | special_event (anciennes valeurs acceptées)
  * @return string
  */
 function poke_hub_get_event_source_label(string $source): string {
+    if (function_exists('poke_hub_events_normalize_event_source')) {
+        $source = poke_hub_events_normalize_event_source($source);
+    }
     $labels = [
-        'local_post'    => __('Local post', 'poke-hub'),
-        'remote_post'   => __('Remote post', 'poke-hub'),
-        'special_local' => __('Special event (local)', 'poke-hub'),
-        'special_remote'=> __('Special event (remote)', 'poke-hub'),
+        'local_event'    => __('Local event', 'poke-hub'),
+        'remote_event'   => __('Remote event', 'poke-hub'),
+        'special_event'  => __('Special event', 'poke-hub'),
     ];
     return $labels[$source] ?? ucfirst(str_replace('_', ' ', $source));
 }

@@ -23,6 +23,7 @@ Ce dossier contient toute la documentation du plugin Poké HUB.
 - **User Profiles Source** : l'option **Réglages > Poké HUB > Sources > User Profiles Source** (URL de base des liens profils) n'est affichée et utilisable **que si le module User Profiles est actif**. Elle sert aux codes amis et aux liens vers les profils (sites partageant une base de données). Voir [user-profiles/README_USER_PROFILES.md](./user-profiles/README_USER_PROFILES.md#réglages).
 - **Import dates de sortie Pokekalos** : menu **Poké HUB > Outils temporaires** (temporaire) pour importer les dates de sortie (normal, shiny, shadow, etc.) depuis les fiches Pokédex Pokémon GO de pokekalos.fr. Deux passes : formes de base (`{slug}-{dex}.html`) puis formes Méga (`{slug}-{dex}m.html`). Dates stockées en **YYYY-MM-DD** ; option « ignorer les existants », limite espèces, dry-run. Script CLI : `scripts/import-pokekalos-release-dates.php`. Voir [pokemon/POKEKALOS_RELEASE_DATES.md](./pokemon/POKEKALOS_RELEASE_DATES.md).
 - **Biomes (Pokémon GO)** : onglet admin **Pokémon → Biomes** (CRUD, images de fond multiples, espèces) ; liaison N–N via `pokemon_biome_pokemon_links` ; sur la fiche Pokémon, champ biomes dans la section **Regional availability** (sous-partie *Biomes*, puis *Regional*). Détail : [pokemon/BIOMES.md](./pokemon/BIOMES.md).
+- **Événements (sources & routing)** : une seule table **`special_events`** (préfixe Sources) pour les spéciaux SQL ; pas de `remote_special_events`. Liste unifiée avec **`local_event`**, **`remote_event`**, **`special_event`**. Doc : [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md).
 
 ## 📁 Structure
 
@@ -60,7 +61,7 @@ La documentation spécifique à chaque module se trouve dans des sous-dossiers :
 - **[events/](./events/)** - Documentation du module Events
   - [README-ROUTING.md](./events/README-ROUTING.md) - Documentation du système de routing
   - [INTEGRATION-ELEMENTOR.md](./events/INTEGRATION-ELEMENTOR.md) - Intégration avec Elementor
-  - [EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md) - Gestion des événements distants
+  - [EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md) - Sources d’événements (local / distant / SQL), routing `/pokemon-go/events/`, Spotlight Day Hours
 
 - **[pokemon/](./pokemon/)** - Documentation du module Pokémon
   - [BIOMES.md](./pokemon/BIOMES.md) - Biomes (tables, admin, fiche Pokémon, helpers, filtres)

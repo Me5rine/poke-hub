@@ -927,7 +927,7 @@ Fonds spéciaux pour les Pokémon.
 - `title` : Titre
 - `image_url` : URL de l'image
 - `event_id` : ID de l'événement associé (optionnel)
-- `event_type` : Type d'événement (`local_post`, `remote_post`, `special_local`, `special_remote`)
+- `event_type` : Source logique liée à l’événement référencé (ex. `local_event`, `remote_event`, `special_event` — voir normalisation dans `poke_hub_events_normalize_event_source()` ; anciennes valeurs `local_post` / `remote_post` / `special_*` encore acceptées en lecture)
 - `extra` : Données supplémentaires
 
 #### Table : `{prefix}_pokehub_pokemon_background_pokemon_links`
@@ -960,6 +960,7 @@ Liens Background ↔ Pokémon.
 - `recurring_window_end_ts` : Fin de la fenêtre de récurrence
 - `image_id` : ID de l'image (média WordPress)
 - `image_url` : URL de l'image
+- `content_source_type`, `content_source_id` : (optionnel) liaison vers un contenu WordPress — ex. `post` + ID d’article pour les créneaux **Spotlight** issus de la metabox **Day Pokémon Hours**
 - `created_at`, `updated_at` : Dates de création/mise à jour
 
 #### Table : `{prefix}_pokehub_special_event_pokemon`
@@ -1063,7 +1064,7 @@ Pour les tables distantes, utilisez le préfixe `remote_` :
 - `remote_termmeta` : Métadonnées de termes distants
 - `remote_term_taxonomy` : Taxonomies distantes
 - `remote_term_relationships` : Relations termes/posts distants
-- `remote_special_events` : Événements spéciaux distants
+- ~~`remote_special_events`~~ : **obsolète** — les spéciaux SQL utilisent uniquement **`special_events`** (préfixe selon réglages Sources, comme les autres tables Pokémon / contenu)
 - etc.
 
 ---

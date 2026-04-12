@@ -225,6 +225,17 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 </div>
             </header>
             <div class="pokehub-collection-stats pokehub-collection-local-stats">—</div>
+            <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-label="<?php esc_attr_e('Filter Pokémon by status in the grid', 'poke-hub'); ?>">
+                <div class="pokehub-collection-status-filters-inner">
+                    <span class="me5rine-lab-form-label pokehub-collection-status-filters-heading"><?php esc_html_e('Show in grid', 'poke-hub'); ?></span>
+                    <div class="pokehub-collection-status-filters-checkboxes">
+                        <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="owned" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <?php esc_html_e('Owned', 'poke-hub'); ?></label>
+                        <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="for_trade" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-for-trade" aria-hidden="true"></span> <?php esc_html_e('For trade', 'poke-hub'); ?></label>
+                        <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="missing" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-missing" aria-hidden="true"></span> <?php esc_html_e('Missing', 'poke-hub'); ?></label>
+                    </div>
+                </div>
+                <p class="pokehub-collection-filter-empty-hint me5rine-lab-form-message me5rine-lab-form-message-warning is-hidden" role="status" aria-live="polite"><?php esc_html_e('Select at least one status to see Pokémon in the grid.', 'poke-hub'); ?></p>
+            </div>
             <div class="pokehub-collection-tiles pokehub-collection-tiles-local" data-pool="[]" data-items="{}"></div>
         </div>
         <?php
@@ -313,6 +324,20 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             ?>
             <span class="pokehub-collection-progress"><?php echo (int) $owned; ?> / <?php echo (int) $total; ?></span>
         </div>
+
+        <?php if ($total > 0) : ?>
+        <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-label="<?php esc_attr_e('Filter Pokémon by status in the grid', 'poke-hub'); ?>">
+            <div class="pokehub-collection-status-filters-inner">
+                <span class="me5rine-lab-form-label pokehub-collection-status-filters-heading"><?php esc_html_e('Show in grid', 'poke-hub'); ?></span>
+                <div class="pokehub-collection-status-filters-checkboxes">
+                    <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="owned" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <?php esc_html_e('Owned', 'poke-hub'); ?></label>
+                    <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="for_trade" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-for-trade" aria-hidden="true"></span> <?php esc_html_e('For trade', 'poke-hub'); ?></label>
+                    <label class="pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="missing" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-missing" aria-hidden="true"></span> <?php esc_html_e('Missing', 'poke-hub'); ?></label>
+                </div>
+            </div>
+            <p class="pokehub-collection-filter-empty-hint me5rine-lab-form-message me5rine-lab-form-message-warning is-hidden" role="status" aria-live="polite"><?php esc_html_e('Select at least one status to see Pokémon in the grid.', 'poke-hub'); ?></p>
+        </div>
+        <?php endif; ?>
 
         <?php
         $display_mode = $collection['options']['display_mode'] ?? 'tiles';

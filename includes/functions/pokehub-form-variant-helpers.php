@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
 
 /**
  * Retourne les événements associés à une forme / costume (form variant).
- * Une forme peut être associée à plusieurs événements (local_post, remote_post, special_local, special_remote).
+ * Une forme peut être associée à plusieurs événements (local_event, remote_event, special_event).
  *
  * @param int $form_variant_id ID de la forme (pokemon_form_variants.id)
  * @return array Liste de [ 'event_type' => string, 'event_id' => int ]
