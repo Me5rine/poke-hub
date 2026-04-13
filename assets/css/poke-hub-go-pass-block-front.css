@@ -1,3 +1,8 @@
+/* Bloc Pass GO — même ancre que les autres blocs (titre `.pokehub-block-title` dans `poke-hub-blocks-front.css`) */
+.pokehub-go-pass-block-wrapper {
+    margin: 2rem 0;
+}
+
 /* Bloc Pass GO (article) — carte résumé */
 .pokehub-go-pass-block--summary .pokehub-go-pass-summary-card,
 .pokehub-go-pass-summary-card {

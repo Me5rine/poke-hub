@@ -45,7 +45,9 @@ $heading = $block_title !== '' ? $block_title : __('Eggs', 'poke-hub');
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title pokehub-eggs-block-title"><?php echo esc_html($heading); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title($heading, 'eggs', ['title_class' => 'pokehub-eggs-block-title'])
+        : '<h2 class="pokehub-block-title pokehub-eggs-block-title">' . esc_html($heading) . '</h2>'; ?>
 
     <?php
     if (function_exists('pokehub_render_egg_type_section')) {

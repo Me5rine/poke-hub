@@ -778,6 +778,61 @@ function pokehub_content_save_quests($source_type, $source_id, array $quests) {
     }
 }
 
+if (!function_exists('pokehub_quests_parse_pokemon_ids_from_reward_input')) {
+    /**
+     * Extrait les IDs Pokémon d'une récompense brute (POST / parse_str / JSON).
+     * Gère tableau, chaîne "25" ou "25,133", scalaire numérique, objet stdClass.
+     *
+     * @param array $reward
+     * @return int[]
+     */
+    function pokehub_quests_parse_pokemon_ids_from_reward_input(array $reward): array {
+        $ids = [];
+        if (isset($reward['pokemon_ids'])) {
+            $raw = $reward['pokemon_ids'];
+            if (is_object($raw)) {
+                $raw = array_values((array) $raw);
+            }
+            if (is_array($raw)) {
+                foreach ($raw as $v) {
+                    if ($v === '' || $v === null) {
+                        continue;
+                    }
+                    if (is_numeric($v)) {
+                        $n = (int) $v;
+                        if ($n > 0) {
+                            $ids[] = $n;
+                        }
+                    }
+                }
+                return array_values(array_unique($ids));
+            }
+            if (is_string($raw) || is_numeric($raw)) {
+                $s = trim((string) $raw);
+                if ($s === '') {
+                    return [];
+                }
+                if (strpos($s, ',') !== false) {
+                    foreach (explode(',', $s) as $part) {
+                        $n = (int) trim($part);
+                        if ($n > 0) {
+                            $ids[] = $n;
+                        }
+                    }
+                    return array_values(array_unique($ids));
+                }
+                $n = (int) $s;
+                return $n > 0 ? [$n] : [];
+            }
+        }
+        if (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null && is_numeric($reward['pokemon_id'])) {
+            $n = (int) $reward['pokemon_id'];
+            return $n > 0 ? [$n] : [];
+        }
+        return [];
+    }
+}
+
 /**
  * Nettoie un tableau de quêtes issu d'une requête (POST) pour enregistrement.
  * Utilisé par la metabox events et par le module Quêtes (indépendant du module events).
@@ -801,18 +856,15 @@ function pokehub_quests_clean_from_request(array $quests) {
         ];
         if (isset($quest['rewards']) && is_array($quest['rewards'])) {
             foreach ($quest['rewards'] as $reward) {
+                if (is_object($reward)) {
+                    $reward = json_decode(wp_json_encode($reward), true);
+                }
+                if (!is_array($reward)) {
+                    continue;
+                }
                 $cleaned_reward = ['type' => sanitize_key($reward['type'] ?? 'pokemon')];
                 if ($cleaned_reward['type'] === 'pokemon') {
-                    if (isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])) {
-                        $cleaned_reward['pokemon_ids'] = array_map('intval', array_filter($reward['pokemon_ids'], function ($id) {
-                            return !empty($id) && is_numeric($id);
-                        }));
-                    } elseif (isset($reward['pokemon_id'])) {
-                        $pid = (int) $reward['pokemon_id'];
-                        $cleaned_reward['pokemon_ids'] = $pid > 0 ? [$pid] : [];
-                    } else {
-                        $cleaned_reward['pokemon_ids'] = [];
-                    }
+                    $cleaned_reward['pokemon_ids'] = pokehub_quests_parse_pokemon_ids_from_reward_input($reward);
                     $cleaned_reward['force_shiny'] = !empty($reward['force_shiny']);
                     $pokemon_genders = [];
                     if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {

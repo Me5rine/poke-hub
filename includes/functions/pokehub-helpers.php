@@ -539,11 +539,34 @@ function pokehub_table_exists(string $table_name): bool {
         return false;
     }
 
-    // SHOW TABLES LIKE 'xxx'
-    $sql   = $wpdb->prepare('SHOW TABLES LIKE %s', $table_name);
+    // LIKE interprète _ et % : sans échappement, les underscores du nom de table matchent n’importe quel caractère
+    // (risque de faux positifs / requêtes lourdes). Même logique que les requêtes WP core sur information_schema.
+    $like  = $wpdb->esc_like($table_name);
+    $sql   = $wpdb->prepare('SHOW TABLES LIKE %s', $like);
     $found = $wpdb->get_var($sql);
 
     return ($found === $table_name);
+}
+
+/**
+ * Comme pokehub_table_exists(), avec cache en mémoire pour la durée de la requête HTTP.
+ * Limite les SHOW TABLES répétés et évite des erreurs SQL quand le schéma PokéHub n’est pas
+ * installé sur la base courante (ex. environnement lab sans tables).
+ *
+ * @param string $table_name Nom complet de table (préfixe inclus).
+ */
+function pokehub_table_ready_cached(string $table_name): bool {
+    static $cache = [];
+    $table_name = trim($table_name);
+    if ($table_name === '') {
+        return false;
+    }
+    if (array_key_exists($table_name, $cache)) {
+        return $cache[$table_name];
+    }
+    $cache[$table_name] = function_exists('pokehub_table_exists') && pokehub_table_exists($table_name);
+
+    return $cache[$table_name];
 }
 
 /**

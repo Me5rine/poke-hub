@@ -81,6 +81,17 @@
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 1rem;
     margin: 1rem 0;
+    align-items: start;
+}
+
+/* Colonne : tuile carrée + texte libre en dessous (évite de casser le ratio avec longues descriptions) */
+.pokehub-bonus-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 0;
+    width: 100%;
 }
 
 @media (max-width: 768px) {
@@ -112,7 +123,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0;
+    gap: 0.35rem;
     background: linear-gradient(
         to bottom,
         rgba(240, 240, 240, 0.3) 0%,
@@ -202,14 +213,38 @@
     color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
     line-height: 1.2;
     word-break: break-word;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    max-width: 100%;
 }
 
-.pokehub-bonus-description {
-    font-size: 0.75rem;
-    color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5D697D));
+/* Description riche sous la tuile (hors aspect-ratio) */
+.pokehub-bonus-description--below {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 0.8125rem;
+    color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5d697d));
     text-align: center;
-    line-height: 1.4;
-    margin-top: 0.25rem;
+    line-height: 1.45;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    padding: 0 0.125rem;
+}
+
+.pokehub-bonus-description--below p {
+    margin: 0.4em 0;
+}
+
+.pokehub-bonus-description--below p:first-child {
+    margin-top: 0;
+}
+
+.pokehub-bonus-description--below p:last-child {
+    margin-bottom: 0;
 }
 
 .pokehub-bonus-badge {

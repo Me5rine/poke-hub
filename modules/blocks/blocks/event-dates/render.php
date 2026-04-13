@@ -82,7 +82,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-event-da
 
 // Construire le HTML directement sans buffer pour éviter les conflits
 $output = '<div ' . $wrapper_attributes . '>';
-$output .= '<h2 class="pokehub-block-title">' . esc_html__('Date', 'poke-hub') . '</h2>';
+$output .= function_exists('pokehub_render_block_title')
+    ? pokehub_render_block_title(__('Date', 'poke-hub'), 'event-dates')
+    : '<h2 class="pokehub-block-title">' . esc_html__('Date', 'poke-hub') . '</h2>';
 $output .= $dates_html;
 $output .= '</div>';
 

@@ -273,35 +273,41 @@ function pokehub_render_bonuses_visual($bonuses, $layout = 'cards') {
             $image_html = $bonus['image_html'] ?? '';
             $bonus_title = $bonus['title'] ?? '';
             $bonus_description = $bonus['event_description'] ?? ($bonus['description'] ?? '');
+            $bonus_description = is_string($bonus_description) ? trim($bonus_description) : '';
         ?>
-            <div class="pokehub-bonus-card">
-                <div class="pokehub-bonus-card-inner">
-                    <?php if ($image_html || $image_url) : ?>
-                        <div class="pokehub-bonus-image-wrapper">
-                            <?php if ($image_html) : ?>
-                                <?php // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG inline (bucket) ou img raster depuis poke_hub_render_bonus_asset_markup
-                                echo $image_html; ?>
-                            <?php else : ?>
-                            <img
-                                src="<?php echo esc_url($image_url); ?>"
-                                alt="<?php echo esc_attr($bonus_title); ?>"
-                                class="pokehub-bonus-image"
-                                loading="lazy"
-                                onerror="this.style.display='none';"
-                            />
-                            <?php endif; ?>
-                            <?php if ($ratio) : ?>
-                                <span class="pokehub-bonus-badge" title="<?php echo esc_attr($ratio); ?>"><?php echo esc_html($ratio); ?></span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+            <div class="pokehub-bonus-cell">
+                <div class="pokehub-bonus-card">
+                    <div class="pokehub-bonus-card-inner">
+                        <?php if ($image_html || $image_url) : ?>
+                            <div class="pokehub-bonus-image-wrapper">
+                                <?php if ($image_html) : ?>
+                                    <?php // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG inline (bucket) ou img raster depuis poke_hub_render_bonus_asset_markup
+                                    echo $image_html; ?>
+                                <?php else : ?>
+                                <img
+                                    src="<?php echo esc_url($image_url); ?>"
+                                    alt="<?php echo esc_attr($bonus_title); ?>"
+                                    class="pokehub-bonus-image"
+                                    loading="lazy"
+                                    onerror="this.style.display='none';"
+                                />
+                                <?php endif; ?>
+                                <?php if ($ratio) : ?>
+                                    <span class="pokehub-bonus-badge" title="<?php echo esc_attr($ratio); ?>"><?php echo esc_html($ratio); ?></span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
 
-                    <?php if (!empty($bonus_description)) : ?>
-                        <div class="pokehub-bonus-description">
-                            <?php echo wp_kses_post($bonus_description); ?>
-                        </div>
-                    <?php endif; ?>
+                        <?php if ($bonus_title !== '') : ?>
+                            <div class="pokehub-bonus-name"><?php echo esc_html($bonus_title); ?></div>
+                        <?php endif; ?>
+                    </div>
                 </div>
+                <?php if ($bonus_description !== '') : ?>
+                    <div class="pokehub-bonus-description pokehub-bonus-description--below">
+                        <?php echo wp_kses_post($bonus_description); ?>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>

@@ -19,7 +19,19 @@
 				? useBlockProps({ className: 'pokehub-block-placeholder' })
 				: { className: 'pokehub-block-placeholder' };
 
-			return el('div', blockProps, el('p', {}, __('GO Pass', 'poke-hub')));
+			return el(
+				'div',
+				blockProps,
+				el('p', {}, __('GO Pass', 'poke-hub')),
+				el(
+					'small',
+					{},
+					__(
+						'Configure the linked pass and display in the “GO Pass (block)” box below.',
+						'poke-hub'
+					)
+				)
+			);
 		},
 		save: function () {
 			return null;

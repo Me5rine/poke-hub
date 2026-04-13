@@ -529,7 +529,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-special-
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php echo esc_html($type_label); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title($type_label, 'special-research')
+        : '<h2 class="pokehub-block-title">' . esc_html($type_label) . '</h2>'; ?>
     
     <div class="pokehub-special-research-list">
         <?php foreach ($processed_research as $research_item) : ?>

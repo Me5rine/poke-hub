@@ -69,6 +69,8 @@ if ($quests_html === '') {
 $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-event-quests-block-wrapper']);
 
 return '<div ' . $wrapper_attributes . '>'
-    . '<h2 class="pokehub-block-title">' . esc_html__('Field Research', 'poke-hub') . '</h2>'
+    . (function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title(__('Field Research', 'poke-hub'), 'event-quests')
+        : '<h2 class="pokehub-block-title">' . esc_html__('Field Research', 'poke-hub') . '</h2>')
     . $quests_html
     . '</div>';

@@ -701,7 +701,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-new-poke
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php esc_html_e('New Pokemon', 'poke-hub'); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title(__('New Pokemon', 'poke-hub'), 'new-pokemon-evolutions')
+        : '<h2 class="pokehub-block-title">' . esc_html__('New Pokemon', 'poke-hub') . '</h2>'; ?>
     
     <?php 
     /**

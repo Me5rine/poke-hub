@@ -26,6 +26,7 @@ add_action('init', function() {
      */
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-register.php';   // Enregistrement des blocs
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-helpers.php';    // Helpers pour les blocs
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-title-helpers.php'; // Titres + icône SVG optionnelle
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-field-research.php'; // Field Research (rendu bloc event-quests)
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-quests-helpers.php'; // Helpers quêtes (données post)
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-collection-challenges-helpers.php'; // Helpers défis de collection

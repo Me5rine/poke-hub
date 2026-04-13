@@ -16,7 +16,7 @@ function pokehub_get_egg_types() {
     }
     global $wpdb;
     $table = pokehub_get_table('pokemon_egg_types');
-    if (!$table) {
+    if (!$table || !function_exists('pokehub_table_ready_cached') || !pokehub_table_ready_cached($table)) {
         return [];
     }
     return $wpdb->get_results("SELECT * FROM {$table} ORDER BY hatch_distance_km ASC, name_fr ASC");
@@ -34,7 +34,7 @@ function pokehub_get_egg_type($id) {
     }
     global $wpdb;
     $table = pokehub_get_table('pokemon_egg_types');
-    if (!$table) {
+    if (!$table || !function_exists('pokehub_table_ready_cached') || !pokehub_table_ready_cached($table)) {
         return null;
     }
     return $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", (int) $id));

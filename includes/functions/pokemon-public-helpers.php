@@ -9,6 +9,63 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Indique si les données Pokémon (fiches, extra, évolutions…) doivent être lues depuis les tables
+ * au préfixe « source » (option poke_hub_pokemon_remote_prefix + poke_hub_pokemon_get_table_prefix()),
+ * plutôt que depuis les tables locales wpdb->prefix.
+ */
+function pokehub_pokemon_uses_remote_dataset(): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        $cached = false;
+
+        return false;
+    }
+    $pokemon_remote_prefix = trim((string) get_option('poke_hub_pokemon_remote_prefix', ''));
+    if ($pokemon_remote_prefix === '' || $pokemon_remote_prefix === $wpdb->prefix) {
+        $cached = false;
+
+        return false;
+    }
+    if (!function_exists('poke_hub_pokemon_get_table_prefix')) {
+        $cached = false;
+
+        return false;
+    }
+    $actual = (string) poke_hub_pokemon_get_table_prefix();
+    $cached = ($actual !== '' && $actual !== $wpdb->prefix);
+
+    return $cached;
+}
+
+/**
+ * Pour les tables « source » (remote), on ne fait pas de SHOW TABLES (même principe que poke_hub_pokemon_get_scatterbug_patterns).
+ * Pour le préfixe WP courant, on vérifie l’existence via pokehub_table_ready_cached.
+ *
+ * @param bool    $use_remote Résultat de pokehub_pokemon_uses_remote_dataset()
+ * @param string  ...$table_names Noms complets de tables (non vides)
+ */
+function pokehub_pokemon_tables_ready_for_query(bool $use_remote, string ...$table_names): bool {
+    if ($use_remote) {
+        return true;
+    }
+    if (!function_exists('pokehub_table_ready_cached')) {
+        return false;
+    }
+    foreach ($table_names as $t) {
+        $t = trim((string) $t);
+        if ($t === '' || !pokehub_table_ready_cached($t)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Get Scatterbug/Vivillon patterns from database.
  * Only returns patterns marked as regional (extra->regional->is_regional = true).
  * Patterns are stored as form variants for Scatterbug (dex_number 664) and Vivillon (dex_number 666).
@@ -37,23 +94,7 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
         return [];
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    // Si un préfixe distant est configuré ET différent du préfixe local, utiliser les tables distantes
-    // On vérifie aussi que poke_hub_pokemon_get_table_prefix() retourne bien un préfixe différent
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        // Vérifier que la fonction retourne bien le préfixe distant
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            // Si le préfixe retourné est différent du préfixe local, on utilise les tables distantes
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -210,20 +251,7 @@ function pokehub_get_pokemon_data_by_id(int $pokemon_id): ?array {
         return null;
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    // Déterminer quelle table utiliser (locale ou distante)
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -234,6 +262,10 @@ function pokehub_get_pokemon_data_by_id(int $pokemon_id): ?array {
     }
     
     if (!$pokemon_table || !$form_variants_table) {
+        return null;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table, $form_variants_table)) {
         return null;
     }
     
@@ -297,19 +329,7 @@ function pokehub_get_pokemon_cp_for_level(int $pokemon_id, int $level = 15): ?ar
         return null;
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -318,6 +338,10 @@ function pokehub_get_pokemon_cp_for_level(int $pokemon_id, int $level = 15): ?ar
     }
     
     if (!$pokemon_table) {
+        return null;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table)) {
         return null;
     }
     
@@ -380,19 +404,7 @@ function pokehub_get_pokemon_first_type_slug(int $pokemon_id): string {
         return '';
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $types_table = pokehub_get_table('remote_pokemon_types');
@@ -403,6 +415,10 @@ function pokehub_get_pokemon_first_type_slug(int $pokemon_id): string {
     }
     
     if (!$types_table || !$type_links_table) {
+        return '';
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $types_table, $type_links_table)) {
         return '';
     }
     
@@ -444,19 +460,7 @@ function pokehub_get_pokemon_type_color(int $pokemon_id): string {
         return '';
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $types_table = pokehub_get_table('remote_pokemon_types');
@@ -467,6 +471,10 @@ function pokehub_get_pokemon_type_color(int $pokemon_id): string {
     }
     
     if (!$types_table || !$type_links_table) {
+        return '';
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $types_table, $type_links_table)) {
         return '';
     }
     
@@ -505,18 +513,7 @@ function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
         return [];
     }
 
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
 
     if ($use_remote) {
         $types_table      = pokehub_get_table('remote_pokemon_types');
@@ -527,6 +524,10 @@ function pokehub_get_pokemon_types_for_display(int $pokemon_id): array {
     }
 
     if (!$types_table || !$type_links_table) {
+        return [];
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $types_table, $type_links_table)) {
         return [];
     }
 
@@ -588,22 +589,14 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
         return false;
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
 
     $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     if (!$pokemon_table) {
+        return false;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table)) {
         return false;
     }
 
@@ -650,6 +643,11 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
     // Sinon, on regarde si le "base" de la lignée est shiny-disponible.
     $evolutions_table = $use_remote ? pokehub_get_table('remote_pokemon_evolutions') : pokehub_get_table('pokemon_evolutions');
     if (!$evolutions_table) {
+        $result_cache[$cache_key] = false;
+        return false;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $evolutions_table)) {
         $result_cache[$cache_key] = false;
         return false;
     }
@@ -722,18 +720,14 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
         return pokehub_pokemon_can_be_shiny($pokemon_id);
     }
 
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $use_remote           = false;
-    if (!empty(trim($pokemon_remote_prefix)) && trim($pokemon_remote_prefix) !== $wpdb->prefix
-        && function_exists('poke_hub_pokemon_get_table_prefix')) {
-        $actual = poke_hub_pokemon_get_table_prefix();
-        if (!empty($actual) && $actual !== $wpdb->prefix) {
-            $use_remote = true;
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
 
     $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     if (!$pokemon_table) {
+        return false;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table)) {
         return false;
     }
 
@@ -971,10 +965,18 @@ function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
         return $forced_gender;
     }
     
-    // Vérifier si le pokémon a un dysmorphisme de genre
+    // Vérifier si le pokémon a un dysmorphisme de genre (même source local / remote que le reste du plugin).
     global $wpdb;
-    $table = pokehub_get_table('pokemon');
+    if (!isset($wpdb) || !is_object($wpdb) || !function_exists('pokehub_get_table')) {
+        return null;
+    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $table      = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     if (!$table) {
+        return null;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $table)) {
         return null;
     }
     
@@ -1133,23 +1135,11 @@ function poke_hub_pokemon_get_regional_info($pokemon) {
     if (function_exists('pokehub_get_table')) {
         global $wpdb;
         
-        // Vérifier si un préfixe Pokémon distant est configuré
-        $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-        $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-        
-        $use_remote = false;
-        if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-            if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-                $actual_prefix = poke_hub_pokemon_get_table_prefix();
-                if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                    $use_remote = true;
-                }
-            }
-        }
+        $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
         
         $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
         
-        if ($pokemon_table) {
+        if ($pokemon_table && pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table)) {
             $row = $wpdb->get_row(
                 $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $pokemon_id)
             );
@@ -1234,20 +1224,7 @@ function pokehub_get_pokemon_for_select(): array {
         return [];
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    $actual_prefix = '';
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -1323,14 +1300,7 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
     if (!isset($wpdb) || !is_object($wpdb)) {
         return [];
     }
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $use_remote = false;
-    if (!empty(trim($pokemon_remote_prefix)) && function_exists('poke_hub_pokemon_get_table_prefix')) {
-        $actual = poke_hub_pokemon_get_table_prefix();
-        if (!empty($actual) && $actual !== $wpdb->prefix) {
-            $use_remote = true;
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
     if (!$pokemon_table || !$form_variants_table) {
@@ -1407,19 +1377,7 @@ function pokehub_get_items_for_select(): array {
         return [];
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré (les items peuvent être dans la même DB)
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $items_table = pokehub_get_table('remote_items');
@@ -1482,19 +1440,7 @@ function pokehub_get_mega_pokemon_for_select(): array {
         return [];
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -1581,19 +1527,7 @@ function pokehub_get_base_pokemon_for_select(): array {
         return [];
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');
@@ -1699,19 +1633,7 @@ function pokehub_get_item_data_by_id(int $item_id): ?array {
         return null;
     }
 
-    // Vérifier si un préfixe Pokémon distant est configuré (les items peuvent être dans la même DB)
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $items_table = pokehub_get_table('remote_items');
@@ -1720,6 +1642,10 @@ function pokehub_get_item_data_by_id(int $item_id): ?array {
     }
     
     if (!$items_table) {
+        return null;
+    }
+
+    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $items_table)) {
         return null;
     }
     
@@ -1803,19 +1729,7 @@ function poke_hub_get_vivillon_pattern_country_mapping_from_db() {
         return [];
     }
     
-    // Vérifier si un préfixe Pokémon distant est configuré
-    $pokemon_remote_prefix = get_option('poke_hub_pokemon_remote_prefix', '');
-    $pokemon_remote_prefix = trim($pokemon_remote_prefix);
-    
-    $use_remote = false;
-    if (!empty($pokemon_remote_prefix) && $pokemon_remote_prefix !== $wpdb->prefix) {
-        if (function_exists('poke_hub_pokemon_get_table_prefix')) {
-            $actual_prefix = poke_hub_pokemon_get_table_prefix();
-            if (!empty($actual_prefix) && $actual_prefix !== $wpdb->prefix) {
-                $use_remote = true;
-            }
-        }
-    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
     
     if ($use_remote) {
         $pokemon_table = pokehub_get_table('remote_pokemon');

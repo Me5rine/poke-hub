@@ -203,7 +203,9 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                     : esc_html__('POSSIBLE REWARDS', 'poke-hub');
                 $quest_id      = 'pokehub-quest-' . $quest_index;
 
-                $preview_slots = array_slice($pokemon_slots, 0, 4);
+                /** Aperçu enroulé : max 3 vignettes Pokémon, le reste en +N (hauteur de ligne homogène). */
+                $preview_max   = 3;
+                $preview_slots = array_slice($pokemon_slots, 0, $preview_max);
                 $more_pokemon  = max(0, count($pokemon_slots) - count($preview_slots));
                 ?>
 
@@ -326,14 +328,14 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                                             <div class="pokehub-quest-reward-cp">
                                                 <?php if ($max_cp !== null) : ?>
                                                     <div class="pokehub-quest-cp-box">
-                                                        <div class="pokehub-quest-cp-label"><?php esc_html_e('Max CP', 'poke-hub'); ?></div>
-                                                        <div class="pokehub-quest-cp-value"><?php echo esc_html((string) $max_cp); ?></div>
+                                                        <span class="pokehub-quest-cp-label" title="<?php esc_attr_e('Maximum CP at level 15', 'poke-hub'); ?>"><?php echo esc_html_x('CP max', 'Short label for maximum CP (level 15)', 'poke-hub'); ?></span>
+                                                        <span class="pokehub-quest-cp-value"><?php echo esc_html((string) $max_cp); ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                                 <?php if ($min_cp !== null) : ?>
                                                     <div class="pokehub-quest-cp-box">
-                                                        <div class="pokehub-quest-cp-label"><?php esc_html_e('Min CP', 'poke-hub'); ?></div>
-                                                        <div class="pokehub-quest-cp-value"><?php echo esc_html((string) $min_cp); ?></div>
+                                                        <span class="pokehub-quest-cp-label" title="<?php esc_attr_e('Minimum CP at level 15', 'poke-hub'); ?>"><?php echo esc_html_x('CP min', 'Short label for minimum CP (level 15)', 'poke-hub'); ?></span>
+                                                        <span class="pokehub-quest-cp-value"><?php echo esc_html((string) $min_cp); ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                             </div>

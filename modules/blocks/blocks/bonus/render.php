@@ -91,7 +91,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-bonus-bl
 
 // Construire le HTML directement sans buffer pour éviter les conflits
 $output = '<div ' . $wrapper_attributes . '>';
-$output .= '<h2 class="pokehub-block-title">' . esc_html__('Bonus', 'poke-hub') . '</h2>';
+$output .= function_exists('pokehub_render_block_title')
+    ? pokehub_render_block_title(__('Bonus', 'poke-hub'), 'bonus')
+    : '<h2 class="pokehub-block-title">' . esc_html__('Bonus', 'poke-hub') . '</h2>';
 $output .= $bonuses_html;
 $output .= '</div>';
 

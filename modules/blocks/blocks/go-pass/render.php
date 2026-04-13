@@ -89,7 +89,9 @@ if (!$event || !function_exists('pokehub_is_go_pass_special_event') || !pokehub_
     return '';
 }
 
-$block_title_html = '<h2 class="pokehub-block-title">' . esc_html__('Pass GO', 'poke-hub') . '</h2>';
+$block_title_html = function_exists('pokehub_render_block_title')
+    ? pokehub_render_block_title(__('Pass GO', 'poke-hub'), 'go-pass')
+    : '<h2 class="pokehub-block-title">' . esc_html__('Pass GO', 'poke-hub') . '</h2>';
 
 if (!wp_style_is('pokehub-go-pass-block-front', 'registered')) {
     wp_register_style(
@@ -116,14 +118,14 @@ if ($variant === 'full') {
 if ($variant === 'full' && function_exists('pokehub_render_go_pass_html')) {
     $full = pokehub_render_go_pass_html($event);
     if ($full !== '') {
-        return '<div class="pokehub-go-pass-block pokehub-go-pass-block--full">' . $block_title_html . $full . '</div>';
+        return '<div class="pokehub-go-pass-block-wrapper pokehub-go-pass-block pokehub-go-pass-block--full">' . $block_title_html . $full . '</div>';
     }
 }
 
 if (function_exists('pokehub_render_go_pass_summary_html')) {
     $summary = pokehub_render_go_pass_summary_html($event, null);
     if ($summary !== '') {
-        return '<div class="pokehub-go-pass-block pokehub-go-pass-block--summary">' . $block_title_html . $summary . '</div>';
+        return '<div class="pokehub-go-pass-block-wrapper pokehub-go-pass-block pokehub-go-pass-block--summary">' . $block_title_html . $summary . '</div>';
     }
 }
 

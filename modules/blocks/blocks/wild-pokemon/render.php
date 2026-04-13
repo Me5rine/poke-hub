@@ -203,7 +203,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-wild-pok
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php esc_html_e('Pokémon in the wild', 'poke-hub'); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title(__('Pokémon in the wild', 'poke-hub'), 'wild-pokemon')
+        : '<h2 class="pokehub-block-title">' . esc_html__('Pokémon in the wild', 'poke-hub') . '</h2>'; ?>
     <?php if (!empty($pokemon_list)) : ?>
         <div class="pokehub-wild-pokemon-grid">
             <?php foreach ($pokemon_list as $pokemon) : ?>

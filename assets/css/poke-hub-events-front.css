@@ -188,6 +188,33 @@
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
     line-height: 1.25 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+[class*="wp-block-pokehub-"] .pokehub-block-title-icon,
+[class*="pokehub-"][class*="block-wrapper"] .pokehub-block-title-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--pokehub-block-title-icon-box, 1.5rem);
+    height: var(--pokehub-block-title-icon-box, 1.5rem);
+    line-height: 0;
+    color: inherit;
+}
+
+[class*="wp-block-pokehub-"] .pokehub-block-title-icon svg,
+[class*="pokehub-"][class*="block-wrapper"] .pokehub-block-title-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+[class*="wp-block-pokehub-"] .pokehub-block-title-text,
+[class*="pokehub-"][class*="block-wrapper"] .pokehub-block-title-text {
+    min-width: 0;
 }
 
 /* ===== Bloc dates d'événement ===== */
@@ -670,6 +697,12 @@
     -ms-user-select: none;
 }
 
+/* Lignes enroulées : hauteur homogène (aperçu sur une seule rangée de tuiles 48px). */
+.pokehub-quest-item:not(.expanded) .pokehub-quest-main {
+    min-height: calc(48px + 1rem);
+    box-sizing: border-box;
+}
+
 .pokehub-quest-task {
     flex: 1 1 auto;
     min-width: 0;
@@ -700,6 +733,10 @@
 
 .pokehub-quest-item:not(.expanded) .pokehub-quest-rewards-preview {
     margin-top: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    height: 48px;
+    overflow: hidden;
 }
 
 /* Aperçu : mini-cartes = mêmes classes que Pokémon sauvés, taille réduite */
@@ -766,6 +803,15 @@
     .pokehub-quest-rewards-preview {
         max-width: 100%;
         justify-content: flex-start;
+    }
+
+    .pokehub-quest-item:not(.expanded) .pokehub-quest-rewards-preview {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        max-width: 100%;
     }
 }
 
@@ -966,10 +1012,11 @@
     flex-shrink: 0;
     margin-left: 0;
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     justify-content: flex-end;
-    width: 11.5rem;
-    max-width: 45%;
+    width: auto;
+    max-width: min(12rem, 48%);
+    min-width: 0;
 }
 
 .pokehub-quest-reward-image {
@@ -1007,34 +1054,42 @@
 
 .pokehub-quest-reward-cp {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     flex-wrap: nowrap;
+    align-items: center;
 }
 
 .pokehub-quest-cp-box {
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
+    flex-direction: row;
     align-items: center;
-    padding: 0.5rem 0.75rem;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.55rem;
     background: var(--admin-lab-color-block-background, #f7f9fa);
     border: 1px solid var(--admin-lab-color-block-border, var(--admin-lab-color-borders, #e6e6e6));
     border-radius: 6px;
-    min-width: 70px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .pokehub-quest-cp-label {
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     font-weight: 600;
     color: var(--admin-lab-color-text, var(--admin-lab-color-pagination-text, #5D697D));
-    text-transform: uppercase;
-    margin-bottom: 0.25rem;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    margin-bottom: 0;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    line-height: 1.2;
 }
 
 .pokehub-quest-cp-value {
-    font-size: 0.9rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
+    flex-shrink: 0;
+    line-height: 1.2;
 }
 
 /* ===== Ancien système de quêtes (compatibilité) ===== */
@@ -1280,6 +1335,7 @@
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
+    align-items: start;
 }
 
 /* Carte Pokémon — même contour que Field Research */
@@ -1375,8 +1431,11 @@
     font-weight: 600;
     color: var(--admin-lab-color-text-accent, var(--admin-lab-color-header-text, #011322));
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.25;
     word-break: break-word;
+    overflow-wrap: anywhere;
+    width: 100%;
+    flex-shrink: 0;
 }
 
 /* Section Pokémon rares */
@@ -1411,23 +1470,35 @@
 /* Responsive */
 @media (max-width: 768px) {
     .pokehub-wild-pokemon-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
         gap: 0.75rem;
     }
-    
-    .pokehub-wild-pokemon-image-wrapper {
-        width: 60px;
-        height: 60px;
+
+    .pokehub-wild-pokemon-grid > .pokehub-wild-pokemon-card,
+    .pokehub-wild-pokemon-grid--rare > .pokehub-wild-pokemon-card {
+        aspect-ratio: auto;
+        height: auto;
     }
-    
-    .pokehub-wild-pokemon-card-inner {
-        padding: 0.5rem;
+
+    .pokehub-wild-pokemon-grid > .pokehub-wild-pokemon-card > .pokehub-wild-pokemon-card-inner,
+    .pokehub-wild-pokemon-grid--rare > .pokehub-wild-pokemon-card > .pokehub-wild-pokemon-card-inner {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+        justify-content: flex-start;
+        padding: 0.45rem 0.4rem 0.6rem;
     }
-    
-    .pokehub-wild-pokemon-name {
-        font-size: 0.7rem;
+
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-image-wrapper {
+        width: 76px;
+        height: 76px;
     }
-    
+
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-name {
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+
     .pokehub-event-quests-list {
         grid-template-columns: 1fr;
     }
@@ -1447,34 +1518,36 @@
 
 @media (max-width: 480px) {
     .pokehub-wild-pokemon-grid {
-        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 0.6rem;
     }
-    
-    .pokehub-wild-pokemon-image-wrapper {
-        width: 60px;
-        height: 60px;
+
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-image-wrapper {
+        width: 80px;
+        height: 80px;
     }
-    
-    .pokehub-wild-pokemon-card {
-        padding: 0.5rem;
+
+    .pokehub-wild-pokemon-grid > .pokehub-wild-pokemon-card,
+    .pokehub-wild-pokemon-grid--rare > .pokehub-wild-pokemon-card {
+        padding: 0;
     }
-    
-    .pokehub-wild-pokemon-card-inner {
-        min-height: 120px;
-        padding: 0.5rem;
+
+    .pokehub-wild-pokemon-grid > .pokehub-wild-pokemon-card > .pokehub-wild-pokemon-card-inner,
+    .pokehub-wild-pokemon-grid--rare > .pokehub-wild-pokemon-card > .pokehub-wild-pokemon-card-inner {
+        padding: 0.5rem 0.45rem 0.65rem;
     }
-    
-    .pokehub-wild-pokemon-shiny-icon,
-    .pokehub-wild-pokemon-regional-icon {
+
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-shiny-icon,
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-regional-icon {
         width: 20px;
         height: 20px;
         font-size: 1rem;
         top: 4px;
     }
-    
-    .pokehub-wild-pokemon-name {
-        font-size: 0.75rem;
+
+    .pokehub-wild-pokemon-grid .pokehub-wild-pokemon-name {
+        font-size: 0.78rem;
+        line-height: 1.35;
     }
 }
 

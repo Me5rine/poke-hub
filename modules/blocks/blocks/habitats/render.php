@@ -132,7 +132,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-habitats
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php esc_html_e('Habitats', 'poke-hub'); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title(__('Habitats', 'poke-hub'), 'habitats')
+        : '<h2 class="pokehub-block-title">' . esc_html__('Habitats', 'poke-hub') . '</h2>'; ?>
     
     <?php foreach ($habitats as $habitat) : 
         $habitat_name = $habitat['name'] ?? '';

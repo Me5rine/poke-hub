@@ -367,7 +367,9 @@ $wrapper_attributes = get_block_wrapper_attributes(['class' => 'pokehub-collecti
 ob_start();
 ?>
 <div <?php echo $wrapper_attributes; ?>>
-    <h2 class="pokehub-block-title"><?php esc_html_e('Collection Challenges', 'poke-hub'); ?></h2>
+    <?php echo function_exists('pokehub_render_block_title')
+        ? pokehub_render_block_title(__('Collection Challenges', 'poke-hub'), 'collection-challenges')
+        : '<h2 class="pokehub-block-title">' . esc_html__('Collection Challenges', 'poke-hub') . '</h2>'; ?>
     
     <div class="pokehub-collection-challenges-list">
         <?php foreach ($processed_challenges as $challenge) : ?>
