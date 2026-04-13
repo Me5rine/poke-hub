@@ -200,6 +200,8 @@ add_action('admin_init', function () {
                 pokehub_get_table('content_new_pokemon_entries'),
                 pokehub_get_table('content_raids'),
                 pokehub_get_table('content_raid_bosses'),
+                pokehub_get_table('content_go_pass'),
+                pokehub_get_table('go_pass_host_links'),
                 // Bloc "jour -> Pokémon(s) -> heures"
                 pokehub_get_table('content_day_pokemon_hours'),
                 pokehub_get_table('content_day_pokemon_hour_entries'),
@@ -242,6 +244,9 @@ add_action('admin_init', function () {
             // Elle doit donc exister même si seuls les blocs sont activés.
             pokehub_get_table('content_day_pokemon_hours'),
             pokehub_get_table('content_day_pokemon_hour_entries'),
+            // Pass GO : payload (content_go_pass) + liaisons article → pass (go_pass_host_links)
+            pokehub_get_table('content_go_pass'),
+            pokehub_get_table('go_pass_host_links'),
         ],
     ];
 
