@@ -92,9 +92,13 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         if ($source === 'special_event') {
             // Événement SQL (table special_events)
             // Préserver les paramètres de filtrage dans l'URL d'édition
+            $gp_slug   = function_exists('pokehub_go_pass_event_type_slug') ? pokehub_go_pass_event_type_slug() : 'go-pass';
+            $type_slug = isset($item->event_type_slug) ? (string) $item->event_type_slug : '';
+            $edit_action = ($type_slug === $gp_slug) ? 'edit_go_pass' : 'edit_special';
+
             $edit_url_args = [
                 'page'     => 'poke-hub-events',
-                'action'   => 'edit_special',
+                'action'   => $edit_action,
                 'event_id' => (int) $item->id,
             ];
             

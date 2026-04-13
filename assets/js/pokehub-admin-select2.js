@@ -173,11 +173,13 @@ jQuery(function($) {
     function pokehubInitQuestPokemonSelect2WithList(context, pokemonList) {
         var $ctx = context ? $(context) : $(document);
         var restUrl = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData && window.pokehubQuestsData.rest_pokemon_url) ? window.pokehubQuestsData.rest_pokemon_url : '';
-        var useAjax = (restUrl && restUrl.indexOf('pokemon-for-select') !== -1);
+        var list = (pokemonList && pokemonList.length) ? pokemonList : [];
+        // Liste complète déjà fournie (ex. Pass GO, quêtes) : Select2 en local = même Pokémon partout, recherche sans API.
+        var useLocalList = list.length > 0;
+        var useAjax = (restUrl && restUrl.indexOf('pokemon-for-select') !== -1) && !useLocalList;
 
         // Map id -> label pour hydrater les options à partir de data-selected-ids
         var pokemonMap = {};
-        var list = (pokemonList && pokemonList.length) ? pokemonList : [];
         list.forEach(function(p) {
             var id = p && (p.id != null) ? String(p.id) : '';
             var text = (p && (p.text != null)) ? p.text : (p && p.name ? p.name : (id ? '#' + id : ''));
@@ -207,7 +209,7 @@ jQuery(function($) {
                 }
             }
 
-            // 2) Mode AJAX : même comportement que pokehubInitLargePokemonSelect2 (Pokémon sauvages) — pas de milliers d’options en DOM.
+            // 2) Mode AJAX seulement si aucune liste locale : sinon on garde toutes les entrées pour réutiliser le même Pokémon partout.
             if (useAjax) {
                 if (ids.length) {
                     var labelMap = {};
@@ -222,7 +224,7 @@ jQuery(function($) {
                 } else {
                     $select.empty();
                 }
-            } else if (ids.length) {
+            } else if (!useLocalList && ids.length) {
                 ids.forEach(function(id) {
                     var $opt = $select.find('option[value="' + id + '"]');
                     if (!$opt.length) {
@@ -243,8 +245,38 @@ jQuery(function($) {
                 language: { noResults: function() { return 'Aucun Pokémon trouvé'; }, searching: function() { return 'Recherche…'; } }
             };
 
-            // 3) Init Select2 sans vider le select (pas de .empty(), pas de data: qui remplace)
-            if (useAjax) {
+            if (useLocalList) {
+                $select.empty();
+                var dataList = list.map(function(p) {
+                    var pid = p && (p.id != null) ? p.id : '';
+                    var ptext = (p && (p.text != null)) ? p.text : (p && p.name ? p.name : (pid ? '#' + pid : ''));
+                    return {
+                        id: pid,
+                        text: ptext,
+                        name_fr: p.name_fr,
+                        name_en: p.name_en
+                    };
+                });
+                ids.forEach(function(idStr) {
+                    var idNum = parseInt(idStr, 10);
+                    if (!idNum || isNaN(idNum)) {
+                        return;
+                    }
+                    var exists = dataList.some(function(row) {
+                        return Number(row.id) === idNum;
+                    });
+                    if (!exists) {
+                        dataList.push({
+                            id: idNum,
+                            text: pokemonMap[idStr] || ('#' + idStr)
+                        });
+                    }
+                });
+                opts.data = dataList;
+                if (typeof pokehubMultilingualMatcher !== 'undefined') {
+                    opts.matcher = pokehubMultilingualMatcher;
+                }
+            } else if (useAjax) {
                 opts.minimumInputLength = 1;
                 var restNonce = (typeof window.pokehubQuestsData !== 'undefined' && window.pokehubQuestsData.rest_nonce) ? window.pokehubQuestsData.rest_nonce : '';
                 opts.ajax = {
@@ -269,7 +301,11 @@ jQuery(function($) {
 
             // 4) Reforcer la valeur après init
             if (ids.length) {
-                $select.val(ids).trigger('change.select2');
+                if (isMultiple) {
+                    $select.val(ids.map(function(x) { return String(parseInt(x, 10)); }).filter(function(v) { return v && v !== 'NaN'; })).trigger('change.select2');
+                } else {
+                    $select.val(String(parseInt(ids[0], 10))).trigger('change.select2');
+                }
             }
         });
 
@@ -289,7 +325,12 @@ jQuery(function($) {
                 }
             }
             if (ids.length) {
-                $select.val(ids).trigger('change.select2');
+                var isMultiple2 = $select.attr('multiple') !== undefined;
+                if (isMultiple2) {
+                    $select.val(ids.map(function(x) { return String(parseInt(x, 10)); }).filter(function(v) { return v && v !== 'NaN'; })).trigger('change.select2');
+                } else {
+                    $select.val(String(parseInt(ids[0], 10))).trigger('change.select2');
+                }
             }
         });
 
@@ -366,6 +407,28 @@ jQuery(function($) {
         });
     }
     
+    function pokehubInitGoPassBonusRewardSelect2(context) {
+        var $ctx = context ? $(context) : $(document);
+        var l10n = typeof window.pokehubGoPassL10n !== 'undefined' ? window.pokehubGoPassL10n : {};
+        var placeholder = l10n.bonusNone || '—';
+        $ctx.find('select.pokehub-go-pass-bonus-reward-select').each(function() {
+            var $select = $(this);
+            if ($select.data('select2')) {
+                $select.select2('destroy');
+            }
+            $select.select2({
+                width: '100%',
+                placeholder: $select.attr('data-placeholder') || placeholder,
+                allowClear: true,
+                matcher: typeof pokehubMultilingualMatcher !== 'undefined' ? pokehubMultilingualMatcher : undefined,
+                language: {
+                    noResults: function() { return 'Aucun résultat'; },
+                    searching: function() { return 'Recherche…'; }
+                }
+            });
+        });
+    }
+
     function pokehubInitQuestItemSelect2(context) {
         var $ctx = context ? $(context) : $(document);
         var itemsList = typeof pokehubQuestsData !== 'undefined' ? pokehubQuestsData.items : [];
@@ -495,6 +558,7 @@ jQuery(function($) {
     window.pokehubInitPokemonSelect2 = pokehubInitPokemonSelect2;
     window.pokehubInitQuestPokemonSelect2 = pokehubInitQuestPokemonSelect2;
     window.pokehubInitQuestItemSelect2 = pokehubInitQuestItemSelect2;
+    window.pokehubInitGoPassBonusRewardSelect2 = pokehubInitGoPassBonusRewardSelect2;
     window.pokehubInitLargePokemonSelect2 = pokehubInitLargePokemonSelect2;
 
     pokehubInitAttackSelect2(document);

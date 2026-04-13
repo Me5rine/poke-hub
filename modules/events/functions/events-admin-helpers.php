@@ -6,6 +6,84 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Lit l’URL de base du WordPress distant depuis la table `{préfixe événements}_options`
+ * (option WordPress standard `siteurl`), comme pour tout site WP partageant la même base.
+ *
+ * @return string URL sans slash final, ou chaîne vide si introuvable.
+ */
+function pokehub_events_get_remote_wp_base_url(): string {
+    global $wpdb;
+
+    static $resolved = false;
+    static $base     = '';
+
+    if ($resolved) {
+        return $base;
+    }
+    $resolved = true;
+
+    if (!function_exists('poke_hub_events_get_table_prefix')) {
+        $base = (string) apply_filters('pokehub_remote_events_site_base_url', '');
+        return $base;
+    }
+
+    $prefix = poke_hub_events_get_table_prefix('events');
+    $prefix = trim((string) $prefix);
+    if ($prefix === '' || !preg_match('/^[A-Za-z0-9_]+$/', $prefix)) {
+        $base = (string) apply_filters('pokehub_remote_events_site_base_url', '');
+        return $base;
+    }
+
+    $options_table = $prefix . 'options';
+    if (function_exists('pokehub_table_exists') && !pokehub_table_exists($options_table)) {
+        $base = (string) apply_filters('pokehub_remote_events_site_base_url', '');
+        return $base;
+    }
+
+    $options_table_esc = esc_sql($options_table);
+    $raw               = $wpdb->get_var(
+        "SELECT option_value FROM `{$options_table_esc}` WHERE option_name = 'siteurl' LIMIT 1"
+    );
+    $raw = is_string($raw) ? trim($raw) : '';
+    if ($raw === '') {
+        $base = (string) apply_filters('pokehub_remote_events_site_base_url', '');
+        return $base;
+    }
+
+    $parsed = wp_parse_url($raw);
+    if (empty($parsed['scheme']) || empty($parsed['host'])) {
+        $base = (string) apply_filters('pokehub_remote_events_site_base_url', '');
+        return $base;
+    }
+
+    $base = untrailingslashit(esc_url_raw($raw));
+    /**
+     * URL de base du site WordPress distant (événements / actu), dérivée de `siteurl` ou surchargée.
+     *
+     * @param string $base URL sans slash final.
+     */
+    $base = (string) apply_filters('pokehub_remote_events_site_base_url', $base);
+
+    return $base;
+}
+
+/**
+ * URL « Nouvel article » sur le site distant (événements / actu).
+ * Dérivée du préfixe tables (option `siteurl` du site cible) ou filtre `pokehub_remote_events_new_url`.
+ */
+function pokehub_events_get_remote_new_post_url(): string {
+    $base = pokehub_events_get_remote_wp_base_url();
+    if ($base !== '') {
+        return trailingslashit($base) . 'wp-admin/post-new.php';
+    }
+
+    return (string) apply_filters(
+        'pokehub_remote_events_new_url',
+        'https://jv-actu.com/wp-admin/post-new.php'
+    );
+}
+
+/**
  * Tous les types d'événements (event_type) disponibles (distants).
  */
 function poke_hub_events_get_all_event_types(): array {
@@ -38,10 +116,12 @@ function poke_hub_events_get_all_event_types(): array {
  * $item->id = ID du post distant.
  */
 add_filter('pokehub_remote_events_edit_url', function ($url, $item) {
-    // 🔧 ADAPTE ce domaine à ton site distant
-    $remote_admin_base = 'https://jv-actu.com/wp-admin/';
+    $base = pokehub_events_get_remote_wp_base_url();
+    if ($base === '') {
+        return $url;
+    }
 
-    return $remote_admin_base . 'post.php?post=' . (int) $item->id . '&action=edit';
+    return trailingslashit($base) . 'wp-admin/post.php?post=' . (int) $item->id . '&action=edit';
 }, 10, 2);
 
 /**

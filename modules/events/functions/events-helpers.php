@@ -231,6 +231,69 @@ if (!function_exists('poke_hub_special_event_format_datetime')) {
     }
 }
 
+if (!function_exists('poke_hub_special_event_format_date_for_input')) {
+    /**
+     * Partie date (Y-m-d) pour <input type="date">, cohérent avec {@see poke_hub_special_event_format_datetime()}.
+     */
+    function poke_hub_special_event_format_date_for_input(int $timestamp, string $mode = 'local'): string {
+        if ($timestamp <= 0) {
+            return '';
+        }
+        $full = poke_hub_special_event_format_datetime($timestamp, $mode);
+        if ($full === '') {
+            return '';
+        }
+        $parts = explode('T', $full, 2);
+
+        return $parts[0] ?? '';
+    }
+}
+
+if (!function_exists('poke_hub_special_event_format_time_for_input')) {
+    /**
+     * Partie heure (H:i) pour <input type="time">, cohérent avec {@see poke_hub_special_event_format_datetime()}.
+     */
+    function poke_hub_special_event_format_time_for_input(int $timestamp, string $mode = 'local'): string {
+        if ($timestamp <= 0) {
+            return '';
+        }
+        $full = poke_hub_special_event_format_datetime($timestamp, $mode);
+        if ($full === '') {
+            return '';
+        }
+        $parts = explode('T', $full, 2);
+        if (!isset($parts[1]) || $parts[1] === '') {
+            return '';
+        }
+
+        return substr($parts[1], 0, 5);
+    }
+}
+
+if (!function_exists('poke_hub_special_event_parse_date_time_for_save')) {
+    /**
+     * Fusionne date + heure issues de champs séparés (même sémantique que {@see poke_hub_special_event_parse_datetime()}).
+     *
+     * @param string $date Y-m-d
+     * @param string $time H:i ou vide → minuit
+     */
+    function poke_hub_special_event_parse_date_time_for_save(string $date, string $time, string $mode = 'local'): int {
+        $date = trim($date);
+        $time = trim($time);
+        if ($date === '') {
+            return 0;
+        }
+        if ($time === '') {
+            $time = '00:00';
+        }
+        if (strlen($time) > 5) {
+            $time = substr($time, 0, 5);
+        }
+
+        return poke_hub_special_event_parse_datetime($date . 'T' . $time, $mode);
+    }
+}
+
 /**
  * Purge Nginx Helper cache for events pages
  * This ensures that new/updated/deleted events appear immediately on the front-end

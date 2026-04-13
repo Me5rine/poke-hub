@@ -205,23 +205,35 @@ function pokehub_special_events_inject_content($content) {
     
     // Générer le contenu de l'événement
     ob_start();
+    $is_go_pass = function_exists('pokehub_is_go_pass_special_event')
+        ? pokehub_is_go_pass_special_event($event)
+        : false;
     ?>
     <div class="pokehub-special-event-content" data-source="<?php echo esc_attr($is_remote ? 'remote' : 'local'); ?>">
         <?php
         // Vous pouvez personnaliser ce template ici
         if (!empty($event->description)) {
             echo wp_kses_post($event->description);
-        } else {
-            echo '<p>' . esc_html__('Détails de l\'événement à venir...', 'poke-hub') . '</p>';
+        } elseif (!$is_go_pass) {
+            echo '<p>' . esc_html__('Event details coming soon…', 'poke-hub') . '</p>';
+        }
+
+        if ($is_go_pass && function_exists('pokehub_render_go_pass_html')) {
+            $go_pass_block = pokehub_render_go_pass_html($event);
+            if ($go_pass_block !== '') {
+                echo $go_pass_block; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML construit avec échappements internes
+            } else {
+                echo '<p class="pokehub-go-pass-empty">' . esc_html__('GO Pass data is missing. Save the GO Pass in the admin (Special events) so the reward grid can load.', 'poke-hub') . '</p>';
+            }
         }
         
         // Informations supplémentaires
         if (!empty($event->start_ts) && !empty($event->end_ts)) {
             echo '<div class="pokehub-event-dates">';
-            echo '<p><strong>' . esc_html__('Début :', 'poke-hub') . '</strong> ';
+            echo '<p><strong>' . esc_html__('Starts:', 'poke-hub') . '</strong> ';
             echo esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), $event->start_ts, wp_timezone()));
             echo '</p>';
-            echo '<p><strong>' . esc_html__('Fin :', 'poke-hub') . '</strong> ';
+            echo '<p><strong>' . esc_html__('Ends:', 'poke-hub') . '</strong> ';
             echo esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), $event->end_ts, wp_timezone()));
             echo '</p>';
             echo '</div>';

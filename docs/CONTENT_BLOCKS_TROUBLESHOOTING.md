@@ -27,6 +27,7 @@ Si rien ne s'affiche en front, suivez ce guide de diagnostic étape par étape.
 #### Pour le bloc « Day Pokémon Hours » (featured / Spotlight) :
 - Le module **Events** doit être actif et les tables **`special_events`** / **`special_event_pokemon`** doivent exister (sinon repli sur `content_day_pokemon_hours`).
 - Les créneaux **featured_hours** sont saisis dans la metabox **Day Pokémon Hours** sur l’article ; en mode SQL, la liaison au post utilise **`content_source_type`** / **`content_source_id`**. Voir [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md) et [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md).
+- Si les heures sont bonnes dans la metabox mais **fausses** après ouverture / enregistrement sous **Special events** : les lignes Spotlight doivent avoir **`mode` = `local`** (heure du site). Une migration plugin remet les anciennes lignes en `local` ; sinon repasser le mode à **local** dans le formulaire ou re-sauver l’article depuis la metabox. Détail : [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md) § Événements Spotlight.
 
 ### 3. Post types autorisés
 

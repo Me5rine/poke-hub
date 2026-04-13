@@ -1095,7 +1095,7 @@ class Pokehub_DB {
             'content_habitats', 'content_habitat_entries', 'content_special_research', 'content_special_research_steps',
             'content_collection_challenges', 'content_collection_challenge_items', 'content_bonus', 'content_bonus_entries',
             'content_wild_pokemon', 'content_wild_pokemon_entries', 'content_new_pokemon', 'content_new_pokemon_entries',
-            'content_raids', 'content_raid_bosses',
+            'content_raids', 'content_raid_bosses', 'content_go_pass',
             // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
             'content_day_pokemon_hours', 'content_day_pokemon_hour_entries',
         ];
@@ -1167,6 +1167,7 @@ class Pokehub_DB {
         $day_pokemon_hour_entries_tbl = pokehub_get_table('content_day_pokemon_hour_entries');
         $raids_tbl         = pokehub_get_table('content_raids');
         $raid_bosses_tbl   = pokehub_get_table('content_raid_bosses');
+        $go_pass_tbl       = pokehub_get_table('content_go_pass');
 
         $sql_eggs = "CREATE TABLE {$eggs_tbl} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1446,6 +1447,20 @@ class Pokehub_DB {
             KEY pokemon_id (pokemon_id)
         ) {$charset_collate};";
 
+        $sql_go_pass = "CREATE TABLE {$go_pass_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'special_event',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            payload LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
         dbDelta($sql_eggs);
         dbDelta($sql_egg_pokemon);
         dbDelta($sql_quest_groups);
@@ -1481,6 +1496,7 @@ class Pokehub_DB {
         }
         dbDelta($sql_raids);
         dbDelta($sql_raid_bosses);
+        dbDelta($sql_go_pass);
 
         // Migration : ajouter quest_group_id à content_quest_lines si absent (installations existantes)
         $col = $wpdb->get_var($wpdb->prepare(

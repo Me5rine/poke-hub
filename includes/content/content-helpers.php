@@ -112,6 +112,7 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         'content_new_pokemon',
         'content_day_pokemon_hours',
         'content_raids',
+        'content_go_pass',
     ];
 
     foreach ($tables_with_dates as $key) {

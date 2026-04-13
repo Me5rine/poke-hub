@@ -45,6 +45,9 @@ function pokehub_blocks_register_all() {
         'eggs' => [
             'requires' => [],
         ],
+        'go-pass' => [
+            'requires' => [],
+        ],
     ];
     
     foreach ($blocks as $block_name => $config) {

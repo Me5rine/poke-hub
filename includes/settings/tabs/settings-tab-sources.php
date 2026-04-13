@@ -26,8 +26,8 @@ $messages = [];
 // === Options actuelles ===
 
 // Events source (JV Actu) - seulement si module events actif
-$events_prefix      = get_option('poke_hub_events_remote_prefix', '');
-$event_types_prefix = get_option('poke_hub_event_types_remote_prefix', '');
+$events_prefix       = get_option('poke_hub_events_remote_prefix', '');
+$event_types_prefix  = get_option('poke_hub_event_types_remote_prefix', '');
 
 // Assets bucket base URL - URL commune à toutes les images
 $assets_bucket_base_url = get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
@@ -220,6 +220,9 @@ foreach ($messages as $msg) {
                 </td>
             </tr>
         </table>
+        <p class="description" style="margin-top:-0.5em;">
+            <?php _e('Admin links for remote events (e.g. « Add Remote Event ») use the WordPress <code>siteurl</code> value from the <code>{events prefix}options</code> table — no separate site URL setting.', 'poke-hub'); ?>
+        </p>
     <?php endif; ?>
 
     <h2><?php _e('Pokémon Sources', 'poke-hub'); ?></h2>

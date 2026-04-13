@@ -33,10 +33,15 @@ Lorsque la metabox **Day Pokémon Hours** enregistre des créneaux **featured / 
 
 - **`event_type`** : type enregistré en base (souvent `pokemon-spotlight-hour`, résolu via `pokehub_resolve_spotlight_event_type_slug()` dans `includes/content/content-helpers.php`).
 - **`content_source_type`** / **`content_source_id`** : liaison stable au **post WordPress** source (`post` + ID d’article), pour que le bloc **Day Pokémon Hours** retrouve les créneaux même si le **slug** ou les **titres** sont modifiés en admin.
+- **`mode`** : **`local`**. Les horaires sont calculés et stockés comme **heure « murale » du site** (`wp_timezone()`), comme pour le mode **local** du formulaire d’édition des **Special events** (`poke_hub_special_event_format_datetime` / `poke_hub_special_event_parse_datetime` dans `modules/events/functions/events-helpers.php`). Le mode **`fixed`** (interprétation **UTC** des champs `datetime-local`) ne doit pas être utilisé pour ces lignes, sinon les heures divergent entre la metabox **Day Pokémon Hours** et l’admin événements spéciaux.
 - **Titres** : `title_en` au format **`{Nom EN} Spotlight Hour`** ; `title_fr` au format **`Heure vedette {Nom FR}`** ; `title` aligné sur `title_en`.
 - **Slug** : base **`{slug-pokemon}-spotlight-hour`**, unicité via **`pokehub_generate_unique_event_slug()`** (suffixe `-1`, `-2`, … comme pour les autres spéciaux).
 
 La lecture côté bloc combine la liaison **`content_source_*`** et une rétrocompatibilité sur d’anciens préfixes de slug ; détail dans `pokehub_spotlight_sql_parent_scope()`.
+
+**Lecture dans la metabox** : `pokehub_content_get_featured_hours_classic_events_entries_for_parent()` convertit les timestamps Unix vers le fuseau du site pour remplir les champs date / heure — aligné avec **`mode` = `local`**.
+
+**Données anciennes** : une migration ponctuelle (`pokehub_spotlight_special_events_mode_local_v1`, exécutée avec les migrations de table `special_events` dans `includes/pokehub-db.php`) remet en **`local`** les lignes Spotlight encore en **`fixed`**, pour corriger l’affichage / la sauvegarde depuis l’admin **Special events**.
 
 ## Images (hooks / template)
 
@@ -56,6 +61,7 @@ Les slugs doivent rester **uniques** dans `special_events` **et** ne pas entrer 
 |----------|--------|
 | 404 sur `/pokemon-go/events/mon-slug` | Vérifier qu’une ligne existe dans `special_events` avec ce `slug` (même préfixe que la source configurée). |
 | Spotlight absent du bloc Day Hours | Vérifier `content_source_type` / `content_source_id` sur les lignes ; re-sauver la metabox sur l’article ; vérifier le type `pokemon-spotlight-hour` (ou équivalent en base). |
+| Heures Spotlight fausses après édition dans **Special events** | Vérifier que **`mode` = `local`** pour ce type d’événement ; recharger une page admin qui déclenche les migrations si besoin (option `pokehub_spotlight_special_events_mode_local_v1`) ; sinon repasser le mode à **local** à la main ou re-sauver depuis la metabox **Day Pokémon Hours**. |
 | Liste admin incohérente | Vérifier les filtres `source` (`local_event` / `remote_event` / `special_event`). |
 
 ## Voir aussi

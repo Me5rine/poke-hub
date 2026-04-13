@@ -33,17 +33,21 @@ function pokehub_render_special_event_form(
 
     $event_mode = $has_event_data && !empty($event->mode) ? $event->mode : 'local';
     
-    // Convertir les timestamps pour l'affichage dans datetime-local selon le mode
-    if ($has_event_data && !empty($event->start_ts) && function_exists('poke_hub_special_event_format_datetime')) {
-        $start_value = poke_hub_special_event_format_datetime($event->start_ts, $event_mode);
+    // Champs date + heure séparés (cohérents avec le mode local / UTC)
+    if ($has_event_data && !empty($event->start_ts) && function_exists('poke_hub_special_event_format_date_for_input')) {
+        $start_date_value = poke_hub_special_event_format_date_for_input((int) $event->start_ts, $event_mode);
+        $start_time_value = poke_hub_special_event_format_time_for_input((int) $event->start_ts, $event_mode);
     } else {
-        $start_value = '';
+        $start_date_value = '';
+        $start_time_value = '';
     }
-    
-    if ($has_event_data && !empty($event->end_ts) && function_exists('poke_hub_special_event_format_datetime')) {
-        $end_value = poke_hub_special_event_format_datetime($event->end_ts, $event_mode);
+
+    if ($has_event_data && !empty($event->end_ts) && function_exists('poke_hub_special_event_format_date_for_input')) {
+        $end_date_value = poke_hub_special_event_format_date_for_input((int) $event->end_ts, $event_mode);
+        $end_time_value = poke_hub_special_event_format_time_for_input((int) $event->end_ts, $event_mode);
     } else {
-        $end_value = '';
+        $end_date_value = '';
+        $end_time_value = '';
     }
 
     $recurring = $has_event_data && !empty($event->recurring) ? (int) $event->recurring : 0;
@@ -56,9 +60,13 @@ function pokehub_render_special_event_form(
         ? (int) $event->recurring_interval
         : 1;
 
-    $recurring_end_value = ($has_event_data && !empty($event->recurring_window_end_ts) && function_exists('poke_hub_special_event_format_datetime'))
-        ? poke_hub_special_event_format_datetime($event->recurring_window_end_ts, $event_mode)
-        : '';
+    if ($has_event_data && !empty($event->recurring_window_end_ts) && function_exists('poke_hub_special_event_format_date_for_input')) {
+        $recurring_end_date_value = poke_hub_special_event_format_date_for_input((int) $event->recurring_window_end_ts, $event_mode);
+        $recurring_end_time_value = poke_hub_special_event_format_time_for_input((int) $event->recurring_window_end_ts, $event_mode);
+    } else {
+        $recurring_end_date_value = '';
+        $recurring_end_time_value = '';
+    }
 
     $image_id   = $has_event_data && !empty($event->image_id) ? (int) $event->image_id : 0;
     $image_url  = $has_event_data && !empty($event->image_url) ? $event->image_url : '';
@@ -214,24 +222,50 @@ function pokehub_render_special_event_form(
                 </tr>
 
                 <tr>
-                    <th><label for="event_start"><?php esc_html_e('Start date/time', 'poke-hub'); ?></label></th>
+                    <th scope="row"><?php esc_html_e('Start', 'poke-hub'); ?></th>
                     <td>
-                        <input type="datetime-local"
-                               id="event_start"
-                               name="event[start]"
-                               value="<?php echo esc_attr($start_value); ?>"
-                               required>
+                        <span class="pokehub-datetime-split" style="display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <span>
+                                <label for="event_start_date" class="screen-reader-text"><?php esc_html_e('Start date', 'poke-hub'); ?></label>
+                                <input type="date"
+                                       id="event_start_date"
+                                       name="event[start_date]"
+                                       value="<?php echo esc_attr($start_date_value); ?>"
+                                       required>
+                            </span>
+                            <span>
+                                <label for="event_start_time" class="screen-reader-text"><?php esc_html_e('Start time', 'poke-hub'); ?></label>
+                                <input type="time"
+                                       id="event_start_time"
+                                       name="event[start_time]"
+                                       value="<?php echo esc_attr($start_time_value); ?>"
+                                       step="60">
+                            </span>
+                        </span>
                     </td>
                 </tr>
 
                 <tr>
-                    <th><label for="event_end"><?php esc_html_e('End date/time', 'poke-hub'); ?></label></th>
+                    <th scope="row"><?php esc_html_e('End', 'poke-hub'); ?></th>
                     <td>
-                        <input type="datetime-local"
-                               id="event_end"
-                               name="event[end]"
-                               value="<?php echo esc_attr($end_value); ?>"
-                               required>
+                        <span class="pokehub-datetime-split" style="display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <span>
+                                <label for="event_end_date" class="screen-reader-text"><?php esc_html_e('End date', 'poke-hub'); ?></label>
+                                <input type="date"
+                                       id="event_end_date"
+                                       name="event[end_date]"
+                                       value="<?php echo esc_attr($end_date_value); ?>"
+                                       required>
+                            </span>
+                            <span>
+                                <label for="event_end_time" class="screen-reader-text"><?php esc_html_e('End time', 'poke-hub'); ?></label>
+                                <input type="time"
+                                       id="event_end_time"
+                                       name="event[end_time]"
+                                       value="<?php echo esc_attr($end_time_value); ?>"
+                                       step="60">
+                            </span>
+                        </span>
                     </td>
                 </tr>
 
@@ -272,10 +306,16 @@ function pokehub_render_special_event_form(
                             <br><br>
                             <label>
                                 <?php esc_html_e('Repeat until', 'poke-hub'); ?>
-                                <input type="datetime-local"
-                                    name="event[recurring_window_end]"
-                                    value="<?php echo esc_attr($recurring_end_value); ?>">
                             </label>
+                            <span class="pokehub-datetime-split" style="display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:4px;">
+                                <input type="date"
+                                    name="event[recurring_window_end_date]"
+                                    value="<?php echo esc_attr($recurring_end_date_value); ?>">
+                                <input type="time"
+                                    name="event[recurring_window_end_time]"
+                                    value="<?php echo esc_attr($recurring_end_time_value); ?>"
+                                    step="60">
+                            </span>
                         </div>
                     </td>
                 </tr>
@@ -289,6 +329,7 @@ function pokehub_render_special_event_form(
                                   class="large-text"><?php echo esc_textarea($description); ?></textarea>
                     </td>
                 </tr>
+
             </table>
 
             <hr>

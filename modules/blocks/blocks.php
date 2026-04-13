@@ -31,6 +31,7 @@ add_action('init', function() {
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-collection-challenges-helpers.php'; // Helpers défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-special-research-helpers.php'; // Helpers études spéciales
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-eggs-helpers.php'; // Helpers bloc œufs
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-rest-go-pass.php'; // REST + chargement helpers Pass GO (fichier events) pour le bloc
     require_once POKE_HUB_BLOCKS_PATH . '/admin/collection-challenges-metabox.php'; // Meta box défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/admin/special-research-metabox.php'; // Meta box études spéciales
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-admin-ajax.php'; // AJAX helpers admin (indépendant du module Events)
@@ -59,6 +60,7 @@ add_action('init', function() {
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-habitats-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-new-pokemon-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-go-pass-metabox.php';
 
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:
@@ -197,6 +199,20 @@ add_action('init', function() {
             ['pokehub-blocks-front-style', 'pokehub-type-icons', 'pokehub-candy-display'],
             POKE_HUB_VERSION
         );
+
+        wp_register_style(
+            'pokehub-special-event-single',
+            POKE_HUB_URL . 'assets/css/poke-hub-special-events-single.css',
+            [],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style(
+            'pokehub-go-pass-block-front',
+            POKE_HUB_URL . 'assets/css/poke-hub-go-pass-block-front.css',
+            ['pokehub-blocks-front-style'],
+            POKE_HUB_VERSION
+        );
+        wp_enqueue_style('pokehub-special-event-single');
     });
     
     /**

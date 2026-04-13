@@ -1,0 +1,27 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/go-pass",
+	"title": "Pass GO",
+	"category": "pokehub",
+	"icon": "chart-bar",
+	"description": "Affiche un Pass GO (résumé ou grille complète) à partir d’un événement spécial Pass GO.",
+	"keywords": ["go pass", "battle pass", "pokehub", "event"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"specialEventId": {
+			"type": "number",
+			"default": 0
+		},
+		"displayMode": {
+			"type": "string",
+			"default": "summary"
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
