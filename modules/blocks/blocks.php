@@ -32,6 +32,7 @@ add_action('init', function() {
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-special-research-helpers.php'; // Helpers études spéciales
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-eggs-helpers.php'; // Helpers bloc œufs
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-rest-go-pass.php'; // REST + chargement helpers Pass GO (fichier events) pour le bloc
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-go-pass-host-link.php'; // Liaison contenu → Pass GO (table locale)
     require_once POKE_HUB_BLOCKS_PATH . '/admin/collection-challenges-metabox.php'; // Meta box défis de collection
     require_once POKE_HUB_BLOCKS_PATH . '/admin/special-research-metabox.php'; // Meta box études spéciales
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-admin-ajax.php'; // AJAX helpers admin (indépendant du module Events)
@@ -61,6 +62,7 @@ add_action('init', function() {
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-new-pokemon-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-go-pass-metabox.php';
+    require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-go-pass-post-guard.php';
 
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:

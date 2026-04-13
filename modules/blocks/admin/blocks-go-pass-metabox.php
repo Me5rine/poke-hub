@@ -82,15 +82,42 @@ add_action('add_meta_boxes', 'pokehub_blocks_add_go_pass_metabox');
 function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
     wp_nonce_field('pokehub_save_go_pass_metabox', 'pokehub_go_pass_metabox_nonce');
 
-    $event_id = (int) get_post_meta($post->ID, '_pokehub_go_pass_special_event_id', true);
-    $mode     = get_post_meta($post->ID, '_pokehub_go_pass_display_mode', true);
-    $mode     = ($mode === 'full') ? 'full' : 'summary';
+    $event_id = 0;
+    $mode     = 'summary';
+    if (function_exists('pokehub_go_pass_host_link_get_for_post')) {
+        $link = pokehub_go_pass_host_link_get_for_post((int) $post->ID);
+        if ($link) {
+            $event_id = (int) $link['special_event_id'];
+            $mode     = ($link['display_mode'] === 'full') ? 'full' : 'summary';
+        }
+    }
+
+    $host_target = get_post_meta($post->ID, '_pokehub_go_pass_host_target', true);
+    $host_target = is_string($host_target) ? sanitize_key($host_target) : '';
+    if (!in_array($host_target, ['local', 'remote', 'special_event'], true)) {
+        $host_target = 'local';
+    }
+    $host_entity_id = (int) get_post_meta($post->ID, '_pokehub_go_pass_host_entity_id', true);
 
     $options = pokehub_blocks_go_pass_metabox_event_options();
     ?>
     <p class="description">
-        <?php esc_html_e('These settings apply to the “GO Pass” block in the content. Search the list by typing a name.', 'poke-hub'); ?>
+        <?php esc_html_e('Configure the GO Pass for this article here. Choose whether the block is keyed to this WordPress post, a JV Actu mirrored post ID, or a Poké HUB special event row id, then pick the pass and display mode.', 'poke-hub'); ?>
     </p>
+    <fieldset class="pokehub-go-pass-host-target" style="margin:0 0 12px;padding:8px 0;border:none;">
+        <legend class="screen-reader-text"><?php esc_html_e('Host for the GO Pass block', 'poke-hub'); ?></legend>
+        <p><strong><?php esc_html_e('Host for the GO Pass block', 'poke-hub'); ?></strong></p>
+        <p>
+            <label><input type="radio" name="pokehub_go_pass_host_target" value="local" <?php checked($host_target, 'local'); ?> /> <?php esc_html_e('This WordPress post (default)', 'poke-hub'); ?></label><br>
+            <label><input type="radio" name="pokehub_go_pass_host_target" value="remote" <?php checked($host_target, 'remote'); ?> /> <?php esc_html_e('JV Actu — mirrored post ID (remote_posts.ID on this site)', 'poke-hub'); ?></label><br>
+            <label><input type="radio" name="pokehub_go_pass_host_target" value="special_event" <?php checked($host_target, 'special_event'); ?> /> <?php esc_html_e('Poké HUB special event — row id (special_events.id)', 'poke-hub'); ?></label>
+        </p>
+        <p id="pokehub-go-pass-entity-row" class="pokehub-go-pass-entity-row" style="margin-top:8px;">
+            <label for="pokehub_go_pass_host_entity_id"><strong><?php esc_html_e('Host ID', 'poke-hub'); ?></strong></label><br>
+            <input type="number" name="pokehub_go_pass_host_entity_id" id="pokehub_go_pass_host_entity_id" class="small-text" min="1" step="1" value="<?php echo $host_entity_id > 0 ? esc_attr((string) $host_entity_id) : ''; ?>" />
+            <span class="description"><?php esc_html_e('Required for JV Actu or special event host (not used for “this post”).', 'poke-hub'); ?></span>
+        </p>
+    </fieldset>
     <p>
         <label for="pokehub_go_pass_special_event_id"><strong><?php esc_html_e('GO Pass event', 'poke-hub'); ?></strong></label><br>
         <select name="pokehub_go_pass_special_event_id" id="pokehub_go_pass_special_event_id" class="widefat pokehub-go-pass-linked-select" style="width:100%;max-width:100%;">
@@ -117,6 +144,30 @@ function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
     <p class="description">
         <?php esc_html_e('Add the “GO Pass” block from the Poké HUB category in the editor; it will use the choices above.', 'poke-hub'); ?>
     </p>
+    <script>
+    (function () {
+        function sync() {
+            var v = document.querySelector('input[name="pokehub_go_pass_host_target"]:checked');
+            v = v ? v.value : 'local';
+            var row = document.getElementById('pokehub-go-pass-entity-row');
+            var input = document.getElementById('pokehub_go_pass_host_entity_id');
+            if (!row || !input) { return; }
+            if (v === 'local') {
+                row.style.display = 'none';
+                input.disabled = true;
+            } else {
+                row.style.display = '';
+                input.disabled = false;
+            }
+        }
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.name === 'pokehub_go_pass_host_target') { sync(); }
+        });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', sync);
+        } else { sync(); }
+    })();
+    </script>
     <?php
 }
 
@@ -139,6 +190,54 @@ function pokehub_blocks_save_go_pass_metabox($post_id): void {
     $mode = isset($_POST['pokehub_go_pass_display_mode']) ? sanitize_key((string) wp_unslash($_POST['pokehub_go_pass_display_mode'])) : 'summary';
     if (!in_array($mode, ['summary', 'full'], true)) {
         $mode = 'summary';
+    }
+
+    $target = isset($_POST['pokehub_go_pass_host_target']) ? sanitize_key((string) wp_unslash($_POST['pokehub_go_pass_host_target'])) : 'local';
+    if (!in_array($target, ['local', 'remote', 'special_event'], true)) {
+        $target = 'local';
+    }
+    $entity = isset($_POST['pokehub_go_pass_host_entity_id']) ? (int) $_POST['pokehub_go_pass_host_entity_id'] : 0;
+
+    $old_target = get_post_meta($post_id, '_pokehub_go_pass_host_target', true);
+    $old_entity = (int) get_post_meta($post_id, '_pokehub_go_pass_host_entity_id', true);
+
+    if (function_exists('pokehub_go_pass_host_link_delete')) {
+        pokehub_go_pass_host_link_delete('local_post', $post_id);
+        if ($old_target === 'remote' && $old_entity > 0) {
+            pokehub_go_pass_host_link_delete('remote_post', $old_entity);
+        }
+        if ($old_target === 'special_event' && $old_entity > 0) {
+            pokehub_go_pass_host_link_delete('special_event', $old_entity);
+        }
+    }
+
+    update_post_meta($post_id, '_pokehub_go_pass_host_target', $target);
+    if ($target === 'local') {
+        delete_post_meta($post_id, '_pokehub_go_pass_host_entity_id');
+    } elseif ($entity > 0) {
+        update_post_meta($post_id, '_pokehub_go_pass_host_entity_id', $entity);
+    } else {
+        delete_post_meta($post_id, '_pokehub_go_pass_host_entity_id');
+    }
+
+    $table_ok = function_exists('pokehub_get_table') && function_exists('pokehub_table_exists')
+        && pokehub_get_table('go_pass_host_links') !== ''
+        && pokehub_table_exists(pokehub_get_table('go_pass_host_links'));
+
+    if ($table_ok && function_exists('pokehub_go_pass_host_link_save')) {
+        $ptype = get_post_type($post_id);
+        if ($ptype === false) {
+            $ptype = '';
+        }
+        if ($target === 'local') {
+            pokehub_go_pass_host_link_save('local_post', $post_id, $eid, $mode, (string) $ptype);
+        } elseif ($entity > 0) {
+            $kind = $target === 'remote' ? 'remote_post' : 'special_event';
+            pokehub_go_pass_host_link_save($kind, $entity, $eid, $mode, '');
+        }
+        delete_post_meta($post_id, '_pokehub_go_pass_special_event_id');
+        delete_post_meta($post_id, '_pokehub_go_pass_display_mode');
+        return;
     }
 
     update_post_meta($post_id, '_pokehub_go_pass_special_event_id', $eid);

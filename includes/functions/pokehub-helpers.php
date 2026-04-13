@@ -331,6 +331,8 @@ function pokehub_get_table(string $key): string {
         'content_raids'                   => ['scope' => 'content_source', 'suffix' => 'content_raids'],
         'content_raid_bosses'             => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
         'content_go_pass'                => ['scope' => 'content_source', 'suffix' => 'content_go_pass'],
+        // Liaison wp_posts → pass (ids locaux : toujours préfixe WP du site courant)
+        'go_pass_host_links'             => ['scope' => 'local', 'suffix' => 'go_pass_host_links'],
         // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
         'content_day_pokemon_hours'       => ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hours'],
         'content_day_pokemon_hour_entries'=> ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hour_entries'],

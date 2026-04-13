@@ -1168,6 +1168,7 @@ class Pokehub_DB {
         $raids_tbl         = pokehub_get_table('content_raids');
         $raid_bosses_tbl   = pokehub_get_table('content_raid_bosses');
         $go_pass_tbl       = pokehub_get_table('content_go_pass');
+        $go_pass_host_tbl  = pokehub_get_table('go_pass_host_links');
 
         $sql_eggs = "CREATE TABLE {$eggs_tbl} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1461,6 +1462,21 @@ class Pokehub_DB {
             KEY dates (start_ts, end_ts)
         ) {$charset_collate};";
 
+        $sql_go_pass_host = "CREATE TABLE {$go_pass_host_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            host_kind VARCHAR(20) NOT NULL DEFAULT 'local_post',
+            host_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            host_post_type VARCHAR(40) NOT NULL DEFAULT '',
+            pass_source_type VARCHAR(20) NOT NULL DEFAULT 'special_event',
+            pass_source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            display_mode VARCHAR(20) NOT NULL DEFAULT 'summary',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY host_entity (host_kind, host_id),
+            KEY pass_lookup (pass_source_type, pass_source_id)
+        ) {$charset_collate};";
+
         dbDelta($sql_eggs);
         dbDelta($sql_egg_pokemon);
         dbDelta($sql_quest_groups);
@@ -1497,6 +1513,9 @@ class Pokehub_DB {
         dbDelta($sql_raids);
         dbDelta($sql_raid_bosses);
         dbDelta($sql_go_pass);
+        dbDelta($sql_go_pass_host);
+
+        $this->migrateGoPassHostLinksTableFromLegacyPostId($go_pass_host_tbl);
 
         // Migration : ajouter quest_group_id à content_quest_lines si absent (installations existantes)
         $col = $wpdb->get_var($wpdb->prepare(
@@ -1507,6 +1526,77 @@ class Pokehub_DB {
         if (empty($col)) {
             $wpdb->query("ALTER TABLE {$quest_lines_tbl} ADD COLUMN quest_group_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER content_quest_id, ADD KEY quest_group_id (quest_group_id)");
         }
+    }
+
+    /**
+     * Migre go_pass_host_links : ancienne colonne host_post_id → host_kind=local_post + host_id.
+     */
+    private function migrateGoPassHostLinksTableFromLegacyPostId(string $table) {
+        global $wpdb;
+
+        if ($table === '') {
+            return;
+        }
+
+        $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        if ($found !== $table) {
+            return;
+        }
+
+        $cols = [];
+        $col_rows = $wpdb->get_results("SHOW COLUMNS FROM `{$table}`", ARRAY_A);
+        if (!is_array($col_rows)) {
+            return;
+        }
+        foreach ($col_rows as $row) {
+            if (!empty($row['Field'])) {
+                $cols[] = $row['Field'];
+            }
+        }
+
+        if (!in_array('host_post_id', $cols, true)) {
+            return;
+        }
+
+        if (!in_array('host_kind', $cols, true)) {
+            $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `host_kind` VARCHAR(20) NOT NULL DEFAULT 'local_post' AFTER `id`, ADD COLUMN `host_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER `host_kind`");
+        }
+
+        $wpdb->query("UPDATE `{$table}` SET `host_kind` = 'local_post', `host_id` = `host_post_id` WHERE `host_post_id` > 0");
+
+        $indexes = $wpdb->get_results("SHOW INDEX FROM `{$table}`", ARRAY_A);
+        $key_names = [];
+        if (is_array($indexes)) {
+            foreach ($indexes as $ix) {
+                $kn = isset($ix['Key_name']) ? (string) $ix['Key_name'] : '';
+                if ($kn !== '') {
+                    $key_names[$kn] = true;
+                }
+            }
+        }
+
+        if (isset($key_names['host_post_id'])) {
+            $wpdb->query("ALTER TABLE `{$table}` DROP INDEX `host_post_id`");
+        }
+
+        $has_host_entity = isset($key_names['host_entity']);
+        if (!$has_host_entity) {
+            $indexes2 = $wpdb->get_results("SHOW INDEX FROM `{$table}`", ARRAY_A);
+            if (is_array($indexes2)) {
+                foreach ($indexes2 as $ix) {
+                    if (($ix['Key_name'] ?? '') === 'host_entity') {
+                        $has_host_entity = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$has_host_entity) {
+            $wpdb->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `host_entity` (`host_kind`, `host_id`)");
+        }
+
+        $wpdb->query("ALTER TABLE `{$table}` DROP COLUMN `host_post_id`");
     }
 
     /**

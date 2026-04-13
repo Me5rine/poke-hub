@@ -2994,7 +2994,7 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
     // Nettoyage : supprimer les special_events spotlight déjà créés pour ce parent
     // (liaison stable content_source_* si disponible, sinon préfixe de slug hérité).
     list($scope_sql, $scope_args) = pokehub_spotlight_sql_parent_scope((int) $parent_id);
-    $sql_existing = "SELECT id, slug, title, start_ts, end_ts FROM {$events_tbl} WHERE {$scope_sql}";
+    $sql_existing = "SELECT id, slug, title, title_en, title_fr, start_ts, end_ts FROM {$events_tbl} WHERE {$scope_sql}";
     $existing_rows = $wpdb->get_results(
         call_user_func_array([$wpdb, 'prepare'], array_merge([$sql_existing], $scope_args)),
         ARRAY_A
@@ -3010,14 +3010,25 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
                 $existing_event_ids[] = $eid;
             }
             $slug_key = isset($row['slug']) ? (string) $row['slug'] : '';
-            $title_prev = isset($row['title']) ? trim((string) $row['title']) : '';
-            if ($slug_key !== '' && $title_prev !== '') {
-                $preserved_titles_by_slug[$slug_key] = $title_prev;
+            $title_legacy = isset($row['title']) ? trim((string) $row['title']) : '';
+            $title_en_prev = isset($row['title_en']) ? trim((string) $row['title_en']) : '';
+            $title_fr_prev = isset($row['title_fr']) ? trim((string) $row['title_fr']) : '';
+            if ($title_en_prev === '' && $title_legacy !== '') {
+                $title_en_prev = $title_legacy;
+            }
+            $pack = [
+                'en' => $title_en_prev,
+                'fr' => $title_fr_prev,
+                'legacy' => $title_legacy,
+            ];
+            $has_any_title = ($pack['en'] !== '' || $pack['fr'] !== '' || $pack['legacy'] !== '');
+            if ($slug_key !== '' && $has_any_title) {
+                $preserved_titles_by_slug[$slug_key] = $pack;
             }
             $sts = (int) ($row['start_ts'] ?? 0);
             $ets = (int) ($row['end_ts'] ?? 0);
-            if ($sts > 0 && $ets > 0 && $title_prev !== '') {
-                $preserved_titles_by_slot[$sts . '|' . $ets] = $title_prev;
+            if ($sts > 0 && $ets > 0 && $has_any_title) {
+                $preserved_titles_by_slot[$sts . '|' . $ets] = $pack;
             }
         }
     }
@@ -3161,16 +3172,24 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
             : sanitize_title($slug_base);
 
         $slot_ts_key = (int) $start_ts . '|' . (int) $end_ts;
+        $preserved_pack = null;
         if (isset($preserved_titles_by_slot[$slot_ts_key])) {
-            $preserved = (string) $preserved_titles_by_slot[$slot_ts_key];
-            $event_title = $preserved;
-            $event_title_en = $preserved;
-            $event_title_fr = $preserved;
+            $preserved_pack = $preserved_titles_by_slot[$slot_ts_key];
         } elseif (isset($preserved_titles_by_slug[$event_slug])) {
-            $preserved = (string) $preserved_titles_by_slug[$event_slug];
-            $event_title = $preserved;
-            $event_title_en = $preserved;
-            $event_title_fr = $preserved;
+            $preserved_pack = $preserved_titles_by_slug[$event_slug];
+        }
+        if (is_array($preserved_pack)) {
+            if (($preserved_pack['en'] ?? '') !== '') {
+                $event_title_en = (string) $preserved_pack['en'];
+            }
+            if (($preserved_pack['fr'] ?? '') !== '') {
+                $event_title_fr = (string) $preserved_pack['fr'];
+            }
+            if ($event_title_en !== '') {
+                $event_title = $event_title_en;
+            } elseif (($preserved_pack['legacy'] ?? '') !== '') {
+                $event_title = (string) $preserved_pack['legacy'];
+            }
         }
 
         $insert_row = [
