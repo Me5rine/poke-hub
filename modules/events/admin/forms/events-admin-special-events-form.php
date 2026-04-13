@@ -195,7 +195,10 @@ function pokehub_render_special_event_form(
                                 </button>
                             </p>
 
-                            <!-- URL stockée mais pas éditable directement -->
+                            <input type="hidden"
+                                id="event_image_id"
+                                name="event[image_id]"
+                                value="<?php echo esc_attr((string) (int) $image_id); ?>">
                             <input type="hidden"
                                 id="event_image_url"
                                 name="event[image_url]"

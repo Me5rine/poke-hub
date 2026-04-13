@@ -116,6 +116,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
         [
             'selectTitle' => __('Select an image for the special event', 'poke-hub'),
             'buttonText'  => __('Use this image', 'poke-hub'),
+            'noImage'     => __('No image selected yet.', 'poke-hub'),
         ]
     );
 
@@ -184,7 +185,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
         wp_enqueue_script(
             'pokehub-go-pass-admin',
             POKE_HUB_URL . 'assets/js/pokehub-go-pass-admin.js',
-            ['jquery', 'jquery-ui-sortable', 'select2', 'pokehub-admin-select2'],
+            ['jquery', 'jquery-ui-sortable', 'select2', 'pokehub-admin-select2', 'pokehub-media-url'],
             POKE_HUB_VERSION,
             true
         );

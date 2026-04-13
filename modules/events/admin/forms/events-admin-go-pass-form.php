@@ -177,7 +177,14 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                         <div class="pokehub-special-event-image-field" id="pokehub-go-pass-image-field">
                             <div class="image-preview" style="margin-bottom:10px;">
                                 <?php if ($current_image_url) : ?>
-                                    <img src="<?php echo esc_url($current_image_url); ?>" alt="" style="max-width:100%;height:auto;display:block;">
+                                    <img src="<?php echo esc_url($current_image_url); ?>"
+                                         class="pokehub-event-image-preview"
+                                         alt=""
+                                         style="max-width:100%;height:auto;display:block;">
+                                <?php else : ?>
+                                    <p class="description pokehub-event-image-placeholder" style="margin:0;">
+                                        <?php esc_html_e('No image selected yet.', 'poke-hub'); ?>
+                                    </p>
                                 <?php endif; ?>
                             </div>
                             <p>

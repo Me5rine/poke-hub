@@ -147,14 +147,19 @@
         }
 
         /**
-         * === ÉVÉNEMENTS SPÉCIAUX ===
-         * On ne gère QUE une URL (hidden), aucune notion d'image_id ici.
+         * === ÉVÉNEMENTS SPÉCIAUX / PASS GO ===
+         * Bloc .pokehub-special-event-image-field : event[image_id] (médiathèque) + event[image_url] (URL externe).
          */
         $(document).on('click', '.pokehub-select-event-image', function(e){
             e.preventDefault();
 
-            const $field    = $('#pokehub-special-event-image-field');
-            const $urlInput = $field.find('#event_image_url'); // hidden input
+            const $field = $(this).closest('.pokehub-special-event-image-field');
+            if (!$field.length) {
+                return;
+            }
+
+            const $idInput  = $field.find('input[name="event[image_id]"]');
+            const $urlInput = $field.find('input[name="event[image_url]"]');
             let   $preview  = $field.find('.pokehub-event-image-preview');
             const $remove   = $field.find('.pokehub-remove-event-image');
 
@@ -166,17 +171,16 @@
                 multiple: false
             });
 
-            // Pré-remplir l’onglet URL avec la valeur actuelle
             frame.on('open', function(){
                 const state = frame.state('pokehub-types-url');
                 if (state) {
+                    const urlFromField = $urlInput.length ? String($urlInput.val() || '') : '';
                     state.props.set({
-                        url: $urlInput.val() || ''
+                        url: urlFromField
                     });
                 }
             });
 
-            // Sélection depuis la médiathèque (attachment classique)
             frame.on('select', function(){
                 const attachment = frame.state().get('selection').first();
                 if (!attachment) return;
@@ -184,41 +188,47 @@
                 const data = attachment.toJSON();
                 if (!data.url) return;
 
-                $urlInput.val(data.url);
+                if ($idInput.length) {
+                    $idInput.val(data.id ? String(data.id) : '');
+                    if ($urlInput.length) {
+                        $urlInput.val('');
+                    }
+                } else if ($urlInput.length) {
+                    $urlInput.val(data.url);
+                }
 
                 if (!$preview.length) {
-                    // Si le markup de base n’a pas encore d’img, on l’injecte
                     $field.find('.image-preview').html(
-                        '<img src="' + data.url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;">'
+                        '<img src="' + data.url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;" alt="">'
                     );
                     $preview = $field.find('.pokehub-event-image-preview');
                 } else {
-                    $preview
-                        .attr('src', data.url)
-                        .show();
+                    $preview.attr('src', data.url).show();
                 }
 
                 $remove.show();
             });
 
-            // Insertion via l’onglet URL (onglet custom "Insert from URL")
             frame.on('insert', function(state){
                 if (!state || state.id !== 'pokehub-types-url') return;
 
                 const url = state.props.get('url');
                 if (!url) return;
 
-                $urlInput.val(url);
+                if ($idInput.length) {
+                    $idInput.val('');
+                }
+                if ($urlInput.length) {
+                    $urlInput.val(url);
+                }
 
                 if (!$preview.length) {
                     $field.find('.image-preview').html(
-                        '<img src="' + url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;">'
+                        '<img src="' + url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;" alt="">'
                     );
                     $preview = $field.find('.pokehub-event-image-preview');
                 } else {
-                    $preview
-                        .attr('src', url)
-                        .show();
+                    $preview.attr('src', url).show();
                 }
 
                 $remove.show();
@@ -227,30 +237,31 @@
             frame.open();
         });
 
-        // Bouton "Remove image" pour les événements spéciaux
         $(document).on('click', '.pokehub-remove-event-image', function(e){
             e.preventDefault();
 
-            const $field    = $('#pokehub-special-event-image-field');
-            const $urlInput = $field.find('#event_image_url');
-            const $preview  = $field.find('.pokehub-event-image-preview');
-
-            $urlInput.val('');
-
-            if ($preview.length) {
-                $preview
-                    .attr('src', '')
-                    .hide();
+            const $field = $(this).closest('.pokehub-special-event-image-field');
+            if (!$field.length) {
+                return;
             }
 
-            // On remet un petit texte "No image selected yet."
+            const $idInput  = $field.find('input[name="event[image_id]"]');
+            const $urlInput = $field.find('input[name="event[image_url]"]');
+
+            if ($idInput.length) {
+                $idInput.val('');
+            }
+            if ($urlInput.length) {
+                $urlInput.val('');
+            }
+
             const noImageText =
                 (window.pokemonEventsMedia && pokemonEventsMedia.noImage) ||
                 (window.pokemonTypesMedia && pokemonTypesMedia.noImage) ||
                 'No image selected yet.';
 
             $field.find('.image-preview').html(
-                '<p class="description" style="margin:0;">' + noImageText + '</p>'
+                '<p class="description pokehub-event-image-placeholder" style="margin:0;">' + noImageText + '</p>'
             );
 
             $(this).hide();
