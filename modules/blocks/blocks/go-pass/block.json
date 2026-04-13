@@ -20,14 +20,6 @@
 		"displayMode": {
 			"type": "string",
 			"default": "summary"
-		},
-		"hostKind": {
-			"type": "string",
-			"default": ""
-		},
-		"hostId": {
-			"type": "number",
-			"default": 0
 		}
 	},
 	"editorScript": "file:./index.js",

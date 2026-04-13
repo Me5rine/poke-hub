@@ -1,7 +1,7 @@
 <?php
 /**
- * Liaison contenu → Pass GO (special_events) : table locale pokehub_go_pass_host_links.
- * Hôtes : local_post (wp_posts), remote_post (table remote_posts / JV Actu), special_event (ligne special_events).
+ * Liaison contenu → Pass GO (special_events) : uniquement la table pokehub_go_pass_host_links.
+ * Clés : local_post | remote_post | special_event + host_id. Aucune post_meta pour ces liaisons.
  *
  * @package PokeHub
  */
@@ -52,73 +52,16 @@ function pokehub_go_pass_host_link_get(string $host_kind, int $host_id): ?array 
         }
     }
 
-    if ($host_kind === 'local_post') {
-        $eid = (int) get_post_meta($host_id, '_pokehub_go_pass_special_event_id', true);
-        $meta_mode = get_post_meta($host_id, '_pokehub_go_pass_display_mode', true);
-        if ($eid <= 0) {
-            return null;
-        }
-        $mode = ($meta_mode === 'full') ? 'full' : 'summary';
-
-        return ['special_event_id' => $eid, 'display_mode' => $mode];
-    }
-
     return null;
 }
 
 /**
- * Pass GO affiché pour un article en cours d’édition / affiché : selon la métabox
- * (_pokehub_go_pass_host_target + _pokehub_go_pass_host_entity_id).
+ * Pass GO pour un article WordPress : ligne `local_post` + ID dans go_pass_host_links (métabox).
  *
  * @return array{special_event_id: int, display_mode: string}|null
  */
 function pokehub_go_pass_host_link_get_for_post(int $post_id): ?array {
-    if ($post_id <= 0) {
-        return null;
-    }
-
-    $target = get_post_meta($post_id, '_pokehub_go_pass_host_target', true);
-    $target = is_string($target) ? sanitize_key($target) : '';
-
-    if ($target === 'remote') {
-        $hid = (int) get_post_meta($post_id, '_pokehub_go_pass_host_entity_id', true);
-        if ($hid > 0) {
-            $link = pokehub_go_pass_host_link_get('remote_post', $hid);
-            if ($link) {
-                return $link;
-            }
-        }
-        return pokehub_go_pass_host_link_get_post_fallback_pass_meta($post_id);
-    }
-
-    if ($target === 'special_event') {
-        $hid = (int) get_post_meta($post_id, '_pokehub_go_pass_host_entity_id', true);
-        if ($hid > 0) {
-            $link = pokehub_go_pass_host_link_get('special_event', $hid);
-            if ($link) {
-                return $link;
-            }
-        }
-        return pokehub_go_pass_host_link_get_post_fallback_pass_meta($post_id);
-    }
-
     return pokehub_go_pass_host_link_get('local_post', $post_id);
-}
-
-/**
- * Repli si la table distante n’est pas dispo : métas pass sur le post courant.
- *
- * @return array{special_event_id: int, display_mode: string}|null
- */
-function pokehub_go_pass_host_link_get_post_fallback_pass_meta(int $post_id): ?array {
-    $eid = (int) get_post_meta($post_id, '_pokehub_go_pass_special_event_id', true);
-    if ($eid <= 0) {
-        return null;
-    }
-    $meta_mode = get_post_meta($post_id, '_pokehub_go_pass_display_mode', true);
-    $mode      = ($meta_mode === 'full') ? 'full' : 'summary';
-
-    return ['special_event_id' => $eid, 'display_mode' => $mode];
 }
 
 /**
@@ -248,13 +191,13 @@ function pokehub_go_pass_host_link_maybe_migrate_meta(): void {
         }
         if ($eid > 0) {
             pokehub_go_pass_host_link_save('local_post', $pid, $eid, (string) $mode, (string) $ptype);
-            update_post_meta($pid, '_pokehub_go_pass_host_target', 'local');
-            delete_post_meta($pid, '_pokehub_go_pass_host_entity_id');
         } else {
             pokehub_go_pass_host_link_delete('local_post', $pid);
         }
         delete_post_meta($pid, '_pokehub_go_pass_special_event_id');
         delete_post_meta($pid, '_pokehub_go_pass_display_mode');
+        delete_post_meta($pid, '_pokehub_go_pass_host_target');
+        delete_post_meta($pid, '_pokehub_go_pass_host_entity_id');
     }
 
     update_option('pokehub_go_pass_host_links_meta_migrated_v1', '1', false);
@@ -262,15 +205,38 @@ function pokehub_go_pass_host_link_maybe_migrate_meta(): void {
 
 add_action('init', 'pokehub_go_pass_host_link_maybe_migrate_meta', 30);
 
+/**
+ * Supprime toute post_meta résiduelle liée au Pass GO (après migration vers la table).
+ */
+function pokehub_go_pass_host_link_purge_legacy_post_meta(): void {
+    if (get_option('pokehub_go_pass_host_links_legacy_post_meta_purged', '')) {
+        return;
+    }
+    if (!function_exists('pokehub_get_table') || !function_exists('pokehub_table_exists')) {
+        return;
+    }
+    $table = pokehub_get_table('go_pass_host_links');
+    if ($table === '' || !pokehub_table_exists($table)) {
+        return;
+    }
+
+    global $wpdb;
+    $keys = [
+        '_pokehub_go_pass_special_event_id',
+        '_pokehub_go_pass_display_mode',
+        '_pokehub_go_pass_host_target',
+        '_pokehub_go_pass_host_entity_id',
+    ];
+    foreach ($keys as $meta_key) {
+        $wpdb->delete($wpdb->postmeta, ['meta_key' => $meta_key], ['%s']);
+    }
+
+    update_option('pokehub_go_pass_host_links_legacy_post_meta_purged', '1', false);
+}
+
+add_action('init', 'pokehub_go_pass_host_link_purge_legacy_post_meta', 31);
+
 function pokehub_go_pass_host_link_on_delete_post(int $post_id): void {
-    $target = get_post_meta($post_id, '_pokehub_go_pass_host_target', true);
-    $entity = (int) get_post_meta($post_id, '_pokehub_go_pass_host_entity_id', true);
-    if ($target === 'remote' && $entity > 0) {
-        pokehub_go_pass_host_link_delete('remote_post', $entity);
-    }
-    if ($target === 'special_event' && $entity > 0) {
-        pokehub_go_pass_host_link_delete('special_event', $entity);
-    }
     pokehub_go_pass_host_link_delete('local_post', $post_id);
 }
 add_action('delete_post', 'pokehub_go_pass_host_link_on_delete_post', 10, 1);

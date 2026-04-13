@@ -1,6 +1,6 @@
 <?php
 /**
- * Pass GO : une liaison par hôte (local_post / remote_post / special_event dans pokehub_go_pass_host_links) + au plus un bloc dans le contenu.
+ * Pass GO : liaison dans pokehub_go_pass_host_links (article → pass) + au plus un bloc dans le contenu.
  *
  * @package PokeHub
  */

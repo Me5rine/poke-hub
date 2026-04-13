@@ -45,17 +45,7 @@ $host_kinds = function_exists('pokehub_go_pass_host_kinds')
 $event_id = 0;
 $variant  = 'summary';
 
-$attr_kind = isset($attributes['hostKind']) ? sanitize_key((string) $attributes['hostKind']) : '';
-$attr_hid  = isset($attributes['hostId']) ? (int) $attributes['hostId'] : 0;
-if ($attr_kind !== '' && $attr_hid > 0 && in_array($attr_kind, $host_kinds, true) && function_exists('pokehub_go_pass_host_link_get')) {
-    $link = pokehub_go_pass_host_link_get($attr_kind, $attr_hid);
-    if ($link) {
-        $event_id = (int) $link['special_event_id'];
-        $variant  = ($link['display_mode'] === 'full') ? 'full' : 'summary';
-    }
-}
-
-if ($event_id <= 0 && $post_id > 0 && function_exists('pokehub_go_pass_host_link_get_for_post')) {
+if ($post_id > 0 && function_exists('pokehub_go_pass_host_link_get_for_post')) {
     $link = pokehub_go_pass_host_link_get_for_post($post_id);
     if ($link) {
         $event_id = (int) $link['special_event_id'];
@@ -91,14 +81,15 @@ if (!function_exists('pokehub_go_pass_get_special_event_row_by_id')) {
 }
 
 if ($event_id <= 0) {
-    $msg = __('Configure the GO Pass in the “GO Pass (block)” box below the editor.', 'poke-hub');
-    return '<div class="pokehub-go-pass-block pokehub-go-pass-block--empty"><p>' . esc_html($msg) . '</p></div>';
+    return '';
 }
 
 $event = pokehub_go_pass_get_special_event_row_by_id($event_id);
 if (!$event || !function_exists('pokehub_is_go_pass_special_event') || !pokehub_is_go_pass_special_event($event)) {
     return '';
 }
+
+$block_title_html = '<h2 class="pokehub-block-title">' . esc_html__('Pass GO', 'poke-hub') . '</h2>';
 
 if (!wp_style_is('pokehub-go-pass-block-front', 'registered')) {
     wp_register_style(
@@ -125,14 +116,15 @@ if ($variant === 'full') {
 if ($variant === 'full' && function_exists('pokehub_render_go_pass_html')) {
     $full = pokehub_render_go_pass_html($event);
     if ($full !== '') {
-        return '<div class="pokehub-go-pass-block pokehub-go-pass-block--full">' . $full . '</div>';
+        return '<div class="pokehub-go-pass-block pokehub-go-pass-block--full">' . $block_title_html . $full . '</div>';
     }
 }
 
 if (function_exists('pokehub_render_go_pass_summary_html')) {
-    return '<div class="pokehub-go-pass-block pokehub-go-pass-block--summary">' .
-        pokehub_render_go_pass_summary_html($event, null) .
-        '</div>';
+    $summary = pokehub_render_go_pass_summary_html($event, null);
+    if ($summary !== '') {
+        return '<div class="pokehub-go-pass-block pokehub-go-pass-block--summary">' . $block_title_html . $summary . '</div>';
+    }
 }
 
 return '';
