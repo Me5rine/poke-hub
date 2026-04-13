@@ -120,6 +120,12 @@ function poke_hub_events_render_event(object $event): void {
     $end   = $event->end_ts;
 
     $image_url = property_exists($event, 'image_url') ? (string) $event->image_url : '';
+    if ($image_url === '' && !empty($event->image_id)) {
+        $from_id = wp_get_attachment_image_url((int) $event->image_id, 'large');
+        if ($from_id) {
+            $image_url = $from_id;
+        }
+    }
     $color     = !empty($event->event_type_color) ? $event->event_type_color : '#880051';
 
     // URL vers l'événement

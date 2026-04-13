@@ -1696,10 +1696,18 @@ function poke_hub_special_event_normalize_row(array $row): object {
     $mode      = !empty($row['mode']) ? $row['mode'] : 'local';
     $recurring = !empty($row['recurring']) ? (int) $row['recurring'] : 0;
 
-    // 🔹 Image spécifique du special event (nouvelle colonne)
-    //    Si tu n’utilises pas image_id, il restera null.
-    $image_id  = !empty($row['image_id']) ? (int) $row['image_id'] : null;
-    $image_url = !empty($row['image_url']) ? (string) $row['image_url'] : '';
+    // 🔹 Image : en base, image_id (médiathèque locale) + image_url souvent vide si ID seul (sauvegarde admin).
+    $row_image_id = !empty($row['image_id']) ? (int) $row['image_id'] : 0;
+    $image_url    = !empty($row['image_url']) ? (string) $row['image_url'] : '';
+
+    if ($image_url === '' && $row_image_id > 0) {
+        $resolved = wp_get_attachment_image_url($row_image_id, 'large');
+        if ($resolved) {
+            $image_url = $resolved;
+        }
+    }
+
+    $image_id = $row_image_id > 0 ? $row_image_id : null;
 
     // 🔹 On récupère le term event_type complet (nom + couleur + image par défaut)
     $event_type_obj = poke_hub_events_get_event_type_by_slug($etype);
@@ -1711,15 +1719,22 @@ function poke_hub_special_event_normalize_row(array $row): object {
         $event_type_name  = $event_type_obj->name;
         $event_type_color = $event_type_obj->event_type_color ?? '';
 
-        // ⚠️ On ne touche à rien si le special event a déjà une image
+        // Aucune image exploitable sur l’événement → repli sur les défauts du type (local puis distant).
         if ($image_url === '') {
 
             if (!empty($event_type_obj->default_image_url)) {
                 $image_url = $event_type_obj->default_image_url;
 
             } elseif (!empty($event_type_obj->default_image_id)) {
-                $image_id  = (int) $event_type_obj->default_image_id;
-                $image_url = poke_hub_events_get_remote_attachment_url($image_id);
+                $def_id   = (int) $event_type_obj->default_image_id;
+                $image_id = $def_id;
+                $local_u  = wp_get_attachment_image_url($def_id, 'large');
+                if ($local_u) {
+                    $image_url = $local_u;
+                } elseif (function_exists('poke_hub_events_get_remote_attachment_url')) {
+                    $remote_u = poke_hub_events_get_remote_attachment_url($def_id);
+                    $image_url = $remote_u ? (string) $remote_u : '';
+                }
             }
         }
     }

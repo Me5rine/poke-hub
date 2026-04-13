@@ -199,7 +199,7 @@
 
                 if (!$preview.length) {
                     $field.find('.image-preview').html(
-                        '<img src="' + data.url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;" alt="">'
+                        '<img src="' + data.url + '" class="pokehub-event-image-preview" alt="">'
                     );
                     $preview = $field.find('.pokehub-event-image-preview');
                 } else {
@@ -224,7 +224,7 @@
 
                 if (!$preview.length) {
                     $field.find('.image-preview').html(
-                        '<img src="' + url + '" class="pokehub-event-image-preview" style="max-width:100%;height:auto;display:block;" alt="">'
+                        '<img src="' + url + '" class="pokehub-event-image-preview" alt="">'
                     );
                     $preview = $field.find('.pokehub-event-image-preview');
                 } else {

@@ -822,6 +822,26 @@ span[style*="color: red"] {
     display: none;
 }
 
+/* Événements spéciaux / Pass GO — aperçu image (admin) */
+.pokehub-special-event-image-field .image-preview {
+    max-width: 220px;
+    margin-bottom: 10px;
+}
+
+.pokehub-special-event-image-field .pokehub-event-image-preview {
+    display: block;
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 140px;
+    object-fit: contain;
+    border: 1px solid #c3c4c7;
+    padding: 4px;
+    background: #fff;
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+
 select.campaign-display-zones {
     min-width: 200px;
 }
