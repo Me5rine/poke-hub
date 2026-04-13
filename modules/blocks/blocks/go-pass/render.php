@@ -22,10 +22,6 @@ if (!function_exists('pokehub_go_pass_get_special_event_row_by_id')) {
 }
 
 $event_id = isset($attributes['specialEventId']) ? (int) $attributes['specialEventId'] : 0;
-$variant  = isset($attributes['displayMode']) ? sanitize_key((string) $attributes['displayMode']) : 'summary';
-if (!in_array($variant, ['summary', 'full'], true)) {
-    $variant = 'summary';
-}
 
 $post_id = 0;
 if (isset($block) && is_object($block) && !empty($block->context['postId'])) {
@@ -45,12 +41,24 @@ if ($event_id <= 0 && $post_id > 0) {
     }
 }
 
+// Mode d’affichage : la metabox sous l’article est la source de vérité ; attribut du bloc en secours (anciens contenus).
+$variant = isset($attributes['displayMode']) ? sanitize_key((string) $attributes['displayMode']) : 'summary';
+if (!in_array($variant, ['summary', 'full'], true)) {
+    $variant = 'summary';
+}
+if ($post_id > 0) {
+    $meta_mode = get_post_meta($post_id, '_pokehub_go_pass_display_mode', true);
+    if ($meta_mode === 'full' || $meta_mode === 'summary') {
+        $variant = $meta_mode;
+    }
+}
+
 if (!function_exists('pokehub_go_pass_get_special_event_row_by_id')) {
     return '';
 }
 
 if ($event_id <= 0) {
-    $msg = __('Select a GO Pass in the block settings or in the “GO Pass (block)” meta box.', 'poke-hub');
+    $msg = __('Select a GO Pass in the “GO Pass (block)” box below the editor.', 'poke-hub');
     return '<div class="pokehub-go-pass-block pokehub-go-pass-block--empty"><p>' . esc_html($msg) . '</p></div>';
 }
 

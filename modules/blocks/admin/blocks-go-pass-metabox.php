@@ -89,11 +89,11 @@ function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
     $options = pokehub_blocks_go_pass_metabox_event_options();
     ?>
     <p class="description">
-        <?php esc_html_e('If the GO Pass block does not pick an event, these settings are used as a fallback for this post.', 'poke-hub'); ?>
+        <?php esc_html_e('These settings apply to the “GO Pass” block in the content. Search the list by typing a name.', 'poke-hub'); ?>
     </p>
     <p>
         <label for="pokehub_go_pass_special_event_id"><strong><?php esc_html_e('GO Pass event', 'poke-hub'); ?></strong></label><br>
-        <select name="pokehub_go_pass_special_event_id" id="pokehub_go_pass_special_event_id" class="widefat">
+        <select name="pokehub_go_pass_special_event_id" id="pokehub_go_pass_special_event_id" class="widefat pokehub-go-pass-linked-select" style="width:100%;max-width:100%;">
             <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
             <?php foreach ($options as $opt) : ?>
                 <option value="<?php echo esc_attr((string) (int) $opt['id']); ?>" <?php selected($event_id, (int) $opt['id']); ?>>
@@ -109,8 +109,13 @@ function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
             <option value="full" <?php selected($mode, 'full'); ?>><?php esc_html_e('Full reward grid', 'poke-hub'); ?></option>
         </select>
     </p>
+    <p>
+        <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-events&action=add_go_pass')); ?>" class="button button-secondary" target="_blank" rel="noopener noreferrer">
+            <?php esc_html_e('Create a new GO Pass', 'poke-hub'); ?>
+        </a>
+    </p>
     <p class="description">
-        <?php esc_html_e('Add the “GO Pass” block (Poké HUB category) to the content. The block editor can also link another pass or override this fallback.', 'poke-hub'); ?>
+        <?php esc_html_e('Add the “GO Pass” block from the Poké HUB category in the editor; it will use the choices above.', 'poke-hub'); ?>
     </p>
     <?php
 }
@@ -140,3 +145,48 @@ function pokehub_blocks_save_go_pass_metabox($post_id): void {
     update_post_meta($post_id, '_pokehub_go_pass_display_mode', $mode);
 }
 add_action('save_post', 'pokehub_blocks_save_go_pass_metabox');
+
+/**
+ * Select2 sur le choix du Pass GO (recherche par nom) — écran d’édition d’article.
+ */
+function pokehub_blocks_go_pass_metabox_enqueue_assets(string $hook): void {
+    if (!in_array($hook, ['post.php', 'post-new.php'], true)) {
+        return;
+    }
+    $screens = apply_filters('pokehub_go_pass_metabox_post_types', ['post', 'pokehub_event']);
+    $screen  = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || !in_array($screen->post_type, $screens, true)) {
+        return;
+    }
+
+    wp_enqueue_style(
+        'select2',
+        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css',
+        [],
+        '4.1.0'
+    );
+    wp_enqueue_script(
+        'select2',
+        'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
+        ['jquery'],
+        '4.1.0',
+        true
+    );
+
+    wp_add_inline_script(
+        'select2',
+        'jQuery(function($) {
+            var \$sel = $("#pokehub_go_pass_special_event_id");
+            if (!\$sel.length || typeof \$sel.select2 !== "function") { return; }
+            \$sel.select2({
+                width: "100%",
+                language: {
+                    noResults: function() { return "' . esc_js(__('No results', 'poke-hub')) . '"; },
+                    searching: function() { return "' . esc_js(__('Searching…', 'poke-hub')) . '"; }
+                }
+            });
+        });',
+        'after'
+    );
+}
+add_action('admin_enqueue_scripts', 'pokehub_blocks_go_pass_metabox_enqueue_assets', 20);
