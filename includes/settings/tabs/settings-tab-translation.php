@@ -103,24 +103,53 @@ if (!empty($_POST['poke_hub_save_translations'])) {
                 continue;
             }
 
-            $extra = [];
-            if (!empty($row->extra)) {
-                $decoded = json_decode($row->extra, true);
-                if (is_array($decoded)) {
-                    $extra = $decoded;
+            $extra_raw = (string) ($row->extra ?? '');
+            $extra_valid = true;
+            if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                $extra = poke_hub_pokemon_decode_extra_json($extra_raw, $extra_valid);
+            } else {
+                $extra = [];
+                if ($extra_raw !== '') {
+                    $decoded = json_decode($extra_raw, true);
+                    if (is_array($decoded)) {
+                        $extra = $decoded;
+                    } else {
+                        $extra_valid = false;
+                    }
                 }
+            }
+            if (!$extra_valid) {
+                // Ne jamais écraser un extra JSON invalide lors d'une sauvegarde manuelle.
+                $skipped_count++;
+                continue;
             }
             if (!isset($extra['names']) || !is_array($extra['names'])) {
                 $extra['names'] = [];
             }
 
+            $old_name_fr = trim((string) ($row->name_fr ?? ''));
+            $old_lang_val = trim((string) ($extra['names'][$lang] ?? ''));
             $extra['names'][$lang] = $translation;
 
+            $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+                ? poke_hub_pokemon_encode_extra_json($extra, $extra_raw)
+                : wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (!is_string($extra_json)) {
+                $skipped_count++;
+                continue;
+            }
+
             $update_data = [
-                'extra' => wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'extra' => $extra_json,
             ];
             if ($lang === 'fr') {
                 $update_data['name_fr'] = $translation;
+            }
+
+            $new_name_fr = isset($update_data['name_fr']) ? trim((string) $update_data['name_fr']) : $old_name_fr;
+            if ($old_lang_val === $translation && $new_name_fr === $old_name_fr) {
+                $skipped_count++;
+                continue;
             }
 
             $format = ['%s'];

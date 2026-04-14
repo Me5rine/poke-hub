@@ -113,6 +113,38 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         return trim($s, '-');
     };
 
+    $decode_extra_safe = static function ($raw, &$is_valid = null): array {
+        if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+            return poke_hub_pokemon_decode_extra_json($raw, $is_valid);
+        }
+        $raw = (string) $raw;
+        if ($raw === '') {
+            $is_valid = true;
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $is_valid = true;
+            return $decoded;
+        }
+        $is_valid = false;
+        return [];
+    };
+
+    $encode_extra_safe = static function (array $extra, $fallback_raw = '') {
+        if (function_exists('poke_hub_pokemon_encode_extra_json')) {
+            return poke_hub_pokemon_encode_extra_json($extra, $fallback_raw);
+        }
+        return wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    };
+
+    $json_changed = static function ($old_json, $new_json): bool {
+        if (function_exists('poke_hub_pokemon_gm_json_normalize_for_compare')) {
+            return poke_hub_pokemon_gm_json_normalize_for_compare($old_json) !== poke_hub_pokemon_gm_json_normalize_for_compare($new_json);
+        }
+        return (string) $old_json !== (string) $new_json;
+    };
+
     $log[] = 'Import des dates de sortie Pokekalos (uniquement Pokémon avec nom FR) — ' . count($tasks) . ' élément(s) (bases + méga dans l\'ordre dex)'
         . ($limit > 0 ? ' (limite ' . $limit . ')' : '')
         . ($dry_run ? ' [DRY RUN]' : '')
@@ -194,9 +226,13 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         ), OBJECT_K);
 
         foreach ($all_with_dex as $pokemon_id => $p) {
-            $existing_extra = json_decode($p->extra ?? '{}', true);
-            if (!is_array($existing_extra)) {
-                $existing_extra = [];
+            $existing_extra_raw = (string) ($p->extra ?? '');
+            $existing_extra_valid = true;
+            $existing_extra = $decode_extra_safe($existing_extra_raw, $existing_extra_valid);
+            if (!$existing_extra_valid) {
+                $log[] = "  [SKIP] dex={$dex_number} id={$pokemon_id} : extra JSON invalide (préservé)";
+                $skipped++;
+                continue;
             }
             $existing_release = isset($existing_extra['release']) && is_array($existing_extra['release'])
                 ? $existing_extra['release']
@@ -230,7 +266,16 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
             }
 
             $existing_extra['release'] = $new_release;
-            $extra_json = wp_json_encode($existing_extra, JSON_UNESCAPED_UNICODE);
+            $extra_json = $encode_extra_safe($existing_extra, $existing_extra_raw);
+            if (!is_string($extra_json)) {
+                $log[] = "  [ERR] dex={$dex_number} id={$pokemon_id} : encodage extra impossible";
+                $errors++;
+                continue;
+            }
+            if (!$json_changed($existing_extra_raw, $extra_json)) {
+                $skipped++;
+                continue;
+            }
 
             if (!$dry_run) {
                 $wpdb->update(
@@ -331,8 +376,14 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                 if (!$p) {
                     continue;
                 }
-                $existing_extra   = json_decode($p->extra ?? '{}', true);
-                $existing_extra   = is_array($existing_extra) ? $existing_extra : [];
+                $existing_extra_raw = (string) ($p->extra ?? '');
+                $existing_extra_valid = true;
+                $existing_extra = $decode_extra_safe($existing_extra_raw, $existing_extra_valid);
+                if (!$existing_extra_valid) {
+                    $log[] = "  [SKIP] méga id={$pokemon_id} : extra JSON invalide (préservé)";
+                    $skipped++;
+                    continue;
+                }
                 $existing_release = isset($existing_extra['release']) && is_array($existing_extra['release'])
                     ? $existing_extra['release']
                     : [];
@@ -355,11 +406,20 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                     }
                 }
                 $existing_extra['release'] = $new_release;
-                $extra_json = wp_json_encode($existing_extra, JSON_UNESCAPED_UNICODE);
-                if (!$dry_run) {
-                    $wpdb->update($pokemon_table, ['extra' => $extra_json], ['id' => $pokemon_id], ['%s'], ['%d']);
+                $extra_json = $encode_extra_safe($existing_extra, $existing_extra_raw);
+                if (!is_string($extra_json)) {
+                    $log[] = "  [ERR] méga id={$pokemon_id} : encodage extra impossible";
+                    $errors++;
+                    continue;
                 }
-                $updated++;
+                if ($json_changed($existing_extra_raw, $extra_json)) {
+                    if (!$dry_run) {
+                        $wpdb->update($pokemon_table, ['extra' => $extra_json], ['id' => $pokemon_id], ['%s'], ['%d']);
+                    }
+                    $updated++;
+                } else {
+                    $skipped++;
+                }
 
                 // Reporter la date méga sur le(s) Pokémon de base (même dex_number) dans release.mega
                 $mega_date = trim((string) ($new_release['mega'] ?? ''));
@@ -372,9 +432,12 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                         $dex_number
                     ), OBJECT_K);
                     foreach ($base_forms as $base_id => $base_row) {
-                        $base_extra = json_decode($base_row->extra ?? '{}', true);
-                        if (!is_array($base_extra)) {
-                            $base_extra = [];
+                        $base_extra_raw = (string) ($base_row->extra ?? '');
+                        $base_extra_valid = true;
+                        $base_extra = $decode_extra_safe($base_extra_raw, $base_extra_valid);
+                        if (!$base_extra_valid) {
+                            $skipped++;
+                            continue;
                         }
                         $base_release = isset($base_extra['release']) && is_array($base_extra['release'])
                             ? $base_extra['release']
@@ -387,7 +450,15 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                         ], $base_release);
                         $base_release['mega'] = $mega_date;
                         $base_extra['release'] = $base_release;
-                        $base_extra_json = wp_json_encode($base_extra, JSON_UNESCAPED_UNICODE);
+                        $base_extra_json = $encode_extra_safe($base_extra, $base_extra_raw);
+                        if (!is_string($base_extra_json)) {
+                            $errors++;
+                            continue;
+                        }
+                        if (!$json_changed($base_extra_raw, $base_extra_json)) {
+                            $skipped++;
+                            continue;
+                        }
                         if (!$dry_run) {
                             $wpdb->update($pokemon_table, ['extra' => $base_extra_json], ['id' => $base_id], ['%s'], ['%d']);
                         }

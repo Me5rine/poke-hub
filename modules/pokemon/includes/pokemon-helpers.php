@@ -4,6 +4,52 @@
 if (!defined('ABSPATH')) { exit; }
 
 /**
+ * Décode un JSON `extra` de façon sûre.
+ *
+ * @param mixed $raw
+ * @param bool|null $is_valid
+ * @return array
+ */
+function poke_hub_pokemon_decode_extra_json($raw, &$is_valid = null): array {
+    $raw = (string) $raw;
+    if ($raw === '') {
+        $is_valid = true;
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+        $is_valid = true;
+        return $decoded;
+    }
+
+    $is_valid = false;
+    return [];
+}
+
+/**
+ * Encode un tableau `extra` en JSON.
+ * En cas d'échec d'encodage, conserve le JSON brut existant si fourni.
+ *
+ * @param array $extra
+ * @param mixed $fallback_raw
+ * @return string|null
+ */
+function poke_hub_pokemon_encode_extra_json(array $extra, $fallback_raw = ''): ?string {
+    $encoded = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (is_string($encoded)) {
+        return $encoded;
+    }
+
+    $fallback_raw = (string) $fallback_raw;
+    if ($fallback_raw !== '') {
+        return $fallback_raw;
+    }
+
+    return null;
+}
+
+/**
  * Liste simple de tous les Pokémon pour le select admin.
  */
 function pokehub_get_all_pokemon_for_select(): array {
@@ -241,9 +287,6 @@ function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, a
         return;
     }
 
-    // On supprime toutes les anciennes lignes pour ce Pokémon
-    $wpdb->delete($table_links, ['pokemon_id' => $pokemon_id], ['%d']);
-
     $rows_to_insert = [];
 
     $normalize = function(array $raw_list, string $role) {
@@ -283,6 +326,17 @@ function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, a
     if (empty($rows_to_insert)) {
         return;
     }
+
+    // On ne remplace que les rôles gérés par ce formulaire.
+    // Les liens "special" (ou autres rôles personnalisés) sont préservés.
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$table_links}
+             WHERE pokemon_id = %d
+               AND role IN ('fast', 'charged')",
+            $pokemon_id
+        )
+    );
 
     foreach ($rows_to_insert as $row) {
         $wpdb->insert(

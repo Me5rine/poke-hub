@@ -1549,6 +1549,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'it' => isset($_POST['name_it']) ? sanitize_text_field(wp_unslash($_POST['name_it'])) : '',
         'es' => isset($_POST['name_es']) ? sanitize_text_field(wp_unslash($_POST['name_es'])) : '',
         'ja' => isset($_POST['name_ja']) ? sanitize_text_field(wp_unslash($_POST['name_ja'])) : '',
+        'ko' => isset($_POST['name_ko']) ? sanitize_text_field(wp_unslash($_POST['name_ko'])) : '',
     ];
 
     // GO : stats complémentaires
@@ -1669,14 +1670,26 @@ function poke_hub_pokemon_handle_pokemon_form() {
     // ---------- Extra : on part de l’existant (pour ne pas écraser les infos Game Master, etc.) ----------
 
     $existing_extra = [];
+    $existing_extra_raw = '';
+    $existing_extra_valid = true;
     if ($is_update) {
         $row_existing = $wpdb->get_row(
             $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $id)
         );
         if ($row_existing && !empty($row_existing->extra)) {
-            $decoded_extra = json_decode($row_existing->extra, true);
-            if (is_array($decoded_extra)) {
-                $existing_extra = $decoded_extra;
+            $existing_extra_raw = (string) $row_existing->extra;
+            if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                $existing_extra = poke_hub_pokemon_decode_extra_json($existing_extra_raw, $existing_extra_valid);
+                if (!$existing_extra_valid) {
+                    $existing_extra = [];
+                }
+            } else {
+                $decoded_extra = json_decode($existing_extra_raw, true);
+                if (is_array($decoded_extra)) {
+                    $existing_extra = $decoded_extra;
+                } else {
+                    $existing_extra_valid = false;
+                }
             }
         }
     }
@@ -1691,6 +1704,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'female' => $gender_female,
     ];
     $extra['has_gender_dimorphism'] = (bool) $has_gender_dimorphism;
+    if (function_exists('poke_hub_pokemon_gm_merge_extra_names_with_existing')) {
+        $names = poke_hub_pokemon_gm_merge_extra_names_with_existing($names, $existing_extra);
+    }
     $extra['names']    = $names;
 
     // Release / régional
@@ -1862,6 +1878,15 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     // ---------- Data communs ----------
 
+    $extra_json = null;
+    if ($is_update && !$existing_extra_valid) {
+        $extra_json = $existing_extra_raw;
+    } elseif (function_exists('poke_hub_pokemon_encode_extra_json')) {
+        $extra_json = poke_hub_pokemon_encode_extra_json($extra, $existing_extra_raw);
+    } else {
+        $extra_json = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
     $data_common = [
         'dex_number'      => $dex_number,
         'name_en'         => $name_en,
@@ -1885,7 +1910,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'dodge_probability'              => $dodge_probability,
         'attack_probability'             => $attack_probability,
 
-        'extra'           => wp_json_encode($extra),
+        'extra'           => $extra_json,
     ];
 
     // ---------- Insert ----------
@@ -1956,7 +1981,20 @@ function poke_hub_pokemon_handle_pokemon_form() {
         exit;
     }
 
-    $wpdb->update($table, $data_common, ['id' => $id], null, ['%d']);
+    $update_data = $data_common;
+    $update_format = null;
+    if (function_exists('poke_hub_pokemon_gm_wpdb_data_only_changed_columns')) {
+        $row_current = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $id));
+        if ($row_current) {
+            $update_data = poke_hub_pokemon_gm_wpdb_data_only_changed_columns($data_common, $row_current);
+            if (function_exists('poke_hub_pokemon_gm_wpdb_format_for_pokemon_row')) {
+                $update_format = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row($update_data);
+            }
+        }
+    }
+    if (!empty($update_data)) {
+        $wpdb->update($table, $update_data, ['id' => $id], $update_format, ['%d']);
+    }
 
     // Récupération automatique des traductions depuis Bulbapedia (si name_en a changé ou traductions manquantes)
     if ($id > 0 && !empty($name_en) && function_exists('poke_hub_pokemon_auto_fetch_translations')) {

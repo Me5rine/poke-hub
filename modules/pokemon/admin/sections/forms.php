@@ -411,14 +411,24 @@ function poke_hub_pokemon_handle_forms_form() {
             $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $id)
         );
         if ($existing_row && !empty($existing_row->extra)) {
-            $existing_extra = json_decode($existing_row->extra, true);
-            if (is_array($existing_extra)) {
+            $existing_extra_valid = true;
+            if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                $existing_extra = poke_hub_pokemon_decode_extra_json($existing_row->extra, $existing_extra_valid);
+            } else {
+                $decoded_existing = json_decode($existing_row->extra, true);
+                $existing_extra = is_array($decoded_existing) ? $decoded_existing : [];
+                $existing_extra_valid = is_array($decoded_existing);
+            }
+            if ($existing_extra_valid && is_array($existing_extra)) {
                 // Fusionner avec les données existantes (préserver les autres champs)
                 $extra = array_merge($existing_extra, $extra);
                 // Si des traductions existaient déjà, les fusionner aussi
                 if (!empty($existing_extra['names']) && is_array($existing_extra['names'])) {
                     $extra['names'] = array_merge($existing_extra['names'], $names);
                 }
+            } elseif (!$existing_extra_valid && !empty($existing_row->extra)) {
+                // JSON invalide: conserver le brut existant (pas d'écrasement destructif).
+                $extra_json = (string) $existing_row->extra;
             }
         }
     }
@@ -435,7 +445,11 @@ function poke_hub_pokemon_handle_forms_form() {
             )
         );
 
-        $extra_json = wp_json_encode($extra);
+        if (!isset($extra_json)) {
+            $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+                ? poke_hub_pokemon_encode_extra_json($extra)
+                : wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
 
         if ($existing) {
             $wpdb->update(

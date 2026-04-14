@@ -1276,12 +1276,25 @@ function poke_hub_pokemon_fetch_official_names_existing($limit = 0, $force = fal
                     continue;
                 }
 
-                $extra = [];
-                if (!empty($row->extra)) {
-                    $decoded = json_decode((string) $row->extra, true);
-                    if (is_array($decoded)) {
-                        $extra = $decoded;
+                $extra_raw = (string) ($row->extra ?? '');
+                $extra_valid = true;
+                if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                    $extra = poke_hub_pokemon_decode_extra_json($extra_raw, $extra_valid);
+                } else {
+                    $extra = [];
+                    if ($extra_raw !== '') {
+                        $decoded = json_decode($extra_raw, true);
+                        if (is_array($decoded)) {
+                            $extra = $decoded;
+                        } else {
+                            $extra_valid = false;
+                        }
                     }
+                }
+                if (!$extra_valid) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
                 }
 
                 list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
@@ -1301,8 +1314,17 @@ function poke_hub_pokemon_fetch_official_names_existing($limit = 0, $force = fal
                     }
                 }
 
+                $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+                    ? poke_hub_pokemon_encode_extra_json($extra_new, $extra_raw)
+                    : wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                if (!is_string($extra_json)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
                 $update_data = [
-                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'extra' => $extra_json,
                 ];
                 $formats = ['%s'];
 
@@ -1469,12 +1491,25 @@ function poke_hub_attacks_fetch_existing_official_names($limit = 0, $force = fal
                     continue;
                 }
 
-                $extra = [];
-                if (!empty($row->extra)) {
-                    $decoded = json_decode((string) $row->extra, true);
-                    if (is_array($decoded)) {
-                        $extra = $decoded;
+                $extra_raw = (string) ($row->extra ?? '');
+                $extra_valid = true;
+                if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                    $extra = poke_hub_pokemon_decode_extra_json($extra_raw, $extra_valid);
+                } else {
+                    $extra = [];
+                    if ($extra_raw !== '') {
+                        $decoded = json_decode($extra_raw, true);
+                        if (is_array($decoded)) {
+                            $extra = $decoded;
+                        } else {
+                            $extra_valid = false;
+                        }
                     }
+                }
+                if (!$extra_valid) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
                 }
 
                 list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
@@ -1494,8 +1529,17 @@ function poke_hub_attacks_fetch_existing_official_names($limit = 0, $force = fal
                     }
                 }
 
+                $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+                    ? poke_hub_pokemon_encode_extra_json($extra_new, $extra_raw)
+                    : wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                if (!is_string($extra_json)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
                 $update_data = [
-                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'extra' => $extra_json,
                 ];
                 $formats = ['%s'];
 
@@ -1662,12 +1706,25 @@ function poke_hub_types_fetch_existing_official_names($limit = 0, $force = false
                     continue;
                 }
 
-                $extra = [];
-                if (!empty($row->extra)) {
-                    $decoded = json_decode((string) $row->extra, true);
-                    if (is_array($decoded)) {
-                        $extra = $decoded;
+                $extra_raw = (string) ($row->extra ?? '');
+                $extra_valid = true;
+                if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+                    $extra = poke_hub_pokemon_decode_extra_json($extra_raw, $extra_valid);
+                } else {
+                    $extra = [];
+                    if ($extra_raw !== '') {
+                        $decoded = json_decode($extra_raw, true);
+                        if (is_array($decoded)) {
+                            $extra = $decoded;
+                        } else {
+                            $extra_valid = false;
+                        }
                     }
+                }
+                if (!$extra_valid) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
                 }
 
                 list($extra_new, $changed) = poke_hub_bulbapedia_merge_names_into_extra(
@@ -1687,8 +1744,17 @@ function poke_hub_types_fetch_existing_official_names($limit = 0, $force = false
                     }
                 }
 
+                $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+                    ? poke_hub_pokemon_encode_extra_json($extra_new, $extra_raw)
+                    : wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                if (!is_string($extra_json)) {
+                    $out['errors']++;
+                    $prev_id = $id;
+                    continue;
+                }
+
                 $update_data = [
-                    'extra' => wp_json_encode($extra_new, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'extra' => $extra_json,
                 ];
                 $formats = ['%s'];
 

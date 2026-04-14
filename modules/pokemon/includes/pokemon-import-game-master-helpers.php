@@ -640,12 +640,20 @@ function poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, array $links, 
         return;
     }
 
-    // Nettoyage des liens POUR CE POKÉMON UNIQUEMENT
-    $wpdb->delete( $link_table, [ 'pokemon_id' => $pokemon_id ], [ '%d' ] );
-
     if ( empty( $links ) ) {
         return;
     }
+
+    // On ne remplace que les rôles pilotés par le Game Master.
+    // Les liens manuels "special" sont conservés.
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$link_table}
+             WHERE pokemon_id = %d
+               AND role IN ('fast', 'charged')",
+            $pokemon_id
+        )
+    );
 
     $values       = [];
     $placeholders = [];

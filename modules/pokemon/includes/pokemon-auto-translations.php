@@ -6,6 +6,37 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Décode extra JSON de manière sûre.
+ */
+function poke_hub_auto_tr_decode_extra($raw, &$is_valid = null) {
+    if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+        return poke_hub_pokemon_decode_extra_json($raw, $is_valid);
+    }
+    $raw = (string) $raw;
+    if ($raw === '') {
+        $is_valid = true;
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+        $is_valid = true;
+        return $decoded;
+    }
+    $is_valid = false;
+    return [];
+}
+
+/**
+ * Encode extra JSON de manière sûre.
+ */
+function poke_hub_auto_tr_encode_extra(array $extra, $fallback_raw = '') {
+    if (function_exists('poke_hub_pokemon_encode_extra_json')) {
+        return poke_hub_pokemon_encode_extra_json($extra, $fallback_raw);
+    }
+    return wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}
+
+/**
  * Récupère automatiquement les traductions depuis Bulbapedia lors de l'ajout/modification d'un Pokémon.
  * 
  * @param int $pokemon_id ID du Pokémon
@@ -55,12 +86,11 @@ function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_nu
     }
 
     // Récupérer les données extra existantes
-    $extra = [];
-    if (!empty($row->extra)) {
-        $decoded = json_decode($row->extra, true);
-        if (is_array($decoded)) {
-            $extra = $decoded;
-        }
+    $extra_raw = (string) ($row->extra ?? '');
+    $extra_valid = true;
+    $extra = poke_hub_auto_tr_decode_extra($extra_raw, $extra_valid);
+    if (!$extra_valid) {
+        return false;
     }
 
     if (!isset($extra['names']) || !is_array($extra['names'])) {
@@ -94,7 +124,11 @@ function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_nu
     }
 
     // Mettre à jour la base de données
-    $update_data['extra'] = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $extra_json = poke_hub_auto_tr_encode_extra($extra, $extra_raw);
+    if (!is_string($extra_json)) {
+        return false;
+    }
+    $update_data['extra'] = $extra_json;
     
     $format = ['%s']; // extra
     if (isset($update_data['name_fr'])) {
@@ -151,12 +185,11 @@ function poke_hub_attack_auto_fetch_translations($attack_id, $name_en) {
     }
 
     // Récupérer les données extra existantes
-    $extra = [];
-    if (!empty($row->extra)) {
-        $decoded = json_decode($row->extra, true);
-        if (is_array($decoded)) {
-            $extra = $decoded;
-        }
+    $extra_raw = (string) ($row->extra ?? '');
+    $extra_valid = true;
+    $extra = poke_hub_auto_tr_decode_extra($extra_raw, $extra_valid);
+    if (!$extra_valid) {
+        return false;
     }
 
     if (!isset($extra['names']) || !is_array($extra['names'])) {
@@ -190,7 +223,11 @@ function poke_hub_attack_auto_fetch_translations($attack_id, $name_en) {
     }
 
     // Mettre à jour la base de données
-    $update_data['extra'] = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $extra_json = poke_hub_auto_tr_encode_extra($extra, $extra_raw);
+    if (!is_string($extra_json)) {
+        return false;
+    }
+    $update_data['extra'] = $extra_json;
     
     $format = ['%s']; // extra
     if (isset($update_data['name_fr'])) {
@@ -247,12 +284,11 @@ function poke_hub_type_auto_fetch_translations($type_id, $name_en) {
     }
 
     // Récupérer les données extra existantes
-    $extra = [];
-    if (!empty($row->extra)) {
-        $decoded = json_decode($row->extra, true);
-        if (is_array($decoded)) {
-            $extra = $decoded;
-        }
+    $extra_raw = (string) ($row->extra ?? '');
+    $extra_valid = true;
+    $extra = poke_hub_auto_tr_decode_extra($extra_raw, $extra_valid);
+    if (!$extra_valid) {
+        return false;
     }
 
     if (!isset($extra['names']) || !is_array($extra['names'])) {
@@ -286,7 +322,11 @@ function poke_hub_type_auto_fetch_translations($type_id, $name_en) {
     }
 
     // Mettre à jour la base de données
-    $update_data['extra'] = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $extra_json = poke_hub_auto_tr_encode_extra($extra, $extra_raw);
+    if (!is_string($extra_json)) {
+        return false;
+    }
+    $update_data['extra'] = $extra_json;
     
     $format = ['%s']; // extra
     if (isset($update_data['name_fr'])) {

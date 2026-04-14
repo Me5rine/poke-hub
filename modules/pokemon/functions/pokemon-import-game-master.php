@@ -367,10 +367,18 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     // Extra existant (mise à jour) : base commune pour release, names, regional, puis fusion profonde
     $gm_existing_extra = [];
+    $gm_existing_extra_valid = true;
+    $existing_extra_raw = '';
     $existing_release  = [];
     if ( $row ) {
-        $dec = json_decode( $row->extra ?? '{}', true );
-        $gm_existing_extra = is_array( $dec ) ? $dec : [];
+        $existing_extra_raw = (string) ( $row->extra ?? '' );
+        if ( function_exists( 'poke_hub_pokemon_decode_extra_json' ) ) {
+            $gm_existing_extra = poke_hub_pokemon_decode_extra_json( $existing_extra_raw, $gm_existing_extra_valid );
+        } else {
+            $dec = json_decode( $existing_extra_raw !== '' ? $existing_extra_raw : '{}', true );
+            $gm_existing_extra = is_array( $dec ) ? $dec : [];
+            $gm_existing_extra_valid = ( $existing_extra_raw === '' ) || is_array( $dec );
+        }
         if ( isset( $gm_existing_extra['release'] ) && is_array( $gm_existing_extra['release'] ) ) {
             $existing_release = $gm_existing_extra['release'];
             if ( ! isset( $extra['release'] ) || ! is_array( $extra['release'] ) ) {
@@ -459,7 +467,14 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $extra = poke_hub_pokemon_gm_deep_merge_extra( $gm_existing_extra, $extra );
     }
 
-    $extra_json = wp_json_encode( $extra );
+    if ( $row && ! $gm_existing_extra_valid ) {
+        // JSON existant invalide: on n'écrase jamais le champ extra.
+        $extra_json = $existing_extra_raw;
+    } elseif ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+        $extra_json = poke_hub_pokemon_encode_extra_json( $extra, $existing_extra_raw );
+    } else {
+        $extra_json = wp_json_encode( $extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+    }
 
     // Préparer les données pour l'insertion/mise à jour
     $data = [
@@ -1017,9 +1032,17 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
 
             $mega_existing_decoded = [];
+            $mega_existing_extra_valid = true;
+            $mega_existing_extra_raw = '';
             if ( $mega_row ) {
-                $md = json_decode( $mega_row->extra ?? '{}', true );
-                $mega_existing_decoded = is_array( $md ) ? $md : [];
+                $mega_existing_extra_raw = (string) ( $mega_row->extra ?? '' );
+                if ( function_exists( 'poke_hub_pokemon_decode_extra_json' ) ) {
+                    $mega_existing_decoded = poke_hub_pokemon_decode_extra_json( $mega_existing_extra_raw, $mega_existing_extra_valid );
+                } else {
+                    $md = json_decode( $mega_existing_extra_raw !== '' ? $mega_existing_extra_raw : '{}', true );
+                    $mega_existing_decoded = is_array( $md ) ? $md : [];
+                    $mega_existing_extra_valid = ( $mega_existing_extra_raw === '' ) || is_array( $md );
+                }
             }
             if ( $mega_row && function_exists( 'poke_hub_pokemon_gm_merge_extra_names_with_existing' )
                 && isset( $mega_extra['names'] ) && is_array( $mega_extra['names'] ) ) {
@@ -1027,6 +1050,15 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
             if ( $mega_row && function_exists( 'poke_hub_pokemon_gm_deep_merge_extra' ) ) {
                 $mega_extra = poke_hub_pokemon_gm_deep_merge_extra( $mega_existing_decoded, $mega_extra );
+            }
+
+            $mega_extra_json = null;
+            if ( $mega_row && ! $mega_existing_extra_valid ) {
+                $mega_extra_json = $mega_existing_extra_raw;
+            } elseif ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+                $mega_extra_json = poke_hub_pokemon_encode_extra_json( $mega_extra, $mega_existing_extra_raw );
+            } else {
+                $mega_extra_json = wp_json_encode( $mega_extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
             }
 
             $mega_data = [
@@ -1053,8 +1085,12 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'dodge_probability'              => (float) ( $flags['dodge_probability'] ?? 0.0 ),
                 'attack_probability'             => (float) ( $flags['attack_probability'] ?? 0.0 ),
 
-                'extra'          => wp_json_encode( $mega_extra ),
+                'extra'          => $mega_extra_json,
             ];
+            if ( $mega_row && empty( $mega_names['fr'] ) && ! empty( $mega_row->name_fr ) ) {
+                // Préserver un FR manuel existant si l'import n'en fournit pas.
+                unset( $mega_data['name_fr'] );
+            }
 
             // Ne pas réutiliser $format de la forme de base : l’ordre des colonnes diffère
             // (ex. sans name_fr sur update) → slug recevait %d et devenait 0 en base.
@@ -1198,9 +1234,17 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
         'names'       => $names,
     ];
     $attack_existing_decoded = [];
+    $attack_existing_extra_valid = true;
+    $attack_existing_extra_raw = '';
     if ( $row ) {
-        $ad = json_decode( $row->extra ?? '{}', true );
-        $attack_existing_decoded = is_array( $ad ) ? $ad : [];
+        $attack_existing_extra_raw = (string) ( $row->extra ?? '' );
+        if ( function_exists( 'poke_hub_pokemon_decode_extra_json' ) ) {
+            $attack_existing_decoded = poke_hub_pokemon_decode_extra_json( $attack_existing_extra_raw, $attack_existing_extra_valid );
+        } else {
+            $ad = json_decode( $attack_existing_extra_raw !== '' ? $attack_existing_extra_raw : '{}', true );
+            $attack_existing_decoded = is_array( $ad ) ? $ad : [];
+            $attack_existing_extra_valid = ( $attack_existing_extra_raw === '' ) || is_array( $ad );
+        }
         if ( function_exists( 'poke_hub_pokemon_gm_merge_extra_names_with_existing' ) ) {
             $extra['names'] = poke_hub_pokemon_gm_merge_extra_names_with_existing( $extra['names'], $attack_existing_decoded );
         }
@@ -1208,7 +1252,13 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
             $extra = poke_hub_pokemon_gm_deep_merge_extra( $attack_existing_decoded, $extra );
         }
     }
-    $extra_json = wp_json_encode( $extra );
+    if ( $row && ! $attack_existing_extra_valid ) {
+        $extra_json = $attack_existing_extra_raw;
+    } elseif ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+        $extra_json = poke_hub_pokemon_encode_extra_json( $extra, $attack_existing_extra_raw );
+    } else {
+        $extra_json = wp_json_encode( $extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+    }
 
     $attack_data = [
         'slug'     => $slug,
@@ -1217,6 +1267,10 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
         'category' => $category,
         'extra'    => $extra_json,
     ];
+    if ( $row && empty( $names['fr'] ) && ! empty( $row->name_fr ) ) {
+        // Préserver un FR manuel existant si l'import n'en fournit pas.
+        unset( $attack_data['name_fr'] );
+    }
     if ( $row && function_exists( 'poke_hub_pokemon_gm_wpdb_data_only_changed_columns' ) ) {
         $attack_data   = poke_hub_pokemon_gm_wpdb_data_only_changed_columns( $attack_data, $row );
         $attack_format = poke_hub_pokemon_gm_wpdb_format_attack_row( $attack_data );
@@ -1454,9 +1508,17 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
         'names'       => $names,
     ];
     $pvp_existing_decoded = [];
+    $pvp_existing_extra_valid = true;
+    $pvp_existing_extra_raw = '';
     if ( $row ) {
-        $pd = json_decode( $row->extra ?? '{}', true );
-        $pvp_existing_decoded = is_array( $pd ) ? $pd : [];
+        $pvp_existing_extra_raw = (string) ( $row->extra ?? '' );
+        if ( function_exists( 'poke_hub_pokemon_decode_extra_json' ) ) {
+            $pvp_existing_decoded = poke_hub_pokemon_decode_extra_json( $pvp_existing_extra_raw, $pvp_existing_extra_valid );
+        } else {
+            $pd = json_decode( $pvp_existing_extra_raw !== '' ? $pvp_existing_extra_raw : '{}', true );
+            $pvp_existing_decoded = is_array( $pd ) ? $pd : [];
+            $pvp_existing_extra_valid = ( $pvp_existing_extra_raw === '' ) || is_array( $pd );
+        }
         if ( function_exists( 'poke_hub_pokemon_gm_merge_extra_names_with_existing' ) ) {
             $extra['names'] = poke_hub_pokemon_gm_merge_extra_names_with_existing( $extra['names'], $pvp_existing_decoded );
         }
@@ -1464,7 +1526,13 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
             $extra = poke_hub_pokemon_gm_deep_merge_extra( $pvp_existing_decoded, $extra );
         }
     }
-    $extra_json = wp_json_encode( $extra );
+    if ( $row && ! $pvp_existing_extra_valid ) {
+        $extra_json = $pvp_existing_extra_raw;
+    } elseif ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+        $extra_json = poke_hub_pokemon_encode_extra_json( $extra, $pvp_existing_extra_raw );
+    } else {
+        $extra_json = wp_json_encode( $extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+    }
 
     $attack_data = [
         'slug'    => $slug,
@@ -1472,6 +1540,10 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
         'name_fr' => $names['fr'],
         'extra'   => $extra_json,
     ];
+    if ( $row && empty( $names['fr'] ) && ! empty( $row->name_fr ) ) {
+        // Préserver un FR manuel existant si l'import n'en fournit pas.
+        unset( $attack_data['name_fr'] );
+    }
     if ( $row && function_exists( 'poke_hub_pokemon_gm_wpdb_data_only_changed_columns' ) ) {
         $attack_data   = poke_hub_pokemon_gm_wpdb_data_only_changed_columns( $attack_data, $row );
         $attack_format = poke_hub_pokemon_gm_wpdb_format_attack_row( $attack_data );

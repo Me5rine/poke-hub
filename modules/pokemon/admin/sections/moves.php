@@ -866,11 +866,39 @@ function poke_hub_pokemon_handle_attacks_form() {
     $table_attacks = pokehub_get_table('attacks');
     $table_stats   = pokehub_get_table('attack_stats');
 
-    // On continue à stocker le jeu dans extra (cohérence avec l'existant)
-    $extra = [
-        'game_key' => $game_key,
-    ];
-    $extra_json = wp_json_encode($extra);
+    $existing_row = null;
+    $existing_extra_raw = '';
+    $existing_extra_valid = true;
+    $existing_extra = [];
+
+    if ($action === 'update_move' && $id > 0) {
+        $existing_row = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$table_attacks} WHERE id = %d", $id)
+        );
+        if (!$existing_row) {
+            wp_redirect(add_query_arg('ph_msg', 'invalid_id', $redirect_base));
+            exit;
+        }
+        $existing_extra_raw = (string) ($existing_row->extra ?? '');
+        if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+            $existing_extra = poke_hub_pokemon_decode_extra_json($existing_extra_raw, $existing_extra_valid);
+        } else {
+            $decoded_existing = json_decode($existing_extra_raw !== '' ? $existing_extra_raw : '{}', true);
+            $existing_extra = is_array($decoded_existing) ? $decoded_existing : [];
+            $existing_extra_valid = ($existing_extra_raw === '') || is_array($decoded_existing);
+        }
+        if (!$existing_extra_valid) {
+            wp_redirect(add_query_arg('ph_msg', 'invalid_extra', $redirect_base));
+            exit;
+        }
+    }
+
+    // On fusionne l'extra existant et on met à jour uniquement game_key.
+    $extra = is_array($existing_extra) ? $existing_extra : [];
+    $extra['game_key'] = $game_key;
+    $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
+        ? poke_hub_pokemon_encode_extra_json($extra, $existing_extra_raw)
+        : wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $data = [
         'slug'     => $slug,
@@ -907,7 +935,17 @@ function poke_hub_pokemon_handle_attacks_form() {
         exit;
     }
 
-    $wpdb->update($table_attacks, $data, ['id' => $id], $format, ['%d']);
+    $update_data = $data;
+    $update_format = $format;
+    if ($existing_row && function_exists('poke_hub_pokemon_gm_wpdb_data_only_changed_columns')) {
+        $update_data = poke_hub_pokemon_gm_wpdb_data_only_changed_columns($data, $existing_row);
+        if (function_exists('poke_hub_pokemon_gm_wpdb_format_attack_row')) {
+            $update_format = poke_hub_pokemon_gm_wpdb_format_attack_row($update_data);
+        }
+    }
+    if (!empty($update_data)) {
+        $wpdb->update($table_attacks, $update_data, ['id' => $id], $update_format, ['%d']);
+    }
 
     // Récupération automatique des traductions depuis Bulbapedia
     if (!empty($name_en) && function_exists('poke_hub_attack_auto_fetch_translations')) {
