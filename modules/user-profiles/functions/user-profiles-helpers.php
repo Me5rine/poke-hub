@@ -1356,6 +1356,35 @@ function poke_hub_get_country_flag_icon_url(string $um_key, string $label): stri
 }
 
 /**
+ * URL drapeau pour une valeur pays déjà stockée (libellé UM, clé UM, ou pays custom affiché).
+ *
+ * @param string $stored Valeur telle qu’affichée en liste (COALESCE country_custom, country, usermeta).
+ */
+function poke_hub_get_country_flag_icon_url_for_display(string $stored): string {
+    $stored = trim($stored);
+    if ($stored === '') {
+        return '';
+    }
+
+    $um_key = '';
+    $label   = $stored;
+
+    if (function_exists('poke_hub_get_countries')) {
+        foreach (poke_hub_get_countries() as $code => $lbl) {
+            $code_s = (string) $code;
+            $lbl_s  = (string) $lbl;
+            if ($lbl_s === $stored || $code_s === $stored) {
+                $um_key = $code_s;
+                $label  = $lbl_s;
+                break;
+            }
+        }
+    }
+
+    return poke_hub_get_country_flag_icon_url($um_key, $label);
+}
+
+/**
  * Attribut `data-icon="…"` pour une option pays (drapeau à gauche dans Select2).
  */
 function poke_hub_get_country_option_flag_data_attr(string $um_key, string $label): string {

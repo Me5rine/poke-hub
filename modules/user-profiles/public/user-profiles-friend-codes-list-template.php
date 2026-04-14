@@ -89,9 +89,28 @@ function poke_hub_render_friend_codes_list($args = []) {
                             
                             <div class="user-profiles-friend-code-meta">
                                 <?php if (!empty($code['country'])) : ?>
-                                    <span class="user-profiles-friend-code-meta-item">
+                                    <?php
+                                    $country_label = (string) $code['country'];
+                                    $country_flag_url = function_exists('poke_hub_get_country_flag_icon_url_for_display')
+                                        ? poke_hub_get_country_flag_icon_url_for_display($country_label)
+                                        : '';
+                                    ?>
+                                    <span class="user-profiles-friend-code-meta-item user-profiles-friend-code-meta-item--inline-icon">
                                         <strong><?php esc_html_e('Country:', 'poke-hub'); ?></strong>
-                                        <?php echo esc_html($code['country']); ?>
+                                        <span class="user-profiles-friend-code-meta-value">
+                                            <?php if ($country_flag_url !== '') : ?>
+                                                <img
+                                                    src="<?php echo esc_url($country_flag_url); ?>"
+                                                    alt=""
+                                                    width="20"
+                                                    height="20"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    class="user-profiles-friend-code-meta-raster user-profiles-friend-code-meta-flag"
+                                                />
+                                            <?php endif; ?>
+                                            <span class="user-profiles-friend-code-meta-text"><?php echo esc_html($country_label); ?></span>
+                                        </span>
                                     </span>
                                 <?php endif; ?>
                                 
