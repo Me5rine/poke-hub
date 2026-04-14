@@ -306,6 +306,9 @@
                             $countrySelect.find('option').remove();
                             originalCountryOptions.forEach(function(opt) {
                                 var $newOption = $('<option>').val(opt.value).text(opt.text);
+                                if (opt.dataIcon) {
+                                    $newOption.attr('data-icon', opt.dataIcon);
+                                }
                                 // Try to preserve current selection if it exists in original options
                                 if (opt.value === currentValue) {
                                     $newOption.prop('selected', true);
@@ -319,7 +322,21 @@
                         var isSelect2Unlock = $countrySelect.hasClass('select2-hidden-accessible') || $countrySelect.data('select2');
                         if (isSelect2Unlock) {
                             $countrySelect.select2('destroy');
-                            $countrySelect.select2();
+                            var $unlockParent = $countrySelect.closest('.me5rine-lab-form-field');
+                            if (!$unlockParent.length) {
+                                $unlockParent = $('body');
+                            }
+                            var unlockCfg = {
+                                width: '100%',
+                                allowClear: true,
+                                placeholder: $countrySelect.find('option[value=""]').first().text() || 'Select...',
+                                dropdownParent: $unlockParent
+                            };
+                            if ($countrySelect.find('option[data-ph-raster], option[data-icon]').length > 0 &&
+                                typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                                $.extend(unlockCfg, window.pokeHubSelect2RasterTemplatesForSelect($countrySelect));
+                            }
+                            $countrySelect.select2(unlockCfg);
                             if (currentValue) {
                                 $countrySelect.val(currentValue);
                                 // Force Select2 to update its display

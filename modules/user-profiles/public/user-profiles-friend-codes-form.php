@@ -211,7 +211,14 @@ function poke_hub_render_friend_code_form($args = []) {
                             <select name="country" id="country" class="me5rine-lab-form-select">
                                 <option value=""><?php esc_html_e('-- Select a country --', 'poke-hub'); ?></option>
                                 <?php foreach ($args['countries'] as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($selected_country, $label); ?>>
+                                    <?php
+                                    $country_flag_attr = function_exists('poke_hub_get_country_option_flag_data_attr')
+                                        ? poke_hub_get_country_option_flag_data_attr((string) $code, (string) $label)
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($label); ?>"
+                                            <?php echo $country_flag_attr; ?>
+                                            <?php selected($selected_country, $label); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

@@ -123,17 +123,23 @@
         var selectId = $select.attr('id') || '';
         var hasIcons = selectId === 'team' ||
                       selectId === 'scatterbug_pattern' ||
+                      selectId === 'country' ||
+                      selectId === 'filter_country' ||
                       selectId === 'filter_team' ||
                       selectId === 'filter_pattern' ||
                       $select.find('option[data-ph-raster], option[data-icon]').length > 0;
 
-        // Ajouter les templates pour afficher les icônes
-        if (hasIcons) {
+        // Ajouter les templates pour afficher les icônes (data-ph-raster ou data-icon)
+        if (hasIcons && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+            $.extend(config, window.pokeHubSelect2RasterTemplatesForSelect($select));
+        } else if (hasIcons) {
             config.templateResult = function(data) {
                 if (!data.id) {
                     return data.text;
                 }
-                var $option = $select.find('option[value="' + data.id + '"]');
+                var $option = $select.find('option').filter(function () {
+                    return $(this).val() === String(data.id);
+                }).first();
                 if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
                     return window.pokeHubSpanWithSelectIcon(data.text, $option);
                 }
@@ -148,7 +154,9 @@
                 if (!data.id) {
                     return data.text;
                 }
-                var $option = $select.find('option[value="' + data.id + '"]');
+                var $option = $select.find('option').filter(function () {
+                    return $(this).val() === String(data.id);
+                }).first();
                 if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
                     return window.pokeHubSpanWithSelectIcon(data.text, $option);
                 }

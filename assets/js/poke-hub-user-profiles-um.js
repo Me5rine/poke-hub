@@ -93,7 +93,8 @@
                                     originalPatternOptions.push({
                                         value: $(this).val(),
                                         text: $(this).text(),
-                                        selected: $(this).prop('selected')
+                                        selected: $(this).prop('selected'),
+                                        phRaster: $(this).attr('data-ph-raster') || ''
                                     });
                                 });
                                 $patternSelect.data('original-options', originalPatternOptions);
@@ -540,7 +541,8 @@
                         originalPatternOptions.push({
                             value: $(this).val(),
                             text: $(this).text(),
-                            selected: $(this).prop('selected')
+                            selected: $(this).prop('selected'),
+                            phRaster: $(this).attr('data-ph-raster') || ''
                         });
                     });
                     $patternSelect.data('original-options', originalPatternOptions);
@@ -554,7 +556,8 @@
                         originalCountryOptions.push({
                             value: $(this).val(),
                             text: $(this).text(),
-                            selected: $(this).prop('selected')
+                            selected: $(this).prop('selected'),
+                            dataIcon: $(this).attr('data-icon') || ''
                         });
                     });
                     $countrySelect.data('original-options', originalCountryOptions);
@@ -690,6 +693,9 @@
                     var isValid = !hasMappingKey || validPatterns.length === 0 || validPatterns.indexOf(opt.value) !== -1;
                     if (isValid) {
                         var $newOption = $('<option>').val(opt.value).text(opt.text);
+                        if (opt.phRaster) {
+                            $newOption.attr('data-ph-raster', opt.phRaster);
+                        }
                         if (opt.value === selectedPatternValue) {
                             $newOption.prop('selected', true);
                         }
@@ -731,7 +737,8 @@
                         if ($emptyOption.length === 0) {
                             $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                         }
-                        $patternSelect.select2({
+                        var hasIconsPat = $patternSelect.find('option[data-ph-raster], option[data-icon]').length > 0;
+                        var s2PatCfg = {
                             width: '100%',
                             allowClear: true,
                             placeholder: {
@@ -739,7 +746,11 @@
                                 text: placeholderText
                             },
                             dropdownParent: $parent.length ? $parent : $('body')
-                        });
+                        };
+                        if (hasIconsPat && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                            $.extend(s2PatCfg, window.pokeHubSelect2RasterTemplatesForSelect($patternSelect));
+                        }
+                        $patternSelect.select2(s2PatCfg);
                         if (selectedPatternValue) {
                             $patternSelect.val(selectedPatternValue);
                         } else {
@@ -765,6 +776,9 @@
                     $patternSelect.find('option').remove();
                     originalPatternOptions.forEach(function(opt) {
                         var $newOption = $('<option>').val(opt.value).text(opt.text);
+                        if (opt.phRaster) {
+                            $newOption.attr('data-ph-raster', opt.phRaster);
+                        }
                         if (opt.selected || (opt.value === currentPatternValue && currentPatternValue)) {
                             $newOption.prop('selected', true);
                         }
@@ -798,7 +812,8 @@
                             if ($emptyOption.length === 0) {
                                 $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                             }
-                            $patternSelect.select2({
+                            var hasIconsPat2 = $patternSelect.find('option[data-ph-raster], option[data-icon]').length > 0;
+                            var s2PatCfg2 = {
                                 width: '100%',
                                 allowClear: true,
                                 placeholder: {
@@ -806,7 +821,11 @@
                                     text: placeholderText
                                 },
                                 dropdownParent: $parent.length ? $parent : $('body')
-                            });
+                            };
+                            if (hasIconsPat2 && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                                $.extend(s2PatCfg2, window.pokeHubSelect2RasterTemplatesForSelect($patternSelect));
+                            }
+                            $patternSelect.select2(s2PatCfg2);
                             if (currentPatternValue) {
                                 $patternSelect.val(currentPatternValue);
                             } else {
@@ -914,7 +933,8 @@
                                 originalPatternOptions.push({
                                     value: $(this).val(),
                                     text: $(this).text(),
-                                    selected: $(this).prop('selected')
+                                    selected: $(this).prop('selected'),
+                                    phRaster: $(this).attr('data-ph-raster') || ''
                                 });
                             });
                             $patternSelect.data('original-options', originalPatternOptions);
@@ -926,7 +946,8 @@
                                 originalCountryOptions.push({
                                     value: $(this).val(),
                                     text: $(this).text(),
-                                    selected: $(this).prop('selected')
+                                    selected: $(this).prop('selected'),
+                                    dataIcon: $(this).attr('data-icon') || ''
                                 });
                             });
                             $countrySelect.data('original-options', originalCountryOptions);
@@ -1141,6 +1162,9 @@
                         $countrySelect.find('option').remove();
                         originalCountryOptions.forEach(function(opt) {
                             var $newOption = $('<option>').val(opt.value).text(opt.text);
+                            if (opt.dataIcon) {
+                                $newOption.attr('data-icon', opt.dataIcon);
+                            }
                             // Try to preserve current selection
                             if (opt.value === currentCountryValue || (opt.selected && !currentCountryValue)) {
                                 $newOption.prop('selected', true);

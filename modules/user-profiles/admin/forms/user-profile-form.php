@@ -145,7 +145,14 @@ function poke_hub_render_user_profile_form($user_id) {
                             <select name="country" id="country" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a country --', 'poke-hub'); ?></option>
                                 <?php foreach ($countries as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                    <?php
+                                    $country_flag_attr = function_exists('poke_hub_get_country_option_flag_data_attr')
+                                        ? poke_hub_get_country_option_flag_data_attr((string) $code, (string) $label)
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($label); ?>"
+                                            <?php echo $country_flag_attr; ?>
+                                            <?php selected($profile['country'], $label); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -357,7 +364,14 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                             <select name="country" id="country" class="admin-lab-field-select">
                                 <option value=""><?php _e('-- Select a country --', 'poke-hub'); ?></option>
                                 <?php foreach ($countries as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'], $label); ?>>
+                                    <?php
+                                    $country_flag_attr = function_exists('poke_hub_get_country_option_flag_data_attr')
+                                        ? poke_hub_get_country_option_flag_data_attr((string) $code, (string) $label)
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($label); ?>"
+                                            <?php echo $country_flag_attr; ?>
+                                            <?php selected($profile['country'], $label); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

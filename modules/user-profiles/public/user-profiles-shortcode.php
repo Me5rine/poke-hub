@@ -141,7 +141,14 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             <select name="country" id="country" class="me5rine-lab-form-select<?php echo empty($profile['country']) ? ' me5rine-lab-form-select-placeholder' : ''; ?>">
                                 <option value=""<?php echo empty($profile['country']) ? ' selected' : ''; ?>><?php esc_html_e('-- Select a country --', 'poke-hub'); ?></option>
                                 <?php foreach ($countries as $code => $label) : ?>
-                                    <option value="<?php echo esc_attr($label); ?>" <?php selected($profile['country'] ?? '', $label); ?>>
+                                    <?php
+                                    $country_flag_attr = function_exists('poke_hub_get_country_option_flag_data_attr')
+                                        ? poke_hub_get_country_option_flag_data_attr((string) $code, (string) $label)
+                                        : '';
+                                    ?>
+                                    <option value="<?php echo esc_attr($label); ?>"
+                                            <?php echo $country_flag_attr; ?>
+                                            <?php selected($profile['country'] ?? '', $label); ?>>
                                         <?php echo esc_html($label); ?>
                                     </option>
                                 <?php endforeach; ?>

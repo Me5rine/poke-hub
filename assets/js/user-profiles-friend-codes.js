@@ -100,7 +100,8 @@ window.pokeHubFriendCodesLoaded = true;
                                     originalPatternOptions.push({
                                         value: $(this).val(),
                                         text: $(this).text(),
-                                        selected: $(this).prop('selected')
+                                        selected: $(this).prop('selected'),
+                                        phRaster: $(this).attr('data-ph-raster') || ''
                                     });
                                 });
                                 $patternSelect.data('original-options', originalPatternOptions);
@@ -586,7 +587,8 @@ window.pokeHubFriendCodesLoaded = true;
                     originalPatternOptions.push({
                         value: $(this).val(),
                         text: $(this).text(),
-                        selected: $(this).prop('selected')
+                        selected: $(this).prop('selected'),
+                        phRaster: $(this).attr('data-ph-raster') || ''
                     });
                 });
                 $patternSelect.data('original-options', originalPatternOptions);
@@ -600,7 +602,8 @@ window.pokeHubFriendCodesLoaded = true;
                     originalCountryOptions.push({
                         value: $(this).val(),
                         text: $(this).text(),
-                        selected: $(this).prop('selected')
+                        selected: $(this).prop('selected'),
+                        dataIcon: $(this).attr('data-icon') || ''
                     });
                 });
                 $countrySelect.data('original-options', originalCountryOptions);
@@ -709,6 +712,9 @@ window.pokeHubFriendCodesLoaded = true;
                 var isValid = !hasMappingKey || validPatterns.length === 0 || validPatterns.indexOf(opt.value) !== -1;
                 if (isValid) {
                     var $newOption = $('<option>').val(opt.value).text(opt.text);
+                    if (opt.phRaster) {
+                        $newOption.attr('data-ph-raster', opt.phRaster);
+                    }
                     if (opt.value === selectedPatternValue) {
                         $newOption.prop('selected', true);
                     }
@@ -750,7 +756,6 @@ window.pokeHubFriendCodesLoaded = true;
                     if ($emptyOption.length === 0) {
                         $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                     }
-                    // Check if this select has icons
                     var hasIcons = $patternSelect.find('option[data-ph-raster], option[data-icon]').length > 0;
                     var select2Config = {
                         width: '100%',
@@ -761,37 +766,8 @@ window.pokeHubFriendCodesLoaded = true;
                         },
                         dropdownParent: $parent.length ? $parent : $('body')
                     };
-                    
-                    // Add icon templates if this select has icons
-                    if (hasIcons) {
-                        select2Config.templateResult = function(data) {
-                            if (!data.id) {
-                                return data.text;
-                            }
-                            var $option = $patternSelect.find('option[value="' + data.id + '"]');
-                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
-                                return window.pokeHubSpanWithSelectIcon(data.text, $option);
-                            }
-                            var iconUrl = $option.attr('data-icon');
-                            if (iconUrl) {
-                                return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
-                            }
-                            return data.text;
-                        };
-                        select2Config.templateSelection = function(data) {
-                            if (!data.id) {
-                                return data.text;
-                            }
-                            var $option = $patternSelect.find('option[value="' + data.id + '"]');
-                            if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
-                                return window.pokeHubSpanWithSelectIcon(data.text, $option);
-                            }
-                            var iconUrl = $option.attr('data-icon');
-                            if (iconUrl) {
-                                return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
-                            }
-                            return data.text;
-                        };
+                    if (hasIcons && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                        $.extend(select2Config, window.pokeHubSelect2RasterTemplatesForSelect($patternSelect));
                     }
                     
                     $patternSelect.select2(select2Config);
@@ -820,6 +796,9 @@ window.pokeHubFriendCodesLoaded = true;
                 $patternSelect.find('option').remove();
                 originalPatternOptions.forEach(function(opt) {
                     var $newOption = $('<option>').val(opt.value).text(opt.text);
+                    if (opt.phRaster) {
+                        $newOption.attr('data-ph-raster', opt.phRaster);
+                    }
                     if (opt.selected || (opt.value === currentPatternValue && currentPatternValue)) {
                         $newOption.prop('selected', true);
                     }
@@ -853,7 +832,8 @@ window.pokeHubFriendCodesLoaded = true;
                         if ($emptyOption.length === 0) {
                             $patternSelect.prepend('<option value="">' + placeholderText + '</option>');
                         }
-                        $patternSelect.select2({
+                        var hasIconsRestore = $patternSelect.find('option[data-ph-raster], option[data-icon]').length > 0;
+                        var select2RestoreConfig = {
                             width: '100%',
                             allowClear: true,
                             placeholder: {
@@ -861,7 +841,11 @@ window.pokeHubFriendCodesLoaded = true;
                                 text: placeholderText
                             },
                             dropdownParent: $parent.length ? $parent : $('body')
-                        });
+                        };
+                        if (hasIconsRestore && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                            $.extend(select2RestoreConfig, window.pokeHubSelect2RasterTemplatesForSelect($patternSelect));
+                        }
+                        $patternSelect.select2(select2RestoreConfig);
                         if (currentPatternValue) {
                             $patternSelect.val(currentPatternValue);
                         } else {
@@ -971,7 +955,8 @@ window.pokeHubFriendCodesLoaded = true;
                             originalPatternOptions.push({
                                 value: $(this).val(),
                                 text: $(this).text(),
-                                selected: $(this).prop('selected')
+                                selected: $(this).prop('selected'),
+                                phRaster: $(this).attr('data-ph-raster') || ''
                             });
                         });
                         $patternSelect.data('original-options', originalPatternOptions);
@@ -983,7 +968,8 @@ window.pokeHubFriendCodesLoaded = true;
                             originalCountryOptions.push({
                                 value: $(this).val(),
                                 text: $(this).text(),
-                                selected: $(this).prop('selected')
+                                selected: $(this).prop('selected'),
+                                dataIcon: $(this).attr('data-icon') || ''
                             });
                         });
                         $countrySelect.data('original-options', originalCountryOptions);
@@ -1343,6 +1329,9 @@ window.pokeHubFriendCodesLoaded = true;
                     $countrySelect.find('option').remove();
                     originalCountryOptions.forEach(function(opt) {
                         var $newOption = $('<option>').val(opt.value).text(opt.text);
+                        if (opt.dataIcon) {
+                            $newOption.attr('data-icon', opt.dataIcon);
+                        }
                         // Try to preserve current selection
                         if (opt.value === currentCountryValue || (opt.selected && !currentCountryValue)) {
                             $newOption.prop('selected', true);
@@ -1363,36 +1352,8 @@ window.pokeHubFriendCodesLoaded = true;
                             dropdownParent: $countrySelect.closest('.me5rine-lab-form-field').length ? $countrySelect.closest('.me5rine-lab-form-field') : $('body')
                         };
                         
-                        // Add icon templates if this select has icons
-                        if (hasCountryIcons) {
-                            countrySelect2Config.templateResult = function(data) {
-                                if (!data.id) {
-                                    return data.text;
-                                }
-                                var $option = $countrySelect.find('option[value="' + data.id + '"]');
-                                if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
-                                    return window.pokeHubSpanWithSelectIcon(data.text, $option);
-                                }
-                                var iconUrl = $option.attr('data-icon');
-                                if (iconUrl) {
-                                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
-                                }
-                                return data.text;
-                            };
-                            countrySelect2Config.templateSelection = function(data) {
-                                if (!data.id) {
-                                    return data.text;
-                                }
-                                var $option = $countrySelect.find('option[value="' + data.id + '"]');
-                                if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
-                                    return window.pokeHubSpanWithSelectIcon(data.text, $option);
-                                }
-                                var iconUrl = $option.attr('data-icon');
-                                if (iconUrl) {
-                                    return $('<span><img src="' + iconUrl + '" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;" alt="" />' + data.text + '</span>');
-                                }
-                                return data.text;
-                            };
+                        if (hasCountryIcons && typeof window.pokeHubSelect2RasterTemplatesForSelect === 'function') {
+                            $.extend(countrySelect2Config, window.pokeHubSelect2RasterTemplatesForSelect($countrySelect));
                         }
                         
                         $countrySelect.select2('destroy');

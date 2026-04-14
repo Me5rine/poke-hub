@@ -1300,6 +1300,74 @@ function poke_hub_get_countries() {
 }
 
 /**
+ * Code ISO 3166-1 alpha-2 (minuscules) pour afficher un drapeau, à partir de la clé UM et du libellé.
+ *
+ * Ultimate Member fournit en général une clé à deux lettres ; les pays « custom » fusionnés dans
+ * {@see poke_hub_get_countries()} sont mappés manuellement. Filtre : {@see 'poke_hub_country_flag_iso2'}.
+ */
+function poke_hub_resolve_country_flag_iso2(string $um_key, string $label): string {
+    $um_key = trim($um_key);
+    $label = trim($label);
+
+    if ($um_key !== '' && strlen($um_key) === 2 && ctype_alpha($um_key)) {
+        $iso2 = strtolower($um_key);
+    } elseif ($label !== '' && strlen($label) === 2 && ctype_alpha($label)) {
+        $iso2 = strtolower($label);
+    } else {
+        static $custom_to_iso = [
+            'Hawaï'         => 'us',
+            'Galápagos'     => 'ec',
+            'Açores'        => 'pt',
+            'Îles Baléares' => 'es',
+            'Madère'        => 'pt',
+            'Kosovo'        => 'xk',
+        ];
+        $iso2 = '';
+        if (isset($custom_to_iso[$label])) {
+            $iso2 = $custom_to_iso[$label];
+        } elseif (isset($custom_to_iso[$um_key])) {
+            $iso2 = $custom_to_iso[$um_key];
+        }
+    }
+
+    $iso2 = apply_filters('poke_hub_country_flag_iso2', $iso2, $um_key, $label);
+    if (!is_string($iso2) || $iso2 === '') {
+        return '';
+    }
+    $iso2 = strtolower(preg_replace('/[^a-z]/', '', $iso2));
+
+    return strlen($iso2) === 2 ? $iso2 : '';
+}
+
+/**
+ * URL d’image drapeau (flagcdn, 20px de large) pour Select2 / data-icon.
+ *
+ * Filtre : {@see 'poke_hub_country_flag_icon_url'}.
+ */
+function poke_hub_get_country_flag_icon_url(string $um_key, string $label): string {
+    $iso2 = poke_hub_resolve_country_flag_iso2($um_key, $label);
+    if ($iso2 === '') {
+        return '';
+    }
+
+    $url = 'https://flagcdn.com/w20/' . $iso2 . '.png';
+
+    return (string) apply_filters('poke_hub_country_flag_icon_url', $url, $iso2, $um_key, $label);
+}
+
+/**
+ * Attribut `data-icon="…"` pour une option pays (drapeau à gauche dans Select2).
+ */
+function poke_hub_get_country_option_flag_data_attr(string $um_key, string $label): string {
+    $url = poke_hub_get_country_flag_icon_url($um_key, $label);
+    if ($url === '') {
+        return '';
+    }
+
+    return ' data-icon="' . esc_url($url) . '"';
+}
+
+/**
  * Get country label from country code.
  * 
  * @param string $country_code Country code (e.g., 'FR', 'US', 'GB')

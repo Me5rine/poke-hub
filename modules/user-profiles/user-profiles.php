@@ -100,8 +100,10 @@ function poke_hub_user_profiles_admin_assets($hook) {
                     var selectId = \$select.attr('id') || '';
                     var hasIcons = selectId === 'team' ||
                                   selectId === 'scatterbug_pattern' ||
+                                  selectId === 'country' ||
                                   selectId === 'filter_team' ||
                                   selectId === 'filter_pattern' ||
+                                  selectId === 'filter_country' ||
                                   selectId === 'filter-by-team' ||
                                   selectId === 'filter-by-scatterbug-pattern' ||
                                   \$select.find('option[data-ph-raster], option[data-icon]').length > 0;
@@ -119,7 +121,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
                             if (!data.id) {
                                 return data.text;
                             }
-                            var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            var \$option = \$select.find('option').filter(function() { return \$(this).val() === String(data.id); }).first();
                             if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
                                 return window.pokeHubSpanWithSelectIcon(data.text, \$option);
                             }
@@ -133,7 +135,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
                             if (!data.id) {
                                 return data.text;
                             }
-                            var \$option = \$select.find('option[value=\"' + data.id + '\"]');
+                            var \$option = \$select.find('option').filter(function() { return \$(this).val() === String(data.id); }).first();
                             if (typeof window.pokeHubSpanWithSelectIcon === 'function') {
                                 return window.pokeHubSpanWithSelectIcon(data.text, \$option);
                             }
@@ -245,7 +247,7 @@ function poke_hub_user_profiles_frontend_assets() {
     wp_enqueue_script(
         'pokehub-user-profiles-um-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
-        ['jquery', 'select2'],
+        ['jquery', 'select2', 'pokehub-raster-format-fallback'],
         POKE_HUB_VERSION,
         true
     );

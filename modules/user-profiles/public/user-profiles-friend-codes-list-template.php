@@ -96,25 +96,90 @@ function poke_hub_render_friend_codes_list($args = []) {
                                 <?php endif; ?>
                                 
                                 <?php if (!empty($code['scatterbug_pattern'])) : ?>
-                                    <span class="user-profiles-friend-code-meta-item">
+                                    <?php
+                                    $pattern_slug = (string) $code['scatterbug_pattern'];
+                                    $pattern_label = isset($args['scatterbug_patterns'][$pattern_slug])
+                                        ? (string) $args['scatterbug_patterns'][$pattern_slug]
+                                        : $pattern_slug;
+                                    $pattern_icon = '';
+                                    if ($pattern_slug !== '' && function_exists('poke_hub_render_bucket_raster_img')) {
+                                        $pattern_icon = poke_hub_render_bucket_raster_img('vivillon', $pattern_slug, [
+                                            'alt'     => $pattern_label,
+                                            'class'   => 'user-profiles-friend-code-meta-raster',
+                                            'width'   => 20,
+                                            'height'  => 20,
+                                            'loading' => 'lazy',
+                                        ]);
+                                    }
+                                    ?>
+                                    <span class="user-profiles-friend-code-meta-item user-profiles-friend-code-meta-item--inline-icon">
                                         <strong><?php echo $args['context'] === 'vivillon' ? esc_html__('Pattern:', 'poke-hub') : esc_html__('Scatterbug Pattern:', 'poke-hub'); ?></strong>
-                                        <?php 
-                                        $pattern_slug = $code['scatterbug_pattern'];
-                                        $pattern_label = isset($args['scatterbug_patterns'][$pattern_slug]) 
-                                            ? $args['scatterbug_patterns'][$pattern_slug] 
-                                            : $pattern_slug;
-                                        echo esc_html($pattern_label); 
-                                        ?>
+                                        <span class="user-profiles-friend-code-meta-value">
+                                            <?php
+                                            if ($pattern_icon !== '') {
+                                                echo wp_kses(
+                                                    $pattern_icon,
+                                                    [
+                                                        'img' => [
+                                                            'src'             => [],
+                                                            'alt'             => [],
+                                                            'class'           => [],
+                                                            'width'           => [],
+                                                            'height'          => [],
+                                                            'loading'         => [],
+                                                            'decoding'        => [],
+                                                            'data-ph-raster'  => [],
+                                                            'data-ph-raster-step' => [],
+                                                        ],
+                                                    ]
+                                                );
+                                            }
+                                            ?>
+                                            <span class="user-profiles-friend-code-meta-text"><?php echo esc_html($pattern_label); ?></span>
+                                        </span>
                                     </span>
                                 <?php endif; ?>
                                 
                                 <?php if (!empty($code['team'])) : ?>
-                                    <span class="user-profiles-friend-code-meta-item">
+                                    <?php
+                                    $team_slug = (string) $code['team'];
+                                    $team_label = isset($args['teams'][$team_slug]) ? (string) $args['teams'][$team_slug] : $team_slug;
+                                    $team_icon = '';
+                                    if ($team_slug !== '' && function_exists('poke_hub_render_bucket_raster_img')) {
+                                        $team_icon = poke_hub_render_bucket_raster_img('teams', $team_slug, [
+                                            'alt'     => $team_label,
+                                            'class'   => 'user-profiles-friend-code-meta-raster',
+                                            'width'   => 20,
+                                            'height'  => 20,
+                                            'loading' => 'lazy',
+                                        ]);
+                                    }
+                                    ?>
+                                    <span class="user-profiles-friend-code-meta-item user-profiles-friend-code-meta-item--inline-icon">
                                         <strong><?php esc_html_e('Team:', 'poke-hub'); ?></strong>
-                                        <?php 
-                                        $team_label = isset($args['teams'][$code['team']]) ? $args['teams'][$code['team']] : $code['team'];
-                                        echo esc_html($team_label); 
-                                        ?>
+                                        <span class="user-profiles-friend-code-meta-value">
+                                            <?php
+                                            if ($team_icon !== '') {
+                                                echo wp_kses(
+                                                    $team_icon,
+                                                    [
+                                                        'img' => [
+                                                            'src'             => [],
+                                                            'alt'             => [],
+                                                            'class'           => [],
+                                                            'width'           => [],
+                                                            'height'          => [],
+                                                            'loading'         => [],
+                                                            'decoding'        => [],
+                                                            'data-ph-raster'  => [],
+                                                            'data-ph-raster-step' => [],
+                                                        ],
+                                                    ]
+                                                );
+                                            }
+                                            ?>
+                                            <span class="user-profiles-friend-code-meta-text"><?php echo esc_html($team_label); ?></span>
+                                        </span>
                                     </span>
                                 <?php endif; ?>
                                 
