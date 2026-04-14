@@ -586,7 +586,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         </div>
 
         <?php
-        $show_sprite_preview = function_exists('poke_hub_pokemon_get_image_url')
+        $show_sprite_preview = (function_exists('poke_hub_pokemon_get_image_sources') || function_exists('poke_hub_pokemon_get_image_url'))
             && (($slug !== '') || ($dex_number > 0));
         if ($show_sprite_preview) :
             $preview_pokemon = (object) [
@@ -604,39 +604,84 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             <div class="pokehub-pokemon-sprite-preview-grid" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
                 <?php
                 $preview_cells = [];
+                $resolve_preview_sources = static function ($pokemon_obj, array $args = []) {
+                    if (function_exists('poke_hub_pokemon_get_image_sources')) {
+                        $srcs = poke_hub_pokemon_get_image_sources($pokemon_obj, $args);
+                        $primary = trim((string) ($srcs['primary'] ?? ''));
+                        $fallback = trim((string) ($srcs['fallback'] ?? ''));
+                        $src = $primary !== '' ? $primary : $fallback;
+                        return [
+                            'src'      => $src,
+                            'primary'  => $primary,
+                            'fallback' => $fallback,
+                        ];
+                    }
+
+                    $url = function_exists('poke_hub_pokemon_get_image_url')
+                        ? trim((string) poke_hub_pokemon_get_image_url($pokemon_obj, $args))
+                        : '';
+                    return [
+                        'src'      => $url,
+                        'primary'  => $url,
+                        'fallback' => '',
+                    ];
+                };
+
                 if ($has_gender_dimorphism) {
+                    $src_normal_male = $resolve_preview_sources($preview_pokemon, ['shiny' => false, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Normal (male)', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false, 'gender' => 'male']),
+                        'src'   => $src_normal_male['src'],
+                        'fallback' => $src_normal_male['fallback'],
                     ];
+                    $src_normal_female = $resolve_preview_sources($preview_pokemon, ['shiny' => false, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Normal (female)', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false, 'gender' => 'female']),
+                        'src'   => $src_normal_female['src'],
+                        'fallback' => $src_normal_female['fallback'],
                     ];
+                    $src_shiny_male = $resolve_preview_sources($preview_pokemon, ['shiny' => true, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Shiny (male)', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true, 'gender' => 'male']),
+                        'src'   => $src_shiny_male['src'],
+                        'fallback' => $src_shiny_male['fallback'],
                     ];
+                    $src_shiny_female = $resolve_preview_sources($preview_pokemon, ['shiny' => true, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Shiny (female)', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true, 'gender' => 'female']),
+                        'src'   => $src_shiny_female['src'],
+                        'fallback' => $src_shiny_female['fallback'],
                     ];
                 } else {
+                    $src_normal = $resolve_preview_sources($preview_pokemon, ['shiny' => false]);
                     $preview_cells[] = [
                         'label' => __('Normal', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => false]),
+                        'src'   => $src_normal['src'],
+                        'fallback' => $src_normal['fallback'],
                     ];
+                    $src_shiny = $resolve_preview_sources($preview_pokemon, ['shiny' => true]);
                     $preview_cells[] = [
                         'label' => __('Shiny', 'poke-hub'),
-                        'url'   => poke_hub_pokemon_get_image_url($preview_pokemon, ['shiny' => true]),
+                        'src'   => $src_shiny['src'],
+                        'fallback' => $src_shiny['fallback'],
                     ];
                 }
                 foreach ($preview_cells as $cell) :
                     ?>
                 <div class="pokehub-pokemon-sprite-preview-item" style="text-align:center;max-width:120px;">
                     <div style="font-weight:600;margin-bottom:8px;font-size:12px;line-height:1.3;"><?php echo esc_html($cell['label']); ?></div>
-                    <?php if (!empty($cell['url'])) : ?>
-                        <img src="<?php echo esc_url($cell['url']); ?>" alt="" width="96" height="96" style="width:96px;height:96px;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;" loading="lazy" />
+                    <?php if (!empty($cell['src'])) : ?>
+                        <img
+                            src="<?php echo esc_url($cell['src']); ?>"
+                            alt=""
+                            width="96"
+                            height="96"
+                            style="width:96px;height:96px;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;"
+                            loading="lazy"
+                            <?php if (!empty($cell['fallback']) && $cell['fallback'] !== $cell['src']) : ?>
+                                onerror="this.onerror=null;this.src='<?php echo esc_js($cell['fallback']); ?>';"
+                            <?php endif; ?>
+                        />
                     <?php else : ?>
                         <p class="description" style="margin:0;"><?php esc_html_e('No asset base URL configured.', 'poke-hub'); ?></p>
                     <?php endif; ?>
