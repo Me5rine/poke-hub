@@ -522,8 +522,9 @@ function poke_hub_pokemon_handle_forms_form() {
             }
         }
         
-        // Purger le cache des patterns Scatterbug/Vivillon si on a modifié les traductions
-        delete_transient('poke_hub_scatterbug_patterns');
+        if (function_exists('poke_hub_flush_scatterbug_patterns_cache')) {
+            poke_hub_flush_scatterbug_patterns_cache();
+        }
     }
 
     $msg = ($action === 'add_form') ? 'saved' : 'updated';
@@ -578,6 +579,10 @@ function poke_hub_pokemon_handle_forms_delete() {
         $wpdb->delete($events_table, ['form_variant_id' => $id], ['%d']);
     }
     $wpdb->delete($table, ['id' => $id], ['%d']);
+
+    if (function_exists('poke_hub_flush_scatterbug_patterns_cache')) {
+        poke_hub_flush_scatterbug_patterns_cache();
+    }
 
     $redirect = add_query_arg(
         [

@@ -118,6 +118,12 @@ $can_manage_cleanup = true;
 
     <?php
     $auto_create_pages = get_option('poke_hub_user_profiles_auto_create_pages', true);
+    $friend_code_report_threshold = (int) get_option('poke_hub_friend_code_report_threshold', 3);
+    if ($friend_code_report_threshold < 1) {
+        $friend_code_report_threshold = 1;
+    } elseif ($friend_code_report_threshold > 20) {
+        $friend_code_report_threshold = 20;
+    }
     ?>
     <table class="form-table">
         <tr valign="top">
@@ -162,6 +168,28 @@ $can_manage_cleanup = true;
                     <?php _e('If disabled, you will need to manually create a page with the shortcode [pokedle] after activating the module.', 'poke-hub'); ?>
                     <?php if (!in_array('games', $active_modules, true)): ?>
                         <br><em><?php _e('Note: The Games module is not currently activated.', 'poke-hub'); ?></em>
+                    <?php endif; ?>
+                </p>
+            </td>
+        </tr>
+        <tr valign="top">
+            <th scope="row">
+                <label for="poke_hub_friend_code_report_threshold">
+                    <?php _e('User Profiles: Obsolete code report threshold', 'poke-hub'); ?>
+                </label>
+            </th>
+            <td>
+                <input type="number"
+                       name="poke_hub_friend_code_report_threshold"
+                       id="poke_hub_friend_code_report_threshold"
+                       min="1"
+                       max="20"
+                       step="1"
+                       value="<?php echo esc_attr($friend_code_report_threshold); ?>" />
+                <p class="description">
+                    <?php _e('Number of obsolete reports required before a friend code is hidden from public lists. The code stays in database.', 'poke-hub'); ?>
+                    <?php if (!in_array('user-profiles', $active_modules, true)): ?>
+                        <br><em><?php _e('Note: The User Profiles module is not currently activated.', 'poke-hub'); ?></em>
                     <?php endif; ?>
                 </p>
             </td>

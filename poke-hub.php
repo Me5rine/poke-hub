@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.2.0
+Version: 2.2.1
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -548,7 +548,7 @@ add_action('wp_enqueue_scripts', 'poke_hub_enqueue_pokemon_image_fallback_script
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_pokemon_image_fallback_script', 20);
 
 /**
- * Repli WebP → PNG → JPG pour les images bucket (data-ph-raster).
+ * Repli raster bucket (data-ph-raster) : ordre WebP → PNG → JPG par défaut (défini côté PHP, filtre possible).
  */
 function poke_hub_register_raster_format_fallback_script(): void {
     wp_register_script(

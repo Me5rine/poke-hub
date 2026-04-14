@@ -401,7 +401,13 @@ function pokehub_render_special_events_page() {
 add_action('wp_ajax_pokehub_get_pokemon_special_attacks', function () {
     check_ajax_referer('pokehub_pokemon_attacks', 'nonce');
 
-    $pokemon_id = isset($_POST['pokemon_id']) ? (int) $_POST['pokemon_id'] : 0;
+    $raw_pid = isset($_POST['pokemon_id']) ? wp_unslash((string) $_POST['pokemon_id']) : '';
+    $pokemon_id = 0;
+    if ($raw_pid !== '' && preg_match('/^(\d+)\|(male|female)$/i', $raw_pid, $m)) {
+        $pokemon_id = (int) $m[1];
+    } else {
+        $pokemon_id = (int) $raw_pid;
+    }
     if ($pokemon_id <= 0) {
         wp_send_json_error(['message' => 'Invalid Pokémon ID']);
     }
@@ -434,30 +440,34 @@ add_action('wp_ajax_pokehub_check_pokemon_gender_dimorphism', function () {
         wp_send_json_error(['message' => 'Invalid nonce']);
     }
 
-    $pokemon_id = isset($_POST['pokemon_id']) ? (int) $_POST['pokemon_id'] : 0;
+    $raw_pid = isset($_POST['pokemon_id']) ? wp_unslash((string) $_POST['pokemon_id']) : '';
+    $pokemon_id = 0;
+    if ($raw_pid !== '' && preg_match('/^(\d+)\|(male|female)$/i', $raw_pid, $m)) {
+        $pokemon_id = (int) $m[1];
+    } else {
+        $pokemon_id = (int) $raw_pid;
+    }
     if (!$pokemon_id) {
         wp_send_json_error(['message' => 'Invalid pokemon_id']);
     }
 
-    global $wpdb;
-    $table = pokehub_get_table('pokemon');
-    if (!$table) {
-        wp_send_json_success(['has_gender_dimorphism' => false]);
-    }
+    $profile = function_exists('poke_hub_pokemon_get_gender_profile')
+        ? poke_hub_pokemon_get_gender_profile($pokemon_id)
+        : [
+            'has_gender_dimorphism'   => false,
+            'gender_ratio'            => ['male' => 0.0, 'female' => 0.0],
+            'available_genders'       => [],
+            'spawn_available_genders' => [],
+            'default_gender'          => null,
+        ];
 
-    $row = $wpdb->get_row(
-        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
-    );
-
-    $has_gender_dimorphism = false;
-    if ($row && !empty($row->extra)) {
-        $extra = json_decode($row->extra, true);
-        if (is_array($extra) && !empty($extra['has_gender_dimorphism'])) {
-            $has_gender_dimorphism = true;
-        }
-    }
-
-    wp_send_json_success(['has_gender_dimorphism' => $has_gender_dimorphism]);
+    wp_send_json_success([
+        'has_gender_dimorphism'   => !empty($profile['has_gender_dimorphism']),
+        'gender_ratio'            => is_array($profile['gender_ratio'] ?? null) ? $profile['gender_ratio'] : ['male' => 0.0, 'female' => 0.0],
+        'available_genders'       => is_array($profile['available_genders'] ?? null) ? array_values($profile['available_genders']) : [],
+        'spawn_available_genders' => is_array($profile['spawn_available_genders'] ?? null) ? array_values($profile['spawn_available_genders']) : [],
+        'default_gender'          => isset($profile['default_gender']) ? $profile['default_gender'] : null,
+    ]);
 });
 
 
@@ -513,15 +523,26 @@ add_action('admin_post_pokehub_save_special_event', function () {
 
     if (is_array($pokemon_payload)) {
         foreach ($pokemon_payload as $p) {
-            $pokemon_id = isset($p['pokemon_id']) ? (int) $p['pokemon_id'] : 0;
+            $raw_pokemon = isset($p['pokemon_id']) ? (string) $p['pokemon_id'] : '';
+            $pokemon_id = 0;
+            $gender_from_token = null;
+            if ($raw_pokemon !== '' && preg_match('/^(\d+)\|(male|female)$/i', $raw_pokemon, $m)) {
+                $pokemon_id = (int) $m[1];
+                $gender_from_token = strtolower((string) $m[2]);
+            } else {
+                $pokemon_id = (int) $raw_pokemon;
+            }
             if (!$pokemon_id) {
                 continue;
             }
 
             // Récupérer le genre (male, female, ou null)
             $gender = null;
+            if ($gender_from_token !== null && in_array($gender_from_token, ['male', 'female'], true)) {
+                $gender = $gender_from_token;
+            }
             if (!empty($p['gender']) && in_array($p['gender'], ['male', 'female'], true)) {
-                $gender = sanitize_text_field($p['gender']);
+                $gender = sanitize_text_field((string) $p['gender']);
             }
 
             $wpdb->insert(

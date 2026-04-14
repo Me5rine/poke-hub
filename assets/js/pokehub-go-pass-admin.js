@@ -102,6 +102,9 @@
         if (window.pokehubInitGoPassBonusRewardSelect2) {
             window.pokehubInitGoPassBonusRewardSelect2($ctx);
         }
+        if (window.pokehubInitPokemonGenderSelectors) {
+            window.pokehubInitPokemonGenderSelectors($ctx);
+        }
     }
 
     function bonusCatalogOptionsHtml() {
@@ -173,16 +176,17 @@
             nb +
             '[description]" class="large-text" rows="2" style="width:100%;" disabled></textarea></label></div>' +
             '<div class="pokehub-reward-pokemon-fields" style="display:none;">' +
-            '<label>' +
+            '<label class="pokehub-gender-field-group">' +
             L('pokemon', 'Pokémon') +
             ' (' +
             L('oneCopy', '×1') +
             ') : ' +
             '<select name="' +
             nb +
-            '[pokemon_id]" class="pokehub-select-pokemon pokehub-quest-pokemon-select" style="width:100%;min-width:250px;" disabled data-placeholder="' +
+            '[pokemon_id]" class="pokehub-select-pokemon pokehub-quest-pokemon-select pokehub-gender-driven-select" style="width:100%;min-width:250px;" disabled data-placeholder="' +
             escAttr(L('searchPokemon')) +
-            '"></select></label>' +
+            '" data-gender-name-template="' + nb + '[gender]" data-gender-scope="available"></select>' +
+            '<div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div></label>' +
             '<div class="pokehub-go-pass-pokemon-flags" style="margin-top:8px;">' +
             '<label style="display:inline-block;margin-right:10px;"><input type="checkbox" name="' +
             nb +

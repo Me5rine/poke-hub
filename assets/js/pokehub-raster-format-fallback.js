@@ -1,5 +1,5 @@
 /**
- * Repli format raster bucket : WebP → PNG → JPG (ordre défini dans data-ph-raster JSON).
+ * Repli format raster bucket : ordre défini dans data-ph-raster (JSON d’URLs), en général WebP → PNG → JPG.
  * Écoute en capture pour devancer d’autres handlers d’erreur sur la même image.
  */
 (function () {

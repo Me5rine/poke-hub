@@ -80,6 +80,12 @@ $profile['reasons'] = array_map('strval', $profile['reasons']);
             <p><?php esc_html_e('Pokémon GO profile updated successfully', 'poke-hub'); ?></p>
         </div>
     <?php endif; ?>
+
+    <?php if ($can_edit && !empty($profile['friend_code']) && !empty($profile['friend_code_hidden'])) : ?>
+        <div class="me5rine-lab-form-message me5rine-lab-form-message-warning user-profiles-friend-code-hidden-notice">
+            <p><?php esc_html_e('Your friend code no longer appears on public lists after several obsolete code reports. If you reset it in Pokémon GO, please enter your new friend code below and save.', 'poke-hub'); ?></p>
+        </div>
+    <?php endif; ?>
     
     <?php if ($can_edit) : ?>
         <form method="post" action="" class="me5rine-lab-form-section">

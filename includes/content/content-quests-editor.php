@@ -75,9 +75,21 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                         $is_xl_candy = $reward_type === 'xl_candy';
                         $is_mega_energy = $reward_type === 'mega_energy';
                         $is_pokemon_resource_reward = $is_candy || $is_xl_candy || $is_mega_energy;
-                        $selected_pokemon_ids = isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])
-                            ? array_map('intval', $reward['pokemon_ids'])
-                            : (isset($reward['pokemon_id']) ? [(int) $reward['pokemon_id']] : []);
+                        $raw_reward_ids = isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])
+                            ? $reward['pokemon_ids']
+                            : (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null
+                                ? [(string) $reward['pokemon_id']]
+                                : []);
+                        $reward_genders = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])
+                            ? $reward['pokemon_genders']
+                            : null;
+                        $parsed_reward_ids = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+                            ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_reward_ids, $reward_genders)
+                            : [
+                                'pokemon_ids' => array_values(array_filter(array_map('intval', $raw_reward_ids))),
+                                'pokemon_genders' => is_array($reward_genders) ? $reward_genders : [],
+                            ];
+                        $selected_pokemon_ids = $parsed_reward_ids['pokemon_ids'];
                         ?>
                         <div class="pokehub-reward-pokemon-fields" style="display:<?php echo $is_pokemon ? 'block' : 'none'; ?>;">
                             <label><?php _e('Pokémon', 'poke-hub'); ?>:
@@ -90,8 +102,8 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                     data-reward-index="<?php echo esc_attr($reward_index); ?>"
                                     data-placeholder="<?php esc_attr_e('Search Pokémon…', 'poke-hub'); ?>"
                                     <?php
-                                    $selected_ids_attr = array_values(array_filter(array_map('intval', $selected_pokemon_ids), static function ($id) {
-                                        return $id > 0;
+                                    $selected_ids_attr = array_values(array_filter($selected_pokemon_ids, static function ($id) {
+                                        return (int) $id > 0;
                                     }));
                                     if ($selected_ids_attr !== []) {
                                         echo ' data-selected-ids="' . esc_attr(implode(',', $selected_ids_attr)) . '"';
@@ -147,7 +159,15 @@ function pokehub_render_quest_editor_item($index, $quest, $prefix = 'event') {
                                 >
                                     <option value=""><?php _e('Select a Pokémon', 'poke-hub'); ?></option>
                                     <?php
-                                    $selected_pokemon_id = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
+                                    $parsed_res = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+                                        ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders(
+                                            isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null
+                                                ? [(string) $reward['pokemon_id']]
+                                                : [],
+                                            null
+                                        )
+                                        : ['pokemon_ids' => isset($reward['pokemon_id']) ? [(int) $reward['pokemon_id']] : []];
+                                    $selected_pokemon_id = (int) ($parsed_res['pokemon_ids'][0] ?? 0);
                                     if ($selected_pokemon_id > 0 && function_exists('pokehub_get_pokemon_data_by_id')) {
                                         $pokemon_data = pokehub_get_pokemon_data_by_id($selected_pokemon_id);
                                         if ($pokemon_data) {

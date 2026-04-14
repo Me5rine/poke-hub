@@ -106,9 +106,30 @@ function poke_hub_render_friend_code_form($args = []) {
         $selected_team = $args['existing_profile']['team'];
     }
     
+    $show_friend_code_hidden_notice = false;
+    if ($args['is_logged_in'] && !empty($args['existing_profile']['friend_code']) && !empty($args['existing_profile']['friend_code_hidden'])) {
+        $show_friend_code_hidden_notice = true;
+    } elseif (!$args['is_logged_in'] && function_exists('poke_hub_current_ip_has_hidden_anonymous_listing') && poke_hub_current_ip_has_hidden_anonymous_listing()) {
+        $show_friend_code_hidden_notice = true;
+    }
+
     ?>
     <div class="me5rine-lab-form-block">
         <h3 class="me5rine-lab-title-medium"><?php echo esc_html($title); ?></h3>
+
+        <?php if ($show_friend_code_hidden_notice) : ?>
+            <div class="me5rine-lab-form-message me5rine-lab-form-message-warning user-profiles-friend-code-hidden-notice">
+                <p>
+                    <?php
+                    if ($args['is_logged_in']) {
+                        esc_html_e('Your friend code no longer appears on public lists after several obsolete code reports. If you reset it in Pokémon GO, please submit your new code here or from your profile.', 'poke-hub');
+                    } else {
+                        esc_html_e('A friend code added from this connection no longer appears on public lists (obsolete reports). If it was yours and you changed it in Pokémon GO, please update it below. If this message is not for you, you can ignore it.', 'poke-hub');
+                    }
+                    ?>
+                </p>
+            </div>
+        <?php endif; ?>
         
         <?php if (!empty($args['form_message'])) : ?>
             <div class="me5rine-lab-form-message me5rine-lab-form-message-<?php echo esc_attr($args['form_message_type']); ?>">

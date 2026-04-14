@@ -189,6 +189,10 @@ jQuery(function($) {
         $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon, select.pokehub-quest-pokemon-select').each(function() {
             var $select = $(this);
             if ($select.data('select2')) return;
+            var dimorphicOnly = String($select.attr('data-gender-dimorphic-only') || '') === '1';
+            var isMultiple = $select.attr('multiple') !== undefined;
+            var inlineGenderMode = isMultiple && $select.hasClass('pokehub-gender-driven-select');
+            var existingGenderMap = pokehubNormalizeGenderMap($select.attr('data-existing-genders'));
 
             // 1) Lire les ids pré-sélectionnés (data-selected-ids, ou fallback : .val() / option:selected déjà présents)
             var raw = ($select.attr('data-selected-ids') || '').trim();
@@ -215,7 +219,17 @@ jQuery(function($) {
                     var labelMap = {};
                     ids.forEach(function(id) {
                         var $o = $select.find('option[value="' + id + '"]');
-                        labelMap[id] = ($o.length ? $o.text() : null) || pokemonMap[id] || ('#' + id);
+                        if ($o.length) {
+                            labelMap[id] = $o.text();
+                            return;
+                        }
+                        var parsed = pokehubParsePokemonGenderToken(id);
+                        if (!parsed) {
+                            labelMap[id] = '#' + id;
+                            return;
+                        }
+                        var base = pokemonMap[parsed.id] || ('#' + parsed.id);
+                        labelMap[id] = parsed.gender ? pokehubInlineGenderOptionLabel(base, parsed.gender) : base;
                     });
                     $select.empty();
                     ids.forEach(function(id) {
@@ -235,8 +249,9 @@ jQuery(function($) {
                 });
             }
 
+            ids = pokehubApplyInlineGenderTokensToIds(ids, existingGenderMap, inlineGenderMode);
+
             var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
-            var isMultiple = $select.attr('multiple') !== undefined;
             var opts = {
                 placeholder: placeholder,
                 multiple: isMultiple,
@@ -254,21 +269,33 @@ jQuery(function($) {
                         id: pid,
                         text: ptext,
                         name_fr: p.name_fr,
-                        name_en: p.name_en
+                        name_en: p.name_en,
+                        has_gender_dimorphism: p && p.has_gender_dimorphism ? 1 : 0
                     };
                 });
+                if (dimorphicOnly) {
+                    dataList = dataList.filter(function(row) {
+                        return Number(row.has_gender_dimorphism) === 1;
+                    });
+                }
+                dataList = pokehubExpandPokemonOptionsWithGenderVariants(dataList, inlineGenderMode);
                 ids.forEach(function(idStr) {
-                    var idNum = parseInt(idStr, 10);
+                    var parsedId = pokehubParsePokemonGenderToken(idStr);
+                    if (!parsedId) {
+                        return;
+                    }
+                    var idNum = parseInt(parsedId.id, 10);
                     if (!idNum || isNaN(idNum)) {
                         return;
                     }
                     var exists = dataList.some(function(row) {
-                        return Number(row.id) === idNum;
+                        return String(row.id) === idStr;
                     });
                     if (!exists) {
+                        var baseLabel = pokemonMap[String(idNum)] || ('#' + idNum);
                         dataList.push({
-                            id: idNum,
-                            text: pokemonMap[idStr] || ('#' + idStr)
+                            id: idStr,
+                            text: parsedId.gender ? pokehubInlineGenderOptionLabel(baseLabel, parsedId.gender) : baseLabel
                         });
                     }
                 });
@@ -286,11 +313,16 @@ jQuery(function($) {
                     headers: restNonce ? { 'X-WP-Nonce': restNonce } : {},
                     data: function(params) {
                         var t = params.term || '';
-                        return { search: t, q: t, term: t };
+                        return {
+                            search: t,
+                            q: t,
+                            term: t,
+                            dimorphic_only: dimorphicOnly ? 1 : 0
+                        };
                     },
                     processResults: function(data) {
                         if (Array.isArray(data)) {
-                            return { results: data };
+                            return { results: pokehubExpandPokemonOptionsWithGenderVariants(data, inlineGenderMode) };
                         }
                         return { results: [] };
                     },
@@ -298,14 +330,22 @@ jQuery(function($) {
                 };
             }
             $select.select2(opts);
+            if (inlineGenderMode) {
+                $select.off('change.pokehubInlineGender').on('change.pokehubInlineGender', function() {
+                    pokehubSyncInlineGenderHiddenInputs($select);
+                });
+            }
 
             // 4) Reforcer la valeur après init
             if (ids.length) {
                 if (isMultiple) {
-                    $select.val(ids.map(function(x) { return String(parseInt(x, 10)); }).filter(function(v) { return v && v !== 'NaN'; })).trigger('change.select2');
+                    $select.val(ids).trigger('change.select2');
                 } else {
                     $select.val(String(parseInt(ids[0], 10))).trigger('change.select2');
                 }
+            }
+            if (inlineGenderMode) {
+                pokehubSyncInlineGenderHiddenInputs($select);
             }
         });
 
@@ -313,6 +353,9 @@ jQuery(function($) {
         $ctx.find('select.pokehub-sr-reward-pokemon, .pokehub-special-research-metabox select.pokehub-select-pokemon, select.pokehub-quest-pokemon-select').each(function() {
             var $select = $(this);
             if (!$select.data('select2')) return;
+            var isMultiple2 = $select.attr('multiple') !== undefined;
+            var inlineGenderMode2 = isMultiple2 && $select.hasClass('pokehub-gender-driven-select');
+            var existingGenderMap2 = pokehubNormalizeGenderMap($select.attr('data-existing-genders'));
             var raw = ($select.attr('data-selected-ids') || '').trim();
             var ids = raw ? raw.split(',').map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; }) : [];
             if (ids.length === 0) {
@@ -324,13 +367,16 @@ jQuery(function($) {
                     ids = fromOptions.map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; });
                 }
             }
+            ids = pokehubApplyInlineGenderTokensToIds(ids, existingGenderMap2, inlineGenderMode2);
             if (ids.length) {
-                var isMultiple2 = $select.attr('multiple') !== undefined;
                 if (isMultiple2) {
-                    $select.val(ids.map(function(x) { return String(parseInt(x, 10)); }).filter(function(v) { return v && v !== 'NaN'; })).trigger('change.select2');
+                    $select.val(ids).trigger('change.select2');
                 } else {
                     $select.val(String(parseInt(ids[0], 10))).trigger('change.select2');
                 }
+            }
+            if (inlineGenderMode2) {
+                pokehubSyncInlineGenderHiddenInputs($select);
             }
         });
 
@@ -404,6 +450,341 @@ jQuery(function($) {
                     }
                 });
             });
+        });
+    }
+
+    function pokehubResolvePokemonGenderConfig() {
+        var candidates = [
+            window.pokehubPokemonGenderConfig,
+            window.pokehubQuestsGender,
+            window.pokehubHabitatsGender,
+            window.pokehubWildPokemonGender,
+            window.pokehubNewPokemonGender
+        ];
+        for (var i = 0; i < candidates.length; i++) {
+            var cfg = candidates[i];
+            if (cfg && cfg.ajax_url && cfg.nonce) {
+                return cfg;
+            }
+        }
+        return null;
+    }
+
+    function pokehubNormalizeGenderMap(raw) {
+        var out = {};
+        if (!raw) {
+            return out;
+        }
+        var map = raw;
+        if (typeof raw === 'string') {
+            try {
+                map = JSON.parse(raw);
+            } catch (e) {
+                map = {};
+            }
+        }
+        if (!map || typeof map !== 'object') {
+            return out;
+        }
+        Object.keys(map).forEach(function(k) {
+            var pid = String(parseInt(k, 10));
+            var g = String(map[k] || '');
+            if ((g === 'male' || g === 'female') && pid !== 'NaN' && pid !== '0') {
+                out[pid] = g;
+            }
+        });
+        return out;
+    }
+
+    function pokehubParsePokemonGenderToken(rawValue) {
+        var raw = String(rawValue || '').trim();
+        if (!raw) {
+            return null;
+        }
+        var forced = raw.match(/^(\d+)\|(male|female)$/);
+        if (forced) {
+            return {
+                id: String(parseInt(forced[1], 10)),
+                gender: forced[2]
+            };
+        }
+        var pid = String(parseInt(raw, 10));
+        if (!pid || pid === 'NaN' || pid === '0') {
+            return null;
+        }
+        return {
+            id: pid,
+            gender: ''
+        };
+    }
+
+    function pokehubGenderSuffixLabel(gender) {
+        return gender === 'female' ? 'Femelle' : 'Male';
+    }
+
+    function pokehubInlineGenderOptionLabel(baseLabel, gender) {
+        return String(baseLabel || '') + ' (' + pokehubGenderSuffixLabel(gender) + ')';
+    }
+
+    function pokehubExpandPokemonOptionsWithGenderVariants(entries, enabled) {
+        if (!enabled || !Array.isArray(entries)) {
+            return Array.isArray(entries) ? entries : [];
+        }
+        var out = [];
+        entries.forEach(function(row) {
+            if (!row) {
+                return;
+            }
+            var pid = String(parseInt(row.id, 10));
+            if (!pid || pid === 'NaN' || pid === '0') {
+                return;
+            }
+            var baseText = (row.text != null) ? row.text : ('#' + pid);
+            var baseRow = $.extend({}, row, { id: pid, text: baseText });
+            out.push(baseRow);
+            if (Number(row.has_gender_dimorphism) === 1) {
+                out.push($.extend({}, row, { id: pid + '|male', text: pokehubInlineGenderOptionLabel(baseText, 'male') }));
+                out.push($.extend({}, row, { id: pid + '|female', text: pokehubInlineGenderOptionLabel(baseText, 'female') }));
+            }
+        });
+        return out;
+    }
+
+    function pokehubApplyInlineGenderTokensToIds(ids, genderMap, enabled) {
+        if (!enabled || !Array.isArray(ids)) {
+            return ids;
+        }
+        return ids.map(function(rawId) {
+            var id = String(parseInt(rawId, 10));
+            if (!id || id === 'NaN' || id === '0') {
+                return rawId;
+            }
+            var g = genderMap[id] || '';
+            return (g === 'male' || g === 'female') ? (id + '|' + g) : id;
+        });
+    }
+
+    function pokehubSyncInlineGenderHiddenInputs($select) {
+        if (!$select || !$select.length || $select.attr('multiple') === undefined) {
+            return;
+        }
+        var nameTemplate = $select.attr('data-gender-name-template') || '';
+        if (!nameTemplate) {
+            return;
+        }
+        var wrapperSelector = $select.attr('data-gender-wrapper-selector') || '';
+        var $wrapper = wrapperSelector ? $select.closest('.pokehub-gender-field-group').find(wrapperSelector).first() : $select.closest('.pokehub-gender-field-group').find('.pokehub-pokemon-gender-options').first();
+        if (!$wrapper.length) {
+            return;
+        }
+
+        var selected = $select.val();
+        var values = Array.isArray(selected) ? selected.slice() : [];
+        var byId = {};
+        values.forEach(function(v) {
+            var parsed = pokehubParsePokemonGenderToken(v);
+            if (!parsed) {
+                return;
+            }
+            // Priorité à la dernière sélection pour un Pokémon donné.
+            byId[parsed.id] = parsed.gender ? (parsed.id + '|' + parsed.gender) : parsed.id;
+        });
+        var normalizedValues = Object.keys(byId).map(function(pid) { return byId[pid]; });
+        if (!$select.data('pokehub-inline-gender-syncing')) {
+            if (normalizedValues.join(',') !== values.join(',')) {
+                $select.data('pokehub-inline-gender-syncing', true);
+                $select.val(normalizedValues).trigger('change.select2');
+                $select.data('pokehub-inline-gender-syncing', false);
+                return;
+            }
+        }
+
+        var genderMap = {};
+        normalizedValues.forEach(function(v) {
+            var parsed = pokehubParsePokemonGenderToken(v);
+            if (parsed && (parsed.gender === 'male' || parsed.gender === 'female')) {
+                genderMap[parsed.id] = parsed.gender;
+            }
+        });
+        $select.attr('data-existing-genders', JSON.stringify(genderMap));
+
+        $wrapper.empty().hide();
+        Object.keys(genderMap).forEach(function(pid) {
+            var name = nameTemplate.indexOf('__POKEMON_ID__') !== -1
+                ? nameTemplate.replace(/__POKEMON_ID__/g, pid)
+                : nameTemplate;
+            $('<input>', {
+                type: 'hidden',
+                name: name,
+                value: genderMap[pid]
+            }).appendTo($wrapper);
+        });
+    }
+
+    var pokehubGenderProfileCache = {};
+    function pokehubFetchGenderProfile(pokemonId, cfg) {
+        var deferred = $.Deferred();
+        var key = String(parseInt(pokemonId, 10));
+        if (!cfg || !cfg.ajax_url || !cfg.nonce || !key || key === 'NaN' || key === '0') {
+            deferred.resolve(null);
+            return deferred.promise();
+        }
+        if (Object.prototype.hasOwnProperty.call(pokehubGenderProfileCache, key)) {
+            deferred.resolve(pokehubGenderProfileCache[key]);
+            return deferred.promise();
+        }
+
+        $.post(cfg.ajax_url, {
+            action: 'pokehub_check_pokemon_gender_dimorphism',
+            pokemon_id: key,
+            nonce: cfg.nonce
+        }).done(function(resp) {
+            var profile = null;
+            if (resp && resp.success && resp.data && typeof resp.data === 'object') {
+                profile = resp.data;
+            }
+            pokehubGenderProfileCache[key] = profile;
+            deferred.resolve(profile);
+        }).fail(function() {
+            pokehubGenderProfileCache[key] = null;
+            deferred.resolve(null);
+        });
+
+        return deferred.promise();
+    }
+
+    function pokehubBuildGenderSelectHtml(pokemonId, profile, selectedGender, nameTemplate, scope) {
+        if (!profile || !profile.has_gender_dimorphism) {
+            return '';
+        }
+        var source = (scope === 'spawn') ? profile.spawn_available_genders : profile.available_genders;
+        var genders = Array.isArray(source) ? source.filter(function(g) { return g === 'male' || g === 'female'; }) : [];
+        if (genders.length < 2) {
+            return '';
+        }
+
+        var pid = String(parseInt(pokemonId, 10));
+        var safeTemplate = String(nameTemplate || '');
+        if (!safeTemplate) {
+            return '';
+        }
+        var name = safeTemplate.indexOf('__POKEMON_ID__') !== -1
+            ? safeTemplate.replace(/__POKEMON_ID__/g, pid)
+            : safeTemplate;
+        var def = profile.default_gender === 'female' ? 'female' : 'male';
+        var defaultLabel = def === 'female' ? 'Defaut (Femelle)' : 'Defaut (Male)';
+        var current = (selectedGender === 'male' || selectedGender === 'female') ? selectedGender : '';
+
+        var html = '<div class="pokehub-pokemon-gender-row" style="margin:6px 0;">';
+        html += '<label style="display:flex;align-items:center;gap:8px;">';
+        html += '<span>Sexe #' + pid + ' :</span>';
+        html += '<select name="' + name + '" data-pokemon-id="' + pid + '" style="min-width:170px;">';
+        html += '<option value="">' + defaultLabel + '</option>';
+        for (var i = 0; i < genders.length; i++) {
+            var g = genders[i];
+            var label = g === 'female' ? 'Femelle' : 'Male';
+            html += '<option value="' + g + '"' + (current === g ? ' selected' : '') + '>' + label + '</option>';
+        }
+        html += '</select>';
+        html += '</label>';
+        html += '</div>';
+        return html;
+    }
+
+    function pokehubRefreshGenderSelector($select) {
+        if (!$select || !$select.length) {
+            return;
+        }
+        if ($select.attr('multiple') !== undefined) {
+            pokehubSyncInlineGenderHiddenInputs($select);
+            return;
+        }
+        var cfg = pokehubResolvePokemonGenderConfig();
+        if (!cfg) {
+            return;
+        }
+        var nameTemplate = $select.attr('data-gender-name-template') || '';
+        if (!nameTemplate) {
+            return;
+        }
+        var scope = ($select.attr('data-gender-scope') || 'available') === 'spawn' ? 'spawn' : 'available';
+        var wrapperSelector = $select.attr('data-gender-wrapper-selector') || '';
+        var $wrapper = wrapperSelector ? $select.closest('.pokehub-gender-field-group').find(wrapperSelector).first() : $select.closest('.pokehub-gender-field-group').find('.pokehub-pokemon-gender-options').first();
+        if (!$wrapper.length) {
+            return;
+        }
+
+        var rawSelected = $select.val();
+        var selectedList = [];
+        if (Array.isArray(rawSelected)) {
+            selectedList = rawSelected;
+        } else if (rawSelected !== null && rawSelected !== undefined && String(rawSelected) !== '') {
+            selectedList = [rawSelected];
+        }
+        var selectedIds = selectedList.map(function(v) {
+            return String(parseInt(v, 10));
+        }).filter(function(v) {
+            return v !== 'NaN' && v !== '0';
+        });
+
+        if (!selectedIds.length) {
+            $wrapper.empty().hide();
+            return;
+        }
+
+        var currentMap = {};
+        $wrapper.find('select[data-pokemon-id]').each(function() {
+            var pid = String($(this).attr('data-pokemon-id') || '');
+            var g = String($(this).val() || '');
+            if ((g === 'male' || g === 'female') && pid) {
+                currentMap[pid] = g;
+            }
+        });
+        var initialMap = pokehubNormalizeGenderMap($select.attr('data-existing-genders'));
+        Object.keys(initialMap).forEach(function(pid) {
+            if (!Object.prototype.hasOwnProperty.call(currentMap, pid)) {
+                currentMap[pid] = initialMap[pid];
+            }
+        });
+
+        var requestId = Date.now().toString() + Math.random().toString(16).slice(2);
+        $select.attr('data-gender-request-id', requestId);
+
+        var calls = selectedIds.map(function(pid) {
+            return pokehubFetchGenderProfile(pid, cfg);
+        });
+
+        $.when.apply($, calls).done(function() {
+            if ($select.attr('data-gender-request-id') !== requestId) {
+                return;
+            }
+
+            var profiles = [];
+            if (calls.length === 1) {
+                profiles = [arguments[0]];
+            } else {
+                profiles = Array.prototype.slice.call(arguments);
+            }
+
+            var html = '';
+            for (var i = 0; i < selectedIds.length; i++) {
+                var pid = selectedIds[i];
+                var profile = profiles[i] || null;
+                html += pokehubBuildGenderSelectHtml(pid, profile, currentMap[pid] || '', nameTemplate, scope);
+            }
+
+            if (html) {
+                $wrapper.html(html).show();
+            } else {
+                $wrapper.empty().hide();
+            }
+        });
+    }
+
+    function pokehubInitPokemonGenderSelectors(context) {
+        var $ctx = context ? $(context) : $(document);
+        $ctx.find('select.pokehub-gender-driven-select').each(function() {
+            pokehubRefreshGenderSelector($(this));
         });
     }
     
@@ -485,6 +866,10 @@ jQuery(function($) {
         $ctx.find(largeListSelector).each(function() {
             var $select = $(this);
             if ($select.data('select2')) return;
+            var dimorphicOnly = String($select.attr('data-gender-dimorphic-only') || '') === '1';
+            var isMultiple = $select.attr('multiple') !== undefined;
+            var inlineGenderMode = isMultiple && $select.hasClass('pokehub-gender-driven-select');
+            var existingGenderMap = pokehubNormalizeGenderMap($select.attr('data-existing-genders'));
 
             var raw = ($select.attr('data-selected-ids') || '').trim();
             var ids = raw ? raw.split(',').map(function(v) { return String(parseInt(v, 10)); }).filter(function(v) { return v !== 'NaN' && v !== '0'; }) : [];
@@ -498,12 +883,23 @@ jQuery(function($) {
                 }
                 if (ids.length) $select.attr('data-selected-ids', ids.join(','));
             }
+            ids = pokehubApplyInlineGenderTokensToIds(ids, existingGenderMap, inlineGenderMode);
 
             if (useAjax && ids.length) {
                 var labelMap = {};
                 ids.forEach(function(id) {
                     var $o = $select.find('option[value="' + id + '"]');
-                    labelMap[id] = ($o.length ? $o.text() : null) || pokemonMap[id] || ('#' + id);
+                    if ($o.length) {
+                        labelMap[id] = $o.text();
+                        return;
+                    }
+                    var parsed = pokehubParsePokemonGenderToken(id);
+                    if (!parsed) {
+                        labelMap[id] = '#' + id;
+                        return;
+                    }
+                    var base = pokemonMap[parsed.id] || ('#' + parsed.id);
+                    labelMap[id] = parsed.gender ? pokehubInlineGenderOptionLabel(base, parsed.gender) : base;
                 });
                 $select.empty();
                 ids.forEach(function(id) {
@@ -518,7 +914,6 @@ jQuery(function($) {
             }
 
             var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
-            var isMultiple = $select.attr('multiple') !== undefined;
             var opts = {
                 placeholder: placeholder,
                 multiple: isMultiple,
@@ -536,17 +931,37 @@ jQuery(function($) {
                     headers: restNonce ? { 'X-WP-Nonce': restNonce } : {},
                     data: function(params) {
                         var t = params.term || '';
-                        return { search: t, q: t, term: t };
+                        return {
+                            search: t,
+                            q: t,
+                            term: t,
+                            dimorphic_only: dimorphicOnly ? 1 : 0
+                        };
                     },
                     processResults: function(data) {
-                        if (Array.isArray(data)) return { results: data };
+                        if (Array.isArray(data)) return { results: pokehubExpandPokemonOptionsWithGenderVariants(data, inlineGenderMode) };
                         return { results: [] };
                     },
                     cache: true
                 };
+            } else if (inlineGenderMode && list.length) {
+                opts.data = pokehubExpandPokemonOptionsWithGenderVariants(list, true);
+                if (typeof pokehubMultilingualMatcher !== 'undefined') {
+                    opts.matcher = pokehubMultilingualMatcher;
+                }
             }
             $select.select2(opts);
-            if (ids.length) $select.val(ids).trigger('change.select2');
+            if (inlineGenderMode) {
+                $select.off('change.pokehubInlineGender').on('change.pokehubInlineGender', function() {
+                    pokehubSyncInlineGenderHiddenInputs($select);
+                });
+            }
+            if (ids.length) {
+                $select.val(ids).trigger('change.select2');
+            }
+            if (inlineGenderMode) {
+                pokehubSyncInlineGenderHiddenInputs($select);
+            }
         });
     }
 
@@ -560,6 +975,7 @@ jQuery(function($) {
     window.pokehubInitQuestItemSelect2 = pokehubInitQuestItemSelect2;
     window.pokehubInitGoPassBonusRewardSelect2 = pokehubInitGoPassBonusRewardSelect2;
     window.pokehubInitLargePokemonSelect2 = pokehubInitLargePokemonSelect2;
+    window.pokehubInitPokemonGenderSelectors = pokehubInitPokemonGenderSelectors;
 
     pokehubInitAttackSelect2(document);
     pokehubInitWeatherSelect2(document);
@@ -570,7 +986,12 @@ jQuery(function($) {
     // Field Research / quêtes : toujours document (les selects ne sont pas dans la metabox études spéciales).
     // Si on limitait au conteneur SR, les quêtes sur l’article ne recevaient pas Select2 et affichaient la liste HTML brute.
     pokehubInitQuestPokemonSelect2(document);
-    pokehubInitQuestItemSelect2(questCtx);
+    pokehubInitQuestItemSelect2(document);
+    pokehubInitPokemonGenderSelectors(document);
+
+    $(document).on('change', 'select.pokehub-gender-driven-select', function() {
+        pokehubRefreshGenderSelector($(this));
+    });
     
     // Initialiser Select2 pour le champ multiselect des pays régionaux
     $('#regional_countries').each(function() {

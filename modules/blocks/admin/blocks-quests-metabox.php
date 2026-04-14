@@ -299,25 +299,44 @@ function pokehub_render_event_quests_metabox($post) {
                 });
                 
                 promise.done(function(resp) {
-                    if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
-                        hasAnyDimorphic = true;
-                        var savedGender = '';
-                        if (pokehubQuestsGender.saved_genders && pokehubQuestsGender.saved_genders[questIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId]) {
-                            savedGender = pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId];
-                        }
-                        
-                        var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
-                        var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
-                        $label.text('Pokémon #' + pokemonId + ':');
-                        var $selectGender = $('<select name="pokehub_quests[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_genders][' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
-                        $selectGender.append('<option value=""><?php echo esc_js(__('Default (Male)', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="male"' + (savedGender === 'male' ? ' selected' : '') + '><?php echo esc_js(__('Male', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="female"' + (savedGender === 'female' ? ' selected' : '') + '><?php echo esc_js(__('Female', 'poke-hub')); ?></option>');
-                        
-                        $genderRow.append($label);
-                        $genderRow.append($selectGender);
-                        $list.append($genderRow);
+                    if (!(resp && resp.success && resp.data)) {
+                        return;
                     }
+                    var data = resp.data;
+                    var availableGenders = Array.isArray(data.available_genders) ? data.available_genders : [];
+                    if (!(data.has_gender_dimorphism && availableGenders.length > 1)) {
+                        return;
+                    }
+
+                    hasAnyDimorphic = true;
+                    var savedGender = '';
+                    if (pokehubQuestsGender.saved_genders && pokehubQuestsGender.saved_genders[questIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex] && pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId]) {
+                        savedGender = pokehubQuestsGender.saved_genders[questIndex][rewardIndex][pokemonId];
+                    }
+                    var defaultGender = (data.default_gender && availableGenders.indexOf(data.default_gender) !== -1)
+                        ? data.default_gender
+                        : availableGenders[0];
+                    var genderLabels = {
+                        male: '<?php echo esc_js(__('Male', 'poke-hub')); ?>',
+                        female: '<?php echo esc_js(__('Female', 'poke-hub')); ?>'
+                    };
+                    
+                    var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
+                    var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
+                    $label.text('Pokémon #' + pokemonId + ':');
+                    var $selectGender = $('<select name="pokehub_quests[' + questIndex + '][rewards][' + rewardIndex + '][pokemon_genders][' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
+                    $selectGender.append('<option value=""><?php echo esc_js(__('Default', 'poke-hub')); ?> (' + (genderLabels[defaultGender] || defaultGender) + ')</option>');
+                    availableGenders.forEach(function(gender) {
+                        if (gender !== 'male' && gender !== 'female') {
+                            return;
+                        }
+                        var selectedAttr = savedGender === gender ? ' selected' : '';
+                        $selectGender.append('<option value="' + gender + '"' + selectedAttr + '>' + genderLabels[gender] + '</option>');
+                    });
+                    
+                    $genderRow.append($label);
+                    $genderRow.append($selectGender);
+                    $list.append($genderRow);
                 });
                 
                 promises.push(promise);

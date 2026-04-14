@@ -237,7 +237,16 @@ add_action('init', function() {
                 } elseif (is_array($ids_param)) {
                     $ids = array_values(array_filter(array_map('intval', $ids_param), function($id) { return $id > 0; }));
                 }
-                $pokemon_list = pokehub_get_pokemon_for_select_filtered($ids, $search);
+                $dimorphic_only = false;
+                $raw_dimorphic_only = $request->get_param('dimorphic_only');
+                if (is_string($raw_dimorphic_only)) {
+                    $dimorphic_only = in_array(strtolower(trim($raw_dimorphic_only)), ['1', 'true', 'yes', 'on'], true);
+                } elseif (is_numeric($raw_dimorphic_only)) {
+                    $dimorphic_only = ((int) $raw_dimorphic_only) === 1;
+                } elseif (is_bool($raw_dimorphic_only)) {
+                    $dimorphic_only = $raw_dimorphic_only;
+                }
+                $pokemon_list = pokehub_get_pokemon_for_select_filtered($ids, $search, $dimorphic_only);
                 return rest_ensure_response($pokemon_list);
             },
             'permission_callback' => function() {

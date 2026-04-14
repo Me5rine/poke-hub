@@ -1191,6 +1191,7 @@ class Pokehub_DB {
             content_egg_id BIGINT UNSIGNED NOT NULL,
             egg_type_id BIGINT UNSIGNED NOT NULL,
             pokemon_id BIGINT UNSIGNED NOT NULL,
+            gender VARCHAR(10) NULL DEFAULT NULL,
             rarity TINYINT UNSIGNED NOT NULL DEFAULT 1,
             is_worldwide_override TINYINT(1) NOT NULL DEFAULT 0,
             is_forced_shiny TINYINT(1) NOT NULL DEFAULT 0,
@@ -1441,6 +1442,7 @@ class Pokehub_DB {
             content_raid_id BIGINT UNSIGNED NOT NULL,
             tier TINYINT UNSIGNED NOT NULL DEFAULT 1,
             pokemon_id BIGINT UNSIGNED NOT NULL,
+            gender VARCHAR(10) NULL DEFAULT NULL,
             is_mega TINYINT(1) NOT NULL DEFAULT 0,
             sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             PRIMARY KEY (id),
@@ -1514,6 +1516,24 @@ class Pokehub_DB {
         dbDelta($sql_raid_bosses);
         dbDelta($sql_go_pass);
         dbDelta($sql_go_pass_host);
+
+        $egg_gender_col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'gender'",
+            $wpdb->dbname,
+            $egg_pokemon_tbl
+        ));
+        if (empty($egg_gender_col)) {
+            $wpdb->query("ALTER TABLE {$egg_pokemon_tbl} ADD COLUMN gender VARCHAR(10) NULL DEFAULT NULL AFTER pokemon_id");
+        }
+
+        $raid_gender_col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'gender'",
+            $wpdb->dbname,
+            $raid_bosses_tbl
+        ));
+        if (empty($raid_gender_col)) {
+            $wpdb->query("ALTER TABLE {$raid_bosses_tbl} ADD COLUMN gender VARCHAR(10) NULL DEFAULT NULL AFTER pokemon_id");
+        }
 
         $this->migrateGoPassHostLinksTableFromLegacyPostId($go_pass_host_tbl);
 
@@ -1766,6 +1786,9 @@ class Pokehub_DB {
             team VARCHAR(50) NOT NULL DEFAULT '',
             friend_code VARCHAR(12) NOT NULL DEFAULT '',
             friend_code_public TINYINT(1) NOT NULL DEFAULT 1,
+            friend_code_hidden TINYINT(1) NOT NULL DEFAULT 0,
+            friend_code_report_count INT UNSIGNED NOT NULL DEFAULT 0,
+            friend_code_last_reported_at DATETIME NULL DEFAULT NULL,
             xp BIGINT UNSIGNED NOT NULL DEFAULT 0,
             pokemon_go_username VARCHAR(191) NOT NULL DEFAULT '',
             scatterbug_pattern VARCHAR(50) NOT NULL DEFAULT '',
@@ -1779,7 +1802,8 @@ class Pokehub_DB {
             KEY user_id (user_id),
             KEY discord_id (discord_id),
             KEY profile_type (profile_type),
-            KEY anonymous_ip (anonymous_ip)
+            KEY anonymous_ip (anonymous_ip),
+            KEY friend_code_hidden (friend_code_hidden)
         ) {$charset_collate};";
 
         dbDelta($sql_user_profiles);
@@ -1795,6 +1819,9 @@ class Pokehub_DB {
         
         // Migration: add anonymous_ip for rate limiting / ownership of anonymous friend code rows
         $this->migrateUserProfilesAddAnonymousIpColumn($user_profiles_table);
+
+        // Migration: add report columns for obsolete friend code moderation
+        $this->migrateUserProfilesAddFriendCodeReportColumns($user_profiles_table);
     }
     
     /**
@@ -1889,6 +1916,7 @@ class Pokehub_DB {
         $this->migrateUserProfilesAddProfileTypeColumn($table_name);
         $this->migrateUserProfilesAddCountryCustomColumn($table_name);
         $this->migrateUserProfilesAddAnonymousIpColumn($table_name);
+        $this->migrateUserProfilesAddFriendCodeReportColumns($table_name);
     }
     
     /**
@@ -1953,6 +1981,67 @@ class Pokehub_DB {
         if (empty($column_exists) || (int) $column_exists === 0) {
             // Add country_custom column after country column
             $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN country_custom VARCHAR(191) NULL DEFAULT NULL AFTER country");
+        }
+    }
+
+    /**
+     * Migration: add friend code report moderation columns to user_profiles table.
+     * Keeps obsolete codes in database while hiding them from public lists when threshold is reached.
+     *
+     * @param string $table_name Name of the user_profiles table
+     */
+    private function migrateUserProfilesAddFriendCodeReportColumns($table_name) {
+        global $wpdb;
+
+        $table_exists = ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+
+        $hidden_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = %s
+                 AND TABLE_NAME = %s
+                 AND COLUMN_NAME = 'friend_code_hidden'",
+                DB_NAME,
+                $table_name
+            )
+        );
+
+        if ($hidden_exists === 0) {
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN friend_code_hidden TINYINT(1) NOT NULL DEFAULT 0 AFTER friend_code_public");
+            $wpdb->query("ALTER TABLE {$table_name} ADD KEY friend_code_hidden (friend_code_hidden)");
+        }
+
+        $count_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = %s
+                 AND TABLE_NAME = %s
+                 AND COLUMN_NAME = 'friend_code_report_count'",
+                DB_NAME,
+                $table_name
+            )
+        );
+
+        if ($count_exists === 0) {
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN friend_code_report_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER friend_code_hidden");
+        }
+
+        $reported_at_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = %s
+                 AND TABLE_NAME = %s
+                 AND COLUMN_NAME = 'friend_code_last_reported_at'",
+                DB_NAME,
+                $table_name
+            )
+        );
+
+        if ($reported_at_exists === 0) {
+            $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN friend_code_last_reported_at DATETIME NULL DEFAULT NULL AFTER friend_code_report_count");
         }
     }
 

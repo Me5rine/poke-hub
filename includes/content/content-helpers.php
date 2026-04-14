@@ -189,6 +189,37 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
     }
 }
 
+if (!function_exists('pokehub_content_table_has_column')) {
+    /**
+     * Vérifie la présence d'une colonne SQL pour une table de contenu.
+     */
+    function pokehub_content_table_has_column(string $table_name, string $column_name): bool {
+        static $cache = [];
+        $table_name = trim($table_name);
+        $column_name = trim($column_name);
+        if ($table_name === '' || $column_name === '') {
+            return false;
+        }
+        $key = $table_name . '::' . $column_name;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+        global $wpdb;
+        $col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s
+               AND TABLE_NAME = %s
+               AND COLUMN_NAME = %s",
+            $wpdb->dbname,
+            $table_name,
+            $column_name
+        ));
+        $cache[$key] = !empty($col);
+        return $cache[$key];
+    }
+}
+
 // --- Œufs ---
 
 /**
@@ -244,6 +275,7 @@ function pokehub_content_get_eggs($source_type, $source_id) {
             'rarity'                => (int) $e->rarity,
             'is_worldwide_override' => (bool) $e->is_worldwide_override,
             'is_forced_shiny'       => (bool) $e->is_forced_shiny,
+            'gender'                => isset($e->gender) && in_array((string) $e->gender, ['male', 'female'], true) ? (string) $e->gender : null,
         ];
     }
     return array_values($by_type);
@@ -270,6 +302,7 @@ function pokehub_content_save_eggs($source_type, $source_id, array $eggs, $start
     if (!$eggs_tbl || !$pokemon_tbl) {
         return;
     }
+    $egg_has_gender_col = pokehub_content_table_has_column($pokemon_tbl, 'gender');
 
     $dates = ($start_ts > 0 || $end_ts > 0)
         ? ['start_ts' => (int) $start_ts, 'end_ts' => (int) $end_ts]
@@ -318,18 +351,24 @@ function pokehub_content_save_eggs($source_type, $source_id, array $eggs, $start
             if ($pid <= 0) {
                 continue;
             }
+            $insert_data = [
+                'content_egg_id'         => $content_egg_id,
+                'egg_type_id'             => $et_id,
+                'pokemon_id'              => $pid,
+                'rarity'                  => isset($p['rarity']) ? max(1, min(5, (int) $p['rarity'])) : 1,
+                'is_worldwide_override'   => !empty($p['is_worldwide_override']) ? 1 : 0,
+                'is_forced_shiny'         => !empty($p['is_forced_shiny']) ? 1 : 0,
+                'sort_order'              => $sort++,
+            ];
+            $insert_format = ['%d', '%d', '%d', '%d', '%d', '%d', '%d'];
+            if ($egg_has_gender_col) {
+                $insert_data['gender'] = isset($p['gender']) && in_array((string) $p['gender'], ['male', 'female'], true) ? (string) $p['gender'] : null;
+                array_splice($insert_format, 3, 0, '%s');
+            }
             $wpdb->insert(
                 $pokemon_tbl,
-                [
-                    'content_egg_id'         => $content_egg_id,
-                    'egg_type_id'             => $et_id,
-                    'pokemon_id'              => $pid,
-                    'rarity'                  => isset($p['rarity']) ? max(1, min(5, (int) $p['rarity'])) : 1,
-                    'is_worldwide_override'   => !empty($p['is_worldwide_override']) ? 1 : 0,
-                    'is_forced_shiny'         => !empty($p['is_forced_shiny']) ? 1 : 0,
-                    'sort_order'              => $sort++,
-                ],
-                ['%d', '%d', '%d', '%d', '%d', '%d', '%d']
+                $insert_data,
+                $insert_format
             );
         }
     }
@@ -407,9 +446,12 @@ function pokehub_content_get_all_eggs_aggregated_at($timestamp = null) {
                 'rarity'                => max(1, min(5, (int) $e->rarity)),
                 'is_worldwide_override' => !empty($e->is_worldwide_override),
                 'is_forced_shiny'       => !empty($e->is_forced_shiny),
+                'gender'                => isset($e->gender) && in_array((string) $e->gender, ['male', 'female'], true) ? (string) $e->gender : null,
             ];
             if (!isset($by_type[$et_id][$key]) || $entry['rarity'] > $by_type[$et_id][$key]['rarity']) {
                 $by_type[$et_id][$key] = $entry;
+            } elseif ($by_type[$et_id][$key]['gender'] === null && $entry['gender'] !== null) {
+                $by_type[$et_id][$key]['gender'] = $entry['gender'];
             }
         }
     }
@@ -626,41 +668,37 @@ function pokehub_content_normalize_quest_rewards(array $rewards) {
         $type = isset($reward['type']) ? sanitize_key($reward['type']) : 'pokemon';
         $norm = ['type' => $type];
         if ($type === 'pokemon') {
+            $raw_tokens = [];
             if (isset($reward['pokemon_ids'])) {
                 $raw = $reward['pokemon_ids'];
                 if (is_array($raw)) {
-                    $norm['pokemon_ids'] = array_values(array_map('intval', array_filter($raw, function ($id) {
-                        return $id !== '' && $id !== null && is_numeric($id) && (int) $id > 0;
-                    })));
+                    $raw_tokens = $raw;
                 } elseif (is_string($raw)) {
-                    // Chaîne stockée en base (ex. "1,87" ou "1") : convertir en tableau d'entiers
-                    $norm['pokemon_ids'] = array_values(array_filter(array_map(function ($id) {
-                        return (int) trim($id);
-                    }, explode(',', $raw)), function ($id) {
-                        return $id > 0;
-                    }));
+                    $raw_tokens = array_map('trim', explode(',', $raw));
                 } else {
-                    // Objet (stdClass) renvoyé par json_decode sans true, ou autre : convertir en tableau
-                    $norm['pokemon_ids'] = array_values(array_map('intval', array_filter((array) $raw, function ($id) {
-                        return $id !== '' && $id !== null && is_numeric($id) && (int) $id > 0;
-                    })));
+                    $raw_tokens = (array) $raw;
                 }
-            } elseif (isset($reward['pokemon_id']) && (is_numeric($reward['pokemon_id']) || $reward['pokemon_id'] !== '')) {
-                $id = (int) $reward['pokemon_id'];
-                $norm['pokemon_ids'] = $id > 0 ? [$id] : [];
-            } else {
-                $norm['pokemon_ids'] = [];
+            } elseif (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null) {
+                $raw_tokens = [(string) $reward['pokemon_id']];
             }
-            $norm['force_shiny']   = !empty($reward['force_shiny']);
-            $norm['pokemon_genders'] = [];
-            if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {
-                foreach ($reward['pokemon_genders'] as $pid => $gender) {
+            $raw_genders = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders']) ? $reward['pokemon_genders'] : [];
+            if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_tokens, $raw_genders);
+                $norm['pokemon_ids'] = $parsed['pokemon_ids'];
+                $norm['pokemon_genders'] = $parsed['pokemon_genders'];
+            } else {
+                $norm['pokemon_ids'] = array_values(array_map('intval', array_filter($raw_tokens, function ($id) {
+                    return $id !== '' && $id !== null && is_numeric($id) && (int) $id > 0;
+                })));
+                $norm['pokemon_genders'] = [];
+                foreach ($raw_genders as $pid => $gender) {
                     $pid = (int) $pid;
                     if ($pid > 0 && in_array($gender, ['male', 'female'], true)) {
                         $norm['pokemon_genders'][$pid] = $gender;
                     }
                 }
             }
+            $norm['force_shiny'] = !empty($reward['force_shiny']);
         } elseif (in_array($type, ['candy', 'xl_candy', 'mega_energy'], true)) {
             $norm['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
             $norm['quantity']   = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
@@ -787,49 +825,47 @@ if (!function_exists('pokehub_quests_parse_pokemon_ids_from_reward_input')) {
      * @return int[]
      */
     function pokehub_quests_parse_pokemon_ids_from_reward_input(array $reward): array {
-        $ids = [];
+        $tokens = [];
         if (isset($reward['pokemon_ids'])) {
             $raw = $reward['pokemon_ids'];
             if (is_object($raw)) {
                 $raw = array_values((array) $raw);
             }
             if (is_array($raw)) {
-                foreach ($raw as $v) {
-                    if ($v === '' || $v === null) {
-                        continue;
-                    }
-                    if (is_numeric($v)) {
-                        $n = (int) $v;
-                        if ($n > 0) {
-                            $ids[] = $n;
-                        }
-                    }
-                }
-                return array_values(array_unique($ids));
-            }
-            if (is_string($raw) || is_numeric($raw)) {
+                $tokens = $raw;
+            } elseif (is_string($raw) || is_numeric($raw)) {
                 $s = trim((string) $raw);
                 if ($s === '') {
                     return [];
                 }
-                if (strpos($s, ',') !== false) {
-                    foreach (explode(',', $s) as $part) {
-                        $n = (int) trim($part);
-                        if ($n > 0) {
-                            $ids[] = $n;
-                        }
-                    }
-                    return array_values(array_unique($ids));
+                $tokens = strpos($s, ',') !== false ? array_map('trim', explode(',', $s)) : [$s];
+            }
+        } elseif (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null) {
+            $tokens = [(string) $reward['pokemon_id']];
+        }
+        if ($tokens !== [] && function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+            return pokehub_parse_post_pokemon_multiselect_tokens_with_genders($tokens, null)['pokemon_ids'];
+        }
+        $ids = [];
+        foreach ($tokens as $v) {
+            if ($v === '' || $v === null) {
+                continue;
+            }
+            if (is_string($v) && preg_match('/^(\d+)\|(male|female)$/i', (string) $v, $m)) {
+                $n = (int) $m[1];
+                if ($n > 0) {
+                    $ids[] = $n;
                 }
-                $n = (int) $s;
-                return $n > 0 ? [$n] : [];
+                continue;
+            }
+            if (is_numeric($v)) {
+                $n = (int) $v;
+                if ($n > 0) {
+                    $ids[] = $n;
+                }
             }
         }
-        if (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null && is_numeric($reward['pokemon_id'])) {
-            $n = (int) $reward['pokemon_id'];
-            return $n > 0 ? [$n] : [];
-        }
-        return [];
+        return array_values(array_unique($ids));
     }
 }
 
@@ -864,18 +900,35 @@ function pokehub_quests_clean_from_request(array $quests) {
                 }
                 $cleaned_reward = ['type' => sanitize_key($reward['type'] ?? 'pokemon')];
                 if ($cleaned_reward['type'] === 'pokemon') {
-                    $cleaned_reward['pokemon_ids'] = pokehub_quests_parse_pokemon_ids_from_reward_input($reward);
-                    $cleaned_reward['force_shiny'] = !empty($reward['force_shiny']);
-                    $pokemon_genders = [];
-                    if (isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])) {
-                        foreach ($reward['pokemon_genders'] as $pokemon_id => $gender) {
+                    $raw_tokens = [];
+                    if (isset($reward['pokemon_ids'])) {
+                        $raw = $reward['pokemon_ids'];
+                        if (is_array($raw)) {
+                            $raw_tokens = $raw;
+                        } elseif (is_string($raw)) {
+                            $raw_tokens = array_map('trim', explode(',', $raw));
+                        }
+                    }
+                    if ($raw_tokens === [] && isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null) {
+                        $raw_tokens = [(string) $reward['pokemon_id']];
+                    }
+                    $raw_genders = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders']) ? $reward['pokemon_genders'] : [];
+                    if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                        $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_tokens, $raw_genders);
+                        $cleaned_reward['pokemon_ids'] = $parsed['pokemon_ids'];
+                        $cleaned_reward['pokemon_genders'] = $parsed['pokemon_genders'];
+                    } else {
+                        $cleaned_reward['pokemon_ids'] = pokehub_quests_parse_pokemon_ids_from_reward_input($reward);
+                        $pokemon_genders = [];
+                        foreach ($raw_genders as $pokemon_id => $gender) {
                             $pokemon_id = (int) $pokemon_id;
                             if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
                                 $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);
                             }
                         }
+                        $cleaned_reward['pokemon_genders'] = $pokemon_genders;
                     }
-                    $cleaned_reward['pokemon_genders'] = $pokemon_genders;
+                    $cleaned_reward['force_shiny'] = !empty($reward['force_shiny']);
                 } elseif (in_array($cleaned_reward['type'], ['candy', 'xl_candy', 'mega_energy'], true)) {
                     $cleaned_reward['pokemon_id'] = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
                     $cleaned_reward['quantity'] = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
@@ -1234,6 +1287,14 @@ function pokehub_content_save_new_pokemon($source_type, $source_id, array $pokem
     if (!$main_tbl || !$entries_tbl) {
         return;
     }
+    if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+        $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($pokemon_ids, $genders);
+        $pokemon_ids = $parsed['pokemon_ids'];
+        $genders = [];
+        foreach ($parsed['pokemon_genders'] as $gk => $gv) {
+            $genders[(int) $gk] = $gv;
+        }
+    }
     $dates = pokehub_content_get_dates_for_source($source_type, $source_id);
     $row   = pokehub_content_get_new_pokemon_row($source_type, $source_id);
 
@@ -1256,7 +1317,8 @@ function pokehub_content_save_new_pokemon($source_type, $source_id, array $pokem
     }
 
     $sort = 0;
-    foreach (array_map('intval', array_filter($pokemon_ids)) as $pid) {
+    foreach ($pokemon_ids as $pid) {
+        $pid = (int) $pid;
         if ($pid <= 0) {
             continue;
         }
@@ -1367,10 +1429,19 @@ function pokehub_content_save_habitats($source_type, $source_id, array $habitats
         if ($name === '' || $slug === '') {
             continue;
         }
+        $pokemon_payload = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+            ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders(
+                isset($h['pokemon_ids']) ? (array) $h['pokemon_ids'] : [],
+                isset($h['pokemon_genders']) && is_array($h['pokemon_genders']) ? $h['pokemon_genders'] : null
+            )
+            : [
+                'pokemon_ids'     => isset($h['pokemon_ids']) ? array_map('intval', (array) $h['pokemon_ids']) : [],
+                'pokemon_genders' => isset($h['pokemon_genders']) && is_array($h['pokemon_genders']) ? $h['pokemon_genders'] : [],
+            ];
         $pokemon_data = wp_json_encode([
-            'pokemon_ids'      => isset($h['pokemon_ids']) ? array_map('intval', (array) $h['pokemon_ids']) : [],
+            'pokemon_ids'      => $pokemon_payload['pokemon_ids'],
             'forced_shiny_ids' => isset($h['forced_shiny_ids']) ? array_map('intval', (array) $h['forced_shiny_ids']) : [],
-            'pokemon_genders'  => isset($h['pokemon_genders']) && is_array($h['pokemon_genders']) ? $h['pokemon_genders'] : [],
+            'pokemon_genders'  => $pokemon_payload['pokemon_genders'],
         ]);
         $schedule_data = wp_json_encode(isset($h['schedule']) && is_array($h['schedule']) ? $h['schedule'] : []);
         $wpdb->insert($entries_tbl, [
@@ -1687,6 +1758,139 @@ function pokehub_content_save_collection_challenges($source_type, $source_id, ar
 
 // --- Bloc "Jour -> Pokémon(s) -> Heures" ---
 
+if (!function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+    /**
+     * Normalise les valeurs de multiselect Pokémon issues du POST : IDs simples et tokens "123|male" / "123|female".
+     * Les entrées `pokemon_genders` du POST (champs cachés) priment sur le suffixe du token.
+     *
+     * @param array<int|string> $tokens
+     * @param array<string|int, mixed>|null $post_genders
+     * @return array{pokemon_ids: array<int, int>, pokemon_genders: array<string, string>}
+     */
+    function pokehub_parse_post_pokemon_multiselect_tokens_with_genders(array $tokens, $post_genders = null): array {
+        $genders_from_post = [];
+        if (is_array($post_genders)) {
+            foreach ($post_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $g = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($g, ['male', 'female'], true)) {
+                    $genders_from_post[(string) $pid] = $g;
+                }
+            }
+        }
+
+        $genders_from_tokens = [];
+        $ids_order = [];
+        $seen = [];
+
+        $push_id = static function (int $pid) use (&$ids_order, &$seen): void {
+            if ($pid <= 0) {
+                return;
+            }
+            if (!isset($seen[$pid])) {
+                $ids_order[] = $pid;
+                $seen[$pid] = true;
+            }
+        };
+
+        foreach ($tokens as $token) {
+            if (is_array($token) || is_object($token)) {
+                continue;
+            }
+            $t = is_string($token) ? trim(wp_unslash($token)) : trim((string) $token);
+            if ($t === '') {
+                continue;
+            }
+            if (preg_match('/^(\d+)\|(male|female)$/i', $t, $m)) {
+                $pid = (int) $m[1];
+                $g = strtolower((string) $m[2]);
+                if ($pid > 0 && in_array($g, ['male', 'female'], true)) {
+                    $push_id($pid);
+                    $genders_from_tokens[(string) $pid] = $g;
+                }
+                continue;
+            }
+            if (preg_match('/^\d+$/', $t)) {
+                $pid = (int) $t;
+                $push_id($pid);
+            }
+        }
+
+        $merged_genders = $genders_from_tokens;
+        foreach ($genders_from_post as $pk => $g) {
+            $merged_genders[(string) $pk] = $g;
+        }
+
+        foreach ($merged_genders as $pk => $_g) {
+            $ipi = (int) $pk;
+            if ($ipi > 0 && !isset($seen[$ipi])) {
+                $push_id($ipi);
+            }
+        }
+
+        foreach (array_keys($merged_genders) as $pk) {
+            if (!in_array((int) $pk, $ids_order, true)) {
+                unset($merged_genders[$pk]);
+            }
+        }
+
+        return [
+            'pokemon_ids'     => $ids_order,
+            'pokemon_genders' => $merged_genders,
+        ];
+    }
+}
+
+if (!function_exists('pokehub_content_normalize_pokemon_ids_with_genders')) {
+    /**
+     * @param mixed $raw
+     * @return array{pokemon_ids: array<int, int>, pokemon_genders: array<string, string>}
+     */
+    function pokehub_content_normalize_pokemon_ids_with_genders($raw): array {
+        $result = [
+            'pokemon_ids' => [],
+            'pokemon_genders' => [],
+        ];
+
+        $decoded = $raw;
+        if (is_string($decoded) && $decoded !== '') {
+            $json = json_decode($decoded, true);
+            if (is_array($json)) {
+                $decoded = $json;
+            } else {
+                $decoded = [$decoded];
+            }
+        }
+
+        $pokemon_ids = [];
+        $pokemon_genders = [];
+
+        if (is_array($decoded) && isset($decoded['pokemon_ids'])) {
+            $pokemon_ids = is_array($decoded['pokemon_ids']) ? $decoded['pokemon_ids'] : [];
+            if (isset($decoded['pokemon_genders']) && is_array($decoded['pokemon_genders'])) {
+                foreach ($decoded['pokemon_genders'] as $pid => $gender) {
+                    $pid = (int) $pid;
+                    $gender = is_string($gender) ? sanitize_key($gender) : '';
+                    if ($pid > 0 && in_array($gender, ['male', 'female'], true)) {
+                        $pokemon_genders[(string) $pid] = $gender;
+                    }
+                }
+            }
+        } elseif (is_array($decoded)) {
+            $pokemon_ids = $decoded;
+        }
+
+        $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders((array) $pokemon_ids, $pokemon_genders);
+        $pokemon_ids = $parsed['pokemon_ids'];
+        $pokemon_genders = $parsed['pokemon_genders'];
+
+        $result['pokemon_ids'] = $pokemon_ids;
+        $result['pokemon_genders'] = $pokemon_genders;
+
+        return $result;
+    }
+}
+
 /**
  * Récupère les "sets" jour/pokémon/heures pour une source.
  *
@@ -1737,7 +1941,7 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
     // 1) Raiders (content_raids + content_raid_bosses)
     $out = [];
     $raid_sets_map = []; // set_key => set struct
-    $raid_days_map = []; // set_key => [day_key => [pokemon_ids=>true]]
+    $raid_days_map = []; // set_key => [day_key => ['pokemon_ids'=>[pid=>true], 'pokemon_genders'=>[pid=>gender]]]
     $raid_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_raids') : '';
     $raid_bosses_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_raid_bosses') : '';
     if ($raid_tbl && $raid_bosses_tbl) {
@@ -1794,13 +1998,17 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
             }
 
             if (!isset($raid_days_map[$set_key][$day_key])) {
-                $raid_days_map[$set_key][$day_key] = [];
+                $raid_days_map[$set_key][$day_key] = ['pokemon_ids' => [], 'pokemon_genders' => []];
             }
 
             foreach ($bosses as $b) {
                 $pid = (int) ($b['pokemon_id'] ?? 0);
                 if ($pid > 0) {
-                    $raid_days_map[$set_key][$day_key][$pid] = true;
+                    $raid_days_map[$set_key][$day_key]['pokemon_ids'][$pid] = true;
+                    $gender = isset($b['gender']) ? sanitize_key((string) $b['gender']) : '';
+                    if (in_array($gender, ['male', 'female'], true)) {
+                        $raid_days_map[$set_key][$day_key]['pokemon_genders'][(string) $pid] = $gender;
+                    }
                 }
             }
         }
@@ -1809,7 +2017,7 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
             $days = [];
             if (!empty($raid_days_map[$set_key])) {
                 $day_items = [];
-                foreach ($raid_days_map[$set_key] as $day_key => $pid_map) {
+                foreach ($raid_days_map[$set_key] as $day_key => $day_data) {
                     $parts = explode('|', (string) $day_key);
                     if (count($parts) !== 4) continue;
                     $day_items[] = [
@@ -1817,7 +2025,8 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                         'end_date' => $parts[1],
                         'start_time' => $parts[2],
                         'end_time' => $parts[3],
-                        'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                        'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($day_data['pokemon_ids'] ?? [])))),
+                        'pokemon_genders' => isset($day_data['pokemon_genders']) && is_array($day_data['pokemon_genders']) ? $day_data['pokemon_genders'] : [],
                     ];
                 }
                 usort($day_items, function($a, $b) {
@@ -1843,10 +2052,11 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
 
     // 2) Œufs (content_eggs + content_egg_pokemon)
     $egg_sets_map = []; // egg_type_id => set struct
-    $egg_days_map = []; // egg_type_id => [day_key => [pokemon_ids=>true]]
+    $egg_days_map = []; // egg_type_id => [day_key => ['pokemon_ids'=>[pid=>true], 'pokemon_genders'=>[pid=>gender]]]
     $eggs_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_eggs') : '';
     $egg_pokemon_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_egg_pokemon') : '';
     if ($eggs_tbl && $egg_pokemon_tbl) {
+        $egg_has_gender_col = pokehub_content_table_has_column($egg_pokemon_tbl, 'gender');
         $egg_rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$eggs_tbl} WHERE source_type = %s AND source_id = %d ORDER BY start_ts ASC, id ASC",
             $source_type,
@@ -1876,8 +2086,9 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
             }
             $day_key = $date . '|' . $end_date . '|' . $start_time . '|' . $end_time;
 
+            $egg_cols = $egg_has_gender_col ? 'egg_type_id, pokemon_id, gender' : 'egg_type_id, pokemon_id';
             $egg_pokemons = $wpdb->get_results($wpdb->prepare(
-                "SELECT egg_type_id, pokemon_id FROM {$egg_pokemon_tbl} WHERE content_egg_id = %d ORDER BY sort_order ASC, id ASC",
+                "SELECT {$egg_cols} FROM {$egg_pokemon_tbl} WHERE content_egg_id = %d ORDER BY sort_order ASC, id ASC",
                 $eid
             ), ARRAY_A);
 
@@ -1901,9 +2112,13 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                 }
 
                 if (!isset($egg_days_map[$egg_type_id][$day_key])) {
-                    $egg_days_map[$egg_type_id][$day_key] = [];
+                    $egg_days_map[$egg_type_id][$day_key] = ['pokemon_ids' => [], 'pokemon_genders' => []];
                 }
-                $egg_days_map[$egg_type_id][$day_key][$pid] = true;
+                $egg_days_map[$egg_type_id][$day_key]['pokemon_ids'][$pid] = true;
+                $gender = isset($ep['gender']) ? sanitize_key((string) $ep['gender']) : '';
+                if (in_array($gender, ['male', 'female'], true)) {
+                    $egg_days_map[$egg_type_id][$day_key]['pokemon_genders'][(string) $pid] = $gender;
+                }
             }
         }
 
@@ -1911,7 +2126,7 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
         sort($egg_type_ids, SORT_NUMERIC);
         foreach ($egg_type_ids as $egg_type_id) {
             $day_items = [];
-            foreach (($egg_days_map[$egg_type_id] ?? []) as $day_key => $pid_map) {
+            foreach (($egg_days_map[$egg_type_id] ?? []) as $day_key => $day_data) {
                 $parts = explode('|', (string) $day_key);
                 if (count($parts) !== 4) continue;
                 $day_items[] = [
@@ -1919,7 +2134,8 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                     'end_date' => $parts[1],
                     'start_time' => $parts[2],
                     'end_time' => $parts[3],
-                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($day_data['pokemon_ids'] ?? [])))),
+                    'pokemon_genders' => isset($day_data['pokemon_genders']) && is_array($day_data['pokemon_genders']) ? $day_data['pokemon_genders'] : [],
                 ];
             }
             usort($day_items, function($a, $b) {
@@ -1942,7 +2158,7 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
     }
 
     // 3) Quêtes (content_quests + content_quest_lines) -> une seule set dans l'éditeur
-    $quest_days_map = []; // day_key => [pokemon_ids=>true]
+    $quest_days_map = []; // day_key => ['pokemon_ids'=>[pid=>true], 'pokemon_genders'=>[pid=>gender]]
     $quests_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quests') : '';
     $quest_lines_tbl = function_exists('pokehub_get_table') ? pokehub_get_table('content_quest_lines') : '';
     if ($quests_tbl && $quest_lines_tbl) {
@@ -2029,15 +2245,23 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                         foreach ($reward['pokemon_ids'] as $pid) {
                             $pid = (int) $pid;
                             if ($pid > 0) {
-                                if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = [];
-                                $quest_days_map[$day_key][$pid] = true;
+                                if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = ['pokemon_ids' => [], 'pokemon_genders' => []];
+                                $quest_days_map[$day_key]['pokemon_ids'][$pid] = true;
+                                $g = isset($reward['pokemon_genders'][$pid]) ? sanitize_key((string) $reward['pokemon_genders'][$pid]) : '';
+                                if (in_array($g, ['male', 'female'], true)) {
+                                    $quest_days_map[$day_key]['pokemon_genders'][(string) $pid] = $g;
+                                }
                             }
                         }
                     } elseif (isset($reward['pokemon_id'])) {
                         $pid = (int) $reward['pokemon_id'];
                         if ($pid > 0) {
-                            if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = [];
-                            $quest_days_map[$day_key][$pid] = true;
+                            if (!isset($quest_days_map[$day_key])) $quest_days_map[$day_key] = ['pokemon_ids' => [], 'pokemon_genders' => []];
+                            $quest_days_map[$day_key]['pokemon_ids'][$pid] = true;
+                            $g = isset($reward['gender']) ? sanitize_key((string) $reward['gender']) : '';
+                            if (in_array($g, ['male', 'female'], true)) {
+                                $quest_days_map[$day_key]['pokemon_genders'][(string) $pid] = $g;
+                            }
                         }
                     }
                 }
@@ -2046,7 +2270,7 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
 
         if (!empty($quest_days_map)) {
             $day_items = [];
-            foreach ($quest_days_map as $day_key => $pid_map) {
+            foreach ($quest_days_map as $day_key => $day_data) {
                 $parts = explode('|', (string) $day_key);
                 if (count($parts) !== 4) continue;
                 $day_items[] = [
@@ -2054,7 +2278,8 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
                     'end_date' => $parts[1],
                     'start_time' => $parts[2],
                     'end_time' => $parts[3],
-                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) $pid_map))),
+                    'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($day_data['pokemon_ids'] ?? [])))),
+                    'pokemon_genders' => isset($day_data['pokemon_genders']) && is_array($day_data['pokemon_genders']) ? $day_data['pokemon_genders'] : [],
                 ];
             }
             usort($day_items, function($a, $b) {
@@ -2099,24 +2324,17 @@ function pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id): a
             $days = [];
             foreach ($entries as $e) {
                 $pokemon_ids_raw = $e['pokemon_ids'] ?? '';
-                $pokemon_ids = [];
-                if (is_string($pokemon_ids_raw) && $pokemon_ids_raw !== '') {
-                    $decoded = json_decode($pokemon_ids_raw, true);
-                    if (is_array($decoded)) {
-                        $pokemon_ids = $decoded;
-                    }
-                } elseif (is_array($pokemon_ids_raw)) {
-                    $pokemon_ids = $pokemon_ids_raw;
-                }
+                $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids_raw);
+                $pokemon_ids = $pokemon_payload['pokemon_ids'];
+                $pokemon_genders = $pokemon_payload['pokemon_genders'];
 
                 $days[] = [
                     'date' => (string) ($e['day_date'] ?? ''),
                 'end_date' => (string) ($e['end_day_date'] ?? ''),
                     'start_time' => (string) ($e['start_time'] ?? ''),
                     'end_time' => (string) ($e['end_time'] ?? ''),
-                    'pokemon_ids' => array_values(array_map('intval', array_filter((array) $pokemon_ids, function ($id) {
-                        return is_numeric($id) && (int) $id > 0;
-                    }))),
+                    'pokemon_ids' => $pokemon_ids,
+                    'pokemon_genders' => $pokemon_genders,
                 ];
             }
 
@@ -2164,7 +2382,7 @@ function pokehub_content_get_day_pokemon_hours_entries($source_type, $source_id,
     }
 
     $sets = pokehub_content_get_day_pokemon_hours_sets($source_type, $source_id);
-    $merged = []; // day_key => ['date','end_date','start_time','end_time','pokemon_ids_map'=>[pid=>true]]
+    $merged = []; // day_key => ['date','end_date','start_time','end_time','pokemon_ids_map'=>[pid=>true],'pokemon_genders'=>[pid=>gender]]
     foreach ($sets as $set) {
         if (($set['content_type'] ?? '') !== $content_type) {
             continue;
@@ -2190,6 +2408,7 @@ function pokehub_content_get_day_pokemon_hours_entries($source_type, $source_id,
                             'start_time' => $start_time,
                             'end_time' => $end_time,
                             'pokemon_ids_map' => [],
+                            'pokemon_genders' => [],
                         ];
                     }
                     $pokemon_ids = isset($d['pokemon_ids']) && is_array($d['pokemon_ids']) ? $d['pokemon_ids'] : [];
@@ -2197,6 +2416,14 @@ function pokehub_content_get_day_pokemon_hours_entries($source_type, $source_id,
                         $pid = (int) $pid;
                         if ($pid > 0) {
                             $merged[$day_key]['pokemon_ids_map'][$pid] = true;
+                        }
+                    }
+                    $pokemon_genders = isset($d['pokemon_genders']) && is_array($d['pokemon_genders']) ? $d['pokemon_genders'] : [];
+                    foreach ($pokemon_genders as $pid => $gender) {
+                        $pid = (int) $pid;
+                        $gender = is_string($gender) ? sanitize_key($gender) : '';
+                        if ($pid > 0 && in_array($gender, ['male', 'female'], true) && isset($merged[$day_key]['pokemon_ids_map'][$pid])) {
+                            $merged[$day_key]['pokemon_genders'][(string) $pid] = $gender;
                         }
                     }
                 }
@@ -2212,6 +2439,7 @@ function pokehub_content_get_day_pokemon_hours_entries($source_type, $source_id,
             'start_time' => (string) ($item['start_time'] ?? ''),
             'end_time' => (string) ($item['end_time'] ?? ''),
             'pokemon_ids' => array_values(array_map('intval', array_keys((array) ($item['pokemon_ids_map'] ?? [])))),
+            'pokemon_genders' => isset($item['pokemon_genders']) && is_array($item['pokemon_genders']) ? $item['pokemon_genders'] : [],
         ];
     }
 
@@ -2281,12 +2509,20 @@ function pokehub_content_save_day_pokemon_hours($source_type, $source_id, array 
             }
 
             $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-            if (!is_array($pokemon_ids)) {
-                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids);
+            $pokemon_ids = $pokemon_payload['pokemon_ids'];
+            $pokemon_genders = [];
+            if (isset($day['pokemon_genders']) && is_array($day['pokemon_genders'])) {
+                foreach ($day['pokemon_genders'] as $pid => $gender) {
+                    $pid = (int) $pid;
+                    $gender = is_string($gender) ? sanitize_key($gender) : '';
+                    if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                        $pokemon_genders[(string) $pid] = $gender;
+                    }
+                }
+            } else {
+                $pokemon_genders = $pokemon_payload['pokemon_genders'];
             }
-            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
-                return is_numeric($id) && (int) $id > 0;
-            })));
 
             if ($date === '' || empty($pokemon_ids)) {
                 continue;
@@ -2298,6 +2534,7 @@ function pokehub_content_save_day_pokemon_hours($source_type, $source_id, array 
                 'start_time'  => $start_time,
                 'end_time'    => $end_time,
                 'pokemon_ids' => $pokemon_ids,
+                'pokemon_genders' => $pokemon_genders,
             ];
         }
 
@@ -2437,8 +2674,18 @@ function pokehub_content_save_day_pokemon_hours($source_type, $source_id, array 
             $st = (string) ($d['start_time'] ?? '');
             $et = (string) ($d['end_time'] ?? '');
             $pokemon_ids = isset($d['pokemon_ids']) && is_array($d['pokemon_ids']) ? $d['pokemon_ids'] : [];
+            $pokemon_genders = isset($d['pokemon_genders']) && is_array($d['pokemon_genders']) ? $d['pokemon_genders'] : [];
 
             if ($date === '' || empty($pokemon_ids)) continue;
+
+            $gender_map = [];
+            foreach ($pokemon_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $gender = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                    $gender_map[(string) $pid] = $gender;
+                }
+            }
 
             $wpdb->insert($entries_tbl, [
                 'content_day_pokemon_hours_id' => $row_id,
@@ -2446,7 +2693,10 @@ function pokehub_content_save_day_pokemon_hours($source_type, $source_id, array 
                 'start_time'=> $st,
                 'end_time'  => $et,
                 'end_day_date' => $end_date_raw,
-                'pokemon_ids' => wp_json_encode(array_values(array_map('intval', $pokemon_ids))),
+                'pokemon_ids' => wp_json_encode([
+                    'pokemon_ids' => array_values(array_map('intval', $pokemon_ids)),
+                    'pokemon_genders' => $gender_map,
+                ]),
                 'sort_order'=> (int) $entry_sort,
             ], ['%d', '%s', '%s', '%s', '%s', '%s', '%d']);
 
@@ -2477,6 +2727,7 @@ function pokehub_content_save_day_pokemon_hours_raids(string $source_type, int $
     if (!$raids_tbl || !$raid_bosses_tbl) {
         return;
     }
+    $raid_has_gender_col = pokehub_content_table_has_column($raid_bosses_tbl, 'gender');
 
     $tz = wp_timezone();
     $make_ts = function(string $date, string $time) use ($tz): int {
@@ -2523,12 +2774,17 @@ function pokehub_content_save_day_pokemon_hours_raids(string $source_type, int $
                 $end_date = $date;
             }
             $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-            if (!is_array($pokemon_ids)) {
-                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids);
+            $pokemon_ids = $pokemon_payload['pokemon_ids'];
+            $pokemon_genders = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? $day['pokemon_genders'] : $pokemon_payload['pokemon_genders'];
+            $gender_map = [];
+            foreach ($pokemon_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $gender = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                    $gender_map[$pid] = $gender;
+                }
             }
-            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
-                return is_numeric($id) && (int) $id > 0;
-            })));
 
             if ($date === '' || empty($pokemon_ids)) continue;
 
@@ -2550,13 +2806,25 @@ function pokehub_content_save_day_pokemon_hours_raids(string $source_type, int $
 
             $boss_sort = 0;
             foreach ($pokemon_ids as $pid) {
-                $wpdb->insert($raid_bosses_tbl, [
-                    'content_raid_id' => $raid_id,
-                    'tier' => (int) $tier,
-                    'pokemon_id' => (int) $pid,
-                    'is_mega' => (int) $is_mega,
-                    'sort_order' => (int) $boss_sort++,
-                ], ['%d', '%d', '%d', '%d', '%d']);
+                $current_sort = (int) $boss_sort++;
+                if ($raid_has_gender_col) {
+                    $wpdb->insert($raid_bosses_tbl, [
+                        'content_raid_id' => $raid_id,
+                        'tier' => (int) $tier,
+                        'pokemon_id' => (int) $pid,
+                        'gender' => isset($gender_map[$pid]) ? (string) $gender_map[$pid] : null,
+                        'is_mega' => (int) $is_mega,
+                        'sort_order' => $current_sort,
+                    ], ['%d', '%d', '%d', '%s', '%d', '%d']);
+                } else {
+                    $wpdb->insert($raid_bosses_tbl, [
+                        'content_raid_id' => $raid_id,
+                        'tier' => (int) $tier,
+                        'pokemon_id' => (int) $pid,
+                        'is_mega' => (int) $is_mega,
+                        'sort_order' => $current_sort,
+                    ], ['%d', '%d', '%d', '%d', '%d']);
+                }
             }
 
             $sort_order++;
@@ -2583,6 +2851,7 @@ function pokehub_content_save_day_pokemon_hours_eggs(string $source_type, int $s
     if (!$eggs_tbl || !$egg_pokemon_tbl) {
         return;
     }
+    $egg_has_gender_col = pokehub_content_table_has_column($egg_pokemon_tbl, 'gender');
 
     $tz = wp_timezone();
     $make_ts = function(string $date, string $time) use ($tz): int {
@@ -2629,12 +2898,17 @@ function pokehub_content_save_day_pokemon_hours_eggs(string $source_type, int $s
                 $end_date = $date;
             }
             $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-            if (!is_array($pokemon_ids)) {
-                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids);
+            $pokemon_ids = $pokemon_payload['pokemon_ids'];
+            $pokemon_genders = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? $day['pokemon_genders'] : $pokemon_payload['pokemon_genders'];
+            $gender_map = [];
+            foreach ($pokemon_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $gender = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                    $gender_map[$pid] = $gender;
+                }
             }
-            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
-                return is_numeric($id) && (int) $id > 0;
-            })));
 
             if ($date === '' || empty($pokemon_ids)) continue;
 
@@ -2656,15 +2930,29 @@ function pokehub_content_save_day_pokemon_hours_eggs(string $source_type, int $s
 
             $boss_sort = 0;
             foreach ($pokemon_ids as $pid) {
-                $wpdb->insert($egg_pokemon_tbl, [
-                    'content_egg_id' => $egg_id,
-                    'egg_type_id' => (int) $egg_type_id,
-                    'pokemon_id' => (int) $pid,
-                    'rarity' => 1,
-                    'is_worldwide_override' => 0,
-                    'is_forced_shiny' => 0,
-                    'sort_order' => (int) $boss_sort++,
-                ], ['%d', '%d', '%d', '%d', '%d', '%d', '%d']);
+                $current_sort = (int) $boss_sort++;
+                if ($egg_has_gender_col) {
+                    $wpdb->insert($egg_pokemon_tbl, [
+                        'content_egg_id' => $egg_id,
+                        'egg_type_id' => (int) $egg_type_id,
+                        'pokemon_id' => (int) $pid,
+                        'gender' => isset($gender_map[$pid]) ? (string) $gender_map[$pid] : null,
+                        'rarity' => 1,
+                        'is_worldwide_override' => 0,
+                        'is_forced_shiny' => 0,
+                        'sort_order' => $current_sort,
+                    ], ['%d', '%d', '%d', '%s', '%d', '%d', '%d', '%d']);
+                } else {
+                    $wpdb->insert($egg_pokemon_tbl, [
+                        'content_egg_id' => $egg_id,
+                        'egg_type_id' => (int) $egg_type_id,
+                        'pokemon_id' => (int) $pid,
+                        'rarity' => 1,
+                        'is_worldwide_override' => 0,
+                        'is_forced_shiny' => 0,
+                        'sort_order' => $current_sort,
+                    ], ['%d', '%d', '%d', '%d', '%d', '%d', '%d']);
+                }
             }
 
             $sort_order++;
@@ -2768,12 +3056,17 @@ function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int 
                 $end_date = $date;
             }
             $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-            if (!is_array($pokemon_ids)) {
-                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids);
+            $pokemon_ids = $pokemon_payload['pokemon_ids'];
+            $pokemon_genders = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? $day['pokemon_genders'] : $pokemon_payload['pokemon_genders'];
+            $gender_map = [];
+            foreach ($pokemon_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $gender = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                    $gender_map[(string) $pid] = $gender;
+                }
             }
-            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
-                return is_numeric($id) && (int) $id > 0;
-            })));
 
             if ($date === '' || empty($pokemon_ids)) continue;
 
@@ -2798,7 +3091,7 @@ function pokehub_content_save_day_pokemon_hours_quests(string $source_type, int 
                 'type' => 'pokemon',
                 'pokemon_ids' => $pokemon_ids,
                 'force_shiny' => false,
-                'pokemon_genders' => [],
+                'pokemon_genders' => $gender_map,
                 $marker_key => true,
             ]];
 
@@ -3125,12 +3418,17 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
             }
 
             $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-            if (!is_array($pokemon_ids)) {
-                $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+            $pokemon_payload = pokehub_content_normalize_pokemon_ids_with_genders($pokemon_ids);
+            $pokemon_ids = $pokemon_payload['pokemon_ids'];
+            $pokemon_genders = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? $day['pokemon_genders'] : $pokemon_payload['pokemon_genders'];
+            $gender_map = [];
+            foreach ($pokemon_genders as $pid => $gender) {
+                $pid = (int) $pid;
+                $gender = is_string($gender) ? sanitize_key($gender) : '';
+                if ($pid > 0 && in_array($pid, $pokemon_ids, true) && in_array($gender, ['male', 'female'], true)) {
+                    $gender_map[(string) $pid] = $gender;
+                }
             }
-            $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function($id) {
-                return is_numeric($id) && (int) $id > 0;
-            })));
 
             if ($date === '' || $st === '' || $et === '' || empty($pokemon_ids)) {
                 continue;
@@ -3152,6 +3450,7 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
                     'start_ts' => (int) $start_ts,
                     'end_ts' => (int) $end_ts,
                     'pokemon_ids' => [],
+                    'pokemon_genders' => [],
                 ];
             }
 
@@ -3159,6 +3458,11 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
                 $slots[$slot_key]['pokemon_ids'],
                 array_map('intval', $pokemon_ids)
             )));
+            foreach ($gender_map as $pid => $gender) {
+                if (in_array((int) $pid, $slots[$slot_key]['pokemon_ids'], true)) {
+                    $slots[$slot_key]['pokemon_genders'][(string) $pid] = $gender;
+                }
+            }
         }
     }
 
@@ -3171,6 +3475,7 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
         $start_ts = (int) ($slot['start_ts'] ?? 0);
         $end_ts = (int) ($slot['end_ts'] ?? 0);
         $pokemon_ids = isset($slot['pokemon_ids']) && is_array($slot['pokemon_ids']) ? $slot['pokemon_ids'] : [];
+        $pokemon_genders = isset($slot['pokemon_genders']) && is_array($slot['pokemon_genders']) ? $slot['pokemon_genders'] : [];
 
         if ($slot_date === '' || $slot_st === '' || $slot_et === '' || $start_ts <= 0 || $end_ts <= 0 || empty($pokemon_ids)) {
             continue;
@@ -3275,7 +3580,7 @@ function pokehub_content_save_day_pokemon_hours_featured_hours_classic_events(st
             $wpdb->insert($event_pokemon_tbl, [
                 'event_id' => (int) $event_id,
                 'pokemon_id' => (int) $pid,
-                'gender' => null,
+                'gender' => isset($pokemon_genders[(string) $pid]) ? (string) $pokemon_genders[(string) $pid] : null,
             ], ['%d', '%d', '%s']);
         }
     }
@@ -3358,13 +3663,21 @@ function pokehub_content_get_featured_hours_classic_events_entries_for_parent(in
             continue;
         }
 
-        $pokemon_ids = $wpdb->get_col($wpdb->prepare(
-            "SELECT pokemon_id FROM {$event_pokemon_tbl} WHERE event_id = %d",
+        $pokemon_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT pokemon_id, gender FROM {$event_pokemon_tbl} WHERE event_id = %d",
             $event_id
-        ));
-        $pokemon_ids = array_values(array_map('intval', (array) $pokemon_ids));
+        ), ARRAY_A);
+        $pokemon_ids = array_values(array_map('intval', wp_list_pluck((array) $pokemon_rows, 'pokemon_id')));
         $pokemon_ids = array_values(array_filter($pokemon_ids, function($pid) { return $pid > 0; }));
         if (empty($pokemon_ids)) continue;
+        $pokemon_genders = [];
+        foreach ((array) $pokemon_rows as $row) {
+            $pid = isset($row['pokemon_id']) ? (int) $row['pokemon_id'] : 0;
+            $gender = isset($row['gender']) ? sanitize_key((string) $row['gender']) : '';
+            if ($pid > 0 && in_array($gender, ['male', 'female'], true)) {
+                $pokemon_genders[(string) $pid] = $gender;
+            }
+        }
 
         $out[] = [
             'date' => (string) $start_parts['date'],
@@ -3372,6 +3685,7 @@ function pokehub_content_get_featured_hours_classic_events_entries_for_parent(in
             'start_time' => (string) $start_parts['time'],
             'end_time' => (string) $end_parts['time'],
             'pokemon_ids' => $pokemon_ids,
+            'pokemon_genders' => $pokemon_genders,
         ];
     }
 

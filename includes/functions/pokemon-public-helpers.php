@@ -66,6 +66,17 @@ function pokehub_pokemon_tables_ready_for_query(bool $use_remote, string ...$tab
 }
 
 /**
+ * Purge le cache des motifs Scatterbug / Vivillon (transient utilisé par
+ * {@see poke_hub_pokemon_get_scatterbug_patterns()}).
+ *
+ * À appeler après modification ou suppression d’un form variant en admin, ou après un import.
+ */
+function poke_hub_flush_scatterbug_patterns_cache(): void {
+    delete_transient('poke_hub_scatterbug_patterns');
+    delete_transient('poke_hub_scatterbug_patterns_v2');
+}
+
+/**
  * Get Scatterbug/Vivillon patterns from database.
  * Only returns patterns marked as regional (extra->regional->is_regional = true).
  * Patterns are stored as form variants for Scatterbug (dex_number 664) and Vivillon (dex_number 666).
@@ -73,11 +84,14 @@ function pokehub_pokemon_tables_ready_for_query(bool $use_remote, string ...$tab
  * This function is available even if the Pokémon module is not active, as it's used by
  * the user-profiles module to display Scatterbug pattern selection.
  *
+ * Résultat mis en cache 12 h ; utiliser {@see poke_hub_flush_scatterbug_patterns_cache()} pour forcer
+ * un rechargement depuis la base (ex. après édition des traductions dans les variants).
+ *
  * @return array Associative array form_slug => label (French or English name)
  */
 function poke_hub_pokemon_get_scatterbug_patterns(): array {
     // Cache avec transient (12 heures) pour éviter les requêtes DB répétées
-    $cache_key = 'poke_hub_scatterbug_patterns';
+    $cache_key = 'poke_hub_scatterbug_patterns_v2';
     $cached = get_transient($cache_key);
     if ($cached !== false && is_array($cached)) {
         return $cached;
@@ -136,8 +150,6 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
     
     // Vérifier s'il y a eu une erreur SQL
     if ($wpdb->last_error) {
-        // En cas d'erreur SQL, retourner un tableau vide
-        // Le fallback dans poke_hub_get_scatterbug_patterns() utilisera la liste par défaut
         return [];
     }
     
@@ -158,51 +170,22 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
             continue;
         }
 
-        // Mapping des traductions WordPress pour les patterns courants
-        $pattern_translations = [
-            'archipelago' => __('Archipel', 'poke-hub'),
-            'continental' => __('Continental', 'poke-hub'),
-            'elegant' => __('Élégant', 'poke-hub'),
-            'garden' => __('Jardin', 'poke-hub'),
-            'high-plains' => __('Hautes Plaines', 'poke-hub'),
-            'icy-snow' => __('Neige Glacée', 'poke-hub'),
-            'jungle' => __('Jungle', 'poke-hub'),
-            'marine' => __('Marin', 'poke-hub'),
-            'meadow' => __('Prairie', 'poke-hub'),
-            'modern' => __('Moderne', 'poke-hub'),
-            'monsoon' => __('Mousson', 'poke-hub'),
-            'ocean' => __('Océan', 'poke-hub'),
-            'polar' => __('Polaire', 'poke-hub'),
-            'river' => __('Rivière', 'poke-hub'),
-            'sandstorm' => __('Tempête de Sable', 'poke-hub'),
-            'savanna' => __('Savane', 'poke-hub'),
-            'sun' => __('Soleil', 'poke-hub'),
-            'tundra' => __('Toundra', 'poke-hub'),
-        ];
-
         $final_label = null;
 
-        // Priorité 1: Vérifier si une traduction WordPress existe (via __())
-        if (isset($pattern_translations[$form_slug])) {
-            $final_label = $pattern_translations[$form_slug];
-        }
-
-        // Priorité 2: Si pas de traduction WordPress, vérifier si extra->names->fr existe
-        if (empty($final_label) && !empty($pattern->form_variant_extra)) {
+        // Priorité 1: extra->names->fr (données importées / base)
+        if (!empty($pattern->form_variant_extra)) {
             $extra = json_decode($pattern->form_variant_extra, true);
             if (is_array($extra) && !empty($extra['names']['fr'])) {
                 $final_label = trim((string) $extra['names']['fr']);
             }
         }
 
-        // Priorité 3: Sinon, laisser en anglais (utiliser le label de la DB ou form_slug formaté)
+        // Priorité 2: label DB, sinon slug formaté
         if (empty($final_label)) {
             $label = (string) ($pattern->label ?? '');
             if (empty($label)) {
-                // Fallback: générer un label à partir du form_slug (en anglais)
                 $final_label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
             } else {
-                // Utiliser le label de la DB (probablement en anglais)
                 $final_label = $label;
             }
         }
@@ -215,8 +198,6 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
         set_transient($cache_key, $result, 12 * HOUR_IN_SECONDS);
     }
 
-    // Si aucun pattern trouvé, retourner un tableau vide
-    // Le fallback dans poke_hub_get_scatterbug_patterns() utilisera la liste par défaut
     return $result;
 }
 
@@ -948,6 +929,143 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
  */
 
 /**
+ * Profil de genre d'un Pokémon : dimorphisme, ratios GM, genres disponibles et genre par défaut.
+ *
+ * Notes importantes :
+ * - `available_genders` décrit les genres utilisables globalement (UI, assets).
+ * - `spawn_available_genders` décrit les genres qui peuvent apparaître en nature (d'après ratios GM).
+ * - Le genre forcé côté contenu reste prioritaire (quêtes, events, habitats...).
+ *
+ * @param int $pokemon_id
+ * @return array{
+ *   has_gender_dimorphism: bool,
+ *   gender_ratio: array{male: float, female: float},
+ *   available_genders: string[],
+ *   spawn_available_genders: string[],
+ *   default_gender: string|null
+ * }
+ */
+function poke_hub_pokemon_get_gender_profile(int $pokemon_id): array {
+    $pokemon_id = (int) $pokemon_id;
+    $profile = [
+        'has_gender_dimorphism'   => false,
+        'gender_ratio'            => ['male' => 0.0, 'female' => 0.0],
+        'available_genders'       => [],
+        'spawn_available_genders' => [],
+        'default_gender'          => null,
+    ];
+
+    if ($pokemon_id <= 0) {
+        return $profile;
+    }
+
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb) || !function_exists('pokehub_get_table')) {
+        return $profile;
+    }
+
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $table      = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    if (!$table || !pokehub_pokemon_tables_ready_for_query($use_remote, $table)) {
+        return $profile;
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
+    );
+    if (!$row || empty($row->extra)) {
+        return $profile;
+    }
+
+    $extra = json_decode($row->extra, true);
+    if (!is_array($extra)) {
+        return $profile;
+    }
+
+    $has_dimorphism = !empty($extra['has_gender_dimorphism']);
+    $ratio_male     = isset($extra['gender']['male']) ? (float) $extra['gender']['male'] : 0.0;
+    $ratio_female   = isset($extra['gender']['female']) ? (float) $extra['gender']['female'] : 0.0;
+
+    $available = [];
+    if (isset($extra['gender']['available_genders']) && is_array($extra['gender']['available_genders'])) {
+        foreach ($extra['gender']['available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $available, true)) {
+                $available[] = $g;
+            }
+        }
+    } elseif (isset($extra['available_genders']) && is_array($extra['available_genders'])) {
+        foreach ($extra['available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $available, true)) {
+                $available[] = $g;
+            }
+        }
+    }
+
+    if (empty($available)) {
+        if ($has_dimorphism) {
+            // Compatibilité : un Pokémon dimorphique doit permettre les deux sexes dans l'UI globale.
+            $available = ['male', 'female'];
+        } else {
+            if ($ratio_male > 0) {
+                $available[] = 'male';
+            }
+            if ($ratio_female > 0) {
+                $available[] = 'female';
+            }
+        }
+    }
+
+    $spawn_available = [];
+    if (isset($extra['gender']['spawn_available_genders']) && is_array($extra['gender']['spawn_available_genders'])) {
+        foreach ($extra['gender']['spawn_available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $spawn_available, true)) {
+                $spawn_available[] = $g;
+            }
+        }
+    } elseif (isset($extra['spawn_available_genders']) && is_array($extra['spawn_available_genders'])) {
+        foreach ($extra['spawn_available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $spawn_available, true)) {
+                $spawn_available[] = $g;
+            }
+        }
+    }
+
+    if (empty($spawn_available)) {
+        if ($has_dimorphism && !empty($available)) {
+            // Cas des espèces à dimorphisme marqué (ex: Wimessir, Paragruel) :
+            // on ne se fie pas aveuglément au ratio GM global, souvent orienté vers un visuel par défaut.
+            $spawn_available = $available;
+        } else {
+            // Fallback ratio pour les espèces non dimorphiques / anciennes données.
+            if ($ratio_male > 0) {
+                $spawn_available[] = 'male';
+            }
+            if ($ratio_female > 0) {
+                $spawn_available[] = 'female';
+            }
+        }
+    }
+
+    $default_gender = null;
+    if ($has_dimorphism) {
+        // Comportement conservé : mâle par défaut quand on ne force rien.
+        if (in_array('male', $available, true)) {
+            $default_gender = 'male';
+        } elseif (!empty($available)) {
+            $default_gender = (string) $available[0];
+        }
+    }
+
+    $profile['has_gender_dimorphism']   = $has_dimorphism;
+    $profile['gender_ratio']            = ['male' => $ratio_male, 'female' => $ratio_female];
+    $profile['available_genders']       = $available;
+    $profile['spawn_available_genders'] = $spawn_available;
+    $profile['default_gender']          = $default_gender;
+
+    return $profile;
+}
+
+/**
  * Genre à utiliser pour les sprites (et tout appelant qui s’aligne sur la même règle).
  *
  * @param int               $pokemon_id    ID du Pokémon en base.
@@ -965,30 +1083,10 @@ function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
         return $forced_gender;
     }
     
-    // Vérifier si le pokémon a un dysmorphisme de genre (même source local / remote que le reste du plugin).
-    global $wpdb;
-    if (!isset($wpdb) || !is_object($wpdb) || !function_exists('pokehub_get_table')) {
-        return null;
-    }
-    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
-    $table      = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
-    if (!$table) {
-        return null;
-    }
-
-    if (!pokehub_pokemon_tables_ready_for_query($use_remote, $table)) {
-        return null;
-    }
-    
-    $row = $wpdb->get_row(
-        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
-    );
-    
-    if ($row && !empty($row->extra)) {
-        $extra = json_decode($row->extra, true);
-        if (is_array($extra) && !empty($extra['has_gender_dimorphism'])) {
-            // Par défaut, utiliser 'male' si le pokémon a un dysmorphisme de genre
-            return 'male';
+    if (function_exists('poke_hub_pokemon_get_gender_profile')) {
+        $profile = poke_hub_pokemon_get_gender_profile($pokemon_id);
+        if (!empty($profile['default_gender']) && in_array($profile['default_gender'], ['male', 'female'], true)) {
+            return $profile['default_gender'];
         }
     }
     
@@ -1209,6 +1307,86 @@ function poke_hub_pokemon_get_display_info($pokemon, array $args = []) {
  */
 
 /**
+ * Rang de tri pour les catégories de formes dans les listes.
+ * Ordre voulu: base/normal -> costume -> mega -> autres.
+ */
+function pokehub_pokemon_select_category_rank(string $category): int {
+    $category = sanitize_key($category);
+    if ($category === '' || in_array($category, ['normal', 'base', 'default'], true)) {
+        return 0;
+    }
+    if (in_array($category, ['costume', 'costumed'], true)) {
+        return 1;
+    }
+    if ($category === 'mega') {
+        return 2;
+    }
+    return 3;
+}
+
+/**
+ * Trie les rows Pokémon pour les listes/selecteurs:
+ * dex -> nom (regroupement espèce) -> catégorie de forme -> libellé de forme.
+ *
+ * @param array<int, array<string, mixed>> $rows
+ */
+function pokehub_sort_pokemon_select_rows(array &$rows): void {
+    usort($rows, static function (array $a, array $b): int {
+        $dexA = isset($a['dex_number']) ? (int) $a['dex_number'] : 0;
+        $dexB = isset($b['dex_number']) ? (int) $b['dex_number'] : 0;
+        if ($dexA !== $dexB) {
+            return $dexA <=> $dexB;
+        }
+
+        $nameA = trim((string) (($a['name_fr'] ?? '') !== '' ? $a['name_fr'] : ($a['name_en'] ?? '')));
+        $nameB = trim((string) (($b['name_fr'] ?? '') !== '' ? $b['name_fr'] : ($b['name_en'] ?? '')));
+        $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
+        $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
+        if ($nameAN !== $nameBN) {
+            return $nameAN <=> $nameBN;
+        }
+
+        $rankA = pokehub_pokemon_select_category_rank((string) ($a['form_category'] ?? ''));
+        $rankB = pokehub_pokemon_select_category_rank((string) ($b['form_category'] ?? ''));
+        if ($rankA !== $rankB) {
+            return $rankA <=> $rankB;
+        }
+
+        $formA = trim((string) ($a['form'] ?? ''));
+        $formB = trim((string) ($b['form'] ?? ''));
+        $formAN = function_exists('mb_strtolower') ? mb_strtolower($formA, 'UTF-8') : strtolower($formA);
+        $formBN = function_exists('mb_strtolower') ? mb_strtolower($formB, 'UTF-8') : strtolower($formB);
+        if ($formAN !== $formBN) {
+            return $formAN <=> $formBN;
+        }
+
+        $idA = isset($a['id']) ? (int) $a['id'] : 0;
+        $idB = isset($b['id']) ? (int) $b['id'] : 0;
+        return $idA <=> $idB;
+    });
+}
+
+/**
+ * Vérifie rapidement si un Pokémon est dimorphique via le profil de genre.
+ */
+function pokehub_pokemon_is_dimorphic_for_select(int $pokemon_id): bool {
+    static $cache = [];
+    if ($pokemon_id <= 0) {
+        return false;
+    }
+    if (array_key_exists($pokemon_id, $cache)) {
+        return (bool) $cache[$pokemon_id];
+    }
+    $is_dimorphic = false;
+    if (function_exists('poke_hub_pokemon_get_gender_profile')) {
+        $profile = poke_hub_pokemon_get_gender_profile($pokemon_id);
+        $is_dimorphic = !empty($profile['has_gender_dimorphism']);
+    }
+    $cache[$pokemon_id] = $is_dimorphic;
+    return $is_dimorphic;
+}
+
+/**
  * Récupère tous les Pokémon pour les sélecteurs Select2
  * 
  * @return array Format: [['id' => 1, 'text' => 'Pikachu (#025)', 'name_fr' => 'Pikachu', 'name_en' => 'Pikachu', 'dex_number' => 25], ...]
@@ -1243,7 +1421,8 @@ function pokehub_get_pokemon_for_select(): array {
                 p.name_fr,
                 p.name_en,
                 p.form_variant_id,
-                COALESCE(fv.label, fv.form_slug, '') AS form
+                COALESCE(fv.label, fv.form_slug, '') AS form,
+                COALESCE(fv.category, 'normal') AS form_category
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
@@ -1252,6 +1431,7 @@ function pokehub_get_pokemon_for_select(): array {
     if (empty($rows)) {
         return [];
     }
+    pokehub_sort_pokemon_select_rows($rows);
     
     $result = [];
     foreach ($rows as $pokemon) {
@@ -1278,6 +1458,7 @@ function pokehub_get_pokemon_for_select(): array {
             'name_fr' => $name_fr,
             'name_en' => $name_en,
             'dex_number' => $dex_number,
+            'has_gender_dimorphism' => pokehub_pokemon_is_dimorphic_for_select((int) $pokemon['id']),
         ];
     }
     
@@ -1292,7 +1473,7 @@ function pokehub_get_pokemon_for_select(): array {
  * @param string $search Terme de recherche (name_fr, name_en, dex_number).
  * @return array Format: [['id' => 1, 'text' => '...', 'name_fr' => '...', 'name_en' => '...', 'dex_number' => 25], ...]
  */
-function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search = ''): array {
+function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search = '', bool $dimorphic_only = false): array {
     if (!function_exists('pokehub_get_table')) {
         return [];
     }
@@ -1323,7 +1504,8 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
     }
     $where_sql = implode(' AND ', $where);
     $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
-            COALESCE(fv.label, fv.form_slug, '') AS form
+            COALESCE(fv.label, fv.form_slug, '') AS form,
+            COALESCE(fv.category, 'normal') AS form_category
             FROM {$pokemon_table} p
             LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
             WHERE {$where_sql}
@@ -1335,8 +1517,14 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
     if (empty($rows)) {
         return [];
     }
+    pokehub_sort_pokemon_select_rows($rows);
     $result = [];
     foreach ($rows as $pokemon) {
+        $pokemon_id = (int) $pokemon['id'];
+        $is_dimorphic = pokehub_pokemon_is_dimorphic_for_select($pokemon_id);
+        if ($dimorphic_only && !$is_dimorphic) {
+            continue;
+        }
         $dex_number = isset($pokemon['dex_number']) ? (int) $pokemon['dex_number'] : 0;
         $name_fr = $pokemon['name_fr'] ?? '';
         $name_en = $pokemon['name_en'] ?? '';
@@ -1351,11 +1539,12 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
             $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
         }
         $result[] = [
-            'id' => (int) $pokemon['id'],
+            'id' => $pokemon_id,
             'text' => $text,
             'name_fr' => $name_fr,
             'name_en' => $name_en,
             'dex_number' => $dex_number,
+            'has_gender_dimorphism' => $is_dimorphic,
         ];
     }
     return $result;
@@ -1551,7 +1740,8 @@ function pokehub_get_base_pokemon_for_select(): array {
                     p.name_fr,
                     p.name_en,
                     p.form_variant_id,
-                    COALESCE(fv.label, fv.form_slug, '') AS form
+                    COALESCE(fv.label, fv.form_slug, '') AS form,
+                    COALESCE(fv.category, 'normal') AS form_category
              FROM {$pokemon_table} p
              LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
              WHERE p.id NOT IN (SELECT DISTINCT target_pokemon_id FROM {$evolutions_table} WHERE target_pokemon_id > 0)
@@ -1566,7 +1756,8 @@ function pokehub_get_base_pokemon_for_select(): array {
                     p.name_fr,
                     p.name_en,
                     p.form_variant_id,
-                    COALESCE(fv.label, fv.form_slug, '') AS form
+                    COALESCE(fv.label, fv.form_slug, '') AS form,
+                    COALESCE(fv.category, 'normal') AS form_category
              FROM {$pokemon_table} p
              LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
              WHERE p.is_default = 1
@@ -1578,6 +1769,7 @@ function pokehub_get_base_pokemon_for_select(): array {
     if (empty($rows)) {
         return [];
     }
+    pokehub_sort_pokemon_select_rows($rows);
     
     $result = [];
     foreach ($rows as $pokemon) {
@@ -2282,7 +2474,10 @@ function poke_hub_get_raster_asset_variant_urls(string $asset_type, string $slug
 }
 
 /**
- * Chaîne d’URLs uniques pour repli WebP → PNG → JPG (sans HEAD serveur).
+ * Chaîne d’URLs uniques pour repli format raster (sans HEAD serveur).
+ *
+ * Ordre par défaut : WebP → PNG → JPG (y compris Vivillon, équipes, etc.). Filtre
+ * {@see 'poke_hub_raster_asset_url_chain_order'} pour ajuster par type d’asset.
  *
  * @return string[]
  */
@@ -2293,8 +2488,24 @@ function poke_hub_get_raster_asset_url_chain(string $asset_type, string $slug): 
     }
 
     $u = poke_hub_get_raster_asset_variant_urls($asset_type, $slug);
+    $order = ['webp', 'png', 'jpg'];
+    /**
+     * Ordre des variantes raster pour data-ph-raster (clés : webp, png, jpg).
+     *
+     * @param string[] $order      Clés dans l’ordre de tentative
+     * @param string   $asset_type Type d’asset
+     * @param string   $slug       Slug
+     */
+    $order = apply_filters('poke_hub_raster_asset_url_chain_order', $order, $asset_type, $slug);
+    if (!is_array($order) || $order === []) {
+        $order = ['webp', 'png', 'jpg'];
+    }
+
     $out = [];
-    foreach (['webp', 'png', 'jpg'] as $k) {
+    foreach ($order as $k) {
+        if (!is_string($k) || $k === '') {
+            continue;
+        }
         $url = isset($u[$k]) ? trim((string) $u[$k]) : '';
         if ($url !== '' && !in_array($url, $out, true)) {
             $out[] = $url;

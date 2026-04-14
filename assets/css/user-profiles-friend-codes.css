@@ -28,15 +28,23 @@
     font-style: italic;
 }
 
-/* Carte de code ami */
+/* Carte de code ami : plus d’air entre le texte et le QR */
 .user-profiles-friend-code-card {
     display: flex;
-    gap: 20px;
+    gap: 32px;
     align-items: flex-start;
 }
 
 .user-profiles-friend-code-content {
     flex: 1;
+    min-width: 0;
+    padding-right: 8px;
+}
+
+@media (min-width: 480px) {
+    .user-profiles-friend-code-content {
+        padding-right: 16px;
+    }
 }
 
 /* En-tête de la carte (code) */
@@ -72,12 +80,136 @@
     /* Styles pour chaque élément de métadonnée */
 }
 
-/* Temps écoulé */
+/* Temps écoulé + signalement (ligne unique, discret) */
 .user-profiles-friend-code-time {
     margin-top: 10px;
     font-size: 0.85em;
     color: var(--me5rine-lab-text-light, #5D697D);
     font-style: italic;
+}
+
+.user-profiles-friend-code-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--me5rine-lab-border, #DEE5EC);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+
+.user-profiles-friend-code-footer-row {
+    display: block;
+}
+
+/* Une ligne de métadonnée (délai + signalement), alignée à gauche, loin du QR */
+.user-profiles-friend-code-footer-meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    max-width: 100%;
+}
+
+.user-profiles-friend-code-footer .user-profiles-friend-code-time {
+    margin-top: 0;
+}
+
+.user-profiles-friend-code-footer-sep {
+    color: var(--me5rine-lab-text-light, #5D697D);
+    font-size: 0.85em;
+    opacity: 0.75;
+    user-select: none;
+}
+
+/* Petit bouton « ghost » : lisible comme action, sans gabarit Me5rine */
+.user-profiles-friend-code-report-link {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 5px 12px;
+    border: 1px solid var(--me5rine-lab-border, #DEE5EC);
+    border-radius: 10px;
+    max-width: min(100%, 300px);
+    text-align: center;
+    white-space: normal;
+    background: var(--me5rine-lab-bg-light, #f4f6f8);
+    box-shadow: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    font-style: normal;
+    line-height: 1.25;
+    color: var(--me5rine-lab-text, #3d4a5c);
+    cursor: pointer;
+    text-decoration: none;
+    vertical-align: middle;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.user-profiles-friend-code-report-link:hover:not(:disabled):not(.user-profiles-friend-code-report-link--already-reported),
+.user-profiles-friend-code-report-link:active:not(:disabled):not(.user-profiles-friend-code-report-link--already-reported),
+.user-profiles-friend-code-report-link:focus:not(:disabled):not(.user-profiles-friend-code-report-link--already-reported) {
+    color: #fff;
+    background: #343a40;
+    border-color: #343a40;
+    outline: none;
+}
+
+/* Anneau discret au focus clavier (:focus-visible) ; :focus seul = même fond sans double anneau souris */
+.user-profiles-friend-code-report-link:focus-visible:not(:disabled):not(.user-profiles-friend-code-report-link--already-reported) {
+    box-shadow: 0 0 0 2px var(--me5rine-lab-bg, #fff), 0 0 0 4px rgba(52, 58, 64, 0.45);
+}
+
+.user-profiles-friend-code-report-link:focus:not(:focus-visible):not(:disabled):not(.user-profiles-friend-code-report-link--already-reported) {
+    box-shadow: none;
+}
+
+/* Déjà signalé (transient) ou inactif après succès : non utilisable, grisé */
+.user-profiles-friend-code-report-link:disabled,
+.user-profiles-friend-code-report-link.user-profiles-friend-code-report-link--already-reported {
+    color: #868e96;
+    background: #e9ecef;
+    border-color: #ced4da;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 1;
+    box-shadow: none;
+}
+
+.user-profiles-friend-code-report-link.is-loading:not(.user-profiles-friend-code-report-link--already-reported) {
+    opacity: 0.55;
+    cursor: wait;
+    pointer-events: none;
+}
+
+.user-profiles-friend-code-card .poke-hub-friend-code-report-feedback {
+    display: block;
+    margin: 2px 0 0;
+    font-size: 0.8em;
+    line-height: 1.35;
+    text-align: left;
+    max-width: 100%;
+}
+
+.poke-hub-friend-code-report-feedback.is-success {
+    color: #198754;
+}
+
+.poke-hub-friend-code-report-feedback.is-error {
+    color: #dc3545;
+}
+
+.poke-hub-friend-code-report-feedback.is-info {
+    color: var(--me5rine-lab-text-light, #5D697D);
+    font-style: italic;
+}
+
+.user-profiles-friend-code-hidden-notice {
+    margin-bottom: 12px;
 }
 
 /* QR Code */
@@ -221,4 +353,5 @@
     .vivillon-dashboard .user-profiles-friend-code-card > .user-profiles-friend-code-qr {
         align-self: center;
     }
+
 }

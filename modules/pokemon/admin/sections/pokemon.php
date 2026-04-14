@@ -1541,6 +1541,38 @@ function poke_hub_pokemon_handle_pokemon_form() {
     $gender_female = isset($_POST['gender_female']) ? (float) str_replace(',', '.', $_POST['gender_female']) : 0;
     $has_gender_dimorphism = !empty($_POST['has_gender_dimorphism']) ? 1 : 0;
 
+    $available_genders = [];
+    if (isset($_POST['gender_available_genders']) && is_array($_POST['gender_available_genders'])) {
+        foreach (wp_unslash($_POST['gender_available_genders']) as $raw_gender) {
+            $clean_gender = sanitize_key($raw_gender);
+            if (in_array($clean_gender, ['male', 'female'], true) && !in_array($clean_gender, $available_genders, true)) {
+                $available_genders[] = $clean_gender;
+            }
+        }
+    }
+
+    $spawn_available_genders = [];
+    if (isset($_POST['gender_spawn_available_genders']) && is_array($_POST['gender_spawn_available_genders'])) {
+        foreach (wp_unslash($_POST['gender_spawn_available_genders']) as $raw_gender) {
+            $clean_gender = sanitize_key($raw_gender);
+            if (in_array($clean_gender, ['male', 'female'], true) && !in_array($clean_gender, $spawn_available_genders, true)) {
+                $spawn_available_genders[] = $clean_gender;
+            }
+        }
+    }
+
+    // spawn_available_genders doit rester un sous-ensemble de available_genders
+    if (!empty($available_genders) && !empty($spawn_available_genders)) {
+        $spawn_available_genders = array_values(array_intersect($spawn_available_genders, $available_genders));
+    }
+
+    $default_gender = isset($_POST['gender_default_gender']) ? sanitize_key(wp_unslash($_POST['gender_default_gender'])) : '';
+    if (!in_array($default_gender, ['male', 'female'], true)) {
+        $default_gender = '';
+    } elseif (!empty($available_genders) && !in_array($default_gender, $available_genders, true)) {
+        $default_gender = '';
+    }
+
     // Noms localisés (on garde la structure extra->names pour les autres langues)
     $names = [
         'fr' => isset($_POST['name_fr']) ? sanitize_text_field(wp_unslash($_POST['name_fr'])) : $name_fr,
@@ -1703,6 +1735,38 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'male'   => $gender_male,
         'female' => $gender_female,
     ];
+    if (!empty($available_genders)) {
+        $extra['gender']['available_genders'] = $available_genders;
+    } else {
+        unset($extra['gender']['available_genders']);
+    }
+    if (!empty($spawn_available_genders)) {
+        $extra['gender']['spawn_available_genders'] = $spawn_available_genders;
+    } else {
+        unset($extra['gender']['spawn_available_genders']);
+    }
+    if ($default_gender !== '') {
+        $extra['gender']['default_gender'] = $default_gender;
+    } else {
+        unset($extra['gender']['default_gender']);
+    }
+
+    // Compat legacy: garder les clés racine synchronisées.
+    if (!empty($available_genders)) {
+        $extra['available_genders'] = $available_genders;
+    } else {
+        unset($extra['available_genders']);
+    }
+    if (!empty($spawn_available_genders)) {
+        $extra['spawn_available_genders'] = $spawn_available_genders;
+    } else {
+        unset($extra['spawn_available_genders']);
+    }
+    if ($default_gender !== '') {
+        $extra['default_gender'] = $default_gender;
+    } else {
+        unset($extra['default_gender']);
+    }
     $extra['has_gender_dimorphism'] = (bool) $has_gender_dimorphism;
     if (function_exists('poke_hub_pokemon_gm_merge_extra_names_with_existing')) {
         $names = poke_hub_pokemon_gm_merge_extra_names_with_existing($names, $existing_extra);

@@ -168,7 +168,11 @@ jQuery(function ($) {
             nonce: PokeHubSpecialEvents.nonce,
             pokemon_id: pokemonId
         }, function (resp) {
-            if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
+            const data = resp && resp.success && resp.data ? resp.data : null;
+            const available = data && Array.isArray(data.available_genders) ? data.available_genders : ['male', 'female'];
+            const canChooseGender = !!(data && data.has_gender_dimorphism && available.length > 1);
+
+            if (canChooseGender) {
                 $genderContainer.show();
             } else {
                 $genderContainer.hide();

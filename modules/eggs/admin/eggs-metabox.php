@@ -37,6 +37,10 @@ function pokehub_eggs_metabox_assets($hook) {
         'rest_nonce' => wp_create_nonce('wp_rest'),
         'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
     ]);
+    wp_localize_script('pokehub-admin-select2', 'pokehubPokemonGenderConfig', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('pokehub_check_pokemon_gender_dimorphism_nonce'),
+    ]);
 }
 add_action('admin_enqueue_scripts', 'pokehub_eggs_metabox_assets');
 
@@ -67,7 +71,26 @@ function pokehub_save_eggs_metabox($post_id) {
 
         foreach ($rows as $row) {
             $r = isset($row['rarity']) ? max(1, min(5, (int) $row['rarity'])) : 1;
-            $pids = isset($row['pokemon']) && is_array($row['pokemon']) ? array_map('intval', array_filter($row['pokemon'])) : [];
+            $pokemon_raw = isset($row['pokemon']) && is_array($row['pokemon']) ? wp_unslash($row['pokemon']) : [];
+            $gender_map_post = isset($row['pokemon_genders']) && is_array($row['pokemon_genders']) ? wp_unslash($row['pokemon_genders']) : [];
+            if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                $parsed_p = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($pokemon_raw, $gender_map_post);
+                $pids = $parsed_p['pokemon_ids'];
+                $gender_map = [];
+                foreach ($parsed_p['pokemon_genders'] as $gk => $gv) {
+                    $gender_map[(int) $gk] = $gv;
+                }
+            } else {
+                $pids = array_map('intval', array_filter($pokemon_raw));
+                $gender_map = [];
+                foreach ($gender_map_post as $pid => $gender) {
+                    $pid = (int) $pid;
+                    $gender = is_string($gender) ? sanitize_key($gender) : '';
+                    if ($pid > 0 && in_array($gender, ['male', 'female'], true)) {
+                        $gender_map[$pid] = $gender;
+                    }
+                }
+            }
             $forced = isset($row['forced_shiny']) && is_array($row['forced_shiny']) ? array_map('intval', array_filter($row['forced_shiny'])) : [];
             $ww = isset($row['worldwide']) && is_array($row['worldwide']) ? array_map('intval', array_filter($row['worldwide'])) : [];
 
@@ -80,6 +103,7 @@ function pokehub_save_eggs_metabox($post_id) {
                     'rarity'                => $r,
                     'is_forced_shiny'       => in_array($pid, $forced, true),
                     'is_worldwide_override' => in_array($pid, $ww, true),
+                    'gender'                => $gender_map[$pid] ?? null,
                 ];
             }
             foreach ($forced as $pid) {
@@ -87,7 +111,7 @@ function pokehub_save_eggs_metabox($post_id) {
                     continue;
                 }
                 if (!isset($entries[$pid])) {
-                    $entries[$pid] = ['pokemon_id' => $pid, 'rarity' => $r, 'is_forced_shiny' => true, 'is_worldwide_override' => false];
+                    $entries[$pid] = ['pokemon_id' => $pid, 'rarity' => $r, 'is_forced_shiny' => true, 'is_worldwide_override' => false, 'gender' => $gender_map[$pid] ?? null];
                 } else {
                     $entries[$pid]['is_forced_shiny'] = true;
                 }
@@ -97,7 +121,7 @@ function pokehub_save_eggs_metabox($post_id) {
                     continue;
                 }
                 if (!isset($entries[$pid])) {
-                    $entries[$pid] = ['pokemon_id' => $pid, 'rarity' => $r, 'is_forced_shiny' => false, 'is_worldwide_override' => true];
+                    $entries[$pid] = ['pokemon_id' => $pid, 'rarity' => $r, 'is_forced_shiny' => false, 'is_worldwide_override' => true, 'gender' => $gender_map[$pid] ?? null];
                 } else {
                     $entries[$pid]['is_worldwide_override'] = true;
                 }
@@ -140,9 +164,12 @@ function pokehub_eggs_saved_to_blocks($saved) {
             }
             $r = isset($p['rarity']) ? max(1, min(5, (int) $p['rarity'])) : 1;
             if (!isset($by_rarity[$r])) {
-                $by_rarity[$r] = ['pokemon' => [], 'forced_shiny' => [], 'worldwide' => []];
+                $by_rarity[$r] = ['pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []];
             }
             $by_rarity[$r]['pokemon'][] = $pid;
+            if (isset($p['gender']) && in_array($p['gender'], ['male', 'female'], true)) {
+                $by_rarity[$r]['pokemon_genders'][(string) $pid] = (string) $p['gender'];
+            }
             if (!empty($p['is_forced_shiny'])) {
                 $by_rarity[$r]['forced_shiny'][] = $pid;
             }
@@ -158,11 +185,12 @@ function pokehub_eggs_saved_to_blocks($saved) {
                     'pokemon'     => array_unique($by_rarity[$r]['pokemon']),
                     'forced_shiny' => array_unique($by_rarity[$r]['forced_shiny']),
                     'worldwide'   => array_unique($by_rarity[$r]['worldwide']),
+                    'pokemon_genders' => $by_rarity[$r]['pokemon_genders'],
                 ];
             }
         }
         if (empty($rows)) {
-            $rows = [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => []]];
+            $rows = [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []]];
         }
         $blocks[] = [
             'egg_type_id' => $et_id,
@@ -170,7 +198,7 @@ function pokehub_eggs_saved_to_blocks($saved) {
         ];
     }
     if (empty($blocks)) {
-        $blocks = [['egg_type_id' => 0, 'rows' => [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => []]]]];
+        $blocks = [['egg_type_id' => 0, 'rows' => [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []]]]];
     }
     return $blocks;
 }
@@ -183,6 +211,7 @@ function pokehub_render_eggs_row($block_index, $row_index, $row, $egg_types, $po
     $pokemon = isset($row['pokemon']) && is_array($row['pokemon']) ? $row['pokemon'] : [];
     $forced_shiny = isset($row['forced_shiny']) && is_array($row['forced_shiny']) ? $row['forced_shiny'] : [];
     $worldwide = isset($row['worldwide']) && is_array($row['worldwide']) ? $row['worldwide'] : [];
+    $pokemon_genders = isset($row['pokemon_genders']) && is_array($row['pokemon_genders']) ? $row['pokemon_genders'] : [];
     $bi = is_numeric($block_index) ? (int) $block_index : $block_index;
     $ri = is_numeric($row_index) ? (int) $row_index : $row_index;
     $prefix = 'pokehub_eggs[' . $bi . '][rows][' . $ri . ']';
@@ -197,13 +226,14 @@ function pokehub_render_eggs_row($block_index, $row_index, $row, $egg_types, $po
                     <?php endfor; ?>
                 </select>
             </label>
-            <label class="pokehub-eggs-row-pokemon">
+            <label class="pokehub-eggs-row-pokemon pokehub-gender-field-group">
                 <span class="pokehub-eggs-row-label"><?php esc_html_e('Pokémon', 'poke-hub'); ?></span>
-                <select name="<?php echo esc_attr($prefix); ?>[pokemon][]" class="pokehub-select-pokemon pokehub-eggs-pokemon-select" multiple style="width:100%; min-width:200px;" data-placeholder="<?php esc_attr_e('Select Pokémon', 'poke-hub'); ?>">
+                <select name="<?php echo esc_attr($prefix); ?>[pokemon][]" class="pokehub-select-pokemon pokehub-eggs-pokemon-select pokehub-gender-driven-select" multiple style="width:100%; min-width:200px;" data-placeholder="<?php esc_attr_e('Select Pokémon', 'poke-hub'); ?>" data-gender-name-template="<?php echo esc_attr($prefix); ?>[pokemon_genders][__POKEMON_ID__]" data-gender-scope="available" data-existing-genders="<?php echo esc_attr(wp_json_encode($pokemon_genders)); ?>">
                     <?php foreach ($pokemon_list as $p) : ?>
                         <option value="<?php echo (int) $p['id']; ?>" <?php selected(in_array((int) $p['id'], $pokemon, true)); ?>><?php echo esc_html($p['text']); ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
             </label>
             <label class="pokehub-eggs-row-forced">
                 <span class="pokehub-eggs-row-label"><?php esc_html_e('Forced shiny', 'poke-hub'); ?></span>
@@ -232,7 +262,7 @@ function pokehub_render_eggs_row($block_index, $row_index, $row, $egg_types, $po
  */
 function pokehub_render_eggs_block_item($block_index, $block, $egg_types, $pokemon_list) {
     $et_id = isset($block['egg_type_id']) ? (int) $block['egg_type_id'] : 0;
-    $rows = isset($block['rows']) && is_array($block['rows']) ? $block['rows'] : [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => []]];
+    $rows = isset($block['rows']) && is_array($block['rows']) ? $block['rows'] : [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []]];
     $idx = is_numeric($block_index) ? (int) $block_index : $block_index;
     $prefix = 'pokehub_eggs[' . $idx . ']';
     ?>
@@ -264,7 +294,7 @@ function pokehub_render_eggs_block_item($block_index, $block, $egg_types, $pokem
  * Template d’une ligne (pour JS add row)
  */
 function pokehub_eggs_row_template($block_index_placeholder, $row_index_placeholder, $egg_types, $pokemon_list) {
-    $row = ['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => []];
+    $row = ['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []];
     $prefix = 'pokehub_eggs[' . $block_index_placeholder . '][rows][' . $row_index_placeholder . ']';
     $rarity = 1;
     $pokemon = $forced_shiny = $worldwide = [];
@@ -279,13 +309,14 @@ function pokehub_eggs_row_template($block_index_placeholder, $row_index_placehol
                     <?php endfor; ?>
                 </select>
             </label>
-            <label class="pokehub-eggs-row-pokemon">
+            <label class="pokehub-eggs-row-pokemon pokehub-gender-field-group">
                 <span class="pokehub-eggs-row-label"><?php esc_html_e('Pokémon', 'poke-hub'); ?></span>
-                <select name="<?php echo esc_attr($prefix); ?>[pokemon][]" class="pokehub-select-pokemon pokehub-eggs-pokemon-select" multiple style="width:100%; min-width:200px;" data-placeholder="<?php esc_attr_e('Select Pokémon', 'poke-hub'); ?>">
+                <select name="<?php echo esc_attr($prefix); ?>[pokemon][]" class="pokehub-select-pokemon pokehub-eggs-pokemon-select pokehub-gender-driven-select" multiple style="width:100%; min-width:200px;" data-placeholder="<?php esc_attr_e('Select Pokémon', 'poke-hub'); ?>" data-gender-name-template="<?php echo esc_attr($prefix); ?>[pokemon_genders][__POKEMON_ID__]" data-gender-scope="available">
                     <?php foreach ($pokemon_list as $p) : ?>
                         <option value="<?php echo (int) $p['id']; ?>"><?php echo esc_html($p['text']); ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
             </label>
             <label class="pokehub-eggs-row-forced">
                 <span class="pokehub-eggs-row-label"><?php esc_html_e('Forced shiny', 'poke-hub'); ?></span>
@@ -331,7 +362,7 @@ function pokehub_render_eggs_metabox($post) {
     </div>
     <script type="text/template" id="pokehub-eggs-block-template">
         <?php
-        $empty_block = ['egg_type_id' => 0, 'rows' => [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => []]]];
+        $empty_block = ['egg_type_id' => 0, 'rows' => [['rarity' => 1, 'pokemon' => [], 'forced_shiny' => [], 'worldwide' => [], 'pokemon_genders' => []]]];
         pokehub_render_eggs_block_item('{{BLOCK_INDEX}}', $empty_block, $egg_types, $pokemon_list);
         ?>
     </script>
@@ -344,6 +375,9 @@ function pokehub_render_eggs_metabox($post) {
         function initEggsSelect2() {
             if (window.pokehubInitQuestPokemonSelect2) {
                 window.pokehubInitQuestPokemonSelect2(document);
+            }
+            if (window.pokehubInitPokemonGenderSelectors) {
+                window.pokehubInitPokemonGenderSelectors(document);
             }
         }
         initEggsSelect2();

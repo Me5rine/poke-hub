@@ -205,6 +205,89 @@ function poke_hub_set_friend_code_add_cookie() {
 }
 
 /**
+ * Check if reporting columns exist on user_profiles table.
+ *
+ * @return bool
+ */
+function poke_hub_user_profiles_reporting_columns_available() {
+    static $available = null;
+    if ($available !== null) {
+        return $available;
+    }
+
+    global $wpdb;
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        $available = false;
+        return $available;
+    }
+
+    $required_columns = [
+        'friend_code_hidden',
+        'friend_code_report_count',
+        'friend_code_last_reported_at',
+    ];
+
+    $found = $wpdb->get_col(
+        $wpdb->prepare(
+            "SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s
+               AND TABLE_NAME = %s
+               AND COLUMN_NAME IN ('friend_code_hidden', 'friend_code_report_count', 'friend_code_last_reported_at')",
+            DB_NAME,
+            $table_name
+        )
+    );
+
+    if (!is_array($found)) {
+        $available = false;
+        return $available;
+    }
+
+    $available = count(array_intersect($required_columns, $found)) === count($required_columns);
+    return $available;
+}
+
+/**
+ * Whether the current IP has an anonymous profile row with a friend code hidden from public lists.
+ *
+ * @return bool
+ */
+function poke_hub_current_ip_has_hidden_anonymous_listing() {
+    if (!poke_hub_user_profiles_reporting_columns_available()) {
+        return false;
+    }
+
+    global $wpdb;
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        return false;
+    }
+
+    $ip = poke_hub_get_client_ip();
+    if ($ip === '' || $ip === '0.0.0.0') {
+        return false;
+    }
+
+    $count = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$table_name}
+         WHERE user_id IS NULL
+         AND (discord_id IS NULL OR discord_id = '')
+         AND profile_type = %s
+         AND friend_code IS NOT NULL
+         AND friend_code != ''
+         AND LENGTH(TRIM(friend_code)) >= 12
+         AND friend_code_hidden = 1
+         AND anonymous_ip = %s",
+        'anonymous',
+        $ip
+    ));
+
+    return $count > 0;
+}
+
+/**
  * Get public friend codes with filters
  *
  * @param array $args {
@@ -227,6 +310,7 @@ function poke_hub_get_public_friend_codes($args = []) {
     $args = wp_parse_args($args, [
         'country' => '',
         'scatterbug_pattern' => '',
+        'exclude_empty_scatterbug_pattern' => false,
         'team' => '',
         'reason' => '',
         'per_page' => 20,
@@ -258,6 +342,9 @@ function poke_hub_get_public_friend_codes($args = []) {
         // Exclude codes where friend_code_public = 0 (explicitly set to private)
         "(up.friend_code_public = 1 OR up.friend_code_public IS NULL)"
     ];
+    if (poke_hub_user_profiles_reporting_columns_available()) {
+        $where[] = "(up.friend_code_hidden = 0 OR up.friend_code_hidden IS NULL)";
+    }
     $where_values = [];
     
     // Country filter (from Ultimate Member usermeta)
@@ -267,6 +354,10 @@ function poke_hub_get_public_friend_codes($args = []) {
     if (!empty($args['scatterbug_pattern'])) {
         $where[] = "up.scatterbug_pattern = %s";
         $where_values[] = sanitize_text_field($args['scatterbug_pattern']);
+    } elseif (!empty($args['exclude_empty_scatterbug_pattern'])) {
+        $where[] = "up.scatterbug_pattern IS NOT NULL";
+        $where[] = "TRIM(up.scatterbug_pattern) != ''";
+        $where[] = "LOWER(TRIM(up.scatterbug_pattern)) NOT IN ('none', 'sans-motif', 'sans_motif', 'without-pattern', 'without_pattern', 'no-pattern', 'no_pattern', 'unknown', 'aucun')";
     }
     
     // Team filter
@@ -370,6 +461,8 @@ function poke_hub_get_public_friend_codes($args = []) {
             'scatterbug_pattern' => $item['scatterbug_pattern'],
             'team' => $item['team'],
             'xp' => (int) $item['xp'],
+            'friend_code_report_count' => isset($item['friend_code_report_count']) ? (int) $item['friend_code_report_count'] : 0,
+            'friend_code_hidden' => !empty($item['friend_code_hidden']) ? 1 : 0,
             'created_at' => $item['created_at'],
             'updated_at' => $item['updated_at'],
         ];
@@ -381,6 +474,169 @@ function poke_hub_get_public_friend_codes($args = []) {
         'total_pages' => $total_pages,
     ];
 }
+
+/**
+ * Get report threshold before hiding a friend code from public lists.
+ *
+ * @return int
+ */
+function poke_hub_get_friend_code_report_threshold() {
+    $threshold = (int) get_option('poke_hub_friend_code_report_threshold', 3);
+    if ($threshold < 1) {
+        $threshold = 1;
+    } elseif ($threshold > 20) {
+        $threshold = 20;
+    }
+    $threshold = (int) apply_filters('poke_hub_friend_code_report_threshold', $threshold);
+    return max(1, $threshold);
+}
+
+/**
+ * Indique si le visiteur actuel (IP) a déjà signalé ce profil récemment (même clé transient que l’AJAX).
+ *
+ * @param int $profile_id ID ligne `user_profiles`.
+ */
+function poke_hub_visitor_already_reported_friend_code(int $profile_id): bool {
+    if ($profile_id <= 0) {
+        return false;
+    }
+    $ip_address = poke_hub_get_client_ip();
+    $report_key  = 'poke_hub_fc_report_' . $profile_id . '_' . md5((string) $ip_address);
+
+    return (bool) get_transient($report_key);
+}
+
+/**
+ * Handle obsolete friend code report from public lists.
+ */
+function poke_hub_ajax_report_friend_code_obsolete() {
+    if (!check_ajax_referer('poke_hub_report_friend_code', 'nonce', false)) {
+        wp_send_json_error([
+            'message' => __('Security check failed. Please refresh the page.', 'poke-hub'),
+        ], 403);
+    }
+
+    $profile_id = isset($_POST['profile_id']) ? absint($_POST['profile_id']) : 0;
+    if ($profile_id <= 0) {
+        wp_send_json_error([
+            'message' => __('Invalid friend code identifier.', 'poke-hub'),
+        ], 400);
+    }
+
+    global $wpdb;
+    $table_name = pokehub_get_table('user_profiles');
+    if (empty($table_name)) {
+        wp_send_json_error([
+            'message' => __('Technical error. Please try again later.', 'poke-hub'),
+        ], 500);
+    }
+
+    if (!poke_hub_user_profiles_reporting_columns_available()) {
+        wp_send_json_error([
+            'message' => __('Reporting is not available yet. Please try again in a few minutes.', 'poke-hub'),
+        ], 503);
+    }
+
+    $ip_address = poke_hub_get_client_ip();
+    $report_key = 'poke_hub_fc_report_' . $profile_id . '_' . md5((string) $ip_address);
+    if (get_transient($report_key)) {
+        wp_send_json_error([
+            'message' => __('You already reported this friend code recently.', 'poke-hub'),
+            'code'    => 'already_reported',
+        ], 429);
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT id, friend_code, friend_code_public, friend_code_hidden, friend_code_report_count
+             FROM {$table_name}
+             WHERE id = %d
+             LIMIT 1",
+            $profile_id
+        ),
+        ARRAY_A
+    );
+
+    if (!$row || empty($row['friend_code'])) {
+        wp_send_json_error([
+            'message' => __('Friend code not found.', 'poke-hub'),
+        ], 404);
+    }
+
+    if ((int) $row['friend_code_public'] === 0) {
+        wp_send_json_success([
+            'message' => __('This friend code is no longer public.', 'poke-hub'),
+            'hidden' => true,
+            'reports' => (int) $row['friend_code_report_count'],
+            'reports_left' => 0,
+        ]);
+    }
+
+    $threshold = poke_hub_get_friend_code_report_threshold();
+    $current_count = isset($row['friend_code_report_count']) ? (int) $row['friend_code_report_count'] : 0;
+    $already_hidden = !empty($row['friend_code_hidden']) || $current_count >= $threshold;
+
+    if ($already_hidden) {
+        wp_send_json_success([
+            'message' => __('This friend code has already been hidden.', 'poke-hub'),
+            'hidden' => true,
+            'reports' => $current_count,
+            'reports_left' => 0,
+        ]);
+    }
+
+    $updated = $wpdb->query(
+        $wpdb->prepare(
+            "UPDATE {$table_name}
+             SET friend_code_report_count = friend_code_report_count + 1,
+                 friend_code_last_reported_at = CURRENT_TIMESTAMP,
+                 friend_code_hidden = CASE
+                     WHEN (friend_code_report_count + 1) >= %d THEN 1
+                     ELSE friend_code_hidden
+                 END
+             WHERE id = %d",
+            $threshold,
+            $profile_id
+        )
+    );
+
+    if ($updated === false) {
+        wp_send_json_error([
+            'message' => __('Unable to save report right now. Please try again.', 'poke-hub'),
+        ], 500);
+    }
+
+    set_transient($report_key, 1, 30 * DAY_IN_SECONDS);
+
+    $new_row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT friend_code_report_count, friend_code_hidden
+             FROM {$table_name}
+             WHERE id = %d
+             LIMIT 1",
+            $profile_id
+        ),
+        ARRAY_A
+    );
+
+    $reports = isset($new_row['friend_code_report_count']) ? (int) $new_row['friend_code_report_count'] : ($current_count + 1);
+    $hidden = !empty($new_row['friend_code_hidden']) || $reports >= $threshold;
+
+    if (function_exists('poke_hub_purge_module_cache')) {
+        poke_hub_purge_module_cache(['poke_hub_friend_codes', 'poke_hub_vivillon']);
+    }
+
+    wp_send_json_success([
+        'message' => $hidden
+            ? __('Thanks. This friend code has been hidden from public lists.', 'poke-hub')
+            : __('Thanks! Your report has been recorded.', 'poke-hub'),
+        'hidden' => $hidden,
+        'reports' => $reports,
+        'reports_left' => max(0, $threshold - $reports),
+    ]);
+}
+add_action('wp_ajax_poke_hub_report_friend_code_obsolete', 'poke_hub_ajax_report_friend_code_obsolete');
+add_action('wp_ajax_nopriv_poke_hub_report_friend_code_obsolete', 'poke_hub_ajax_report_friend_code_obsolete');
 
 /**
  * Add or update a friend code (public)
@@ -453,6 +709,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             'profile_id' => null,
         ];
     }
+    $reporting_available = poke_hub_user_profiles_reporting_columns_available();
     
     $existing_by_user = null;
     $existing_by_code = null;
@@ -615,6 +872,11 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
         'scatterbug_pattern' => isset($data['scatterbug_pattern']) ? sanitize_text_field($data['scatterbug_pattern']) : '',
         'team' => isset($data['team']) ? sanitize_text_field($data['team']) : '',
     ];
+    if ($reporting_available) {
+        $profile_data['friend_code_hidden'] = 0;
+        $profile_data['friend_code_report_count'] = 0;
+        $profile_data['friend_code_last_reported_at'] = null;
+    }
 
     // Determine profile_type based on available identifiers
     // classic: has user_id (WordPress user)
@@ -712,7 +974,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             
             $format = [];
             foreach ($update_data as $key => $value) {
-                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'xp') {
+                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'friend_code_hidden' || $key === 'friend_code_report_count' || $key === 'xp') {
                     $format[] = '%d';
                 } else {
                     $format[] = '%s';
@@ -863,6 +1125,16 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             ), ARRAY_A);
             
             $profile_id = $existing_profile ? $existing_profile['id'] : null;
+            if ($profile_id && poke_hub_user_profiles_reporting_columns_available()) {
+                $wpdb->query($wpdb->prepare(
+                    "UPDATE {$table_name}
+                     SET friend_code_hidden = 0,
+                         friend_code_report_count = 0,
+                         friend_code_last_reported_at = NULL
+                     WHERE id = %d",
+                    $profile_id
+                ));
+            }
             $result = true;
             $existing = $was_existing;
             
@@ -902,6 +1174,11 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
                 'friend_code_public' => 1, // Always set to public for friend codes page
                 'profile_type' => $profile_type_for_update, // Always update profile_type to ensure correctness
             ];
+            if ($reporting_available) {
+                $update_data['friend_code_hidden'] = 0;
+                $update_data['friend_code_report_count'] = 0;
+                $update_data['friend_code_last_reported_at'] = null;
+            }
 
             if ($is_anonymous_web_submission && !empty($ip_address)) {
                 $update_data['anonymous_ip'] = $ip_address;
@@ -985,7 +1262,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             
             $format = [];
             foreach ($update_data as $key => $value) {
-                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'xp') {
+                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'friend_code_hidden' || $key === 'friend_code_report_count' || $key === 'xp') {
                     $format[] = '%d';
                 } else {
                     $format[] = '%s';
@@ -1036,7 +1313,7 @@ function poke_hub_add_public_friend_code($data, $is_logged_in = false) {
             // Prepare format array based on what fields are present
             $format_array = [];
             foreach ($profile_data as $key => $value) {
-                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'xp') {
+                if ($key === 'user_id' || $key === 'friend_code_public' || $key === 'friend_code_hidden' || $key === 'friend_code_report_count' || $key === 'xp') {
                     $format_array[] = '%d';
                 } else {
                     $format_array[] = '%s';

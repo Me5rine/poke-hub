@@ -378,6 +378,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 
     $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
                    COALESCE(fv.label, fv.form_slug, '') AS form_label,
+                   COALESCE(fv.category, 'normal') AS form_category,
                    {$gen_select}
             FROM {$pokemon_table} p
             LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
@@ -423,6 +424,51 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         }
         unset($row);
     }
+
+    // Tri d'affichage harmonisé : génération -> dex -> nom -> base/costume/mega -> forme.
+    usort($results, static function (array $a, array $b): int {
+        $genA = isset($a['generation_number']) ? (int) $a['generation_number'] : 0;
+        $genB = isset($b['generation_number']) ? (int) $b['generation_number'] : 0;
+        if ($genA !== $genB) {
+            return $genA <=> $genB;
+        }
+
+        $dexA = isset($a['dex_number']) ? (int) $a['dex_number'] : 0;
+        $dexB = isset($b['dex_number']) ? (int) $b['dex_number'] : 0;
+        if ($dexA !== $dexB) {
+            return $dexA <=> $dexB;
+        }
+
+        $nameA = trim((string) (($a['name_fr'] ?? '') !== '' ? $a['name_fr'] : ($a['name_en'] ?? '')));
+        $nameB = trim((string) (($b['name_fr'] ?? '') !== '' ? $b['name_fr'] : ($b['name_en'] ?? '')));
+        $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
+        $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
+        if ($nameAN !== $nameBN) {
+            return $nameAN <=> $nameBN;
+        }
+
+        $rankA = function_exists('pokehub_pokemon_select_category_rank')
+            ? pokehub_pokemon_select_category_rank((string) ($a['form_category'] ?? ''))
+            : 3;
+        $rankB = function_exists('pokehub_pokemon_select_category_rank')
+            ? pokehub_pokemon_select_category_rank((string) ($b['form_category'] ?? ''))
+            : 3;
+        if ($rankA !== $rankB) {
+            return $rankA <=> $rankB;
+        }
+
+        $formA = trim((string) ($a['form_label'] ?? ''));
+        $formB = trim((string) ($b['form_label'] ?? ''));
+        $formAN = function_exists('mb_strtolower') ? mb_strtolower($formA, 'UTF-8') : strtolower($formA);
+        $formBN = function_exists('mb_strtolower') ? mb_strtolower($formB, 'UTF-8') : strtolower($formB);
+        if ($formAN !== $formBN) {
+            return $formAN <=> $formBN;
+        }
+
+        $idA = isset($a['id']) ? (int) $a['id'] : 0;
+        $idB = isset($b['id']) ? (int) $b['id'] : 0;
+        return $idA <=> $idB;
+    });
 
     return $results;
 }

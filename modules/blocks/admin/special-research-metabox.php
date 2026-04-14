@@ -5,6 +5,29 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!function_exists('pokehub_special_research_extract_reward_pokemon_ids')) {
+    /**
+     * IDs Pokémon d’une récompense (debug metabox) — gère les tokens `id|genre`.
+     *
+     * @param array $r
+     * @return int[]
+     */
+    function pokehub_special_research_extract_reward_pokemon_ids(array $r): array {
+        if (function_exists('pokehub_quests_parse_pokemon_ids_from_reward_input')) {
+            return pokehub_quests_parse_pokemon_ids_from_reward_input($r);
+        }
+        $ids = [];
+        if (isset($r['pokemon_ids'])) {
+            $ids = is_array($r['pokemon_ids'])
+                ? array_map('intval', array_filter($r['pokemon_ids']))
+                : (is_string($r['pokemon_ids']) ? array_map('intval', array_filter(explode(',', $r['pokemon_ids']))) : []);
+        } elseif (isset($r['pokemon_id']) && is_numeric($r['pokemon_id']) && (int) $r['pokemon_id'] > 0) {
+            $ids = [(int) $r['pokemon_id']];
+        }
+        return $ids;
+    }
+}
+
 /**
  * Ajoute la meta box pour les études spéciales
  */
@@ -49,6 +72,10 @@ function pokehub_special_research_metabox_assets($hook) {
         'nonce' => wp_create_nonce('pokehub_quests_ajax'),
         'rest_nonce' => wp_create_nonce('wp_rest'),
         'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
+    ]);
+    wp_localize_script('pokehub-admin-select2', 'pokehubPokemonGenderConfig', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('pokehub_check_pokemon_gender_dimorphism_nonce'),
     ]);
 }
 add_action('admin_enqueue_scripts', 'pokehub_special_research_metabox_assets', 9999);
@@ -121,12 +148,7 @@ function pokehub_render_special_research_metabox($post) {
                                     if (!is_array($r) || (isset($r['type']) && $r['type'] !== 'pokemon')) {
                                         continue;
                                     }
-                                    $ids = [];
-                                    if (isset($r['pokemon_ids'])) {
-                                        $ids = is_array($r['pokemon_ids']) ? array_map('intval', array_filter($r['pokemon_ids'])) : (is_string($r['pokemon_ids']) ? array_map('intval', array_filter(explode(',', $r['pokemon_ids']))) : []);
-                                    } elseif (isset($r['pokemon_id']) && is_numeric($r['pokemon_id']) && (int) $r['pokemon_id'] > 0) {
-                                        $ids = [(int) $r['pokemon_id']];
-                                    }
+                                    $ids = pokehub_special_research_extract_reward_pokemon_ids($r);
                                     if (!empty($ids)) {
                                         $debug_db_rewards_pokemon[$ri . '_' . $key_prefix . $si . '_' . $qi . '_' . $rwi] = implode(',', $ids);
                                     }
@@ -157,12 +179,7 @@ function pokehub_render_special_research_metabox($post) {
                                         if (!is_array($r) || (isset($r['type']) && $r['type'] !== 'pokemon')) {
                                             continue;
                                         }
-                                        $ids = [];
-                                        if (isset($r['pokemon_ids'])) {
-                                            $ids = is_array($r['pokemon_ids']) ? array_map('intval', array_filter($r['pokemon_ids'])) : (is_string($r['pokemon_ids']) ? array_map('intval', array_filter(explode(',', $r['pokemon_ids']))) : []);
-                                        } elseif (isset($r['pokemon_id']) && is_numeric($r['pokemon_id']) && (int) $r['pokemon_id'] > 0) {
-                                            $ids = [(int) $r['pokemon_id']];
-                                        }
+                                        $ids = pokehub_special_research_extract_reward_pokemon_ids($r);
                                         if (!empty($ids)) {
                                             $debug_db_rewards_pokemon[$ri . '_p' . $pi . '_' . $si . '_' . $qi . '_' . $rwi] = implode(',', $ids);
                                         }
@@ -244,6 +261,9 @@ function pokehub_render_special_research_metabox($post) {
             }
             if (window.pokehubInitQuestItemSelect2) {
                 window.pokehubInitQuestItemSelect2(root);
+            }
+            if (window.pokehubInitPokemonGenderSelectors) {
+                window.pokehubInitPokemonGenderSelectors(root);
             }
             applyPreselectedPokemon(root);
             setTimeout(function() { applyPreselectedPokemon(root); }, 100);
@@ -517,6 +537,7 @@ function pokehub_render_special_research_metabox($post) {
 
             // Sauvegarder les ids actuellement sélectionnés AVANT de vider (évite d'écraser ce que PHP a rendu)
             var prevIds = [];
+            var prevGenders = {};
             var $prevPokemonSelect = fieldsContainer.find('select.pokehub-select-pokemon');
             if ($prevPokemonSelect.length) {
                 var rawPrev = ($prevPokemonSelect.attr('data-selected-ids') || '').trim();
@@ -526,6 +547,13 @@ function pokehub_render_special_research_metabox($post) {
                     var v = $prevPokemonSelect.val();
                     if (Array.isArray(v) && v.length) prevIds = v.map(function(x) { return String(x); });
                 }
+                fieldsContainer.find('.pokehub-pokemon-gender-options select[data-pokemon-id]').each(function() {
+                    var pid = String(parseInt($(this).attr('data-pokemon-id') || '0', 10));
+                    var g = String($(this).val() || '');
+                    if (pid !== '0' && pid !== 'NaN' && (g === 'male' || g === 'female')) {
+                        prevGenders[pid] = g;
+                    }
+                });
             }
 
             // Extraire les indices depuis le name
@@ -554,9 +582,13 @@ function pokehub_render_special_research_metabox($post) {
 
             if (type === 'pokemon') {
                 var idsAttr = prevIds.length ? prevIds.join(',') : '';
+                var gendersAttr = JSON.stringify(prevGenders);
                 fieldsContainer.html(
+                    '<div class="pokehub-gender-field-group">' +
                     '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
-                    '<select name="' + nameBase + '[pokemon_ids][]" class="pokehub-select-pokemon pokehub-sr-reward-pokemon" multiple style="width: 100%;" data-selected-ids="' + idsAttr + '"></select></label>'
+                    '<select name="' + nameBase + '[pokemon_ids][]" class="pokehub-select-pokemon pokehub-sr-reward-pokemon pokehub-gender-driven-select" multiple style="width: 100%;" data-selected-ids="' + idsAttr + '" data-gender-name-template="' + nameBase + '[pokemon_genders][__POKEMON_ID__]" data-gender-scope="available" data-existing-genders=\'' + gendersAttr + '\'></select></label>' +
+                    '<div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>' +
+                    '</div>'
                 );
             } else if (type === 'stardust' || type === 'xp') {
                 fieldsContainer.html(
@@ -872,34 +904,62 @@ function pokehub_render_special_research_reward_editor($research_index, $step_in
         <div class="pokehub-reward-fields" style="margin-top: 10px;">
             <?php
             if ($reward_type === 'pokemon') {
-                // Extraire les IDs Pokémon : accepter pokemon_ids (tableau ou chaîne "1,87"), pokemon_id (singulier), ou sous-tableau depuis la BDD
-                $selected_pokemon_ids = [];
+                // Extraire les IDs (tokens multiselect `id|male` / `id|female` inclus).
+                $gender_seed = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])
+                    ? $reward['pokemon_genders']
+                    : [];
+                $raw_tokens = [];
                 if (isset($reward['pokemon_ids'])) {
                     $saved = $reward['pokemon_ids'];
                     if (is_object($saved)) {
                         $saved = json_decode(wp_json_encode($saved), true);
                     }
                     if (is_string($saved)) {
-                        $selected_pokemon_ids = array_values(array_filter(array_map('intval', array_map('trim', explode(',', $saved))), function ($id) {
-                            return $id > 0;
-                        }));
+                        foreach (array_map('trim', explode(',', $saved)) as $part) {
+                            if ($part !== '') {
+                                $raw_tokens[] = $part;
+                            }
+                        }
                     } elseif (is_array($saved)) {
-                        $selected_pokemon_ids = array_values(array_unique(array_map('intval', array_filter($saved, function ($v) {
-                            return $v !== '' && $v !== null && (is_numeric($v) || is_int($v));
-                        }))));
-                        $selected_pokemon_ids = array_values(array_filter($selected_pokemon_ids, function ($id) {
-                            return $id > 0;
-                        }));
+                        foreach ($saved as $v) {
+                            if ($v === '' || $v === null) {
+                                continue;
+                            }
+                            $raw_tokens[] = is_string($v) ? $v : (string) $v;
+                        }
                     } else {
-                        $selected_pokemon_ids = array_values(array_filter(array_map('intval', (array) $saved), function ($id) {
-                            return $id > 0;
-                        }));
+                        foreach ((array) $saved as $v) {
+                            if ($v === '' || $v === null) {
+                                continue;
+                            }
+                            $raw_tokens[] = (string) $v;
+                        }
                     }
-                } elseif (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && is_numeric($reward['pokemon_id'])) {
-                    $id = (int) $reward['pokemon_id'];
-                    if ($id > 0) {
-                        $selected_pokemon_ids = [$id];
+                } elseif (isset($reward['pokemon_id']) && $reward['pokemon_id'] !== '' && $reward['pokemon_id'] !== null) {
+                    $raw_tokens = [(string) $reward['pokemon_id']];
+                }
+                $selected_pokemon_ids = [];
+                $selected_pokemon_genders = $gender_seed;
+                if ($raw_tokens !== [] && function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                    $parsed_sr = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_tokens, $gender_seed);
+                    $selected_pokemon_ids = $parsed_sr['pokemon_ids'];
+                    $selected_pokemon_genders = $parsed_sr['pokemon_genders'];
+                } elseif ($raw_tokens !== []) {
+                    foreach ($raw_tokens as $t) {
+                        if (preg_match('/^(\d+)\|(male|female)$/i', (string) $t, $m)) {
+                            $id = (int) $m[1];
+                            if ($id > 0) {
+                                $selected_pokemon_ids[] = $id;
+                                $selected_pokemon_genders[(string) $id] = strtolower((string) $m[2]);
+                            }
+                        } elseif (is_numeric($t)) {
+                            $id = (int) $t;
+                            if ($id > 0) {
+                                $selected_pokemon_ids[] = $id;
+                            }
+                        }
                     }
+                    $selected_pokemon_ids = array_values(array_unique($selected_pokemon_ids));
                 }
                 // Fallback : si la BDD brute contient des IDs pour ce reward mais que la normalisation n'a pas rempli (objet/tableau perdu)
                 $fallback_map = isset($GLOBALS['pokehub_sr_debug_db_rewards_pokemon']) ? $GLOBALS['pokehub_sr_debug_db_rewards_pokemon'] : [];
@@ -927,14 +987,18 @@ function pokehub_render_special_research_reward_editor($research_index, $step_in
                     }
                 }
                 ?>
+                <div class="pokehub-gender-field-group">
                 <label>
                     <?php _e('Pokémon', 'poke-hub'); ?>:
                     <select
                         name="<?php echo esc_attr($name_base); ?>[pokemon_ids][]"
-                        class="pokehub-select-pokemon pokehub-sr-reward-pokemon"
+                        class="pokehub-select-pokemon pokehub-sr-reward-pokemon pokehub-gender-driven-select"
                         multiple
                         style="width: 100%; min-width: 250px;"
                         data-selected-ids="<?php echo esc_attr(implode(',', $selected_pokemon_ids)); ?>"
+                        data-gender-name-template="<?php echo esc_attr($name_base); ?>[pokemon_genders][__POKEMON_ID__]"
+                        data-gender-scope="available"
+                        data-existing-genders="<?php echo esc_attr(wp_json_encode($selected_pokemon_genders)); ?>"
                     >
                         <?php
                         // Options des Pokémon déjà enregistrés (libellés). La liste complète est en JS (pokehubQuestsData) pour Select2.
@@ -953,6 +1017,8 @@ function pokehub_render_special_research_reward_editor($research_index, $step_in
                         ?>
                     </select>
                 </label>
+                <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
+                </div>
                 <?php
             } elseif ($reward_type === 'stardust' || $reward_type === 'xp') {
                 ?>

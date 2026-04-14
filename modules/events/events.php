@@ -178,6 +178,14 @@ add_action('admin_enqueue_scripts', function ($hook) {
                 'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
             ]
         );
+        wp_localize_script(
+            'pokehub-admin-select2',
+            'pokehubPokemonGenderConfig',
+            [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce'    => wp_create_nonce('pokehub_check_pokemon_gender_dimorphism_nonce'),
+            ]
+        );
 
         wp_enqueue_script('jquery-ui-sortable');
         wp_enqueue_style('dashicons');

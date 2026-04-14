@@ -39,24 +39,22 @@ add_action('wp_ajax_pokehub_check_pokemon_gender_dimorphism', function () {
         wp_send_json_error(['message' => 'Invalid pokemon_id']);
     }
 
-    global $wpdb;
-    $table = pokehub_get_table('pokemon');
-    if (!$table) {
-        wp_send_json_success(['has_gender_dimorphism' => false]);
-    }
+    $profile = function_exists('poke_hub_pokemon_get_gender_profile')
+        ? poke_hub_pokemon_get_gender_profile($pokemon_id)
+        : [
+            'has_gender_dimorphism'   => false,
+            'gender_ratio'            => ['male' => 0.0, 'female' => 0.0],
+            'available_genders'       => [],
+            'spawn_available_genders' => [],
+            'default_gender'          => null,
+        ];
 
-    $row = $wpdb->get_row(
-        $wpdb->prepare("SELECT extra FROM {$table} WHERE id = %d", $pokemon_id)
-    );
-
-    $has_gender_dimorphism = false;
-    if ($row && !empty($row->extra)) {
-        $extra = json_decode($row->extra, true);
-        if (is_array($extra) && !empty($extra['has_gender_dimorphism'])) {
-            $has_gender_dimorphism = true;
-        }
-    }
-
-    wp_send_json_success(['has_gender_dimorphism' => $has_gender_dimorphism]);
+    wp_send_json_success([
+        'has_gender_dimorphism'   => !empty($profile['has_gender_dimorphism']),
+        'gender_ratio'            => is_array($profile['gender_ratio'] ?? null) ? $profile['gender_ratio'] : ['male' => 0.0, 'female' => 0.0],
+        'available_genders'       => is_array($profile['available_genders'] ?? null) ? array_values($profile['available_genders']) : [],
+        'spawn_available_genders' => is_array($profile['spawn_available_genders'] ?? null) ? array_values($profile['spawn_available_genders']) : [],
+        'default_gender'          => isset($profile['default_gender']) ? $profile['default_gender'] : null,
+    ]);
 });
 

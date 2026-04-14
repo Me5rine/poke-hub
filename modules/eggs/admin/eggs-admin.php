@@ -126,7 +126,11 @@ function poke_hub_eggs_save_pool_pokemon($pool_id, $pokemon_table) {
 
         foreach ($rows as $row) {
             $r = isset($row['rarity']) ? max(1, min(5, (int) $row['rarity'])) : 1;
-            $pids = isset($row['pokemon']) && is_array($row['pokemon']) ? array_map('intval', array_filter($row['pokemon'])) : [];
+            $raw_pokemon = isset($row['pokemon']) && is_array($row['pokemon']) ? wp_unslash($row['pokemon']) : [];
+            $raw_genders = isset($row['pokemon_genders']) && is_array($row['pokemon_genders']) ? wp_unslash($row['pokemon_genders']) : null;
+            $pids = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+                ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_pokemon, $raw_genders)['pokemon_ids']
+                : array_values(array_filter(array_map('intval', $raw_pokemon)));
             $forced = isset($row['forced_shiny']) && is_array($row['forced_shiny']) ? array_map('intval', array_filter($row['forced_shiny'])) : [];
             $ww = isset($row['worldwide']) && is_array($row['worldwide']) ? array_map('intval', array_filter($row['worldwide'])) : [];
 

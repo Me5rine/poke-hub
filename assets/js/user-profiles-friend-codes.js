@@ -8,6 +8,11 @@ window.pokeHubFriendCodesLoaded = true;
     'use strict';
     
     $(document).ready(function() {
+        if (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.reportEnabled === false) {
+            $('.poke-hub-friend-code-report-obsolete').remove();
+            $('.poke-hub-friend-code-report-feedback').remove();
+        }
+
         // Auto-detect country from IP if country field is empty (optional, non-blocking)
         // This runs on all pages where the friend codes script is loaded
         // Uses shared detection script: poke-hub-country-detection.js
@@ -264,6 +269,107 @@ window.pokeHubFriendCodesLoaded = true;
         return false;
     });
 
+    /** Bouton grisé : déjà signalé (transient) ou après succès / HTTP 429. */
+    function markFriendCodeReportButtonUsed($button) {
+        if (!$button || !$button.length) {
+            return;
+        }
+        var msg = (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.reportAlreadyUsed)
+            ? pokeHubFriendCodes.reportAlreadyUsed
+            : '';
+        $button
+            .prop('disabled', true)
+            .addClass('user-profiles-friend-code-report-link--already-reported')
+            .attr('aria-disabled', 'true');
+        if (msg) {
+            $button.attr('title', msg).attr('aria-label', msg);
+        }
+    }
+
+    // Report obsolete friend code
+    $(document).on('click', '.poke-hub-friend-code-report-obsolete', function(e) {
+        e.preventDefault();
+
+        var $button = $(this);
+        var profileId = parseInt($button.attr('data-profile-id'), 10);
+        var $card = $button.closest('.user-profiles-friend-code-card');
+        var $feedback = $card.find('.poke-hub-friend-code-report-feedback').first();
+
+        if (!profileId || profileId <= 0) {
+            setReportFeedback($feedback, 'error', getReportErrorMessage());
+            return false;
+        }
+
+        if (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.reportEnabled === false) {
+            setReportFeedback($feedback, 'error', getReportErrorMessage());
+            return false;
+        }
+
+        if (typeof pokeHubFriendCodes === 'undefined' || !pokeHubFriendCodes.ajaxUrl || !pokeHubFriendCodes.reportNonce) {
+            setReportFeedback($feedback, 'error', getReportErrorMessage());
+            return false;
+        }
+
+        if ($button.prop('disabled') || $button.hasClass('user-profiles-friend-code-report-link--already-reported') || $button.hasClass('is-loading')) {
+            return false;
+        }
+
+        $button.addClass('is-loading').attr('aria-busy', 'true');
+        setReportFeedback($feedback, 'info', '...');
+
+        $.ajax({
+            url: pokeHubFriendCodes.ajaxUrl,
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                action: 'poke_hub_report_friend_code_obsolete',
+                nonce: pokeHubFriendCodes.reportNonce,
+                profile_id: profileId
+            }
+        }).done(function(response) {
+            $button.removeClass('is-loading').removeAttr('aria-busy');
+
+            if (!response || !response.success) {
+                var errData = response && response.data ? response.data : null;
+                var errorMessage = errData && errData.message
+                    ? errData.message
+                    : getReportErrorMessage();
+                if (errData && errData.code === 'already_reported') {
+                    markFriendCodeReportButtonUsed($button);
+                }
+                setReportFeedback($feedback, 'error', errorMessage);
+                return;
+            }
+
+            var payload = response.data || {};
+            var successMessage = payload.message || pokeHubFriendCodes.reportObsoleteSuccess || 'Report saved.';
+            var isHidden = !!payload.hidden;
+            setReportFeedback($feedback, 'success', successMessage);
+
+            if (isHidden) {
+                $card.slideUp(250, function() {
+                    $card.remove();
+                });
+            } else {
+                markFriendCodeReportButtonUsed($button);
+            }
+        }).fail(function(xhr) {
+            $button.removeClass('is-loading').removeAttr('aria-busy');
+
+            var response = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+            var errorMessage = response && response.data && response.data.message
+                ? response.data.message
+                : getReportErrorMessage();
+            setReportFeedback($feedback, 'error', errorMessage);
+
+            if (xhr && xhr.status === 429) {
+                markFriendCodeReportButtonUsed($button);
+            }
+        });
+
+        return false;
+    });
+
     // Fallback copy method for older browsers
     function fallbackCopyTextToClipboard(text, $button) {
         var textArea = document.createElement('textarea');
@@ -303,6 +409,28 @@ window.pokeHubFriendCodesLoaded = true;
         }
         
         document.body.removeChild(textArea);
+    }
+
+    function getReportErrorMessage() {
+        if (typeof pokeHubFriendCodes !== 'undefined' && pokeHubFriendCodes.reportObsoleteError) {
+            return pokeHubFriendCodes.reportObsoleteError;
+        }
+        return 'Unable to report this code right now.';
+    }
+
+    function setReportFeedback($feedback, type, message) {
+        if (!$feedback || !$feedback.length) {
+            return;
+        }
+        $feedback.removeClass('is-error is-success is-info');
+        if (type === 'error') {
+            $feedback.addClass('is-error');
+        } else if (type === 'success') {
+            $feedback.addClass('is-success');
+        } else {
+            $feedback.addClass('is-info');
+        }
+        $feedback.text(message || '');
     }
 
     // Show copy feedback

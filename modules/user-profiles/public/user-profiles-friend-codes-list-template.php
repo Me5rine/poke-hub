@@ -58,6 +58,8 @@ function poke_hub_render_friend_codes_list($args = []) {
                     $qr_url = function_exists('poke_hub_generate_friend_code_qr') 
                         ? poke_hub_generate_friend_code_qr($code['friend_code']) 
                         : '';
+                    $friend_code_reporting_on = function_exists('poke_hub_user_profiles_reporting_columns_available')
+                        && poke_hub_user_profiles_reporting_columns_available();
                     ?>
                     <div class="me5rine-lab-card me5rine-lab-card-bordered user-profiles-friend-code-card">
                         <div class="user-profiles-friend-code-content">
@@ -126,15 +128,44 @@ function poke_hub_render_friend_codes_list($args = []) {
                                 </span>
                             </div>
                             
-                            <div class="user-profiles-friend-code-time">
-                                <?php
-                                $created_timestamp = strtotime($code['created_at']);
-                                $time_ago = human_time_diff($created_timestamp, current_time('timestamp'));
-                                printf(
-                                    esc_html__('%s ago', 'poke-hub'),
-                                    $time_ago
-                                );
-                                ?>
+                            <div class="user-profiles-friend-code-footer">
+                                <div class="user-profiles-friend-code-footer-row">
+                                    <span class="user-profiles-friend-code-footer-meta">
+                                        <span class="user-profiles-friend-code-time">
+                                            <?php
+                                            $created_timestamp = strtotime($code['created_at']);
+                                            $time_ago = human_time_diff($created_timestamp, current_time('timestamp'));
+                                            printf(
+                                                esc_html__('%s ago', 'poke-hub'),
+                                                $time_ago
+                                            );
+                                            ?>
+                                        </span>
+                                        <?php if ($friend_code_reporting_on) : ?>
+                                            <?php
+                                            $profile_row_id = isset($code['id']) ? (int) $code['id'] : 0;
+                                            $already_reported_this = $profile_row_id > 0
+                                                && function_exists('poke_hub_visitor_already_reported_friend_code')
+                                                && poke_hub_visitor_already_reported_friend_code($profile_row_id);
+                                            ?>
+                                            <span class="user-profiles-friend-code-footer-sep" aria-hidden="true">·</span>
+                                            <button type="button"
+                                                    class="user-profiles-friend-code-report-link poke-hub-friend-code-report-obsolete<?php echo $already_reported_this ? ' user-profiles-friend-code-report-link--already-reported' : ''; ?>"
+                                                    data-profile-id="<?php echo esc_attr($code['id']); ?>"
+                                                    aria-label="<?php echo $already_reported_this ? esc_attr(__('You already reported this friend code recently.', 'poke-hub')) : esc_attr(__('Report this trainer code if it is wrong or no longer works in Pokémon GO.', 'poke-hub')); ?>"
+                                                    <?php
+                                                    if ($already_reported_this) {
+                                                        echo ' disabled aria-disabled="true" title="' . esc_attr(__('You already reported this friend code recently.', 'poke-hub')) . '"';
+                                                    }
+                                                    ?>>
+                                                <?php esc_html_e('Report if this code no longer works', 'poke-hub'); ?>
+                                            </button>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                <?php if ($friend_code_reporting_on) : ?>
+                                    <span class="poke-hub-friend-code-report-feedback" aria-live="polite"></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         

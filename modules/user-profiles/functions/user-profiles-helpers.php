@@ -156,12 +156,18 @@ function poke_hub_get_user_profile_by_id($profile_id) {
         }
     }
 
+    $friend_code_hidden = false;
+    if (isset($row['friend_code_hidden'])) {
+        $friend_code_hidden = (int) $row['friend_code_hidden'] === 1;
+    }
+
     $profile = [
         'id'                 => (int) $row['id'],
         'profile_type'       => isset($row['profile_type']) ? $row['profile_type'] : 'classic',
         'team'               => $row['team'] ?: '',
         'friend_code'        => $row['friend_code'] ?: '',
         'friend_code_public' => !empty($row['friend_code_public']),
+        'friend_code_hidden' => $friend_code_hidden,
         'xp'                 => (int) $row['xp'],
         'country'            => $country,
         'pokemon_go_username' => $row['pokemon_go_username'] ?: '',
@@ -267,6 +273,7 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
             'team'                => '',
             'friend_code'         => '',
             'friend_code_public'  => false,
+            'friend_code_hidden'  => false,
             'xp'                  => 0,
             'country'             => $country,
             'pokemon_go_username' => '',
@@ -317,11 +324,17 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
         }
     }
 
+    $friend_code_hidden = false;
+    if (isset($row['friend_code_hidden'])) {
+        $friend_code_hidden = (int) $row['friend_code_hidden'] === 1;
+    }
+
     $profile = [
         'id'                  => (int) $row['id'],
         'team'                => $row['team'] ?: '',
         'friend_code'         => $row['friend_code'] ?: '',
         'friend_code_public'  => !empty($row['friend_code_public']),
+        'friend_code_hidden'  => $friend_code_hidden,
         'xp'                  => (int) $row['xp'],
         'country'             => $country,
         'pokemon_go_username' => $row['pokemon_go_username'] ?: '',
@@ -909,41 +922,20 @@ function poke_hub_get_reasons() {
 
 /**
  * Get available Scatterbug/Vivillon patterns list.
- * Try to retrieve from Pokemon module first, otherwise return a default list.
+ * Source : base (form variants régionaux), via {@see poke_hub_pokemon_get_scatterbug_patterns()}.
  *
  * @return array Patterns list with their labels (form_slug => label)
  */
 function poke_hub_get_scatterbug_patterns() {
     if (function_exists('poke_hub_pokemon_get_scatterbug_patterns')) {
         $patterns = poke_hub_pokemon_get_scatterbug_patterns();
-        
-        // If patterns found, return them
+
         if (!empty($patterns)) {
             return $patterns;
         }
     }
 
-    // Fallback: default list if Pokemon module is not active or no patterns found
-    return [
-        'archipelago' => __('Archipel', 'poke-hub'),
-        'continental' => __('Continental', 'poke-hub'),
-        'elegant'     => __('Élégant', 'poke-hub'),
-        'garden'      => __('Jardin', 'poke-hub'),
-        'high-plains' => __('Hautes Plaines', 'poke-hub'),
-        'icy-snow'    => __('Neige Glacée', 'poke-hub'),
-        'jungle'      => __('Jungle', 'poke-hub'),
-        'marine'      => __('Marin', 'poke-hub'),
-        'meadow'      => __('Prairie', 'poke-hub'),
-        'modern'      => __('Moderne', 'poke-hub'),
-        'monsoon'     => __('Mousson', 'poke-hub'),
-        'ocean'       => __('Océan', 'poke-hub'),
-        'polar'       => __('Polaire', 'poke-hub'),
-        'river'       => __('Rivière', 'poke-hub'),
-        'sandstorm'   => __('Tempête de Sable', 'poke-hub'),
-        'savanna'     => __('Savane', 'poke-hub'),
-        'sun'         => __('Soleil', 'poke-hub'),
-        'tundra'      => __('Toundra', 'poke-hub'),
-    ];
+    return [];
 }
 
 /**

@@ -29,6 +29,7 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
     $is_item               = ($type === 'item');
     $is_bonus              = ($type === 'bonus');
     $selected_pokemon_id   = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
+    $selected_gender       = isset($reward['gender']) && in_array($reward['gender'], ['male', 'female'], true) ? (string) $reward['gender'] : '';
     $selected_ids_attr     = $selected_pokemon_id > 0 ? [(int) $selected_pokemon_id] : [];
     $qty                   = isset($reward['quantity']) ? max(1, (int) $reward['quantity']) : 1;
     $bonus_catalog         = function_exists('pokehub_get_all_bonuses_for_select') ? pokehub_get_all_bonuses_for_select() : [];
@@ -85,13 +86,16 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
         </div>
 
         <div class="pokehub-reward-pokemon-fields" style="display:<?php echo $is_pokemon ? 'block' : 'none'; ?>;">
-            <label>
+            <label class="pokehub-gender-field-group">
                 <?php esc_html_e('Pokémon', 'poke-hub'); ?> (<?php esc_html_e('un exemplaire', 'poke-hub'); ?>) :
                 <select
                     name="<?php echo esc_attr($name_base); ?>[pokemon_id]"
-                    class="pokehub-select-pokemon pokehub-quest-pokemon-select"
+                    class="pokehub-select-pokemon pokehub-quest-pokemon-select pokehub-gender-driven-select"
                     style="width: 100%; min-width: 250px;"
                     data-placeholder="<?php esc_attr_e('Rechercher un Pokémon…', 'poke-hub'); ?>"
+                    data-gender-name-template="<?php echo esc_attr($name_base); ?>[gender]"
+                    data-gender-scope="available"
+                    data-existing-genders="<?php echo esc_attr(wp_json_encode($selected_pokemon_id > 0 && $selected_gender !== '' ? [(string) $selected_pokemon_id => $selected_gender] : [])); ?>"
                     <?php
                     echo $is_pokemon ? '' : ' disabled';
                     if ($selected_ids_attr !== []) {
@@ -119,6 +123,7 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
                     }
                     ?>
                 </select>
+                <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
             </label>
             <div class="pokehub-go-pass-pokemon-flags" style="margin-top:10px;">
                 <span class="description" style="display:block;margin-bottom:6px;"><?php esc_html_e('À activer seulement si vous voulez forcer l’affichage / la variante sur le Pass.', 'poke-hub'); ?></span>

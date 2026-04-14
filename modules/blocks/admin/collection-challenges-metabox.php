@@ -5,6 +5,23 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!function_exists('pokehub_collection_challenges_metabox_pokemon_ids')) {
+    /**
+     * IDs numériques pour l’affichage (tokens multiselect `id|genre` acceptés).
+     *
+     * @param mixed $arr
+     * @return int[]
+     */
+    function pokehub_collection_challenges_metabox_pokemon_ids($arr): array {
+        if (!is_array($arr) || $arr === []) {
+            return [];
+        }
+        return function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+            ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders($arr, null)['pokemon_ids']
+            : array_values(array_filter(array_map('intval', $arr)));
+    }
+}
+
 /**
  * Ajoute la meta box pour les défis de collection
  */
@@ -60,6 +77,10 @@ function pokehub_collection_challenges_metabox_assets($hook) {
         'rest_nonce' => wp_create_nonce('wp_rest'),
         'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
     ]);
+    wp_localize_script('pokehub-admin-select2', 'pokehubPokemonGenderConfig', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('pokehub_check_pokemon_gender_dimorphism_nonce'),
+    ]);
 }
 add_action('admin_enqueue_scripts', 'pokehub_collection_challenges_metabox_assets');
 
@@ -114,6 +135,9 @@ function pokehub_render_collection_challenges_metabox($post) {
             }
             if (window.pokehubInitQuestItemSelect2) {
                 window.pokehubInitQuestItemSelect2($ctx[0] || document);
+            }
+            if (window.pokehubInitPokemonGenderSelectors) {
+                window.pokehubInitPokemonGenderSelectors($ctx[0] || document);
             }
         }
         
@@ -189,13 +213,42 @@ function pokehub_render_collection_challenges_metabox($post) {
             var fieldsContainer = rewardEditor.find('.pokehub-reward-fields');
             var challengeIndex = rewardEditor.closest('.pokehub-collection-challenge-item-editor').data('challenge-index') || 0;
             var rewardIndex = rewardEditor.index();
+
+            var prevIds = [];
+            var prevGenders = {};
+            var $prevPokemonSelect = fieldsContainer.find('select.pokehub-select-pokemon').first();
+            if ($prevPokemonSelect.length) {
+                var rawPrev = ($prevPokemonSelect.attr('data-selected-ids') || '').trim();
+                if (rawPrev) {
+                    prevIds = rawPrev.split(',').map(function(v) { return String(parseInt(v, 10)); })
+                        .filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                } else {
+                    var currentVal = $prevPokemonSelect.val();
+                    if (Array.isArray(currentVal) && currentVal.length) {
+                        prevIds = currentVal.map(function(v) { return String(parseInt(v, 10)); })
+                            .filter(function(v) { return v !== 'NaN' && v !== '0'; });
+                    }
+                }
+                fieldsContainer.find('.pokehub-pokemon-gender-options select[data-pokemon-id]').each(function() {
+                    var pid = String(parseInt($(this).attr('data-pokemon-id') || '0', 10));
+                    var g = String($(this).val() || '');
+                    if (pid !== '0' && pid !== 'NaN' && (g === 'male' || g === 'female')) {
+                        prevGenders[pid] = g;
+                    }
+                });
+            }
             
             fieldsContainer.empty();
             
             if (type === 'pokemon') {
+                var selectedIdsAttr = prevIds.join(',');
+                var selectedGenderAttr = JSON.stringify(prevGenders);
                 fieldsContainer.html(
+                    '<div class="pokehub-gender-field-group">' +
                     '<label><?php echo esc_js(__('Pokémon', 'poke-hub')); ?>: ' +
-                    '<select name="pokehub_collection_challenges[' + challengeIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon" multiple style="width: 100%;"></select></label>'
+                    '<select name="pokehub_collection_challenges[' + challengeIndex + '][rewards][' + rewardIndex + '][pokemon_ids][]" class="pokehub-select-pokemon pokehub-gender-driven-select" multiple style="width: 100%;" data-selected-ids="' + selectedIdsAttr + '" data-gender-name-template="pokehub_collection_challenges[' + challengeIndex + '][rewards][' + rewardIndex + '][pokemon_genders][__POKEMON_ID__]" data-gender-scope="available" data-existing-genders=\'' + selectedGenderAttr + '\'></select></label>' +
+                    '<div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>' +
+                    '</div>'
                 );
             } else if (type === 'stardust' || type === 'xp') {
                 fieldsContainer.html(
@@ -343,9 +396,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_catch = isset($challenge['pokemon_catch']) && is_array($challenge['pokemon_catch']) 
-                            ? array_map('intval', $challenge['pokemon_catch']) 
-                            : [];
+                        $selected_catch = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_catch'] ?? []);
                         if (!empty($selected_catch) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -368,9 +419,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_shadow = isset($challenge['pokemon_shadow']) && is_array($challenge['pokemon_shadow']) 
-                            ? array_map('intval', $challenge['pokemon_shadow']) 
-                            : [];
+                        $selected_shadow = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_shadow'] ?? []);
                         if (!empty($selected_shadow) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -393,9 +442,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_evolution = isset($challenge['pokemon_evolution']) && is_array($challenge['pokemon_evolution']) 
-                            ? array_map('intval', $challenge['pokemon_evolution']) 
-                            : [];
+                        $selected_evolution = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_evolution'] ?? []);
                         if (!empty($selected_evolution) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -418,9 +465,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_hatch = isset($challenge['pokemon_hatch']) && is_array($challenge['pokemon_hatch']) 
-                            ? array_map('intval', $challenge['pokemon_hatch']) 
-                            : [];
+                        $selected_hatch = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_hatch'] ?? []);
                         if (!empty($selected_hatch) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -443,9 +488,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_costume = isset($challenge['pokemon_costume']) && is_array($challenge['pokemon_costume']) 
-                            ? array_map('intval', $challenge['pokemon_costume']) 
-                            : [];
+                        $selected_costume = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_costume'] ?? []);
                         if (!empty($selected_costume) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -468,9 +511,7 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                         style="width: 100%; min-width: 250px;"
                     >
                         <?php
-                        $selected_trade = isset($challenge['pokemon_trade']) && is_array($challenge['pokemon_trade']) 
-                            ? array_map('intval', $challenge['pokemon_trade']) 
-                            : [];
+                        $selected_trade = pokehub_collection_challenges_metabox_pokemon_ids($challenge['pokemon_trade'] ?? []);
                         if (!empty($selected_trade) && function_exists('pokehub_get_pokemon_for_select')) {
                             $pokemon_list = pokehub_get_pokemon_for_select();
                             foreach ($pokemon_list as $pokemon_option) {
@@ -506,16 +547,31 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                             <?php
                             $reward_type = $reward['type'] ?? 'pokemon';
                             if ($reward_type === 'pokemon') {
-                                $selected_pokemon_ids = isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids']) 
-                                    ? array_map('intval', $reward['pokemon_ids']) 
+                                $raw_reward_ids = isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])
+                                    ? $reward['pokemon_ids']
                                     : [];
+                                $raw_reward_genders = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])
+                                    ? $reward['pokemon_genders']
+                                    : null;
+                                if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                                    $parsed_reward = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($raw_reward_ids, $raw_reward_genders);
+                                    $selected_pokemon_ids = $parsed_reward['pokemon_ids'];
+                                    $selected_pokemon_genders = $parsed_reward['pokemon_genders'];
+                                } else {
+                                    $selected_pokemon_ids = pokehub_collection_challenges_metabox_pokemon_ids($raw_reward_ids);
+                                    $selected_pokemon_genders = is_array($raw_reward_genders) ? $raw_reward_genders : [];
+                                }
                                 ?>
+                                <div class="pokehub-gender-field-group">
                                 <label><?php _e('Pokémon', 'poke-hub'); ?>: 
                                     <select 
                                         name="pokehub_collection_challenges[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][pokemon_ids][]" 
-                                        class="pokehub-select-pokemon" 
+                                        class="pokehub-select-pokemon pokehub-gender-driven-select" 
                                         multiple
                                         style="width: 100%; min-width: 250px;"
+                                        data-gender-name-template="pokehub_collection_challenges[<?php echo esc_attr($index); ?>][rewards][<?php echo esc_attr($reward_index); ?>][pokemon_genders][__POKEMON_ID__]"
+                                        data-gender-scope="available"
+                                        data-existing-genders="<?php echo esc_attr(wp_json_encode($selected_pokemon_genders)); ?>"
                                     >
                                         <?php
                                         if (!empty($selected_pokemon_ids) && function_exists('pokehub_get_pokemon_for_select')) {
@@ -528,6 +584,8 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                                         ?>
                                     </select>
                                 </label>
+                                <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
+                                </div>
                                 <?php
                             } elseif ($reward_type === 'stardust' || $reward_type === 'xp') {
                                 ?>
@@ -569,7 +627,13 @@ function pokehub_render_collection_challenge_editor_item($index, $challenge) {
                                 </label>
                                 <?php
                             } elseif (in_array($reward_type, ['candy', 'xl_candy', 'mega_energy'], true)) {
-                                $selected_pokemon_id = isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0;
+                                $raw_candy_pid = isset($reward['pokemon_id']) ? (string) $reward['pokemon_id'] : '';
+                                $selected_pokemon_id = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+                                    ? (int) (pokehub_parse_post_pokemon_multiselect_tokens_with_genders(
+                                        $raw_candy_pid !== '' ? [$raw_candy_pid] : [],
+                                        null
+                                    )['pokemon_ids'][0] ?? 0)
+                                    : (isset($reward['pokemon_id']) ? (int) $reward['pokemon_id'] : 0);
                                 ?>
                                 <label><?php _e('Pokémon', 'poke-hub'); ?>: 
                                     <select 

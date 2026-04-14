@@ -391,22 +391,44 @@ function pokehub_render_wild_pokemon_metabox($post) {
                 });
                 
                 promise.done(function(resp) {
-                    if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
-                        hasAnyDimorphic = true;
-                        var savedGender = pokehubWildPokemonGender.saved_genders && pokehubWildPokemonGender.saved_genders[pokemonId] ? pokehubWildPokemonGender.saved_genders[pokemonId] : '';
-                        
-                        var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
-                        var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
-                        $label.text('Pokémon #' + pokemonId + ':');
-                        var $selectGender = $('<select name="' + genderPrefix + '[' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
-                        $selectGender.append('<option value=""><?php echo esc_js(__('Default (Male)', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="male"' + (savedGender === 'male' ? ' selected' : '') + '><?php echo esc_js(__('Male', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="female"' + (savedGender === 'female' ? ' selected' : '') + '><?php echo esc_js(__('Female', 'poke-hub')); ?></option>');
-                        
-                        $genderRow.append($label);
-                        $genderRow.append($selectGender);
-                        $list.append($genderRow);
+                    if (!(resp && resp.success && resp.data)) {
+                        return;
                     }
+                    var data = resp.data;
+                    var availableGenders = Array.isArray(data.spawn_available_genders) && data.spawn_available_genders.length
+                        ? data.spawn_available_genders
+                        : (Array.isArray(data.available_genders) ? data.available_genders : []);
+                    if (!(data.has_gender_dimorphism && availableGenders.length > 1)) {
+                        return;
+                    }
+
+                    hasAnyDimorphic = true;
+                    var savedGender = pokehubWildPokemonGender.saved_genders && pokehubWildPokemonGender.saved_genders[pokemonId] ? pokehubWildPokemonGender.saved_genders[pokemonId] : '';
+                    var defaultGender = (data.default_gender && availableGenders.indexOf(data.default_gender) !== -1)
+                        ? data.default_gender
+                        : availableGenders[0];
+                    var genderLabels = {
+                        male: '<?php echo esc_js(__('Male', 'poke-hub')); ?>',
+                        female: '<?php echo esc_js(__('Female', 'poke-hub')); ?>'
+                    };
+
+                    var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
+                    var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
+                    $label.text('Pokémon #' + pokemonId + ':');
+                    var $selectGender = $('<select name="' + genderPrefix + '[' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
+                    $selectGender.append('<option value=""><?php echo esc_js(__('Default', 'poke-hub')); ?> (' + (genderLabels[defaultGender] || defaultGender) + ')</option>');
+
+                    availableGenders.forEach(function(gender) {
+                        if (gender !== 'male' && gender !== 'female') {
+                            return;
+                        }
+                        var selectedAttr = savedGender === gender ? ' selected' : '';
+                        $selectGender.append('<option value="' + gender + '"' + selectedAttr + '>' + genderLabels[gender] + '</option>');
+                    });
+
+                    $genderRow.append($label);
+                    $genderRow.append($selectGender);
+                    $list.append($genderRow);
                 });
                 
                 promises.push(promise);
@@ -458,31 +480,42 @@ function pokehub_save_wild_pokemon_metabox($post_id) {
         return;
     }
 
-    // Sauvegarder les Pokémon sauvages (mutuellement exclusifs)
-    $pokemon_ids = isset($_POST['pokehub_wild_pokemon_ids']) && is_array($_POST['pokehub_wild_pokemon_ids']) 
-        ? array_map('intval', $_POST['pokehub_wild_pokemon_ids']) 
-        : [];
-    $forced_shiny_ids = isset($_POST['pokehub_forced_shiny_ids']) && is_array($_POST['pokehub_forced_shiny_ids']) 
-        ? array_map('intval', $_POST['pokehub_forced_shiny_ids']) 
-        : [];
-    $rare_ids = isset($_POST['pokehub_rare_pokemon_ids']) && is_array($_POST['pokehub_rare_pokemon_ids']) 
-        ? array_map('intval', $_POST['pokehub_rare_pokemon_ids']) 
-        : [];
-    
-    // Filtrer les valeurs invalides
-    $pokemon_ids = array_filter($pokemon_ids, function($id) { return $id > 0; });
-    $forced_shiny_ids = array_filter($forced_shiny_ids, function($id) { return $id > 0; });
-    $rare_ids = array_filter($rare_ids, function($id) { return $id > 0; });
-    
-    // Réindexer les tableaux
-    $pokemon_ids = array_values($pokemon_ids);
-    $forced_shiny_ids = array_values($forced_shiny_ids);
-    $rare_ids = array_values($rare_ids);
-    
-    // Sauvegarder les genres
+    $parse_list = static function ($post_key) {
+        $arr = isset($_POST[$post_key]) && is_array($_POST[$post_key]) ? wp_unslash($_POST[$post_key]) : [];
+        if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+            return pokehub_parse_post_pokemon_multiselect_tokens_with_genders($arr, null);
+        }
+        $ids = array_values(array_filter(array_map('intval', $arr), static function ($id) {
+            return $id > 0;
+        }));
+        return ['pokemon_ids' => $ids, 'pokemon_genders' => []];
+    };
+
+    $wild_parsed = $parse_list('pokehub_wild_pokemon_ids');
+    $shiny_parsed = $parse_list('pokehub_forced_shiny_ids');
+    $rare_parsed = $parse_list('pokehub_rare_pokemon_ids');
+
+    $pokemon_ids = array_values(array_filter($wild_parsed['pokemon_ids'], static function ($id) {
+        return $id > 0;
+    }));
+    $forced_shiny_ids = array_values(array_filter($shiny_parsed['pokemon_ids'], static function ($id) {
+        return $id > 0;
+    }));
+    $rare_ids = array_values(array_filter($rare_parsed['pokemon_ids'], static function ($id) {
+        return $id > 0;
+    }));
+
     $pokemon_genders = [];
+    foreach ([$wild_parsed['pokemon_genders'], $shiny_parsed['pokemon_genders'], $rare_parsed['pokemon_genders']] as $gchunk) {
+        foreach ($gchunk as $pid => $gender) {
+            $pid = (int) $pid;
+            if ($pid > 0 && in_array($gender, ['male', 'female'], true)) {
+                $pokemon_genders[$pid] = $gender;
+            }
+        }
+    }
     if (isset($_POST['pokehub_wild_pokemon_genders']) && is_array($_POST['pokehub_wild_pokemon_genders'])) {
-        foreach ($_POST['pokehub_wild_pokemon_genders'] as $pokemon_id => $gender) {
+        foreach (wp_unslash($_POST['pokehub_wild_pokemon_genders']) as $pokemon_id => $gender) {
             $pokemon_id = (int) $pokemon_id;
             if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
                 $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);

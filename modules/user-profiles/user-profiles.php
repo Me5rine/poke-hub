@@ -535,10 +535,17 @@ function poke_hub_friend_codes_shortcode_assets() {
     
     // Localize script for translations, validation and filtering
     wp_localize_script('poke-hub-friend-codes', 'pokeHubFriendCodes', [
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'reportNonce' => wp_create_nonce('poke_hub_report_friend_code'),
+        'reportEnabled' => function_exists('poke_hub_user_profiles_reporting_columns_available') && poke_hub_user_profiles_reporting_columns_available(),
         'copySuccess' => __('✓ Copied!', 'poke-hub'),
         'copyError' => __('Error copying to clipboard', 'poke-hub'),
         'friendCodeNotFound' => __('Unable to find friend code to copy.', 'poke-hub'),
         'friendCodeInvalidLength' => __('Friend code must contain exactly 12 digits.', 'poke-hub'),
+        'reportObsoleteError' => __('Unable to report this code right now.', 'poke-hub'),
+        'reportObsoleteSuccess' => __('Thanks! Your report has been recorded.', 'poke-hub'),
+        'reportObsoleteHidden' => __('Thanks. This friend code has been hidden from public lists.', 'poke-hub'),
+        'reportAlreadyUsed' => __('You already reported this friend code recently.', 'poke-hub'),
         'usernameRequired' => __('Pokémon GO username is required.', 'poke-hub'),
         'selectPlaceholder' => __('Select...', 'poke-hub'),
         'selectDefault' => __('-- Select --', 'poke-hub'),

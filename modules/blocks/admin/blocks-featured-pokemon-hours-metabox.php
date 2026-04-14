@@ -66,6 +66,10 @@ if (!function_exists('pokehub_day_pokemon_hours_metabox_assets')) {
             'rest_nonce' => wp_create_nonce('wp_rest'),
             'rest_pokemon_url' => rest_url('poke-hub/v1/pokemon-for-select'),
         ]);
+        wp_localize_script('pokehub-admin-select2', 'pokehubPokemonGenderConfig', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('pokehub_check_pokemon_gender_dimorphism_nonce'),
+        ]);
     }
 }
 add_action('admin_enqueue_scripts', 'pokehub_day_pokemon_hours_metabox_assets');
@@ -128,13 +132,16 @@ if (!function_exists('pokehub_save_day_pokemon_hours')) {
                 $start_time = sanitize_text_field((string) ($day['start_time'] ?? ''));
                 $end_time = sanitize_text_field((string) ($day['end_time'] ?? ''));
 
-                $pokemon_ids = isset($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
-                if (!is_array($pokemon_ids)) {
-                    $pokemon_ids = is_string($pokemon_ids) ? explode(',', $pokemon_ids) : [];
+                $pokemon_ids_raw = isset($day['pokemon_ids']) ? wp_unslash($day['pokemon_ids']) : [];
+                if (!is_array($pokemon_ids_raw)) {
+                    $pokemon_ids_raw = is_string($pokemon_ids_raw) ? explode(',', $pokemon_ids_raw) : [];
                 }
-                $pokemon_ids = array_values(array_map('intval', array_filter((array) $pokemon_ids, function ($id) {
-                    return is_numeric($id) && (int) $id > 0;
-                })));
+                $pokemon_genders_post = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? wp_unslash($day['pokemon_genders']) : [];
+                $pokemon_payload = function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')
+                    ? pokehub_parse_post_pokemon_multiselect_tokens_with_genders((array) $pokemon_ids_raw, $pokemon_genders_post)
+                    : ['pokemon_ids' => [], 'pokemon_genders' => []];
+                $pokemon_ids = $pokemon_payload['pokemon_ids'];
+                $pokemon_genders = $pokemon_payload['pokemon_genders'];
 
                 if ($date === '' || empty($pokemon_ids)) {
                     continue;
@@ -146,6 +153,7 @@ if (!function_exists('pokehub_save_day_pokemon_hours')) {
                     'start_time' => $start_time,
                     'end_time' => $end_time,
                     'pokemon_ids' => $pokemon_ids,
+                    'pokemon_genders' => $pokemon_genders,
                 ];
             }
 
@@ -356,6 +364,7 @@ if (!function_exists('pokehub_render_day_pokemon_hours_metabox')) {
                                     $start_time = (string) ($day['start_time'] ?? '');
                                     $end_time = (string) ($day['end_time'] ?? '');
                                     $pokemon_ids = isset($day['pokemon_ids']) && is_array($day['pokemon_ids']) ? $day['pokemon_ids'] : [];
+                                    $pokemon_genders = isset($day['pokemon_genders']) && is_array($day['pokemon_genders']) ? $day['pokemon_genders'] : [];
                                     ?>
 
                                     <div class="pokehub-featured-pokemon-hours-day-editor">
@@ -395,14 +404,17 @@ if (!function_exists('pokehub_render_day_pokemon_hours_metabox')) {
                                             />
                                         </label>
 
-                                        <div style="margin-top: 10px;">
+                                        <div class="pokehub-gender-field-group" style="margin-top: 10px;">
                                             <label style="display:block;">
                                                 <?php esc_html_e('Pokémon(s)', 'poke-hub'); ?>:
                                                 <select
                                                     multiple
-                                                    class="pokehub-select-pokemon"
+                                                    class="pokehub-select-pokemon pokehub-gender-driven-select"
                                                     data-placeholder="<?php echo esc_attr(__('Select Pokémon', 'poke-hub')); ?>"
                                                     name="pokehub_day_pokemon_hours[<?php echo esc_attr((string) $set_index); ?>][days][<?php echo esc_attr((string) $day_index); ?>][pokemon_ids][]"
+                                                    data-gender-name-template="pokehub_day_pokemon_hours[<?php echo esc_attr((string) $set_index); ?>][days][<?php echo esc_attr((string) $day_index); ?>][pokemon_genders][__POKEMON_ID__]"
+                                                    data-gender-scope="available"
+                                                    data-existing-genders="<?php echo esc_attr(wp_json_encode($pokemon_genders)); ?>"
                                                     style="width:100%; min-width:220px;"
                                                 >
                                                     <?php foreach ($pokemon_ids as $pid) : ?>
@@ -417,6 +429,7 @@ if (!function_exists('pokehub_render_day_pokemon_hours_metabox')) {
                                                     <?php endforeach; ?>
                                                 </select>
                                             </label>
+                                            <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
                                         </div>
 
                                         <button type="button" class="button-link pokehub-featured-pokemon-hours-remove-day" style="color:#a00; margin-left:0;">
@@ -533,17 +546,20 @@ if (!function_exists('pokehub_render_day_pokemon_hours_metabox')) {
                         <input type="time" name="pokehub_day_pokemon_hours[__SET_INDEX__][days][__DAY_INDEX__][end_time]" value="" />
                     </label>
 
-                    <div style="margin-top: 10px;">
+                    <div class="pokehub-gender-field-group" style="margin-top: 10px;">
                         <label style="display:block;">
                             <?php esc_html_e('Pokémon(s)', 'poke-hub'); ?>:
                             <select
                                 multiple
-                                class="pokehub-select-pokemon"
+                                class="pokehub-select-pokemon pokehub-gender-driven-select"
                                 data-placeholder="<?php echo esc_attr(__('Select Pokémon', 'poke-hub')); ?>"
                                 name="pokehub_day_pokemon_hours[__SET_INDEX__][days][__DAY_INDEX__][pokemon_ids][]"
+                                data-gender-name-template="pokehub_day_pokemon_hours[__SET_INDEX__][days][__DAY_INDEX__][pokemon_genders][__POKEMON_ID__]"
+                                data-gender-scope="available"
                                 style="width:100%; min-width:220px;"
                             ></select>
                         </label>
+                        <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
                     </div>
 
                     <button type="button" class="button-link pokehub-featured-pokemon-hours-remove-day" style="color:#a00; margin-left:0;">
@@ -565,6 +581,9 @@ if (!function_exists('pokehub_render_day_pokemon_hours_metabox')) {
                     function initSelect2($context) {
                         if (window.pokehubInitLargePokemonSelect2) {
                             window.pokehubInitLargePokemonSelect2($context);
+                        }
+                        if (window.pokehubInitPokemonGenderSelectors) {
+                            window.pokehubInitPokemonGenderSelectors($context);
                         }
                     }
 

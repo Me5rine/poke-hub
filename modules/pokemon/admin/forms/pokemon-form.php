@@ -78,6 +78,43 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     $gender_male   = $gender['male']   ?? 0;
     $gender_female = $gender['female'] ?? 0;
 
+    $available_genders = [];
+    if (isset($gender['available_genders']) && is_array($gender['available_genders'])) {
+        foreach ($gender['available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $available_genders, true)) {
+                $available_genders[] = $g;
+            }
+        }
+    } elseif (isset($extra['available_genders']) && is_array($extra['available_genders'])) {
+        foreach ($extra['available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $available_genders, true)) {
+                $available_genders[] = $g;
+            }
+        }
+    }
+
+    $spawn_available_genders = [];
+    if (isset($gender['spawn_available_genders']) && is_array($gender['spawn_available_genders'])) {
+        foreach ($gender['spawn_available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $spawn_available_genders, true)) {
+                $spawn_available_genders[] = $g;
+            }
+        }
+    } elseif (isset($extra['spawn_available_genders']) && is_array($extra['spawn_available_genders'])) {
+        foreach ($extra['spawn_available_genders'] as $g) {
+            if (in_array($g, ['male', 'female'], true) && !in_array($g, $spawn_available_genders, true)) {
+                $spawn_available_genders[] = $g;
+            }
+        }
+    }
+
+    $default_gender = '';
+    if (isset($gender['default_gender']) && in_array($gender['default_gender'], ['male', 'female'], true)) {
+        $default_gender = (string) $gender['default_gender'];
+    } elseif (isset($extra['default_gender']) && in_array($extra['default_gender'], ['male', 'female'], true)) {
+        $default_gender = (string) $extra['default_gender'];
+    }
+
     // Dysmorphisme de genre (si le pokémon a des images différentes mâle/femelle)
     $has_gender_dimorphism = isset($extra['has_gender_dimorphism']) ? (bool) $extra['has_gender_dimorphism'] : false;
 
@@ -347,12 +384,45 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             // Liste de tous les Pokémon pour le select
             $query_all = "
                 SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
-                       fv.label AS variant_label, fv.form_slug
+                       fv.label AS variant_label, fv.form_slug, COALESCE(fv.category, 'normal') AS form_category
                 FROM {$pokemon_table} p
                 LEFT JOIN {$variants_table} fv ON fv.id = p.form_variant_id
                 ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC
             ";
             $all_pokemon_for_evo = $wpdb->get_results($query_all);
+            if (is_array($all_pokemon_for_evo) && function_exists('pokehub_pokemon_select_category_rank')) {
+                usort($all_pokemon_for_evo, static function ($a, $b): int {
+                    $dexA = (int) ($a->dex_number ?? 0);
+                    $dexB = (int) ($b->dex_number ?? 0);
+                    if ($dexA !== $dexB) {
+                        return $dexA <=> $dexB;
+                    }
+
+                    $nameA = trim((string) ((($a->name_fr ?? '') !== '') ? $a->name_fr : ($a->name_en ?? '')));
+                    $nameB = trim((string) ((($b->name_fr ?? '') !== '') ? $b->name_fr : ($b->name_en ?? '')));
+                    $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
+                    $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
+                    if ($nameAN !== $nameBN) {
+                        return $nameAN <=> $nameBN;
+                    }
+
+                    $rankA = pokehub_pokemon_select_category_rank((string) ($a->form_category ?? ''));
+                    $rankB = pokehub_pokemon_select_category_rank((string) ($b->form_category ?? ''));
+                    if ($rankA !== $rankB) {
+                        return $rankA <=> $rankB;
+                    }
+
+                    $formA = trim((string) (($a->variant_label ?? '') !== '' ? $a->variant_label : ($a->form_slug ?? '')));
+                    $formB = trim((string) (($b->variant_label ?? '') !== '' ? $b->variant_label : ($b->form_slug ?? '')));
+                    $formAN = function_exists('mb_strtolower') ? mb_strtolower($formA, 'UTF-8') : strtolower($formA);
+                    $formBN = function_exists('mb_strtolower') ? mb_strtolower($formB, 'UTF-8') : strtolower($formB);
+                    if ($formAN !== $formBN) {
+                        return $formAN <=> $formBN;
+                    }
+
+                    return (int) ($a->id ?? 0) <=> (int) ($b->id ?? 0);
+                });
+            }
 
             // Evolutions sortantes (ce Pokémon -> autre)
             $evolutions_out = $wpdb->get_results(
@@ -743,6 +813,51 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         </label>
                         <p class="description">
                             <?php esc_html_e('Check this if the Pokémon has different images for male and female forms (e.g., Pikachu, Meowstic). When this is enabled, the male image will be used by default in events and wild encounters unless a specific gender is forced.', 'poke-hub'); ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
+                        <label><?php esc_html_e('Available genders (UI/assets)', 'poke-hub'); ?></label>
+                        <label style="display:block; margin-bottom:4px;">
+                            <input type="checkbox" name="gender_available_genders[]" value="male" <?php checked(in_array('male', $available_genders, true)); ?> />
+                            <?php esc_html_e('Male', 'poke-hub'); ?>
+                        </label>
+                        <label style="display:block;">
+                            <input type="checkbox" name="gender_available_genders[]" value="female" <?php checked(in_array('female', $available_genders, true)); ?> />
+                            <?php esc_html_e('Female', 'poke-hub'); ?>
+                        </label>
+                    </div>
+                </div>
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
+                        <label><?php esc_html_e('Spawn available genders (wild/habitats)', 'poke-hub'); ?></label>
+                        <label style="display:block; margin-bottom:4px;">
+                            <input type="checkbox" name="gender_spawn_available_genders[]" value="male" <?php checked(in_array('male', $spawn_available_genders, true)); ?> />
+                            <?php esc_html_e('Male', 'poke-hub'); ?>
+                        </label>
+                        <label style="display:block;">
+                            <input type="checkbox" name="gender_spawn_available_genders[]" value="female" <?php checked(in_array('female', $spawn_available_genders, true)); ?> />
+                            <?php esc_html_e('Female', 'poke-hub'); ?>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-lab-form-row">
+                <div class="admin-lab-form-col-50">
+                    <div class="admin-lab-form-group">
+                        <label for="gender_default_gender"><?php esc_html_e('Default gender override', 'poke-hub'); ?></label>
+                        <select name="gender_default_gender" id="gender_default_gender" style="max-width: 220px;">
+                            <option value=""><?php esc_html_e('Auto (helper fallback)', 'poke-hub'); ?></option>
+                            <option value="male" <?php selected($default_gender, 'male'); ?>><?php esc_html_e('Male', 'poke-hub'); ?></option>
+                            <option value="female" <?php selected($default_gender, 'female'); ?>><?php esc_html_e('Female', 'poke-hub'); ?></option>
+                        </select>
+                        <p class="description">
+                            <?php esc_html_e('Optional override for selectors/images when no explicit gender is forced.', 'poke-hub'); ?>
                         </p>
                     </div>
                 </div>

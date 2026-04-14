@@ -48,6 +48,17 @@ function poke_hub_register_settings() {
         ]
     );
 
+    // User Profiles: seuil de signalements avant masquage d'un code ami
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_friend_code_report_threshold',
+        [
+            'type'              => 'integer',
+            'sanitize_callback' => 'poke_hub_sanitize_friend_code_report_threshold',
+            'default'           => 3,
+        ]
+    );
+
     // Games: création automatique des pages
     register_setting(
         'poke_hub_settings',
@@ -94,6 +105,23 @@ function poke_hub_register_settings() {
 
 }
 add_action('admin_init', 'poke_hub_register_settings');
+
+/**
+ * Sanitize du seuil de signalements de code ami.
+ *
+ * @param mixed $value
+ * @return int
+ */
+function poke_hub_sanitize_friend_code_report_threshold($value): int {
+    $threshold = absint($value);
+    if ($threshold < 1) {
+        $threshold = 1;
+    }
+    if ($threshold > 20) {
+        $threshold = 20;
+    }
+    return $threshold;
+}
 
 /**
  * Liste des modules pour l'affichage (slug => libellé). Dérivée de la source unique settings-modules.php.

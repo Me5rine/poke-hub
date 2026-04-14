@@ -46,21 +46,35 @@ if (!function_exists('pokehub_field_research_flatten_pokemon_slots')) {
                 continue;
             }
             $pokemon_ids = [];
-            if (isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])) {
-                $pokemon_ids = array_filter(array_map('intval', $reward['pokemon_ids']), static function ($id) {
-                    return $id > 0;
-                });
-            } elseif (!empty($reward['pokemon_id'])) {
-                $pokemon_ids = [(int) $reward['pokemon_id']];
-            }
             $genders = isset($reward['pokemon_genders']) && is_array($reward['pokemon_genders'])
                 ? $reward['pokemon_genders']
                 : [];
+            if (isset($reward['pokemon_ids']) && is_array($reward['pokemon_ids'])) {
+                if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                    $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders($reward['pokemon_ids'], $genders);
+                    $pokemon_ids = $parsed['pokemon_ids'];
+                    $genders = $parsed['pokemon_genders'];
+                } else {
+                    $pokemon_ids = array_filter(array_map('intval', $reward['pokemon_ids']), static function ($id) {
+                        return $id > 0;
+                    });
+                }
+            } elseif (!empty($reward['pokemon_id'])) {
+                if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+                    $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders([(string) $reward['pokemon_id']], $genders);
+                    $pokemon_ids = $parsed['pokemon_ids'];
+                    $genders = $parsed['pokemon_genders'];
+                } else {
+                    $pokemon_ids = [(int) $reward['pokemon_id']];
+                }
+            }
             foreach ($pokemon_ids as $pid) {
+                $pid = (int) $pid;
+                $g = $genders[(string) $pid] ?? $genders[$pid] ?? null;
                 $out[] = [
-                    'pokemon_id' => (int) $pid,
+                    'pokemon_id' => $pid,
                     'reward'     => $reward,
-                    'gender'     => $genders[$pid] ?? null,
+                    'gender'     => $g,
                 ];
             }
         }

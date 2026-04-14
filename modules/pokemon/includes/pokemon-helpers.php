@@ -65,12 +65,16 @@ function pokehub_get_all_pokemon_for_select(): array {
                 p.name_fr,
                 p.name_en,
                 p.form_variant_id,
-                COALESCE(fv.label, fv.form_slug, '') AS form
+                COALESCE(fv.label, fv.form_slug, '') AS form,
+                COALESCE(fv.category, 'normal') AS form_category
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );
+    if (is_array($rows) && !empty($rows) && function_exists('pokehub_sort_pokemon_select_rows')) {
+        pokehub_sort_pokemon_select_rows($rows);
+    }
     
     // Construire le nom au format "nom-fr (nom-anglais)" si les deux sont disponibles
     foreach ($rows as &$row) {

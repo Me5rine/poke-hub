@@ -121,7 +121,15 @@ function pokehub_go_pass_normalize_reward_array(array $r): ?array {
     }
 
     if ($type === 'pokemon') {
-        $pid = isset($r['pokemon_id']) ? (int) $r['pokemon_id'] : 0;
+        $raw_pid = isset($r['pokemon_id']) ? (string) $r['pokemon_id'] : '';
+        $pid = 0;
+        $gender_from_token = null;
+        if ($raw_pid !== '' && preg_match('/^(\d+)\|(male|female)$/i', $raw_pid, $m)) {
+            $pid = (int) $m[1];
+            $gender_from_token = strtolower((string) $m[2]);
+        } else {
+            $pid = (int) $raw_pid;
+        }
         if ($pid <= 0) {
             return null;
         }
@@ -136,6 +144,13 @@ function pokehub_go_pass_normalize_reward_array(array $r): ?array {
             if (!empty($r[$flag])) {
                 $out[$flag] = true;
             }
+        }
+        $gender = isset($r['gender']) ? sanitize_key((string) $r['gender']) : '';
+        if (!in_array($gender, ['male', 'female'], true) && $gender_from_token !== null && in_array($gender_from_token, ['male', 'female'], true)) {
+            $gender = $gender_from_token;
+        }
+        if (in_array($gender, ['male', 'female'], true)) {
+            $out['gender'] = $gender;
         }
 
         return $attach_featured($out, $r);
@@ -167,7 +182,16 @@ function pokehub_go_pass_normalize_reward_array(array $r): ?array {
         );
     }
 
-    $pid = isset($r['pokemon_id']) ? (int) $r['pokemon_id'] : 0;
+    $raw_res = isset($r['pokemon_id']) ? (string) $r['pokemon_id'] : '';
+    if (function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+        $parsed_res = pokehub_parse_post_pokemon_multiselect_tokens_with_genders(
+            $raw_res !== '' ? [$raw_res] : [],
+            null
+        );
+        $pid = (int) ($parsed_res['pokemon_ids'][0] ?? 0);
+    } else {
+        $pid = isset($r['pokemon_id']) ? (int) $r['pokemon_id'] : 0;
+    }
     if ($pid <= 0) {
         return null;
     }
@@ -432,6 +456,9 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
                         $imgArgs = [
                             'shiny' => !empty($n['force_shiny']),
                         ];
+                        if (!empty($n['gender']) && in_array($n['gender'], ['male', 'female'], true)) {
+                            $imgArgs['gender'] = (string) $n['gender'];
+                        }
                         $u = poke_hub_pokemon_get_image_url($p, $imgArgs);
                         $img = is_string($u) ? $u : '';
                     }
@@ -452,6 +479,11 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
             }
             if (!empty($n['force_gigamax'])) {
                 $tags[] = __('Gigamax', 'poke-hub');
+            }
+            if (!empty($n['gender']) && $n['gender'] === 'female') {
+                $tags[] = __('Female', 'poke-hub');
+            } elseif (!empty($n['gender']) && $n['gender'] === 'male') {
+                $tags[] = __('Male', 'poke-hub');
             }
             $subtitle = $name . ($tags !== [] ? ' · ' . implode(' · ', $tags) : '');
             break;

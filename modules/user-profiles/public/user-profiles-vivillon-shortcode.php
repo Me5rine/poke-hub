@@ -90,6 +90,7 @@ add_shortcode('poke_hub_vivillon', function ($atts) {
     $friend_codes_args = [
         'country' => $filter_country,
         'scatterbug_pattern' => $filter_pattern, // Pattern is required for vivillon page
+        'exclude_empty_scatterbug_pattern' => true,
         'per_page' => $per_page,
         'paged' => $paged,
         'orderby' => 'created_at',

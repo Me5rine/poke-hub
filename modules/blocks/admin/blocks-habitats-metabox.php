@@ -154,27 +154,35 @@ function pokehub_save_event_habitats($post_id) {
             'all_pokemon_available' => $all_pokemon_available,
         ];
         
-        // Pokémon
-        if (isset($habitat['pokemon_ids']) && is_array($habitat['pokemon_ids'])) {
+        // Pokémon (+ tokens "id|male" depuis le multiselect)
+        if (isset($habitat['pokemon_ids']) && is_array($habitat['pokemon_ids']) && function_exists('pokehub_parse_post_pokemon_multiselect_tokens_with_genders')) {
+            $parsed = pokehub_parse_post_pokemon_multiselect_tokens_with_genders(
+                wp_unslash($habitat['pokemon_ids']),
+                isset($habitat['pokemon_genders']) && is_array($habitat['pokemon_genders']) ? wp_unslash($habitat['pokemon_genders']) : null
+            );
+            $cleaned_habitat['pokemon_ids'] = $parsed['pokemon_ids'];
+            $cleaned_habitat['pokemon_genders'] = $parsed['pokemon_genders'];
+        } elseif (isset($habitat['pokemon_ids']) && is_array($habitat['pokemon_ids'])) {
             $cleaned_habitat['pokemon_ids'] = array_map('intval', array_filter($habitat['pokemon_ids'], 'is_numeric'));
+            $pokemon_genders = [];
+            if (isset($habitat['pokemon_genders']) && is_array($habitat['pokemon_genders'])) {
+                foreach ($habitat['pokemon_genders'] as $pokemon_id => $gender) {
+                    $pokemon_id = (int) $pokemon_id;
+                    if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
+                        $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);
+                    }
+                }
+            }
+            $cleaned_habitat['pokemon_genders'] = $pokemon_genders;
+        }
+        if (!isset($cleaned_habitat['pokemon_genders'])) {
+            $cleaned_habitat['pokemon_genders'] = [];
         }
         
         // Shiny forcés
         if (isset($habitat['forced_shiny_ids']) && is_array($habitat['forced_shiny_ids'])) {
             $cleaned_habitat['forced_shiny_ids'] = array_map('intval', array_filter($habitat['forced_shiny_ids'], 'is_numeric'));
         }
-        
-        // Genres des pokémon
-        $pokemon_genders = [];
-        if (isset($habitat['pokemon_genders']) && is_array($habitat['pokemon_genders'])) {
-            foreach ($habitat['pokemon_genders'] as $pokemon_id => $gender) {
-                $pokemon_id = (int) $pokemon_id;
-                if ($pokemon_id > 0 && in_array($gender, ['male', 'female'], true)) {
-                    $pokemon_genders[$pokemon_id] = sanitize_text_field($gender);
-                }
-            }
-        }
-        $cleaned_habitat['pokemon_genders'] = $pokemon_genders;
         
         // Horaires - Nouvelle structure : date + start_time + end_time par jour
         if (isset($habitat['schedule']) && is_array($habitat['schedule'])) {
@@ -362,25 +370,46 @@ function pokehub_render_event_habitats_metabox($post) {
                 });
                 
                 promise.done(function(resp) {
-                    if (resp && resp.success && resp.data && resp.data.has_gender_dimorphism) {
-                        hasAnyDimorphic = true;
-                        var savedGender = '';
-                        if (pokehubHabitatsGender.saved_genders && pokehubHabitatsGender.saved_genders[habitatIndex] && pokehubHabitatsGender.saved_genders[habitatIndex][pokemonId]) {
-                            savedGender = pokehubHabitatsGender.saved_genders[habitatIndex][pokemonId];
-                        }
-                        
-                        var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
-                        var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
-                        $label.text('Pokémon #' + pokemonId + ':');
-                        var $selectGender = $('<select name="pokehub_habitats[' + habitatIndex + '][pokemon_genders][' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
-                        $selectGender.append('<option value=""><?php echo esc_js(__('Default (Male)', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="male"' + (savedGender === 'male' ? ' selected' : '') + '><?php echo esc_js(__('Male', 'poke-hub')); ?></option>');
-                        $selectGender.append('<option value="female"' + (savedGender === 'female' ? ' selected' : '') + '><?php echo esc_js(__('Female', 'poke-hub')); ?></option>');
-                        
-                        $genderRow.append($label);
-                        $genderRow.append($selectGender);
-                        $list.append($genderRow);
+                    if (!(resp && resp.success && resp.data)) {
+                        return;
                     }
+                    var data = resp.data;
+                    var availableGenders = Array.isArray(data.spawn_available_genders) && data.spawn_available_genders.length
+                        ? data.spawn_available_genders
+                        : (Array.isArray(data.available_genders) ? data.available_genders : []);
+                    if (!(data.has_gender_dimorphism && availableGenders.length > 1)) {
+                        return;
+                    }
+
+                    hasAnyDimorphic = true;
+                    var savedGender = '';
+                    if (pokehubHabitatsGender.saved_genders && pokehubHabitatsGender.saved_genders[habitatIndex] && pokehubHabitatsGender.saved_genders[habitatIndex][pokemonId]) {
+                        savedGender = pokehubHabitatsGender.saved_genders[habitatIndex][pokemonId];
+                    }
+                    var defaultGender = (data.default_gender && availableGenders.indexOf(data.default_gender) !== -1)
+                        ? data.default_gender
+                        : availableGenders[0];
+                    var genderLabels = {
+                        male: '<?php echo esc_js(__('Male', 'poke-hub')); ?>',
+                        female: '<?php echo esc_js(__('Female', 'poke-hub')); ?>'
+                    };
+                    
+                    var $genderRow = $('<div style="margin-bottom: 10px;"></div>');
+                    var $label = $('<label style="display: block; margin-bottom: 4px;"></label>');
+                    $label.text('Pokémon #' + pokemonId + ':');
+                    var $selectGender = $('<select name="pokehub_habitats[' + habitatIndex + '][pokemon_genders][' + pokemonId + ']" style="width: 200px; margin-left: 10px;"></select>');
+                    $selectGender.append('<option value=""><?php echo esc_js(__('Default', 'poke-hub')); ?> (' + (genderLabels[defaultGender] || defaultGender) + ')</option>');
+                    availableGenders.forEach(function(gender) {
+                        if (gender !== 'male' && gender !== 'female') {
+                            return;
+                        }
+                        var selectedAttr = savedGender === gender ? ' selected' : '';
+                        $selectGender.append('<option value="' + gender + '"' + selectedAttr + '>' + genderLabels[gender] + '</option>');
+                    });
+                    
+                    $genderRow.append($label);
+                    $genderRow.append($selectGender);
+                    $list.append($genderRow);
                 });
                 
                 promises.push(promise);
