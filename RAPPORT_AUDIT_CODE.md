@@ -134,3 +134,6 @@ function poke_hub_pokemon_update_names_from_html($html_path, $pokemon_table) {
 **Date du rapport :** 2024  
 **Version du plugin analysée :** 1.5.6
 
+---
+
+*Index de la documentation : [README du dossier docs](docs/README.md) · [Charte rédactionnelle](docs/REDACTION.md)*

@@ -49,3 +49,7 @@ Ces tables sont créées lorsque le module **Quêtes**, **Events** ou **Eggs** e
 
 - [CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md) – Blocs et tables de contenu
 - [docs/blocks/README.md](../blocks/README.md) – Liste des blocs (dont event-quests)
+
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

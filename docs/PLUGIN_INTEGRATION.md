@@ -607,3 +607,7 @@ display_transient_message_front('rafflepress_file_error', 'error');
    - Les styles sont compatibles avec WordPress 5.0+
    - Les tableaux utilisent les classes WordPress natives (`wp-list-table`)
    - Les boutons utilisent les classes WordPress natives (`button`, `button-primary`, `button-secondary`)
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

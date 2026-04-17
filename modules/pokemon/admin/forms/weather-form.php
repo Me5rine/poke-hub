@@ -95,7 +95,7 @@ function poke_hub_pokemon_weathers_edit_form($edit_row = null) {
                         <div class="admin-lab-form-group">
                             <label for="name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="name_fr" name="name_fr" value="<?php echo esc_attr($name_fr); ?>" />
-                            <p class="description"><?php esc_html_e('Example: Pluie, Ensoleillé, Ciel couvert…', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Example: Rainy, Sunny, Cloudy…', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col-50">

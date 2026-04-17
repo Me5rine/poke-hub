@@ -157,3 +157,6 @@ add_action('wp_enqueue_scripts', 'mon_theme_enqueue_me5rine_lab_styles');
 
 Une fois intégré, tous les éléments front-end du plugin utiliseront automatiquement les styles unifiés définis dans votre thème. Une seule modification de variable CSS changera le style partout !
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

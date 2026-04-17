@@ -24,7 +24,7 @@ add_action('pokehub_special_event_content', function($event) {
         
         if (!empty($pokemon_ids)) {
             echo '<div class="pokehub-event-section">';
-            echo '<h2>' . esc_html__('Pokémon en vedette', 'poke-hub') . '</h2>';
+            echo '<h2>' . esc_html__('Featured Pokémon', 'poke-hub') . '</h2>';
             echo '<div class="pokehub-event-pokemon-list">';
             
             foreach ($pokemon_ids as $pokemon_id) {
@@ -68,7 +68,7 @@ add_action('pokehub_special_event_content', function($event) {
         
         if (!empty($bonuses)) {
             echo '<div class="pokehub-event-section">';
-            echo '<h2>' . esc_html__('Bonus actifs', 'poke-hub') . '</h2>';
+            echo '<h2>' . esc_html__('Active bonuses', 'poke-hub') . '</h2>';
             echo '<div class="pokehub-event-bonus-list">';
             
             foreach ($bonuses as $bonus) {

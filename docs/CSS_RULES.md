@@ -548,3 +548,6 @@ Les tableaux utilisent la classe générique `.me5rine-lab-table` et s'appliquen
 4. **Accessibilité** : Utilisez toujours les labels et les attributs ARIA appropriés
 5. **Pas de CSS inline** : Tous les styles doivent être dans les fichiers CSS, jamais en inline (sauf variables CSS pour valeurs dynamiques de shortcodes)
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

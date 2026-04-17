@@ -253,10 +253,10 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                                     ?>
                                     <div class="pokehub-wild-pokemon-card pokehub-field-research-preview-tile">
                                         <?php if (!empty($badges['show_shiny'])) : ?>
-                                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($badges['is_forced_shiny']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($badges['is_forced_shiny']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                                         <?php endif; ?>
                                         <?php if (!empty($badges['show_regional'])) : ?>
-                                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Pokémon régional', 'poke-hub'); ?>">🌍</span>
+                                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                                         <?php endif; ?>
                                         <div class="pokehub-wild-pokemon-card-inner">
                                             <?php if ($img !== '') : ?>
@@ -317,10 +317,10 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                                 <div class="pokehub-quest-reward-item pokehub-quest-reward-item--pokemon">
                                     <div class="pokehub-wild-pokemon-card pokehub-field-research-detail-tile">
                                         <?php if (!empty($badges['show_shiny'])) : ?>
-                                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($badges['is_forced_shiny']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($badges['is_forced_shiny']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                                         <?php endif; ?>
                                         <?php if (!empty($badges['show_regional'])) : ?>
-                                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Pokémon régional', 'poke-hub'); ?>">🌍</span>
+                                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                                         <?php endif; ?>
                                         <div class="pokehub-wild-pokemon-card-inner">
                                             <?php if ($image_url !== '') : ?>

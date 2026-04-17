@@ -192,10 +192,6 @@ Visitez : `https://votre-site.com/pokemon-go/events/slug-evenement`
 
 Consultez le fichier `modules/events/public/events-content-example.php` pour voir des exemples d'utilisation complets.
 
+---
 
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

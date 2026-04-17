@@ -141,3 +141,6 @@ If you need to add a new type of list:
 
 3. Use it everywhere with `poke_hub_get_new_list()` instead of hardcoding values.
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

@@ -71,15 +71,6 @@ Les fichiers `events-content-blocks.php` et `bonus-content-blocks.php` gardent u
 
 L'enregistrement des blocs Gutenberg est maintenant géré par le module `blocks`.
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

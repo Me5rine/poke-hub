@@ -81,7 +81,7 @@ Pour **quel slug** est utilisé sur les lignées d’évolution (famille de bonb
 ### Paramètres dans l'administration
 
 Les URLs sont configurées dans :
-**Réglages > Poke Hub > Sources** (onglet "Sources")
+**Réglages > Poké HUB > Sources** (onglet "Sources")
 
 - **Assets bucket base URL** + chemin **Pokémon** (section *Image Sources*) : seule source principale des sprites (`{clé}.png`). Sans bucket renseigné, les helpers renvoient une URL vide.
 - **Pokémon assets fallback base URL** (section *Pokémon Sources*) : racine alternative ; les chemins et noms de fichiers doivent correspondre à ceux de la source principale.
@@ -188,6 +188,10 @@ if ($slug === '') {
 ```
 
 Exemple : Si `dex_number = 1`, le fichier sera `001.png`
+
+### Slugs invalides (`0`, vide) et tableaux
+
+Si le `slug` vaut `0` (entier ou chaîne) ou est vide, il est ignoré au profit du numéro Dex (`%03d`) ou, si un `id` est connu, d’une relecture en base (`pokehub_get_pokemon_data_by_id`) pour reconstruire l’URL — évite les fichiers du type `0.png` lorsque la ligne Pokémon est incomplète (ex. anciennes données Méga). Détail côté import Game Master : [pokemon/DATA_SAFETY.md](./pokemon/DATA_SAFETY.md).
 
 ## État actuel et recommandations
 
@@ -301,7 +305,6 @@ function poke_hub_pokemon_image_exists($url) {
 }
 ```
 
+---
 
-
-
-
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

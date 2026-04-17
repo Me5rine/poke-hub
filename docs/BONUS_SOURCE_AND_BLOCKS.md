@@ -88,3 +88,7 @@ Liste des classes et lien avec ce document : [POKEHUB_CSS_CLASSES.md](./POKEHUB_
 | Données par article (bonus + description) | Même base que Pokémon | Tables `content_bonus` / `content_bonus_entries` (préfixe Sources = Pokémon et tous les contenus). |
 
 Voir aussi : [blocks/README.md](./blocks/README.md), [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md), [INLINE_SVG.md](./INLINE_SVG.md).
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

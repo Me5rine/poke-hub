@@ -28,6 +28,7 @@ Si rien ne s'affiche en front, suivez ce guide de diagnostic étape par étape.
 - Le module **Events** doit être actif et les tables **`special_events`** / **`special_event_pokemon`** doivent exister (sinon repli sur `content_day_pokemon_hours`).
 - Les créneaux **featured_hours** sont saisis dans la metabox **Day Pokémon Hours** sur l’article ; en mode SQL, la liaison au post utilise **`content_source_type`** / **`content_source_id`**. Voir [CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md) et [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md).
 - Si les heures sont bonnes dans la metabox mais **fausses** après ouverture / enregistrement sous **Special events** : les lignes Spotlight doivent avoir **`mode` = `local`** (heure du site). Une migration plugin remet les anciennes lignes en `local` ; sinon repasser le mode à **local** dans le formulaire ou re-sauver l’article depuis la metabox. Détail : [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md) § Événements Spotlight.
+- Si le **titre FR** d’une Spotlight repasse en anglais après sauvegarde de l’article : mettre à jour le plugin avec le correctif de préservation séparée **`title_en` / `title_fr`**, corriger une fois les lignes déjà impactées dans **Special events**, puis re-sauver l’article.
 
 ### 3. Post types autorisés
 
@@ -172,15 +173,6 @@ define('WP_DEBUG_LOG', true);
 
 5. Contactez le support avec les résultats du diagnostic
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

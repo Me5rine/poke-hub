@@ -21,6 +21,7 @@ modules/blocks/
     ├── event-dates/             # Dates d'événement
     ├── event-quests/            # Quêtes d'événement
     ├── bonus/                   # Bonus
+    ├── go-pass/                 # Pass GO
     ├── wild-pokemon/            # Pokémon Sauvages
     ├── habitats/                # Habitats
     ├── new-pokemon-evolutions/  # New Pokemon
@@ -59,3 +60,7 @@ Voir aussi **[CONTENT_BLOCKS.md](../../docs/CONTENT_BLOCKS.md)** pour l’utilis
 - **Events** : `modules/events/functions/events-helpers.php`, `events-queries.php`
 - **Bonus** : `modules/bonus/functions/bonus-helpers.php`
 - **Blocks** : `blocks-quests-helpers.php`, `blocks-collection-challenges-helpers.php`, `blocks-special-research-helpers.php`
+
+---
+
+*Index de la documentation : [README du dossier docs](../../docs/README.md) · [Charte rédactionnelle](../../docs/REDACTION.md)*

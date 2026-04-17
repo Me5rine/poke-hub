@@ -150,4 +150,6 @@ Ces fichiers ne sont plus utilisés et peuvent être supprimés :
 - [QUICK_START.md](./QUICK_START.md) - Guide de création rapide
 - [BLOCK_STYLES_AND_BEHAVIOR.md](./BLOCK_STYLES_AND_BEHAVIOR.md) - Titres `.pokehub-block-title`, CSS front, bonbons (New Pokémon)
 
+---
 
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

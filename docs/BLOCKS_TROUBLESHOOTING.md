@@ -118,3 +118,7 @@ modules/blocks/
         ├── block.json
         └── render.php
 ```
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

@@ -67,7 +67,7 @@ Quand vous créez une collection, vous choisissez une **catégorie de collection
 
 **En résumé :** la catégorie de **collection** sert à choisir **le type de collection** (ce qu’on collectionne). Le module s’en sert pour construire le **pool** (liste des Pokémon affichés) avec les bons filtres (formes, fonds, etc.).
 
-**Catégories « spécifiques »** : pour certaines catégories (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds…), la collection n’affiche **que** ce type. Les options « inclure Méga / Gigantamax / Dynamax / costumes » ne sont pas proposées (paramètres adaptatifs). Détails dans **docs/COLLECTIONS_MODULE.md** (section *Catégories spécifiques*).
+**Catégories « spécifiques »** : pour certaines catégories (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds…), la collection n’affiche **que** ce type. Les options « inclure Méga / Gigantamax / Dynamax / costumes » ne sont pas proposées (paramètres adaptatifs). Détails dans **docs/COLLECTIONS_MODULE.md** (sections *Catégories spécifiques* et *Statuts d’une entrée* ; vue grille, filtre **Afficher dans la grille**, légende des tuiles).
 
 ---
 
@@ -83,3 +83,7 @@ Donc :
 - **Catégorie des collections** = type de collection (costumés, shiny, fonds…) qui détermine quel pool de Pokémon est affiché.
 
 Les deux sont indépendants ; le mot « catégorie » désigne simplement un type dans chaque contexte (forme vs collection).
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

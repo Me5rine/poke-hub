@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Système de suivi des collections Pokémon GO (type [POGO Collection](https://pogo-collection.com/)) : le joueur crée une ou plusieurs collections (100 %, chromatiques, costumés, fonds, chanceux, obscurs, purifiés, Gigamax, Dynamax, etc.), coche ce qu'il possède / a à l'échange, et peut partager sa liste (lien, image).
+Système de suivi des collections Pokémon GO (type [POGO Collection](https://pogo-collection.com/)) : le joueur crée une ou plusieurs collections (100 %, chromatiques, costumés, fonds, chanceux, obscurs, purifiés, Gigamax, Dynamax, etc.), coche ce qu’il possède / a à l’échange, et peut partager sa liste (lien, image).
 
 ## Stockage : connecté vs non connecté
 
@@ -76,10 +76,22 @@ Le **pool** = Pokémon (table `pokemon` + formes) filtrés par catégorie et opt
 
 Pour les collections “locales” (non connecté), pas de ligne en base : le front garde en localStorage un objet du type `{ id: uuid, name, category, options, items: { [pokemon_id]: status } }`.
 
+### Statuts d’une entrée (données ↔ interface)
+
+Chaque Pokémon du pool a un **statut** stocké côté données (`pokehub_collection_items.status`, REST, `localStorage`) et reflété sur la tuile par l’attribut `data-status` :
+
+| Valeur technique | Rôle |
+|------------------|------|
+| `owned` | Possédé |
+| `for_trade` | À l’échange (équivalent du libellé anglais source *For trade*, domaine d’extension `poke-hub`) |
+| `missing` | Manquant |
+
+Le bloc **Afficher dans la grille** ne change pas ces valeurs : il **filtre uniquement l’affichage** des tuiles (chaîne source anglaise *Show in grid*, même domaine). En français, l’interface désigne ces états comme **possédé**, **à l’échange**, **manquant** ; le code et l’API gardent `owned`, `for_trade`, `missing`.
+
 ## Expérience utilisateur
 
 1. **Création** : drawer (panneau latéral) avec nom, type (catégorie), options selon le type (voir *Catégories spécifiques*), mode d’affichage (tuiles ou liste + sélecteur). Si non connecté : message de stockage local.
-2. **Édition** : grille de tuiles (clic = cycle statut : manquant → possédé → à l’échange → manquant) **ou** liste + Select2 pour ajouter les Pokémon manquants (mode configurable). Une **légende** (vert = possédé, orange = à échanger, gris = manquant) rappelle le sens du clic.
+2. **Édition** : grille de tuiles (clic = cycle **manquant → possédé → à l’échange → manquant**) **ou** liste + Select2 pour ajouter les Pokémon manquants (mode configurable). **Légende** : possédé (vert), à l’échange (orange), manquant (gris). Bloc **Afficher dans la grille** : une case cochée par statut **affiché** ; tout décocher vide la grille et affiche un rappel ; avec **regroupement par génération**, les blocs sans aucune tuile visible sont masqués (voir *Statuts d’une entrée*).
 3. **Partage** : lien (slug ou id), export image (canvas ou serveur).
 4. **Mise à jour** : le joueur revient sur la collection et met à jour les statuts ou les paramètres (drawer paramètres pour les options).
 
@@ -94,6 +106,7 @@ Pour les collections “locales” (non connecté), pas de ligne en base : le fr
 - `modules/collections/public/collections-shortcode.php` — shortcodes `[poke_hub_collections]` et `[poke_hub_collection_view]`.
 - `modules/collections/public/collections-rest.php` — API REST (pool, CRUD, items).
 - `assets/css/poke-hub-collections-front.css` — styles front (CSS global du plugin). `assets/theme/poke-hub-collections-theme.css` — fichier à inclure dans le thème pour surcharges. `modules/collections/assets/js/collections-front.js` — front.
+- `modules/collections/COLLECTIONS_THEME_CSS.md` — référence classes / variables (légende, filtre **Afficher dans la grille**, cartes liste). Chaînes traduisibles : **docs/TRANSLATION.md**. Conventions doc : **docs/REDACTION.md**.
 
 ## Mise en place d’une page
 
@@ -105,3 +118,7 @@ Sur la page dédiée aux collections, placer les deux shortcodes :
 ```
 
 Quand l’URL contient `?collection=slug&view=1` (ou `?id=123`), la vue de la collection s’affiche sous la liste ; sinon seule la liste et le bouton « Créer une collection » s’affichent.
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

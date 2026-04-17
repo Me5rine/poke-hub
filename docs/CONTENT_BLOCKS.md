@@ -50,6 +50,20 @@ add_filter('pokehub_bonus_auto_post_types', function($types) {
 
 Vous pouvez insérer les blocs manuellement via la catégorie **Poké HUB** dans l’éditeur.
 
+### Sélection Pokémon et genres (admin)
+
+Dans les écrans admin qui utilisent les sélecteurs Select2 Pokémon en multi-sélection, les valeurs postées peuvent être :
+- un ID normal (`123`)
+- ou un token genre forcé (`123|male`, `123|female`)
+
+Les genres sont aussi synchronisés via des champs cachés `pokemon_genders[...]`.
+
+Normalisation côté serveur :
+- parseur central : `pokehub_parse_post_pokemon_multiselect_tokens_with_genders()`
+- normalisation globale contenu : `pokehub_content_normalize_pokemon_ids_with_genders()`
+
+Couverture appliquée : GO Pass, Day Pokémon Hours (incluant la génération des featured/spotlight), Eggs, Collection Challenges, Special Research, New Pokémon, Habitats, Field Research, Wild Pokémon, Special Events, Event Quests.
+
 #### Bloc "Event Dates" (`pokehub/event-dates`)
 
 **Attributs :**
@@ -65,6 +79,10 @@ Affiche les quêtes et récompenses du contenu courant (article ou événement).
 
 - **Dépendance d’enregistrement :** module **Events** (le bloc ne dépend pas du module Quêtes).
 - **Gestion des quêtes :** menu **Poké HUB → Quêtes** (module Quêtes) ; la metabox sur les articles reste fournie par le module Events.
+- **Aperçu replié des récompenses Pokémon :** maximum **3** mini-tuiles, puis un badge **`+N`** pour le nombre de Pokémon supplémentaires non affichés.
+- **Compteurs d’aperçu :** le badge **`×M`** continue d’indiquer les lignes de récompenses non-Pokémon (objets, poussière, etc.) en plus de l’aperçu Pokémon.
+- **Lisibilité visuelle :** en mode replié, les lignes sont contraintes pour garder une hauteur homogène ; sur mobile, l’aperçu reste sur une seule ligne avec défilement horizontal si nécessaire.
+- **CP min/max :** les libellés sont affichés en version compacte (`CP max`, `CP min`) avec intitulé complet au survol (`title`) pour éviter les retours à la ligne.
 
 **Attributs :** selon le bloc (souvent `autoDetect`). Voir l’éditeur ou le `block.json` du bloc.
 
@@ -78,6 +96,17 @@ Affiche les quêtes et récompenses du contenu courant (article ou événement).
 - `layout` (string, défaut: `cards`) : Layout d'affichage (`cards` ou `list`)
 
 **Exemple :** `<!--wp:pokehub/bonus {"autoDetect":true,"layout":"cards"} /-->`
+
+#### Bloc "GO Pass" (`pokehub/go-pass`)
+
+Affiche le Pass GO lié au contenu courant (carte résumé ou grille complète).
+
+- **Source des données :** `special_events` (pass) + `content_go_pass` (payload JSON).
+- **Liaison contenu → pass :** table dédiée `go_pass_host_links` (aucune post meta pour la liaison).
+- **Configuration éditeur :** metabox **GO Pass (block)** sous l’article (choix du pass et du mode d’affichage), plus bouton de création d’un pass.
+- **Contrainte de contenu :** un seul bloc `pokehub/go-pass` par article (garde à la sauvegarde).
+
+**Attributs :** `specialEventId` (number, fallback), `displayMode` (`summary` ou `full`).
 
 #### Bloc "Wild Pokémon" (`pokehub/wild-pokemon`)
 
@@ -118,7 +147,7 @@ Affiche les Pokémon par jour avec horaires (données de la metabox **Day Pokém
 
 - Si les tables **`special_events`** et **`special_event_pokemon`** existent : les créneaux **featured_hours** sont lus depuis ces tables (liaison **`content_source_type` = `post`** et **`content_source_id`** = ID du post courant, avec rétrocompatibilité sur d’anciens slugs). Type d’événement en base le plus souvent **`pokemon-spotlight-hour`** (résolution dans `pokehub_resolve_spotlight_event_type_slug()`).
 - Sinon : repli sur les tables de contenu **`content_day_pokemon_hours`** / **`content_day_pokemon_hour_entries`** (`source_type` / `source_id` du post, `content_type` = `featured_hours`).
-- À l’enregistrement depuis la metabox : titres **`title_en`** = `{Nom EN} Spotlight Hour`, **`title_fr`** = `Heure vedette {Nom FR}` ; slug = **`{slug-pokemon}-spotlight-hour`** avec unicité via **`pokehub_generate_unique_event_slug()`** ; colonne **`mode`** en base = **`local`** (fuseau WordPress `wp_timezone()`), pour rester cohérent avec l’édition des mêmes créneaux sous **Poké HUB → Special events** (champs date/heure en heure locale du site, pas en UTC « fixed »). Voir [events/EVENEMENTS-DISTANTS.md](events/EVENEMENTS-DISTANTS.md) § Spotlight.
+- À l’enregistrement depuis la metabox : titres **`title_en`** = `{Nom EN} Spotlight Hour`, **`title_fr`** = `Heure vedette {Nom FR}` ; slug = **`{slug-pokemon}-spotlight-hour`** avec unicité via **`pokehub_generate_unique_event_slug()`** ; colonne **`mode`** en base = **`local`** (fuseau WordPress `wp_timezone()`), pour rester cohérent avec l’édition des mêmes créneaux sous **Poké HUB → Special events** (champs date/heure en heure locale du site, pas en UTC « fixed »). En cas de réenregistrement, les titres existants **EN/FR** sont conservés séparément pour éviter l’écrasement du `title_fr` par l’anglais. Voir [events/EVENEMENTS-DISTANTS.md](events/EVENEMENTS-DISTANTS.md) § Spotlight.
 
 Fichiers utiles : `modules/blocks/blocks/day-pokemon-hours/render.php`, `modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php`, `includes/content/content-helpers.php` (`pokehub_content_get_featured_hours_classic_events_entries_for_parent`, `pokehub_content_save_day_pokemon_hours_featured_hours_classic_events`).
 
@@ -260,15 +289,6 @@ Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nat
 - **Titres, CSS front, bonbons (New Pokémon)** : [docs/blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md)
 - **Dépannage** : [docs/BLOCKS_TROUBLESHOOTING.md](BLOCKS_TROUBLESHOOTING.md)
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

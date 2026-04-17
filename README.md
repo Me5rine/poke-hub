@@ -4,6 +4,8 @@
 **Auteur:** Me5rine  
 **Description:** Plugin modulaire WordPress pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...)
 
+**Documentation technique détaillée** (modules, CSS, données, conventions) : dossier **[docs/](docs/)** — index **[docs/README.md](docs/README.md)**, charte **[docs/REDACTION.md](docs/REDACTION.md)**.
+
 ---
 
 ## Table des matières
@@ -140,6 +142,15 @@ La documentation complète est organisée dans le dossier `docs/` à la racine d
 
 Voir aussi la section [Modules](#modules) pour les liens vers la documentation de chaque module.
 
+### Convention de saisie Pokémon (admin contenu)
+
+Pour les formulaires admin de contenu utilisant la multi-sélection Pokémon (Select2), les IDs peuvent être soumis sous forme :
+- `123`
+- `123|male`
+- `123|female`
+
+Le parsing/merge (avec `pokemon_genders[...]`) est centralisé via `pokehub_parse_post_pokemon_multiselect_tokens_with_genders()`, et utilisé dans les flux de contenu/blocs (Day Pokémon Hours + featured/spotlight, Wild, Habitats, Eggs, Collection Challenges, Special Research, New Pokémon, GO Pass, Special Events, Event Quests).
+
 ---
 
 ## Modules
@@ -248,6 +259,7 @@ Le module Pokémon permet d'importer les données depuis un fichier Game Master 
 - **Détection des changements** : Vérification automatique via `mtime`
 - **Force import** : Option pour forcer l'import même sans changement
 - **Import par batch** : Traitement par lots pour les gros fichiers
+- **Sécurité non destructive** : fusion de `extra` et update des colonnes uniquement si changement effectif
 
 ##### Résumé d'import
 
@@ -454,10 +466,12 @@ Le module inclut un système complet de gestion des codes amis publics avec supp
 - **Formulaire d'ajout / mise à jour** : Les utilisateurs peuvent publier ou mettre à jour leur code ami ; connectés avec un code déjà enregistré : libellés **Update My Friend Code** (titre + bouton)
 - **Gestion des utilisateurs** :
   - **Non connectés** : pseudo Pokémon GO **obligatoire** ; contrôle par **IP** et par **pseudo** (mise à jour de la fiche existante, pas de doublons abusifs) ; nouvelle fiche : cookie + **au plus une création par IP sur 48 h** ; entre deux mêmes fiches : **48 h** ; changement de pseudo sans la même IP : connexion requise (notice warning)
-  - **Connectés** : pas de ces limites sur ce flux ; **dernière IP** enregistrée à chaque sauvegarde de profil (colonne `anonymous_ip`)
+  - **Connectés** : pas de ces limites sur ce flux ; `anonymous_ip` est mise à jour via requête front HTTP quand une IP valide est détectée et qu’elle diffère de la valeur stockée
+  - **Admin/staff** : l’édition de profil préserve `anonymous_ip` par défaut (pas d’écrasement par l’IP admin) ; override manuel possible (`Keep` / `Replace` / `Clear`)
   - Pré-remplissage automatique depuis le profil utilisateur
 - **Affichage public** : Liste publique des codes amis disponibles
 - **Filtres** : Filtrage par pays et motif Prismillon (Scatterbug Pattern)
+- **Drapeaux pays** : affichage automatique des drapeaux dans les selects pays (formulaire, filtres, admin) via `data-icon` + Select2, sans import manuel d'images
 - **Pagination** : Affichage paginé des codes (20 par défaut, configurable)
 - **Copie rapide** : Icône de copie pour copier le code d'un clic
 - **QR Codes** : Génération automatique de QR codes pour ajout rapide dans Pokémon GO
@@ -469,7 +483,7 @@ Le module inclut un système complet de gestion des codes amis publics avec supp
 Chaque code ami affiche :
 - **Code ami** : Formaté avec espaces (ex: `1234 5678 9012`)
 - **Nom Pokémon GO** : Pseudo du joueur
-- **Pays** : Pays du joueur
+- **Pays** : Pays du joueur avec drapeau à gauche sur les tuiles
 - **Motif Prismillon** : Motif Scatterbug recherché
 - **Équipe** : Équipe du joueur (Mystic, Valor, Instinct)
 - **Date d'ajout** : Date complète et temps relatif
@@ -578,6 +592,14 @@ Le module Pokémon inclut un système de traductions automatiques :
 - **Noms officiels** : Récupération des noms officiels depuis le Game Master
 - **Traductions FR/EN** : Support multilingue pour les noms et descriptions
 - **Import Bulbapedia** : Import automatique des types depuis Bulbapedia
+- **Bulk Bulbapedia sécurisé** :
+  - cible les entrées avec au moins une langue manquante parmi `fr,de,it,es,ja,ko`,
+  - supporte la reprise par curseur (`Start after ID` / `Next start after ID`),
+  - n'écrase pas les autres données de `extra` et ignore les lignes `extra` invalides.
+- **Édition manuelle des traductions manquantes** :
+  - modifie uniquement `extra.names[lang]` (et `name_fr` pour le FR),
+  - conserve les autres métadonnées (release, dimorphisme, régional, etc.),
+  - ne sauvegarde que si une valeur a réellement changé.
 
 ### Calculs de CP
 
@@ -1013,7 +1035,7 @@ Profils utilisateur Pokémon GO et codes amis publics.
 - `country` : Pays (surtout anonymes en table ; connectés : source UM usermeta)
 - `country_custom` : Libellé pays « custom » (ex. région affichée) si applicable
 - `reasons` : Raisons JSON (tableau de valeurs)
-- `anonymous_ip` : **Dernière IP** enregistrée lors de la dernière sauvegarde du profil depuis une requête HTTP (tous types de profils ; nom historique de colonne)
+- `anonymous_ip` : **Dernière IP connue** du profil depuis une requête HTTP (nom historique de colonne). En front, mise à jour seulement si l’IP détectée diffère ; en admin, valeur préservée par défaut sauf override explicite.
 - `created_at` : Date de création
 - `updated_at` : Date de mise à jour
 

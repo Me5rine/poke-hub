@@ -43,6 +43,7 @@ Les chaînes affichées côté PHP (render, shortcodes, admin) sont déjà dans 
 
 - **Includes :** `includes/` (settings, admin-ui, content, helpers)
 - **Modules :** chaque module (quests, collections, blocks, events, bonus, pokemon, games, user-profiles, eggs, etc.) utilise `__()`, `_e()`, `esc_html_e()`, etc. avec le text domain `poke-hub`
+- **Collections (vue grille)** : libellés du filtre d’affichage et du message d’aide dans `modules/collections/public/collections-shortcode.php` (sources en anglais, ex. *Show in grid*, *Owned*, *For trade*, *Missing*, *Select at least one status…*). Le sens **métier** en français (possédé, à l’échange, manquant, filtre **Afficher dans la grille**) est aligné sur **docs/COLLECTIONS_MODULE.md** (section *Statuts d’une entrée*).
 - **Blocs :** `modules/blocks/blocks/*/block.json` (title, description en anglais) ; le rendu PHP des blocs utilise aussi les fonctions de traduction
 
 ## Bonnes pratiques pour le code
@@ -60,5 +61,10 @@ printf(_n('%s result', '%s results', $total, 'poke-hub'), number_format_i18n($to
 
 ## Voir aussi
 
+- [Charte rédactionnelle de la documentation](./REDACTION.md) (langue, citations de chaînes sources, liens)
 - [Documentation WordPress sur l’internationalisation](https://developer.wordpress.org/plugins/internationalization/)
 - Dossier du plugin : `languages/` (à créer si besoin pour y déposer les .po/.mo)
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

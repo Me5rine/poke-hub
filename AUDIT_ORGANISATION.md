@@ -150,3 +150,6 @@ Date: 2026-01-19
 
 **Statut final** : ✅ Code propre et bien organisé
 
+---
+
+*Index de la documentation : [README du dossier docs](docs/README.md) · [Charte rédactionnelle](docs/REDACTION.md)*

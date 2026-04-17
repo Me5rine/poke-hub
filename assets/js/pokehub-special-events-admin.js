@@ -71,16 +71,16 @@ jQuery(function ($) {
         // Initialiser Select2 uniquement si l'élément est visible
         if ($select.is(':visible')) {
             $select.select2({
-                placeholder: 'Sélectionner un Pokémon',
+                placeholder: 'Select a Pokémon',
                 allowClear: true,
                 width: '100%',
                 matcher: pokehubMultilingualMatcher,
                 language: {
                     noResults: function() {
-                        return "Aucun résultat trouvé";
+                        return "No results found";
                     },
                     searching: function() {
-                        return "Recherche en cours...";
+                        return "Searching...";
                     }
                 }
             });

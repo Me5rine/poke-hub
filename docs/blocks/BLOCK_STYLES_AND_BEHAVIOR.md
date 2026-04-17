@@ -38,6 +38,32 @@ Pour un nouveau bloc : utiliser un wrapper dont la classe contient **`block-wrap
 
 ---
 
+## Bloc **Event Quests** (`pokehub/event-quests`) - aperçu compact
+
+Le rendu replié des quêtes Field Research suit des contraintes visuelles pour garder des cartes homogènes et lisibles, même avec beaucoup de récompenses.
+
+### Règles d’aperçu (mode replié)
+
+- L’aperçu Pokémon affiche **3 mini-tuiles maximum**.
+- Si plus de 3 Pokémon sont présents, un badge **`+N`** indique les Pokémon supplémentaires non affichés.
+- Le badge **`×M`** continue d’indiquer le nombre de lignes de récompenses non-Pokémon.
+- La zone d’aperçu est forcée sur **une seule ligne** pour éviter les variations de hauteur entre quêtes.
+- Sur petit écran, l’aperçu reste mono-ligne avec défilement horizontal si besoin.
+
+### Règles CP (détail de récompense)
+
+- Les libellés CP sont compacts : **`CP max`** et **`CP min`**.
+- Les pastilles CP sont alignées en ligne (label + valeur) pour limiter la largeur.
+- Le libellé complet reste disponible via `title` (ex. « Maximum CP at level 15 »), pour conserver le contexte sans casser la mise en page.
+
+### Fichiers concernés
+
+- `modules/blocks/functions/blocks-field-research.php` (rendu HTML + compteurs d’aperçu)
+- `assets/css/poke-hub-blocks-front.css` (styles front communs)
+- `assets/css/poke-hub-events-front.css` (styles doublon pour contextes Events)
+
+---
+
 ## Bloc **New Pokémon – Evolution Lines** (`pokehub/new-pokemon-evolutions`)
 
 ### Fichiers
@@ -91,4 +117,8 @@ Fonctions utiles (définies dans `render.php` du bloc, chargées avec le rendu) 
 
 - [README.md](./README.md) — liste des blocs  
 - [CONTENT_BLOCKS.md](../CONTENT_BLOCKS.md) — attributs et utilisation  
-- [POKEMON_IMAGES.md](../POKEMON_IMAGES.md) — URLs sprites, fallback, filtres  
+- [POKEMON_IMAGES.md](../POKEMON_IMAGES.md) — URLs sprites, fallback, filtres
+
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

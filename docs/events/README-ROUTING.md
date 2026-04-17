@@ -151,10 +151,6 @@ print_r($wp_rewrite->rules);
 - Le système est compatible avec les thèmes WordPress classiques (utilise `get_header()` et `get_footer()`).
 - Le SEO est géré automatiquement (titre de page modifié via `document_title_parts`).
 
+---
 
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

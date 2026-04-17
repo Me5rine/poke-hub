@@ -48,6 +48,13 @@ php scripts/import-pokekalos-release-dates.php --limit=50 --skip-existing --dela
 
 ## Comportement de l’import
 
+### Sécurité des données
+
+- L'import modifie uniquement `extra['release']` et conserve les autres clés de `extra`.
+- Si `extra` est invalide (JSON mal formé), la ligne est ignorée pour éviter tout écrasement destructif.
+- Aucune écriture n'est faite si le JSON final est identique à l'existant (update uniquement si différence).
+- Avec `--skip-existing` (ou case « ne pas écraser »), une date déjà renseignée pour une clé `release.*` est conservée.
+
 ### 1. Formes de base (`is_default = 1`)
 
 - **URL** : `{slug}-{dex}.html` (ex. `pikachu-25.html`, `roucarnage-18.html`).
@@ -89,3 +96,8 @@ Dans **Poké HUB > Pokémon** > édition d’un Pokémon :
 | **Limite = N** | Les N premières espèces de chaque catégorie (base puis méga). |
 | **Ignorer les existants** | Ne remplit que les champs de date vides ; ne modifie pas les dates déjà renseignées. |
 | **Dry-run** | Aucune modification en base ; log uniquement. |
+| **`extra` invalide** | La ligne est ignorée (protection anti-écrasement). |
+
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

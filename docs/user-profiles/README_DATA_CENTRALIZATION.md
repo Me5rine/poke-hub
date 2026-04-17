@@ -61,3 +61,6 @@ The module loads files in this order:
 
 This ensures definitions are available when helpers need them.
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

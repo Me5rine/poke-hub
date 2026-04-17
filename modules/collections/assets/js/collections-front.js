@@ -10,7 +10,8 @@
     }
 
     /**
-     * Affiche / masque les tuiles selon les cases « Show in grid » (owned / for_trade / missing).
+     * Filtre d’affichage : masque ou réaffiche les tuiles selon le bloc « Afficher dans la grille »
+     * (cases = statuts visibles : possédé / à l'échange / manquant → données owned / for_trade / missing).
      * @returns {function} fonction apply() à rappeler après changement de statut d’une tuile
      */
     function bindCollectionStatusFilters(wrap) {

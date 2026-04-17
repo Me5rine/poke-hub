@@ -202,3 +202,6 @@ do_action('poke_hub_keycloak_nickname_synced', $user_id, $keycloak_nickname);
 
 - Fonction de synchronisation : `modules/user-profiles/functions/user-profiles-keycloak-sync.php`
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

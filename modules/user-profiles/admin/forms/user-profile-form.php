@@ -98,7 +98,7 @@ function poke_hub_render_user_profile_form($user_id) {
                                 : $profile['friend_code'];
                             ?>
                             <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="admin-lab-field-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
-                            <p class="description"><?php _e('Your Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -109,7 +109,7 @@ function poke_hub_render_user_profile_form($user_id) {
                         <td>
                             <label>
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" <?php checked($profile['friend_code_public'], true); ?>>
-                                <?php _e('Display friend code publicly on user profile', 'poke-hub'); ?>
+                                <?php _e('Display friend code publicly on this profile', 'poke-hub'); ?>
                             </label>
                             <p class="description"><?php _e('If unchecked, the friend code will only be visible to the user and administrators.', 'poke-hub'); ?></p>
                         </td>
@@ -127,7 +127,7 @@ function poke_hub_render_user_profile_form($user_id) {
                                 : $profile['xp'];
                             ?>
                             <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="admin-lab-field-input" pattern="[0-9\s]*" placeholder="0">
-                            <p class="description"><?php _e('Your total XP in Pokémon GO', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('Total XP in Pokémon GO', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -152,7 +152,7 @@ function poke_hub_render_user_profile_form($user_id) {
                                 <?php endforeach; ?>
                             </select>
                             <p class="description">
-                                <?php _e('Your country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
+                                <?php _e('Country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
                             </p>
                         </td>
                     </tr>
@@ -168,14 +168,14 @@ function poke_hub_render_user_profile_form($user_id) {
                             ?>
                             <p class="description"><?php _e('(read-only, updated when this profile is saved)', 'poke-hub'); ?></p>
                             <select name="anonymous_ip_action" id="anonymous_ip_action" class="admin-lab-field-select" style="max-width: 360px;">
-                                <option value="keep" selected><?php _e('Conserver', 'poke-hub'); ?></option>
-                                <option value="set"><?php _e('Remplacer', 'poke-hub'); ?></option>
-                                <option value="clear"><?php _e('Supprimer', 'poke-hub'); ?></option>
+                                <option value="keep" selected><?php _e('Keep', 'poke-hub'); ?></option>
+                                <option value="set"><?php _e('Replace', 'poke-hub'); ?></option>
+                                <option value="clear"><?php _e('Clear', 'poke-hub'); ?></option>
                             </select>
                             <div style="margin-top: 8px; max-width: 360px;">
-                                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip); ?>" placeholder="x.x.x.x ou ipv6" class="admin-lab-field-input" style="width: 100%;">
+                                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip); ?>" placeholder="<?php esc_attr_e('x.x.x.x or ipv6', 'poke-hub'); ?>" class="admin-lab-field-input" style="width: 100%;">
                             </div>
-                            <p class="description"><?php _e('L’IP ne sera modifiée que si l’action n’est pas "Conserver".', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('IP will only be changed when action is not "Keep".', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -185,7 +185,7 @@ function poke_hub_render_user_profile_form($user_id) {
                         </th>
                         <td>
                             <input type="text" name="pokemon_go_username" id="pokemon_go_username" value="<?php echo esc_attr($profile['pokemon_go_username']); ?>" class="admin-lab-field-input">
-                            <p class="description"><?php _e('Your in-game username', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('In-game username', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -333,7 +333,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                                 : $profile['friend_code'];
                             ?>
                             <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="admin-lab-field-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
-                            <p class="description"><?php _e('Your Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('Pokémon GO friend code (must be exactly 12 digits, e.g., 1234 5678 9012)', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -344,7 +344,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                         <td>
                             <label>
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" <?php checked($profile['friend_code_public'], true); ?>>
-                                <?php _e('Display friend code publicly on user profile', 'poke-hub'); ?>
+                                <?php _e('Display friend code publicly on this profile', 'poke-hub'); ?>
                             </label>
                             <p class="description"><?php _e('If unchecked, the friend code will only be visible to the user and administrators.', 'poke-hub'); ?></p>
                         </td>
@@ -362,7 +362,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                                 : $profile['xp'];
                             ?>
                             <input type="text" name="xp" id="xp" value="<?php echo esc_attr($formatted_xp); ?>" class="admin-lab-field-input" pattern="[0-9\s]*" placeholder="0">
-                            <p class="description"><?php _e('Your total XP in Pokémon GO', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('Total XP in Pokémon GO', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -387,7 +387,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                                 <?php endforeach; ?>
                             </select>
                             <p class="description">
-                                <?php _e('Your country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
+                                <?php _e('Country. This will be synchronized with Ultimate Member if available.', 'poke-hub'); ?>
                             </p>
                         </td>
                     </tr>
@@ -403,14 +403,14 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                             ?>
                             <p class="description"><?php _e('(read-only, updated when this profile is saved)', 'poke-hub'); ?></p>
                             <select name="anonymous_ip_action" id="anonymous_ip_action" class="admin-lab-field-select" style="max-width: 360px;">
-                                <option value="keep" selected><?php _e('Conserver', 'poke-hub'); ?></option>
-                                <option value="set"><?php _e('Remplacer', 'poke-hub'); ?></option>
-                                <option value="clear"><?php _e('Supprimer', 'poke-hub'); ?></option>
+                                <option value="keep" selected><?php _e('Keep', 'poke-hub'); ?></option>
+                                <option value="set"><?php _e('Replace', 'poke-hub'); ?></option>
+                                <option value="clear"><?php _e('Clear', 'poke-hub'); ?></option>
                             </select>
                             <div style="margin-top: 8px; max-width: 360px;">
-                                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip_by_id); ?>" placeholder="x.x.x.x ou ipv6" class="admin-lab-field-input" style="width: 100%;">
+                                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip_by_id); ?>" placeholder="<?php esc_attr_e('x.x.x.x or ipv6', 'poke-hub'); ?>" class="admin-lab-field-input" style="width: 100%;">
                             </div>
-                            <p class="description"><?php _e('L’IP ne sera modifiée que si l’action n’est pas "Conserver".', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('IP will only be changed when action is not "Keep".', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 
@@ -420,7 +420,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                         </th>
                         <td>
                             <input type="text" name="pokemon_go_username" id="pokemon_go_username" value="<?php echo esc_attr($profile['pokemon_go_username']); ?>" class="admin-lab-field-input">
-                            <p class="description"><?php _e('Your in-game username', 'poke-hub'); ?></p>
+                            <p class="description"><?php _e('In-game username', 'poke-hub'); ?></p>
                         </td>
                     </tr>
 

@@ -213,3 +213,6 @@ add_action('wp_enqueue_scripts', 'mon_plugin_enqueue_table_scripts');
    - Les tableaux utilisent les classes WordPress natives (`wp-list-table`)
    - Les boutons utilisent les classes WordPress natives (`button`, `button-primary`, `button-secondary`)
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

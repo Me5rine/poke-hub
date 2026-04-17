@@ -156,3 +156,6 @@ Lors du prochain import Game Master, Torkoal sera automatiquement marqué comme 
 
 - **[BIOMES.md](./BIOMES.md)** — biomes Pokémon GO (tables, onglet admin, association sur la fiche Pokémon). Dans l’admin, les champs **biomes** et **régionaux** sont regroupés dans la même section *Regional availability* (biomes en premier, puis bloc *Regional*).
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

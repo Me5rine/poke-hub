@@ -127,28 +127,20 @@ modules/blocks/
 
 ## 📚 Documentation
 
-Chaque module doit avoir :
-
-- **README.md** à la racine du module
-- **Documentation dans `docs/{module}/`** pour les détails
-- **PHPDoc** sur toutes les fonctions publiques
+- **Index** : tout fichier de référence significatif est répertorié dans **[docs/README.md](./README.md)** (éviter les « îlots » non listés).
+- **Conventions** : **[docs/REDACTION.md](./REDACTION.md)** (langue, liens, nommage **Poké HUB** / `poke-hub` / `poke_hub_`).
+- **Par module** : une entrée dans `docs/` (racine ou sous-dossier `docs/{domaine}/`) et/ou un `README.md` **dans** le module lorsque c’est pertinent ; pas d’obligation de dupliquer les deux.
+- **Code** : **PHPDoc** sur les fonctions publiques et points d’extension utiles.
 
 ## 🔍 Références
 
+- [Index de la documentation](./README.md)
+- [Charte rédactionnelle](./REDACTION.md)
 - [Architecture des Blocs](./blocks/ARCHITECTURE.md)
 - [Types de Blocs](./blocks/BLOCK_TYPES.md)
 - [Guide de Création Rapide](./blocks/QUICK_START.md)
 - [Module Quêtes](./quests/README.md)
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

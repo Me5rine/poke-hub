@@ -5,14 +5,20 @@ Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_
 ## Colonne `anonymous_ip` (table `user_profiles`)
 
 - **Rôle** : enregistrer la **dernière adresse IP connue** lors d’une sauvegarde du profil / du code ami.
-- **Remplie** à chaque appel réussi à `poke_hub_save_user_profile()` lorsqu’une IP client est disponible (tous types de profils : classique WordPress, Discord, anonyme). En contexte HTTP, l’IP est obtenue via `poke_hub_get_client_ip()` si disponible, sinon `REMOTE_ADDR`.
+- **Front (HTTP)** : l’IP est lue via `poke_hub_get_client_ip()` (fallback `REMOTE_ADDR`) et n’est enregistrée que si elle est valide/non vide.
+- **Mise à jour front** : pour une ligne existante, `anonymous_ip` est mise à jour **uniquement si la nouvelle IP diffère** de la valeur déjà stockée.
+- **Admin/staff** : par défaut, l’édition d’un profil **préserve** `anonymous_ip` (pas d’écrasement par l’IP du back-office).
+- **Override admin explicite** : le formulaire admin permet `Keep` / `Replace` / `Clear` :
+  - `Keep` : conserve la valeur actuelle,
+  - `Replace` : remplace par l’IP saisie (si format valide),
+  - `Clear` : vide la colonne.
 - **Contexte sans IP** (CLI, cron, etc.) : la colonne n’est **pas effacée** ; elle n’est tout simplement pas mise à jour.
 - Le nom de colonne reste `anonymous_ip` pour compatibilité ; la valeur s’applique à **toutes** les lignes où une sauvegarde a eu lieu depuis le web.
 
 ## Administration
 
 - **Liste** Poké HUB → User Profiles : colonne **« Last IP »** (`anonymous_ip`).
-- **Édition** d’un profil : champ informatif **« Last recorded IP »** (lecture seule), pour tout type de profil.
+- **Édition** d’un profil : ligne **« Last recorded IP »** + contrôle admin (`Keep` / `Replace` / `Clear`) pour gérer explicitement la valeur.
 
 ## Visiteurs non connectés (formulaire public)
 
@@ -37,6 +43,31 @@ Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_
 
 - Pas de limite 48 h ni de quota « nouvelle fiche » sur ce flux (identification par compte WordPress).
 - Si le profil a **déjà un code ami** enregistré, le titre et le bouton du formulaire affichent **« Update My Friend Code »** (traduisible) au lieu de **« Add My Friend Code »**.
+- L’IP du profil peut être mise à jour depuis le front si l’IP détectée diffère de la dernière valeur stockée.
+
+## Drapeaux pays (selects + tuiles)
+
+- Les options pays injectent un attribut `data-icon="..."` quand une URL de drapeau est disponible.
+- Le rendu Select2 affiche automatiquement le drapeau à gauche du texte (formulaire profil, formulaire codes amis, filtres et admin).
+- Les tuiles de codes amis affichent aussi le drapeau à gauche de la valeur **Country**.
+- Les drapeaux sont chargés à distance (flagcdn) : aucune image à enregistrer en médiathèque.
+
+### Helpers concernés
+
+- `poke_hub_resolve_country_flag_iso2()` : résolution ISO2 depuis clé/libellé pays (inclut les pays custom).
+- `poke_hub_get_country_flag_icon_url()` : génération de l’URL de drapeau (filtrable).
+- `poke_hub_get_country_option_flag_data_attr()` : attribut `data-icon` prêt à injecter dans `<option>`.
+- `poke_hub_get_country_flag_icon_url_for_display()` : URL drapeau à partir de la valeur pays affichée en liste.
+
+### Personnalisation
+
+- Filtre `poke_hub_country_flag_iso2` pour forcer/ajuster la résolution ISO2.
+- Filtre `poke_hub_country_flag_icon_url` pour changer la source d’images (CDN tiers, assets locaux, etc.).
+
+### Alignement visuel (tuiles)
+
+- Les classes CSS `user-profiles-friend-code-meta-item--inline-icon`, `user-profiles-friend-code-meta-value`, `user-profiles-friend-code-meta-raster` et `user-profiles-friend-code-meta-text` assurent l’alignement vertical label/icone/texte.
+- Le layout est calé sur une hauteur d’icône de 20px pour éviter le décalage typographique entre label (`strong`) et valeur.
 
 ## Fichiers principaux
 
@@ -49,3 +80,7 @@ Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_
 ## Migration
 
 - Les sites existants reçoivent la colonne via la migration du module (ex. passage en admin ou hooks d’activation). Les nouvelles installations l’ont dès la création de la table.
+
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

@@ -19,9 +19,6 @@ Toute la documentation se trouve dans `docs/events/` :
 - `functions/` - Fonctions helper et queries
 - `public/` - Routing front-end et shortcodes
 
+---
 
-
-
-
-
-
+*Index de la documentation : [README du dossier docs](../../docs/README.md) · [Charte rédactionnelle](../../docs/REDACTION.md)*

@@ -214,11 +214,11 @@ ob_start();
                      style="--pokemon-type-color: <?php echo esc_attr($pokemon['type_color']); ?>" 
                      <?php endif; ?>>
                     <?php if (!empty($pokemon['should_show_shiny'])) : ?>
-                        <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                        <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                     <?php endif; ?>
                     
                     <?php if (!empty($pokemon['should_show_regional_icon'])) : ?>
-                        <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Pokémon régional', 'poke-hub'); ?>">🌍</span>
+                        <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                     <?php endif; ?>
                     
                     <div class="pokehub-wild-pokemon-card-inner">
@@ -255,11 +255,11 @@ ob_start();
                          style="--pokemon-type-color: <?php echo esc_attr($pokemon['type_color']); ?>"
                          <?php endif; ?>>
                         <?php if (!empty($pokemon['should_show_shiny'])) : ?>
-                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                         <?php endif; ?>
                         
                         <?php if (!empty($pokemon['should_show_regional_icon'])) : ?>
-                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Pokémon régional', 'poke-hub'); ?>">🌍</span>
+                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                         <?php endif; ?>
                         
                         <div class="pokehub-wild-pokemon-card-inner">

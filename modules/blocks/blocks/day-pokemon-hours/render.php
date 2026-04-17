@@ -215,10 +215,10 @@ if (!function_exists('pokehub_day_pokemon_hours_render_spotlight_tile')) {
         <div class="pokehub-day-pokemon-hours-spotlight-tile">
             <div class="pokehub-wild-pokemon-card pokehub-day-pokemon-hours-spotlight-card"<?php echo $type_color !== '' ? ' style="--pokemon-type-color: ' . esc_attr($type_color) . '"' : ''; ?>>
                 <?php if (!empty($disp['should_show_shiny'])) : ?>
-                    <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($disp['is_shiny_forced']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                    <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($disp['is_shiny_forced']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                 <?php endif; ?>
                 <?php if (!empty($disp['should_show_regional_icon'])) : ?>
-                    <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Pokémon régional', 'poke-hub'); ?>">🌍</span>
+                    <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                 <?php endif; ?>
                 <div class="pokehub-wild-pokemon-card-inner">
                     <?php if ($image_url !== '') : ?>

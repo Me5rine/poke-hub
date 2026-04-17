@@ -90,7 +90,7 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
     ?>
     <div class="wrap">
         <h1><?php echo esc_html($page_title); ?></h1>
-        <p class="description"><?php esc_html_e('Type d’événement fixé sur le slug Pass GO distant. Renseignez les rangs : une ligne par rang (ou palier bonus).', 'poke-hub'); ?></p>
+        <p class="description"><?php esc_html_e('Event type is fixed to the remote GO Pass slug. Fill in ranks: one row per rank (or bonus milestone).', 'poke-hub'); ?></p>
 
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="pokehub-go-pass-form">
             <?php wp_nonce_field('pokehub_save_go_pass_event', 'pokehub_go_pass_event_nonce'); ?>
@@ -254,8 +254,8 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                 </tr>
             </table>
 
-            <h3><?php esc_html_e('Points du quotidien (actions standards)', 'poke-hub'); ?></h3>
-            <p class="description"><?php esc_html_e('Ces trois actions sont toujours affichées en premier sur le Pass ; indiquez les points pour chacune.', 'poke-hub'); ?></p>
+            <h3><?php esc_html_e('Daily points (standard actions)', 'poke-hub'); ?></h3>
+            <p class="description"><?php esc_html_e('These three actions are always displayed first on the Pass; set points for each one.', 'poke-hub'); ?></p>
             <table class="widefat striped">
                 <thead>
                     <tr>
@@ -265,31 +265,31 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                 </thead>
                 <tbody>
                     <tr>
-                        <td><?php esc_html_e('Gagner un raid', 'poke-hub'); ?></td>
+                        <td><?php esc_html_e('Win a raid', 'poke-hub'); ?></td>
                         <td><input type="number" name="gp_daily_core[raid]" min="0" value="<?php echo esc_attr((string) (int) ($daily_core['raid'] ?? 0)); ?>"></td>
                     </tr>
                     <tr>
-                        <td><?php esc_html_e('Faire éclore un œuf', 'poke-hub'); ?></td>
+                        <td><?php esc_html_e('Hatch an egg', 'poke-hub'); ?></td>
                         <td><input type="number" name="gp_daily_core[egg]" min="0" value="<?php echo esc_attr((string) (int) ($daily_core['egg'] ?? 0)); ?>"></td>
                     </tr>
                     <tr>
-                        <td><?php esc_html_e('Attraper un Pokémon', 'poke-hub'); ?></td>
+                        <td><?php esc_html_e('Catch a Pokémon', 'poke-hub'); ?></td>
                         <td><input type="number" name="gp_daily_core[catch]" min="0" value="<?php echo esc_attr((string) (int) ($daily_core['catch'] ?? 0)); ?>"></td>
                     </tr>
                 </tbody>
             </table>
             <p>
-                <label for="gp_daily_points_cap"><strong><?php esc_html_e('Plafond maximum de points par jour', 'poke-hub'); ?></strong></label><br>
+                <label for="gp_daily_points_cap"><strong><?php esc_html_e('Maximum points cap per day', 'poke-hub'); ?></strong></label><br>
                 <input type="number" id="gp_daily_points_cap" class="small-text" name="gp_daily_points_cap" min="0" value="<?php echo esc_attr((string) $daily_pts_cap); ?>">
-                <span class="description"><?php esc_html_e('0 = pas de limite. Sinon, nombre maximal de points gagnables au total sur une journée (toutes sources confondues, selon votre règle événement).', 'poke-hub'); ?></span>
+                <span class="description"><?php esc_html_e('0 = no limit. Otherwise, maximum total points that can be earned in a single day (all sources combined, based on your event rules).', 'poke-hub'); ?></span>
             </p>
 
-            <h3><?php esc_html_e('Autres tâches quotidiennes', 'poke-hub'); ?></h3>
-            <p class="description"><?php esc_html_e('Une ligne par tâche supplémentaire ; au moins une ligne (libellé et/ou points).', 'poke-hub'); ?></p>
+            <h3><?php esc_html_e('Additional daily tasks', 'poke-hub'); ?></h3>
+            <p class="description"><?php esc_html_e('One row per additional task; at least one row (label and/or points).', 'poke-hub'); ?></p>
             <table class="widefat striped" id="pokehub-gp-daily-table">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e('Tâche', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Task', 'poke-hub'); ?></th>
                         <th style="width:120px;"><?php esc_html_e('Points', 'poke-hub'); ?></th>
                         <th style="width:50px;"></th>
                     </tr>
@@ -304,14 +304,14 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <p><button type="button" class="button" id="pokehub-gp-add-daily"><?php esc_html_e('Ajouter une tâche quotidienne', 'poke-hub'); ?></button></p>
+            <p><button type="button" class="button" id="pokehub-gp-add-daily"><?php esc_html_e('Add a daily task', 'poke-hub'); ?></button></p>
 
-            <h3><?php esc_html_e('Tâches hebdomadaires', 'poke-hub'); ?></h3>
-            <p class="description"><?php esc_html_e('Une ligne par tâche ; au moins une ligne.', 'poke-hub'); ?></p>
+            <h3><?php esc_html_e('Weekly tasks', 'poke-hub'); ?></h3>
+            <p class="description"><?php esc_html_e('One row per task; at least one row.', 'poke-hub'); ?></p>
             <table class="widefat striped" id="pokehub-gp-weekly-table">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e('Tâche', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Task', 'poke-hub'); ?></th>
                         <th style="width:120px;"><?php esc_html_e('Points', 'poke-hub'); ?></th>
                         <th style="width:50px;"></th>
                     </tr>
@@ -326,18 +326,18 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <p><button type="button" class="button" id="pokehub-gp-add-weekly"><?php esc_html_e('Ajouter une tâche hebdomadaire', 'poke-hub'); ?></button></p>
+            <p><button type="button" class="button" id="pokehub-gp-add-weekly"><?php esc_html_e('Add a weekly task', 'poke-hub'); ?></button></p>
 
-            <h3><?php esc_html_e('Rangs et récompenses', 'poke-hub'); ?></h3>
-            <p class="description"><?php esc_html_e('Types : XP, poussière d’étoile, objets, Pokémon (un exemplaire ; options Shiny / Obscur / Dynamax / Gigamax), bonbons, bonbons XL, méga-énergie, accès bonus (catalogue ; texte optionnel sur le Pass).', 'poke-hub'); ?></p>
-            <p class="description"><?php esc_html_e('Le type de récompense « Accès bonus » (gratuit ou Deluxe) définit automatiquement un palier bonus à ce rang : un seul rang, sans « rang fin ». Les autres types sont des récompenses de rang (plage « rang fin » optionnelle). Réordonnez les lignes avec la poignée ; l’ordre enregistré suit l’ordre des lignes.', 'poke-hub'); ?></p>
+            <h3><?php esc_html_e('Ranks and rewards', 'poke-hub'); ?></h3>
+            <p class="description"><?php esc_html_e('Types: XP, stardust, items, Pokémon (single instance; options Shiny / Shadow / Dynamax / Gigantamax), candies, XL candies, mega energy, bonus access (catalog; optional text on the Pass).', 'poke-hub'); ?></p>
+            <p class="description"><?php esc_html_e('The "Bonus access" reward type (free or Deluxe) automatically creates a bonus milestone at that rank: a single rank, with no "end rank". Other types are rank rewards (optional "end rank" range). Reorder rows with the handle; saved order follows row order.', 'poke-hub'); ?></p>
             <table class="widefat striped" id="pokehub-gp-tier-table">
                 <thead>
                     <tr>
                         <th class="pokehub-gp-tier-drag-col" style="width:36px;" aria-hidden="true"></th>
-                        <th style="width:88px;"><?php esc_html_e('Rang début', 'poke-hub'); ?></th>
-                        <th style="width:88px;"><?php esc_html_e('Rang fin', 'poke-hub'); ?></th>
-                        <th><?php esc_html_e('Gratuit', 'poke-hub'); ?></th>
+                        <th style="width:88px;"><?php esc_html_e('Start rank', 'poke-hub'); ?></th>
+                        <th style="width:88px;"><?php esc_html_e('End rank', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Free', 'poke-hub'); ?></th>
                         <th><?php esc_html_e('Deluxe', 'poke-hub'); ?></th>
                         <th style="width:50px;"></th>
                     </tr>
@@ -366,7 +366,7 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
                                        min="1"
                                        value="<?php echo $rk === 'reward' && $r_to > 0 ? esc_attr((string) $r_to) : ''; ?>"
                                        placeholder="—"
-                                       aria-label="<?php esc_attr_e('Rang de fin (optionnel)', 'poke-hub'); ?>"
+                                       aria-label="<?php esc_attr_e('End rank (optional)', 'poke-hub'); ?>"
                                     <?php echo $rk === 'milestone' ? ' disabled style="display:none;"' : ''; ?>
                                 >
                             </td>

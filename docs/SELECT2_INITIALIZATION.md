@@ -571,3 +571,6 @@ Lorsque vous ajoutez Select2 à un nouveau module :
 - [Exemples dans le projet](./SELECT2_EXAMPLES.md) (si créé)
 - [Styles CSS Select2](./ADMIN_CSS.md#select2)
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

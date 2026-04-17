@@ -1273,3 +1273,6 @@ Tous les éléments admin utilisent maintenant ces classes génériques. Pour mo
 - Les variables CSS sont centralisées dans `global-colors.css`
 - Le système d'options d'écran est **générique et réutilisable** pour tous les tableaux
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

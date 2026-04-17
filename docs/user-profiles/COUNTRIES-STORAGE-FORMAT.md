@@ -231,3 +231,6 @@ if (!empty($missing)) {
 
 **⚠️ IMPORTANT** : Toujours utiliser les **labels** (noms complets), jamais les **codes** (FR, DE, US, etc.)
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

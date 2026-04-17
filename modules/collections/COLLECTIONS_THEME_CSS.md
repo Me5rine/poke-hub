@@ -1,5 +1,7 @@
 # Collections – CSS et thème
 
+Référence technique complémentaire à **[docs/README.md](../../docs/README.md)** et à la **[charte doc](../../docs/REDACTION.md)**.
+
 **Emplacement du CSS** : le CSS front des collections est dans le **CSS global du plugin** : `assets/css/poke-hub-collections-front.css` (aucun fichier CSS dans le module). Un **fichier à inclure dans le thème** est fourni : `assets/theme/poke-hub-collections-theme.css` (voir ci‑dessous).
 
 Le module Collections **réutilise au maximum les classes et variables du système CSS commun** du plugin. Voir en priorité :
@@ -91,10 +93,32 @@ En vue collection (mode tuiles), les couleurs reprennent **celles des notices** 
 | Statut | Couleur | Variable (global-colors) |
 |--------|---------|---------------------------|
 | **Possédé** | Vert : **contour et bulle** = `--admin-lab-color-var-green` (#42af13), fond = notice success | `--admin-lab-color-var-green` (contour + pastille), `--admin-lab-color-notice-sucess-background` (fond tuile) |
-| **Disponible à l'échange** | Orange (notice warning) | `--admin-lab-color-notice-warning` |
+| **À l'échange** | Orange (notice warning) | `--admin-lab-color-notice-warning` |
 | **Manquant** | Gris (comme actuellement) | `--me5rine-lab-border` |
 
 Aucune couleur dédiée : tout repose sur les variables notice. Pour harmoniser, surchargez-les dans le thème (comme pour les notices admin). Classes layout : `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing`. Tuiles : `data-status="owned"|"for_trade"|"missing"` et `.pokehub-collection-tile-status`.
+
+## Filtre d’affichage par statut (vue collection)
+
+En vue collection (**compte connecté** ou **collection locale**), un bloc **Afficher dans la grille** permet de masquer ou réafficher des tuiles selon le statut, **sans modifier** les données (REST / base / `localStorage`). Chaîne source de l’interface (anglais, domaine `poke-hub`) : *Show in grid*.
+
+Trois cases correspondent aux statuts techniques suivants (voir aussi **docs/COLLECTIONS_MODULE.md**, section *Statuts d’une entrée*) :
+
+- **Possédé** — `owned`
+- **À l'échange** — `for_trade` (chaîne source *For trade*)
+- **Manquant** — `missing`
+
+Classes dédiées :
+
+- `.pokehub-collection-status-filters` — conteneur du filtre.
+- `.pokehub-collection-status-filters-inner` — ligne titre + cases.
+- `.pokehub-collection-status-filters-heading` — libellé du bloc (titre du groupe).
+- `.pokehub-collection-status-filters-checkboxes` — groupe des cases.
+- `.pokehub-collection-status-filter-label` — libellé d’une case.
+- `.pokehub-collection-filter-status` — case à cocher pilotée par JS (`data-filter-status`).
+- `.pokehub-collection-filter-empty-hint` — message si aucun statut n’est coché.
+
+Le script applique l’attribut HTML `hidden` aux tuiles dont le statut est décoché. Si la collection est regroupée par génération (`.pokehub-collection-generation-block`), les sections sans aucune tuile visible sont masquées.
 
 ## Paramètres adaptatifs (création / édition)
 
@@ -102,8 +126,12 @@ Pour les **catégories spécifiques** (Gigantamax, Dynamax, Costume, etc.), le b
 
 - `.pokehub-collections-options-additive` — bloc des options « en plus » (masqué si type spécifique).
 - `.pokehub-collections-options-specific-hint` — message « Cette collection n’affiche que ce type ».
-- `.pokehub-collections-options-additive.is-hidden`, `.pokehub-collections-options-specific-hint.is-hidden` — affichage conditionnel (avec `.is-hidden { display: none }`).
+- `.pokehub-collections-options-additive.is-hidden`, `.pokehub-collections-options-specific-hint.is-hidden`, `.pokehub-collection-filter-empty-hint.is-hidden` — affichage conditionnel (avec `.is-hidden { display: none }`).
 
 ## Style inline (cartes uniquement)
 
 Quand une image de fond est fournie (personnalisée ou via le filtre), elle est appliquée en **inline** sur `.pokehub-collections-card-bg` (background-image, background-size: cover, background-position: center). Sans image, le dégradé des variables CSS est utilisé. La bannière « collections anonymes » est masquée via la classe `.is-hidden`.
+
+---
+
+*Index de la documentation : [README du dossier docs](../../docs/README.md) · [Charte rédactionnelle](../../docs/REDACTION.md)*

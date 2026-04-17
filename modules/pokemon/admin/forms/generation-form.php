@@ -119,7 +119,7 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                         <div class="admin-lab-form-group">
                             <label for="gen_name_fr"><?php esc_html_e('Name (French)', 'poke-hub'); ?> *</label>
                             <input type="text" id="gen_name_fr" name="name_fr" value="<?php echo esc_attr($current_name_fr); ?>" />
-                            <p class="description"><?php esc_html_e('Example: Génération 1, Première génération…', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Example: Generation 1, First generation…', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col-50">

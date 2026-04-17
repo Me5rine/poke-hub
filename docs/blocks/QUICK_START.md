@@ -147,4 +147,6 @@ npm run build
 - [BLOCK_TYPES.md](./BLOCK_TYPES.md) - Comparaison des approches
 - [Tutoriel WordPress](https://developer.wordpress.org/block-editor/getting-started/create-block/) - Tutoriel officiel
 
+---
 
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

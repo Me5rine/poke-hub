@@ -77,4 +77,6 @@ Si vous commencez avec un bloc PHP et que vous avez besoin de plus de fonctionna
 - [Block Development Environment](https://developer.wordpress.org/block-editor/getting-started/devenv/)
 - [Block API Reference](https://developer.wordpress.org/block-editor/reference-guides/block-api/)
 
+---
 
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

@@ -9,7 +9,7 @@ Si l'onglet "Pokémon GO" ne s'affiche pas dans les profils Ultimate Member, voi
 Si `[poke_hub_user_profile]` ne retourne rien :
 
 1. **Activer le mode debug** : Ajoutez `debug="true"` au shortcode pour voir les informations de débogage
-2. **Vérifier que le module est activé** : Allez dans **Poké HUB > Settings** et vérifiez que le module `user-profiles` est bien activé
+2. **Vérifier que le module est activé** : allez dans **Réglages > Poké HUB > Settings** et vérifiez que le module `user-profiles` est bien activé.
 3. **Vérifier que les fonctions existent** : Le debug doit montrer que `poke_hub_get_user_profile`, `poke_hub_get_teams`, et `poke_hub_get_reasons` existent
 4. **Éviter la classe `um-profile-note`** : Cette classe a `display: none` en CSS, assurez-vous que le shortcode n'est pas dans un élément avec cette classe
 
@@ -34,7 +34,7 @@ L'onglet devrait maintenant apparaître et utiliser automatiquement notre code p
 
 Si vous n'avez pas l'extension Profile Tabs, vous pouvez créer l'onglet manuellement via les hooks WordPress :
 
-1. Vérifiez que le module `user-profiles` est activé dans **Poké HUB > Settings**
+1. Vérifiez que le module `user-profiles` est activé dans **Réglages > Poké HUB > Settings**
 2. Vérifiez que Ultimate Member est installé et actif
 3. Videz le cache WordPress si vous utilisez un plugin de cache
 4. Testez sur une page de profil utilisateur : `/user/{username}/?profiletab=pokehub-profile`
@@ -66,3 +66,6 @@ Cela affichera dans le code source HTML quels onglets sont enregistrés.
 
 Si l'onglet n'apparaît toujours pas après ces étapes, il peut y avoir un conflit avec votre thème ou un autre plugin.
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

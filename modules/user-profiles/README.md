@@ -30,3 +30,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - `includes/` - Données centralisées (équipes, raisons)
 - `public/` - Shortcode et intégration Ultimate Member
 - `templates/` - Templates Ultimate Member
+
+---
+
+*Index de la documentation : [README du dossier docs](../../docs/README.md) · [Charte rédactionnelle](../../docs/REDACTION.md)*

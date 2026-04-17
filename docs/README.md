@@ -1,6 +1,10 @@
 # Documentation Poké HUB
 
-Ce dossier contient toute la documentation du plugin Poké HUB.
+Ce dossier regroupe la **documentation technique** du plugin (architecture, modules, CSS, données, dépannage). Le **[README à la racine](../README.md)** reste le guide large (installation, configuration générale, historique).
+
+**Contribuer à la doc** : respecter la **[charte rédactionnelle](./REDACTION.md)** (langue, liens, nommage **Poké HUB** / `poke-hub` / `poke_hub_`). **Traductions** : [TRANSLATION.md](./TRANSLATION.md).
+
+Sauf **README.md** (cet index) et **REDACTION.md**, les pages Markdown sous `docs/` et dans `modules/**` se terminent par un **pied de page** renvoyant vers cet index et la charte (généré ou mis à jour via `scripts/harmonize-doc-footers.py`).
 
 ## 📌 Changements récents (architecture)
 
@@ -20,8 +24,9 @@ Ce dossier contient toute la documentation du plugin Poké HUB.
 - **Form variants (formes)** : la **catégorie** d’une forme est choisie via un **menu déroulant** en admin (Normal, Costume / Event, Clone, Regional, Mega, Alola, Galar, Hisui, Paldea, Shadow, Purified). Si la forme a la catégorie « Costume / Event », les Pokémon avec cette forme sont considérés costumés/événement automatiquement. Voir [COLLECTIONS_AND_FORMS_CATEGORIES.md](./COLLECTIONS_AND_FORMS_CATEGORIES.md).
 - **Form mapping supprimé** : la table et l’admin des form mappings ont été retirés ; la **catégorie de la form variant** est la source de vérité (plus de mapping Game Master → forme).
 - **Association Pokémon ↔ événements** : lorsqu’un Pokémon est marqué **événement ou costumé** (case à cocher sur la fiche ou forme avec catégorie « Costume / Event »), une section **« Event Association »** apparaît en édition : on peut associer un ou plusieurs événements (même sélecteur que pour les fonds et les formes). Les liaisons sont stockées dans la table **`pokemon_pokemon_events`** ; helper : `poke_hub_get_pokemon_events($pokemon_id)`. Voir [COLLECTIONS_AND_FORMS_CATEGORIES.md](./COLLECTIONS_AND_FORMS_CATEGORIES.md).
-- **User Profiles Source** : l'option **Réglages > Poké HUB > Sources > User Profiles Source** (URL de base des liens profils) n'est affichée et utilisable **que si le module User Profiles est actif**. Elle sert aux codes amis et aux liens vers les profils (sites partageant une base de données). Voir [user-profiles/README_USER_PROFILES.md](./user-profiles/README_USER_PROFILES.md#réglages).
+- **User Profiles Source** : l’option **Réglages > Poké HUB > Sources > User Profiles Source** (URL de base des liens profils) n’est affichée et utilisable **que si le module User Profiles est actif**. Elle sert aux codes amis et aux liens vers les profils (sites partageant une base de données). Voir [user-profiles/README_USER_PROFILES.md](./user-profiles/README_USER_PROFILES.md#réglages).
 - **Import dates de sortie Pokekalos** : menu **Poké HUB > Outils temporaires** (temporaire) pour importer les dates de sortie (normal, shiny, shadow, etc.) depuis les fiches Pokédex Pokémon GO de pokekalos.fr. Deux passes : formes de base (`{slug}-{dex}.html`) puis formes Méga (`{slug}-{dex}m.html`). Dates stockées en **YYYY-MM-DD** ; option « ignorer les existants », limite espèces, dry-run. Script CLI : `scripts/import-pokekalos-release-dates.php`. Voir [pokemon/POKEKALOS_RELEASE_DATES.md](./pokemon/POKEKALOS_RELEASE_DATES.md).
+- **Sécurité des données Pokémon** : import Game Master — fusion **profonde** de `extra`, préservation des noms i18n déjà remplis, **UPDATE SQL** limité aux colonnes modifiées, correction import Méga (formats `$wpdb` + repli slug). Traductions / outils admin : règles détaillées dans [pokemon/DATA_SAFETY.md](./pokemon/DATA_SAFETY.md).
 - **Biomes (Pokémon GO)** : onglet admin **Pokémon → Biomes** (CRUD, images de fond multiples, espèces) ; liaison N–N via `pokemon_biome_pokemon_links` ; sur la fiche Pokémon, champ biomes dans la section **Regional availability** (sous-partie *Biomes*, puis *Regional*). Détail : [pokemon/BIOMES.md](./pokemon/BIOMES.md).
 - **Événements (sources & routing)** : une seule table **`special_events`** (préfixe Sources) pour les spéciaux SQL ; pas de `remote_special_events`. Liste unifiée avec **`local_event`**, **`remote_event`**, **`special_event`**. Doc : [events/EVENEMENTS-DISTANTS.md](./events/EVENEMENTS-DISTANTS.md).
 
@@ -31,20 +36,28 @@ Ce dossier contient toute la documentation du plugin Poké HUB.
 
 La documentation générale se trouve à la racine du dossier `docs/` :
 
+- **[REDACTION.md](./REDACTION.md)** — Charte rédactionnelle (langue, liens, structure, nommage)
 - **[TRANSLATION.md](./TRANSLATION.md)** - Traductions (i18n) : text domain `poke-hub`, langue de base anglaise, fichiers .po/.mo
 - **[ORGANISATION.md](./ORGANISATION.md)** - Organisation générale du plugin
 - **[BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md)** - Bonus : source de vérité (site principal), bloc et metabox (module Blocks uniquement), schéma catalogue, SVG / raster, thème CSS (`--pokehub-bonus-icon-*`)
 - **[INLINE_SVG.md](./INLINE_SVG.md)** - SVG inline depuis le bucket (helpers globaux, types Pokémon, bonus, filtres)
-- **[THEME_INTEGRATION.md](./THEME_INTEGRATION.md)** - Guide d'intégration dans le thème WordPress
-- **[PLUGIN_INTEGRATION.md](./PLUGIN_INTEGRATION.md)** - Guide d'intégration pour utiliser les classes CSS dans d'autres plugins
+- **[THEME_INTEGRATION.md](./THEME_INTEGRATION.md)** - Guide d’intégration dans le thème WordPress
+- **[PLUGIN_INTEGRATION.md](./PLUGIN_INTEGRATION.md)** - Guide d’intégration pour utiliser les classes CSS dans d’autres plugins
+- **[POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md)** - Classes `pokehub-*` (blocs, collections, etc.) et lien avec le système *me5rine-lab*
 - **[CSS_SYSTEM.md](./CSS_SYSTEM.md)** - Documentation complète du système de classes CSS
 - **[CSS_RULES.md](./CSS_RULES.md)** - Règles CSS complètes pour les formulaires
 - **[FRONT_CSS.md](./FRONT_CSS.md)** - Règles CSS unifiées pour les éléments front-end
-- **[ADMIN_CSS.md](./ADMIN_CSS.md)** - Règles CSS unifiées pour l'administration
+- **[ADMIN_CSS.md](./ADMIN_CSS.md)** - Règles CSS unifiées pour l’administration
 - **[TABLE_CSS.md](./TABLE_CSS.md)** - Règles CSS pour les tableaux
 - **[PLUGIN_COPY_GUIDE.md](./PLUGIN_COPY_GUIDE.md)** - Guide : Fichiers à copier pour réutiliser la structure
 - **[SELECT2_INITIALIZATION.md](./SELECT2_INITIALIZATION.md)** - Documentation de l'initialisation Select2
 - **[POKEMON_IMAGES.md](./POKEMON_IMAGES.md)** - Gestion des images Pokémon
+- **[COLLECTIONS_MODULE.md](./COLLECTIONS_MODULE.md)** - Module Collections : shortcodes, pool, statuts (possédé / à l’échange / manquant), filtre **Afficher dans la grille** ; styles et classes détaillés dans **modules/collections/COLLECTIONS_THEME_CSS.md** (référencé aussi par **POKEHUB_CSS_CLASSES.md**)
+- **[COLLECTIONS_AND_FORMS_CATEGORIES.md](./COLLECTIONS_AND_FORMS_CATEGORIES.md)** - Catégories **formes** (variants) vs catégories **collections** (type de liste)
+- **[CONTENT_BLOCKS.md](./CONTENT_BLOCKS.md)** - Blocs de contenu : usage, attributs, exemples, CSS
+- **[CONTENT_BLOCKS_TROUBLESHOOTING.md](./CONTENT_BLOCKS_TROUBLESHOOTING.md)** - Dépannage des blocs de contenu
+- **[BLOCKS_TROUBLESHOOTING.md](./BLOCKS_TROUBLESHOOTING.md)** - Dépannage du module Blocks
+- **[BLOCKS_MODULE_MIGRATION.md](./BLOCKS_MODULE_MIGRATION.md)** - Notes de migration / historique du module Blocks
 
 ### Documentation par Module
 
@@ -65,6 +78,7 @@ La documentation spécifique à chaque module se trouve dans des sous-dossiers :
 
 - **[pokemon/](./pokemon/)** - Documentation du module Pokémon
   - [BIOMES.md](./pokemon/BIOMES.md) - Biomes (tables, admin, fiche Pokémon, helpers, filtres)
+  - [DATA_SAFETY.md](./pokemon/DATA_SAFETY.md) - Règles de sécurité des données (non écrasement)
   - [README-REGIONAL-AUTO-CONFIG.md](./pokemon/README-REGIONAL-AUTO-CONFIG.md) - Configuration automatique des Pokémon régionaux
   - [POKEKALOS_RELEASE_DATES.md](./pokemon/POKEKALOS_RELEASE_DATES.md) - Import des dates de sortie depuis Pokekalos (admin Outils temporaires + CLI)
 
@@ -100,14 +114,18 @@ Consultez la documentation dans le dossier correspondant au module (ex: `blocks/
 
 ## 🔗 Liens rapides
 
+- [Charte rédactionnelle](./REDACTION.md)
 - [Traductions (i18n)](./TRANSLATION.md)
 - [Organisation du plugin](./ORGANISATION.md)
 - [Bonus : source de vérité et bloc](./BONUS_SOURCE_AND_BLOCKS.md)
-- [Guide d'intégration dans le thème](./THEME_INTEGRATION.md)
+- [Guide d’intégration dans le thème](./THEME_INTEGRATION.md)
 - [Système CSS](./CSS_SYSTEM.md)
+- [Classes pokehub-*](./POKEHUB_CSS_CLASSES.md)
+- [Blocs de contenu](./CONTENT_BLOCKS.md)
 - [Module Blocks](./blocks/)
 - [Module Events](./events/)
 - [Module Quêtes](./quests/)
 - [Module User Profiles](./user-profiles/)
 - [Module Pokémon](./pokemon/)
+- [Module Collections](./COLLECTIONS_MODULE.md)
 

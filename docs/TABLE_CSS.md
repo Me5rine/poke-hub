@@ -799,3 +799,7 @@ Les classes CSS pour les options d'écran sont définies dans `ADMIN_CSS.md` (se
 ### Documentation Complète
 
 Pour la documentation complète du système d'options d'écran (CSS, JavaScript, PHP), voir `FRONT_CSS.md` (section "Options d'Écran - Système Générique Réutilisable").
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

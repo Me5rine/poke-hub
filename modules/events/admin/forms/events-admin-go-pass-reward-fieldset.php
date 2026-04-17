@@ -38,15 +38,15 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
     ?>
     <div class="pokehub-quest-reward-editor pokehub-go-pass-reward-editor" style="margin-top:8px;padding:8px;background:#fff;border:1px solid #ccd0d4;">
         <label>
-            <?php esc_html_e('Type de récompense', 'poke-hub'); ?> :
+            <?php esc_html_e('Reward type', 'poke-hub'); ?> :
             <select name="<?php echo esc_attr($name_base); ?>[type]" class="pokehub-reward-type">
                 <option value="xp" <?php selected($type, 'xp'); ?>><?php esc_html_e('XP', 'poke-hub'); ?></option>
-                <option value="stardust" <?php selected($type, 'stardust'); ?>><?php esc_html_e('Poussière d’étoile', 'poke-hub'); ?></option>
-                <option value="item" <?php selected($type, 'item'); ?>><?php esc_html_e('Objet', 'poke-hub'); ?></option>
+                <option value="stardust" <?php selected($type, 'stardust'); ?>><?php esc_html_e('Stardust', 'poke-hub'); ?></option>
+                <option value="item" <?php selected($type, 'item'); ?>><?php esc_html_e('Item', 'poke-hub'); ?></option>
                 <option value="pokemon" <?php selected($type, 'pokemon'); ?>><?php esc_html_e('Pokémon', 'poke-hub'); ?></option>
-                <option value="candy" <?php selected($type, 'candy'); ?>><?php esc_html_e('Bonbon', 'poke-hub'); ?></option>
-                <option value="xl_candy" <?php selected($type, 'xl_candy'); ?>><?php esc_html_e('Bonbon XL', 'poke-hub'); ?></option>
-                <option value="mega_energy" <?php selected($type, 'mega_energy'); ?>><?php esc_html_e('Méga-énergie', 'poke-hub'); ?></option>
+                <option value="candy" <?php selected($type, 'candy'); ?>><?php esc_html_e('Candy', 'poke-hub'); ?></option>
+                <option value="xl_candy" <?php selected($type, 'xl_candy'); ?>><?php esc_html_e('XL Candy', 'poke-hub'); ?></option>
+                <option value="mega_energy" <?php selected($type, 'mega_energy'); ?>><?php esc_html_e('Mega Energy', 'poke-hub'); ?></option>
                 <option value="bonus" <?php selected($type, 'bonus'); ?>><?php esc_html_e('Bonus', 'poke-hub'); ?></option>
             </select>
         </label>
@@ -54,7 +54,7 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
         <p style="margin:8px 0 0;">
             <label>
                 <input type="checkbox" name="<?php echo esc_attr($name_base); ?>[featured]" value="1" <?php checked(!empty($reward['featured'])); ?> />
-                <?php esc_html_e('Mettre en avant dans le résumé', 'poke-hub'); ?>
+                <?php esc_html_e('Highlight in summary', 'poke-hub'); ?>
             </label>
         </p>
 
@@ -80,19 +80,19 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
                 </select>
             </label>
             <label style="display:block;margin-top:8px;">
-                <?php esc_html_e('Texte complémentaire sur le Pass (optionnel)', 'poke-hub'); ?> :
+                <?php esc_html_e('Additional text on the Pass (optional)', 'poke-hub'); ?> :
                 <textarea name="<?php echo esc_attr($name_base); ?>[description]" class="large-text" rows="2" style="width:100%;" <?php echo $is_bonus ? '' : ' disabled'; ?>><?php echo esc_textarea($bonus_desc); ?></textarea>
             </label>
         </div>
 
         <div class="pokehub-reward-pokemon-fields" style="display:<?php echo $is_pokemon ? 'block' : 'none'; ?>;">
             <label class="pokehub-gender-field-group">
-                <?php esc_html_e('Pokémon', 'poke-hub'); ?> (<?php esc_html_e('un exemplaire', 'poke-hub'); ?>) :
+                <?php esc_html_e('Pokémon', 'poke-hub'); ?> (<?php esc_html_e('one copy', 'poke-hub'); ?>) :
                 <select
                     name="<?php echo esc_attr($name_base); ?>[pokemon_id]"
                     class="pokehub-select-pokemon pokehub-quest-pokemon-select pokehub-gender-driven-select"
                     style="width: 100%; min-width: 250px;"
-                    data-placeholder="<?php esc_attr_e('Rechercher un Pokémon…', 'poke-hub'); ?>"
+                    data-placeholder="<?php esc_attr_e('Search a Pokémon…', 'poke-hub'); ?>"
                     data-gender-name-template="<?php echo esc_attr($name_base); ?>[gender]"
                     data-gender-scope="available"
                     data-existing-genders="<?php echo esc_attr(wp_json_encode($selected_pokemon_id > 0 && $selected_gender !== '' ? [(string) $selected_pokemon_id => $selected_gender] : [])); ?>"
@@ -126,14 +126,14 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
                 <div class="pokehub-pokemon-gender-options" style="display:none;margin-top:8px;"></div>
             </label>
             <div class="pokehub-go-pass-pokemon-flags" style="margin-top:10px;">
-                <span class="description" style="display:block;margin-bottom:6px;"><?php esc_html_e('À activer seulement si vous voulez forcer l’affichage / la variante sur le Pass.', 'poke-hub'); ?></span>
+                <span class="description" style="display:block;margin-bottom:6px;"><?php esc_html_e('Enable only if you want to force display/variant on the Pass.', 'poke-hub'); ?></span>
                 <label style="display:inline-block;margin-right:12px;">
                     <input type="checkbox" name="<?php echo esc_attr($name_base); ?>[force_shiny]" value="1" <?php checked(!empty($reward['force_shiny'])); ?> <?php echo $is_pokemon ? '' : ' disabled'; ?> />
                     <?php esc_html_e('Shiny', 'poke-hub'); ?>
                 </label>
                 <label style="display:inline-block;margin-right:12px;">
                     <input type="checkbox" name="<?php echo esc_attr($name_base); ?>[force_shadow]" value="1" <?php checked(!empty($reward['force_shadow'])); ?> <?php echo $is_pokemon ? '' : ' disabled'; ?> />
-                    <?php esc_html_e('Obscur', 'poke-hub'); ?>
+                    <?php esc_html_e('Shadow', 'poke-hub'); ?>
                 </label>
                 <label style="display:inline-block;margin-right:12px;">
                     <input type="checkbox" name="<?php echo esc_attr($name_base); ?>[force_dynamax]" value="1" <?php checked(!empty($reward['force_dynamax'])); ?> <?php echo $is_pokemon ? '' : ' disabled'; ?> />
@@ -155,7 +155,7 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
                     style="width: 100%; min-width: 250px;"
                     <?php echo $is_pokemon_resource ? '' : ' disabled'; ?>
                 >
-                    <option value=""><?php esc_html_e('Choisir un Pokémon', 'poke-hub'); ?></option>
+                    <option value=""><?php esc_html_e('Select a Pokémon', 'poke-hub'); ?></option>
                     <?php
                     if ($selected_pokemon_id > 0 && function_exists('pokehub_get_pokemon_data_by_id')) {
                         $pokemon_data = pokehub_get_pokemon_data_by_id($selected_pokemon_id);
@@ -175,25 +175,25 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
                 </select>
             </label>
             <label class="pokehub-reward-quantity-field" style="display:<?php echo $is_pokemon_resource ? 'block' : 'none'; ?>;">
-                <?php esc_html_e('Quantité', 'poke-hub'); ?> :
+                <?php esc_html_e('Quantity', 'poke-hub'); ?> :
                 <input type="number" name="<?php echo esc_attr($name_base); ?>[quantity]" value="<?php echo esc_attr((string) $qty); ?>" min="1" <?php echo $is_pokemon_resource ? '' : ' disabled'; ?> />
             </label>
         </div>
 
         <div class="pokehub-reward-other-fields" style="display:<?php echo ($is_pokemon || $is_pokemon_resource || $is_bonus) ? 'none' : 'block'; ?>;">
             <label class="pokehub-reward-quantity-field" style="display:<?php echo ($is_stardust || $is_xp || $is_item) ? 'block' : 'none'; ?>;">
-                <?php esc_html_e('Quantité', 'poke-hub'); ?> :
+                <?php esc_html_e('Quantity', 'poke-hub'); ?> :
                 <input type="number" name="<?php echo esc_attr($name_base); ?>[quantity]" value="<?php echo esc_attr((string) $qty); ?>" min="1" <?php echo ($is_stardust || $is_xp || $is_item) ? '' : ' disabled'; ?> />
             </label>
             <label class="pokehub-reward-item-name-field" style="display:<?php echo $is_item ? 'block' : 'none'; ?>;">
-                <?php esc_html_e('Objet', 'poke-hub'); ?> :
+                <?php esc_html_e('Item', 'poke-hub'); ?> :
                 <select
                     name="<?php echo esc_attr($name_base); ?>[item_id]"
                     class="pokehub-select-item"
                     style="width: 100%; min-width: 250px;"
                     <?php echo $is_item ? '' : ' disabled'; ?>
                 >
-                    <option value=""><?php esc_html_e('Choisir un objet', 'poke-hub'); ?></option>
+                    <option value=""><?php esc_html_e('Select an item', 'poke-hub'); ?></option>
                     <?php
                     $selected_item_id = isset($reward['item_id']) ? (int) $reward['item_id'] : 0;
                     if ($selected_item_id > 0 && function_exists('pokehub_get_item_data_by_id')) {
@@ -216,7 +216,7 @@ function pokehub_go_pass_render_reward_editor(string $name_base, array $reward =
         </div>
 
         <p style="margin:8px 0 0;">
-            <button type="button" class="button-link pokehub-gp-remove-reward"><?php esc_html_e('Supprimer cette récompense', 'poke-hub'); ?></button>
+            <button type="button" class="button-link pokehub-gp-remove-reward"><?php esc_html_e('Remove this reward', 'poke-hub'); ?></button>
         </p>
     </div>
     <?php
@@ -263,7 +263,7 @@ function pokehub_go_pass_render_rewards_column(int $tier_index, array $row, stri
         </div>
         <p style="margin:8px 0 0;">
             <button type="button" class="button button-small pokehub-gp-add-reward" data-prefix="<?php echo esc_attr($prefix); ?>">
-                <?php esc_html_e('Ajouter une récompense', 'poke-hub'); ?>
+                <?php esc_html_e('Add reward', 'poke-hub'); ?>
             </button>
         </p>
     </div>

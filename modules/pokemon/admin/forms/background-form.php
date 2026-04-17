@@ -226,14 +226,14 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 <?php endif; ?>
             </div>
 
-            <!-- Section: Linked Pokémon (deux listes distinctes : shiny actif / shiny lock) -->
+            <!-- Section: Linked Pokémon (two distinct lists: shiny active / shiny lock) -->
             <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Linked Pokémon', 'poke-hub'); ?></h3>
                 <p class="description" style="margin-bottom:12px;"><?php esc_html_e('Two separate lists: Pokémon with shiny available for this background, and Pokémon that are shiny lock (background released before the shiny). A Pokémon can only appear in one of the two lists.', 'poke-hub'); ?></p>
                 <div class="admin-lab-form-row" style="display: flex; gap: 1em; flex-wrap: wrap;">
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0; min-width: 280px;">
                         <div class="admin-lab-form-group">
-                            <label for="pokemon_ids_shiny_active"><?php esc_html_e('Pokémon (shiny actif)', 'poke-hub'); ?></label>
+                            <label for="pokemon_ids_shiny_active"><?php esc_html_e('Pokémon (shiny active)', 'poke-hub'); ?></label>
                             <select name="pokemon_ids_shiny_active[]" id="pokemon_ids_shiny_active" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
                                 <?php if (!empty($all_pokemon)) : ?>
                                     <?php foreach ($all_pokemon as $pokemon) : ?>
@@ -258,7 +258,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                     </div>
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0; min-width: 280px;">
                         <div class="admin-lab-form-group">
-                            <label for="shiny_locked_ids"><?php esc_html_e('Pokémon (shiny lock)', 'poke-hub'); ?></label>
+                            <label for="shiny_locked_ids"><?php esc_html_e('Pokémon (shiny locked)', 'poke-hub'); ?></label>
                             <select name="shiny_locked_ids[]" id="shiny_locked_ids" class="pokehub-pokemon-select pokehub-shiny-lock-select" multiple="multiple" style="width:100%;">
                                 <?php if (!empty($all_pokemon)) : ?>
                                     <?php foreach ($all_pokemon as $pokemon) : ?>
@@ -314,13 +314,13 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         // Initialiser Select2 sur les deux champs Pokémon
         if ($.fn.select2) {
             $('#pokemon_ids_shiny_active').select2({
-                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny actif)...', 'poke-hub')); ?>',
+                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny active)...', 'poke-hub')); ?>',
                 allowClear: true,
                 width: '100%',
                 matcher: matcherFn
             });
             $('#shiny_locked_ids').select2({
-                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny lock)...', 'poke-hub')); ?>',
+                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny locked)...', 'poke-hub')); ?>',
                 allowClear: true,
                 width: '100%',
                 matcher: matcherFn

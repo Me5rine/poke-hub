@@ -250,3 +250,6 @@ If disabled, you will need to manually create pages with the shortcodes:
 
 The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Additional specific styles are in `user-profiles-friend-codes.css`. For **notices** (success, error, warning, info), see `../POKEHUB_CSS_CLASSES.md` (section « Notices ») — red / green / orange / blue convention and usage in User Profiles pages.
 
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

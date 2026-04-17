@@ -300,7 +300,7 @@ ob_start();
                     <?php foreach ($pokemon_list as $pokemon) : ?>
                         <div class="pokehub-wild-pokemon-card">
                             <?php if (!empty($pokemon['should_show_shiny'])) : ?>
-                                <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Shiny forcé', 'poke-hub') : esc_attr__('Shiny disponible', 'poke-hub'); ?>">✨</span>
+                                <span class="pokehub-wild-pokemon-shiny-icon" title="<?php echo !empty($pokemon['is_shiny_forced']) ? esc_attr__('Forced shiny', 'poke-hub') : esc_attr__('Shiny available', 'poke-hub'); ?>">✨</span>
                             <?php endif; ?>
                             <div class="pokehub-wild-pokemon-card-inner">
                                 <?php if (!empty($pokemon['image_url'])) : ?>

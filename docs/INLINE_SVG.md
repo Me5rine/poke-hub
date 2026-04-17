@@ -33,3 +33,7 @@ Défini dans `poke-hub.php`, fonction `poke_hub_load_pokemon_public_helpers()` :
 
 - **Bonus** (catalogue, slug unique, priorité SVG) : [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md)  
 - **Images raster Pokémon / bucket** : [POKEMON_IMAGES.md](./POKEMON_IMAGES.md)
+
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

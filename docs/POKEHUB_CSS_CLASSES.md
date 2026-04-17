@@ -1,12 +1,12 @@
-# Classes CSS PokeHub
+# Classes CSS Poké HUB (`pokehub-`)
 
-Ce document décrit toutes les classes CSS spécifiques ajoutées par le plugin PokeHub pour l'affichage frontend. Ces classes sont distinctes des classes génériques `me5rine-lab-form-*` et `admin-lab-*` utilisées dans les autres modules.
+Ce document décrit les classes CSS **spécifiques au plugin** (préfixe `pokehub-`) pour l’affichage front-end. Elles complètent les classes génériques `me5rine-lab-*` et `admin-lab-*`. Nommage produit / slug : voir **[REDACTION.md](./REDACTION.md)**.
 
-## Préfixe des Classes
+## Préfixe des classes
 
-**Préfixe PokeHub** : `pokehub-`
+**Préfixe des sélecteurs** : `pokehub-`
 
-Toutes les classes CSS spécifiques à PokeHub commencent par ce préfixe pour éviter les conflits avec d'autres plugins ou thèmes.
+Toutes les classes listées ici commencent par ce préfixe pour limiter les conflits avec d’autres extensions ou le thème.
 
 ## Structure des Classes par Module
 
@@ -238,7 +238,7 @@ Fichier : `modules/user-profiles/public/user-profiles-shortcode.php`.
 
 Fichiers : `modules/user-profiles/public/user-profiles-friend-codes-form.php`, `user-profiles-friend-codes-shortcode.php`, `user-profiles-vivillon-shortcode.php`.
 
-#### Template Ultimate Member (profil PokeHub)
+#### Template Ultimate Member (profil Poké HUB)
 
 - **Succès (vert)** : confirmation après sauvegarde du profil dans le contexte UM.  
   Classe : `me5rine-lab-form-message me5rine-lab-form-message-success`.
@@ -368,7 +368,8 @@ Pour garder une cohérence visuelle, utiliser **toujours** les classes `me5rine-
 - Les cartes sont des `li.me5rine-lab-card` ; pas de classe `.pokehub-collections-card`
 - `.pokehub-collections-card-link`, `.pokehub-collections-card-bg` — lien et fond (pas d’équivalent thème) ; `.pokehub-collections-card-btn`, `.pokehub-collections-card-btn-settings`, `.pokehub-collections-card-btn-delete` (boutons icône + JS)
 - `.pokehub-collection-view-wrap` (+ `me5rine-lab-dashboard`), `.pokehub-collection-tiles`, `.pokehub-collection-tile`, `.pokehub-collection-tile-status`, `.pokehub-status-{owned|missing|for_trade}`
-- `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing` — légende : **possédé** = vert (contour + bulle = `--admin-lab-color-var-green`, fond = notice success), **disponible à l'échange** = orange (notice warning), **manquant** = gris. Variables : `--admin-lab-color-notice-sucess-*`, `--admin-lab-color-var-green`, `--admin-lab-color-notice-warning`, `--me5rine-lab-border` (global-colors en dépendance)
+- `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing` — légende : **possédé** = vert (contour + bulle = `--admin-lab-color-var-green`, fond = notice success), **à l'échange** = orange (notice warning), **manquant** = gris. Variables : `--admin-lab-color-notice-sucess-*`, `--admin-lab-color-var-green`, `--admin-lab-color-notice-warning`, `--me5rine-lab-border` (global-colors en dépendance)
+- `.pokehub-collection-status-filters`, `.pokehub-collection-status-filters-inner`, `.pokehub-collection-status-filters-heading`, `.pokehub-collection-status-filters-checkboxes`, `.pokehub-collection-status-filter-label`, `.pokehub-collection-filter-status`, `.pokehub-collection-filter-empty-hint` — filtre **Afficher dans la grille** : affichage par statut (`owned` / `for_trade` / `missing` sur `data-status` et `data-filter-status`)
 - `.pokehub-collections-options-additive`, `.pokehub-collections-options-specific-hint` — bloc options « en plus » vs message pour catégories spécifiques (masquage avec `.is-hidden`)
 - `.pokehub-collection-multiselect-wrap`, `.pokehub-collection-multiselect-list-wrap`, `.pokehub-collection-multiselect-list`, `.pokehub-collection-multiselect-item`
 - `.pokehub-collection-generation-block` — bloc details/summary par génération (summary = `me5rine-lab-title-medium`)
@@ -385,3 +386,6 @@ Les styles sont définis dans :
 - `assets/css/poke-hub-special-events-single.css` - Styles pour les pages single d'événements
 - `assets/css/poke-hub-collections-front.css` - Styles du module Collections (front). `assets/theme/poke-hub-collections-theme.css` - Fichier à inclure dans le thème pour surcharges (dégradés, etc.)
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

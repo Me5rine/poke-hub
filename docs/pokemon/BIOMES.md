@@ -74,3 +74,7 @@ Comme pour les fonds (**Backgrounds**), l’onglet **Biomes** et la fiche Pokém
 ## Voir aussi
 
 - [README-REGIONAL-AUTO-CONFIG.md](./README-REGIONAL-AUTO-CONFIG.md) — import Game Master et Pokémon régionaux (indépendant des biomes, mais la fiche admin regroupe biomes et champs régionaux dans la même section).
+
+---
+
+*Index de la documentation : [README du dossier docs](../README.md) · [Charte rédactionnelle](../REDACTION.md)*

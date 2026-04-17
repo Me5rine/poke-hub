@@ -219,3 +219,6 @@ Les classes sont appliquées dans le HTML généré par les fonctions du plugin.
 </div>
 ```
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*

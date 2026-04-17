@@ -251,13 +251,13 @@ jQuery(function($) {
 
             ids = pokehubApplyInlineGenderTokensToIds(ids, existingGenderMap, inlineGenderMode);
 
-            var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
+            var placeholder = $select.attr('data-placeholder') || 'Search a Pokémon…';
             var opts = {
                 placeholder: placeholder,
                 multiple: isMultiple,
                 allowClear: !isMultiple,
                 width: '100%',
-                language: { noResults: function() { return 'Aucun Pokémon trouvé'; }, searching: function() { return 'Recherche…'; } }
+                language: { noResults: function() { return 'No Pokémon found'; }, searching: function() { return 'Searching…'; } }
             };
 
             if (useLocalList) {
@@ -803,8 +803,8 @@ jQuery(function($) {
                 allowClear: true,
                 matcher: typeof pokehubMultilingualMatcher !== 'undefined' ? pokehubMultilingualMatcher : undefined,
                 language: {
-                    noResults: function() { return 'Aucun résultat'; },
-                    searching: function() { return 'Recherche…'; }
+                    noResults: function() { return 'No results'; },
+                    searching: function() { return 'Searching…'; }
                 }
             });
         });
@@ -913,13 +913,13 @@ jQuery(function($) {
                 });
             }
 
-            var placeholder = $select.attr('data-placeholder') || 'Rechercher un Pokémon…';
+            var placeholder = $select.attr('data-placeholder') || 'Search a Pokémon…';
             var opts = {
                 placeholder: placeholder,
                 multiple: isMultiple,
                 allowClear: !isMultiple,
                 width: '100%',
-                language: { noResults: function() { return 'Aucun Pokémon trouvé'; }, searching: function() { return 'Recherche…'; } }
+                language: { noResults: function() { return 'No Pokémon found'; }, searching: function() { return 'Searching…'; } }
             };
             if (useAjax) {
                 opts.minimumInputLength = 1;
@@ -999,7 +999,7 @@ jQuery(function($) {
         if ($select.length && !$select.data('select2')) {
             $select.select2({
                 width: '100%',
-                placeholder: 'Sélectionner des pays...',
+                placeholder: 'Select countries...',
                 allowClear: true
             });
         }
@@ -1011,7 +1011,7 @@ jQuery(function($) {
         if ($select.length && !$select.data('select2')) {
             $select.select2({
                 width: '100%',
-                placeholder: 'Sélectionner des régions...',
+                placeholder: 'Select regions...',
                 allowClear: true
             });
         }

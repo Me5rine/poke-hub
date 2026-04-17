@@ -2471,3 +2471,6 @@ $hidden_class = $is_visible ? '' : 'column-hidden';
 <td class="column-date <?php echo esc_attr($hidden_class); ?>" data-column="date"><?php echo $date; ?></td>
 ```
 
+---
+
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*
