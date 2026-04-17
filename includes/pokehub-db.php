@@ -1549,6 +1549,127 @@ class Pokehub_DB {
     }
 
     /**
+     * Migration de portée :
+     * historiquement `go_pass_host_links` était en `scope=local`, donc les installations
+     * en mode remote pouvaient avoir les liaisons dans la mauvaise table.
+     *
+     * Objectif : recopier la table legacy locale (wp_prefix + 'pokehub_go_pass_host_links')
+     * vers la nouvelle table (préfixe content_source : spéciale / content_go_pass / special_events).
+     */
+    private function migrateGoPassHostLinksLegacyScopeToContentSource(string $new_table): void {
+        global $wpdb;
+
+        // Le correctif est conçu pour fonctionner "sans historique" (aucune migration de données).
+        // On laisse la fonction en place mais on la désactive volontairement.
+        return;
+
+        if ($new_table === '') {
+            return;
+        }
+
+        if (!function_exists('pokehub_table_exists')) {
+            return;
+        }
+
+        // Table legacy : scope local, donc toujours via le préfixe WP du site courant.
+        $legacy_table = isset($wpdb->prefix) ? trim((string) $wpdb->prefix) . 'pokehub_go_pass_host_links' : '';
+
+        // Si on est déjà dans le bon scope (ou si pas de table legacy), rien à faire.
+        if ($legacy_table === '' || $legacy_table === $new_table) {
+            return;
+        }
+
+        if (!pokehub_table_exists($legacy_table) || !pokehub_table_exists($new_table)) {
+            return;
+        }
+
+        // Ne recopier que si la nouvelle table est vide, pour éviter les doublons.
+        $new_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$new_table}`");
+        if ($new_count > 0) {
+            return;
+        }
+
+        $legacy_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$legacy_table}`");
+        if ($legacy_count <= 0) {
+            return;
+        }
+
+        $cols = [];
+        $col_rows = $wpdb->get_results("SHOW COLUMNS FROM `{$legacy_table}`", ARRAY_A);
+        if (is_array($col_rows)) {
+            foreach ($col_rows as $row) {
+                if (!empty($row['Field'])) {
+                    $cols[] = (string) $row['Field'];
+                }
+            }
+        }
+
+        if (empty($cols)) {
+            return;
+        }
+
+        $has_host_post_id   = in_array('host_post_id', $cols, true);
+        $has_host_kind      = in_array('host_kind', $cols, true);
+        $has_host_id        = in_array('host_id', $cols, true);
+        $has_host_post_type = in_array('host_post_type', $cols, true);
+        $has_pass_source_type = in_array('pass_source_type', $cols, true);
+        $has_pass_source_id   = in_array('pass_source_id', $cols, true);
+        $has_display_mode      = in_array('display_mode', $cols, true);
+        $has_created_at        = in_array('created_at', $cols, true);
+        $has_updated_at        = in_array('updated_at', $cols, true);
+
+        // Colonnes indispensables (sinon l'insert échouera).
+        if (
+            (!$has_host_post_type && !$has_host_kind)
+            || !$has_pass_source_type
+            || !$has_pass_source_id
+            || !$has_display_mode
+            || (!$has_host_id && !$has_host_post_id)
+        ) {
+            return;
+        }
+
+        $host_kind_expr = $has_host_kind ? 'host_kind' : "'local_post'";
+        $host_id_expr   = $has_host_id ? 'host_id' : ($has_host_post_id ? 'host_post_id' : '0');
+
+        // Construire l'insert en ne mentionnant que les colonnes réellement présentes.
+        $insert_cols = [
+            'host_kind',
+            'host_id',
+            'host_post_type',
+            'pass_source_type',
+            'pass_source_id',
+            'display_mode',
+        ];
+        $select_exprs = [
+            $host_kind_expr . ' AS host_kind',
+            $host_id_expr . ' AS host_id',
+            'host_post_type',
+            'pass_source_type',
+            'pass_source_id',
+            'display_mode',
+        ];
+
+        if ($has_created_at) {
+            $insert_cols[] = 'created_at';
+            $select_exprs[] = 'created_at';
+        }
+        if ($has_updated_at) {
+            $insert_cols[] = 'updated_at';
+            $select_exprs[] = 'updated_at';
+        }
+
+        // La table cible a la contrainte unique `host_entity`. Comme on copie seulement si new_table vide,
+        // on évite les conflits.
+        $insert_sql = "INSERT INTO `{$new_table}` (" .
+            implode(', ', array_map(static function ($c) { return "`{$c}`"; }, $insert_cols)) .
+            ") SELECT " . implode(', ', $select_exprs) .
+            " FROM `{$legacy_table}`";
+
+        $wpdb->query($insert_sql);
+    }
+
+    /**
      * Migre go_pass_host_links : ancienne colonne host_post_id → host_kind=local_post + host_id.
      */
     private function migrateGoPassHostLinksTableFromLegacyPostId(string $table) {

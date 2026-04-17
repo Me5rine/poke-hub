@@ -85,6 +85,9 @@ function poke_hub_user_profiles_admin_ui() {
             
             // Only save if no validation errors
             if (empty($admin_error_message)) {
+                $anonymous_ip_action = isset($_POST['anonymous_ip_action']) ? sanitize_text_field((string) $_POST['anonymous_ip_action']) : 'keep';
+                $anonymous_ip_override_raw = isset($_POST['anonymous_ip_override']) ? trim(sanitize_text_field((string) $_POST['anonymous_ip_override'])) : '';
+
                 $profile = [
                     'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
                     'friend_code'         => $friend_code,
@@ -94,7 +97,22 @@ function poke_hub_user_profiles_admin_ui() {
                     'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
                     'scatterbug_pattern'  => isset($_POST['scatterbug_pattern']) ? sanitize_text_field($_POST['scatterbug_pattern']) : '',
                     'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
+                    // Lors d'une édition depuis l'admin, on ne doit pas écraser la dernière IP du client.
+                    'preserve_anonymous_ip' => true,
                 ];
+
+                // Admin override de la dernière IP (optionnel).
+                // - keep: ne rien faire
+                // - clear: effacer
+                // - set: remplacer
+                if ($anonymous_ip_action === 'clear') {
+                    $profile['anonymous_ip'] = '';
+                } elseif ($anonymous_ip_action === 'set') {
+                    // Si le champ est vide, ne pas appliquer (on conserve l'IP existante).
+                    if ($anonymous_ip_override_raw !== '') {
+                        $profile['anonymous_ip'] = $anonymous_ip_override_raw;
+                    }
+                }
                 
                 // If profile_id is provided, include it in profile array for update by ID
                 if ($profile_id_to_save > 0) {

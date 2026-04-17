@@ -80,17 +80,24 @@
     /* Styles pour chaque élément de métadonnée */
 }
 
-/* Ligne label + (icône + texte) : centrage vertical (évite l’alignement baseline qui descend le texte) */
+/*
+ * Ligne label + (icône + texte) : même hauteur de ligne que les icônes (20px).
+ * align-items:center sur le parent laissait un bloc 17px (strong) face à 20px (valeur) ;
+ * stretch + flex sur chaque colonne aligne le texte du label et celui de la valeur.
+ */
 .user-profiles-friend-code-meta-item--inline-icon {
     display: inline-flex;
-    align-items: center;
+    align-items: stretch;
     flex-wrap: wrap;
     gap: 6px;
 }
 
 .user-profiles-friend-code-meta-item--inline-icon > strong {
+    display: flex;
+    align-items: center;
     flex-shrink: 0;
-    line-height: 1.25;
+    min-height: 20px;
+    line-height: 1.2;
 }
 
 /* Icônes bucket (motif Vivillon, équipe, drapeau pays) à gauche du libellé sur la vignette */

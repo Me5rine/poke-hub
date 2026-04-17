@@ -57,6 +57,16 @@ function poke_hub_render_user_profile_form($user_id) {
             echo $recorded_ip !== '' ? '<code>' . esc_html($recorded_ip) . '</code>' : esc_html('—');
             ?>
             <span class="description"><?php _e('(read-only, updated when this profile is saved)', 'poke-hub'); ?></span><br>
+            <strong><?php _e('IP (admin override, optional):', 'poke-hub'); ?></strong><br>
+            <select name="anonymous_ip_action" id="anonymous_ip_action" style="max-width: 360px;">
+                <option value="keep" selected><?php _e('Conserver', 'poke-hub'); ?></option>
+                <option value="set"><?php _e('Remplacer', 'poke-hub'); ?></option>
+                <option value="clear"><?php _e('Supprimer', 'poke-hub'); ?></option>
+            </select>
+            <div style="margin-top: 8px; max-width: 360px;">
+                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip); ?>" placeholder="x.x.x.x ou ipv6" style="width: 100%;">
+                <div class="description"><?php _e('L’IP ne sera modifiée que si l’action n’est pas "Conserver".', 'poke-hub'); ?></div>
+            </div>
             <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
         </p>
 
@@ -274,6 +284,16 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
             echo $recorded_ip_by_id !== '' ? '<code>' . esc_html($recorded_ip_by_id) . '</code>' : esc_html('—');
             ?>
             <span class="description"><?php _e('(read-only, updated when this profile is saved)', 'poke-hub'); ?></span><br>
+            <strong><?php _e('IP (admin override, optional):', 'poke-hub'); ?></strong><br>
+            <select name="anonymous_ip_action" id="anonymous_ip_action" style="max-width: 360px;">
+                <option value="keep" selected><?php _e('Conserver', 'poke-hub'); ?></option>
+                <option value="set"><?php _e('Remplacer', 'poke-hub'); ?></option>
+                <option value="clear"><?php _e('Supprimer', 'poke-hub'); ?></option>
+            </select>
+            <div style="margin-top: 8px; max-width: 360px;">
+                <input type="text" name="anonymous_ip_override" id="anonymous_ip_override" value="<?php echo esc_attr($recorded_ip_by_id); ?>" placeholder="x.x.x.x ou ipv6" style="width: 100%;">
+                <div class="description"><?php _e('L’IP ne sera modifiée que si l’action n’est pas "Conserver".', 'poke-hub'); ?></div>
+            </div>
             <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
         </p>
 

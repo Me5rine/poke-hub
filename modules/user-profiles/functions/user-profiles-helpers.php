@@ -403,6 +403,19 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         return false;
     }
 
+    $preserve_anonymous_ip = !empty($profile['preserve_anonymous_ip']) || !empty($profile['skip_ip_update']);
+    // Sécurité côté comportement: on préserve aussi en contexte admin (staff)
+    // pour éviter d'écraser l'IP historique par l'IP de la requête admin.
+    if (
+        !$preserve_anonymous_ip
+        && function_exists('is_admin')
+        && is_admin()
+        && function_exists('current_user_can')
+        && current_user_can('manage_options')
+    ) {
+        $preserve_anonymous_ip = true;
+    }
+
     // Sanitize data
     $team = isset($profile['team']) ? sanitize_text_field($profile['team']) : '';
     $friend_code = isset($profile['friend_code']) ? trim(sanitize_text_field($profile['friend_code'])) : '';
@@ -584,14 +597,55 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         $data['discord_id'] = $discord_id_value;
     }
 
+    // Override admin explicite de la dernière IP (supprimer / remplacer).
+    // Quand présent, on n'applique pas la logique "préserver" ni la comparaison à l'IP front.
+    $anonymous_ip_override_provided = array_key_exists('anonymous_ip', $profile);
+    $anonymous_ip_override_value = $anonymous_ip_override_provided
+        ? trim(sanitize_text_field((string) $profile['anonymous_ip']))
+        : null;
+
+    // anonymous_ip : on l'écrit seulement si nécessaire.
+    // - En admin/staff: ne pas écraser l'IP existante (si la ligne existe déjà).
+    // - En front (utilisateur connecté): mettre à jour uniquement si la nouvelle IP diffère.
     $client_ip_for_profile = '';
     if (function_exists('poke_hub_get_client_ip')) {
         $client_ip_for_profile = poke_hub_get_client_ip();
     } elseif (isset($_SERVER['REMOTE_ADDR'])) {
         $client_ip_for_profile = trim(sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR'])));
     }
-    if ($client_ip_for_profile !== '' && $client_ip_for_profile !== '0.0.0.0') {
-        $data['anonymous_ip'] = $client_ip_for_profile;
+
+    $client_ip_for_profile = is_string($client_ip_for_profile) ? trim($client_ip_for_profile) : '';
+    $client_ip_for_profile_valid = ($client_ip_for_profile !== '' && $client_ip_for_profile !== '0.0.0.0');
+
+    if ($anonymous_ip_override_provided) {
+        // Supprimer (valeur vide) : on efface.
+        if ($anonymous_ip_override_value === '') {
+            $data['anonymous_ip'] = '';
+        } elseif (filter_var($anonymous_ip_override_value, FILTER_VALIDATE_IP)) {
+            // Remplacer : on valide la forme IP avant d'écrire.
+            $data['anonymous_ip'] = $anonymous_ip_override_value;
+        }
+    } elseif ($client_ip_for_profile_valid) {
+        // Admin/staff: préserver si la ligne existe déjà.
+        if ($preserve_anonymous_ip && $existing_row) {
+            // Ne pas toucher anonymous_ip.
+        } else {
+            if ($existing_row) {
+                $current_anonymous_ip = $wpdb->get_var($wpdb->prepare(
+                    "SELECT anonymous_ip FROM {$table_name} WHERE id = %d LIMIT 1",
+                    (int) $existing_row['id']
+                ));
+                $current_anonymous_ip = is_string($current_anonymous_ip) ? trim($current_anonymous_ip) : '';
+
+                // Front: mettre à jour uniquement si l'IP a changé.
+                if ($current_anonymous_ip !== $client_ip_for_profile) {
+                    $data['anonymous_ip'] = $client_ip_for_profile;
+                }
+            } else {
+                // Insertion: on enregistre l'IP si valide.
+                $data['anonymous_ip'] = $client_ip_for_profile;
+            }
+        }
     }
 
     if ($existing_row) {
