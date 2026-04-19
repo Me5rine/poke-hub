@@ -315,3 +315,114 @@ function poke_hub_purge_events_cache() {
     // Fallback if global function not available
     return false;
 }
+
+/**
+ * Intervalle (secondes) pour la purge planifiée du cache liste événements (statuts / temps restant côté anonymes).
+ * Défaut 60 s : compromis charge disque / fraîcheur pour le cache FastCGI Nginx.
+ *
+ * @return int Entre 30 et 86400.
+ */
+function poke_hub_events_front_cache_purge_interval_seconds(): int {
+    $interval = (int) apply_filters('poke_hub_events_front_cache_purge_interval', MINUTE_IN_SECONDS);
+
+    return max(30, min($interval, DAY_IN_SECONDS));
+}
+
+/**
+ * @param array<string,array<string,mixed>> $schedules
+ * @return array<string,array<string,mixed>>
+ */
+function poke_hub_events_register_cron_schedules(array $schedules): array {
+    $interval = poke_hub_events_front_cache_purge_interval_seconds();
+    $label     = __('Poké Hub — cache page événements', 'poke-hub');
+    // Toujours réécrire l’intervalle (sinon un ancien enregistrement WP-Cron garde 10 min après changement de défaut).
+    $schedules['poke_hub_events_cache_interval'] = [
+        'interval' => $interval,
+        'display'  => $label,
+    ];
+    // Compat : anciennes installations enregistrées sous ce nom.
+    $schedules['poke_hub_every_ten_minutes'] = [
+        'interval' => $interval,
+        'display'  => $label,
+    ];
+
+    return $schedules;
+}
+add_filter('cron_schedules', 'poke_hub_events_register_cron_schedules');
+
+/**
+ * Planifie une purge (Nginx + cache objet) pour les visiteurs anonymes ; replanifie si l’intervalle filtré change.
+ */
+function poke_hub_events_maybe_schedule_front_cache_purge(): void {
+    if (!apply_filters('poke_hub_events_enable_scheduled_front_cache_purge', true)) {
+        return;
+    }
+    $hook       = 'poke_hub_events_front_cache_purge';
+    $recurrence = 'poke_hub_events_cache_interval';
+    $wanted     = poke_hub_events_front_cache_purge_interval_seconds();
+    $applied    = (int) get_option('poke_hub_events_purge_interval_applied', -1);
+
+    if ($applied !== $wanted) {
+        while ($ts = wp_next_scheduled($hook)) {
+            wp_unschedule_event($ts, $hook);
+        }
+    }
+
+    if (!wp_next_scheduled($hook)) {
+        $first = max(5, min(30, (int) floor($wanted / 2)));
+        wp_schedule_event(time() + $first, $recurrence, $hook);
+        update_option('poke_hub_events_purge_interval_applied', $wanted, false);
+    }
+}
+add_action('init', 'poke_hub_events_maybe_schedule_front_cache_purge', 20);
+
+/**
+ * Callback WP-Cron : même logique que les sauvegardes admin.
+ */
+function poke_hub_events_run_front_cache_purge_cron(): void {
+    if (function_exists('poke_hub_purge_events_cache')) {
+        poke_hub_purge_events_cache();
+    }
+}
+add_action('poke_hub_events_front_cache_purge', 'poke_hub_events_run_front_cache_purge_cron');
+
+/**
+ * La page courante est-elle une liste d’événements (shortcode ou widget Elementor) ?
+ */
+function poke_hub_events_singular_page_has_events_shortcode(?WP_Post $post = null): bool {
+    if (!$post instanceof WP_Post) {
+        if (!is_singular()) {
+            return false;
+        }
+        $post = get_queried_object();
+        if (!$post instanceof WP_Post) {
+            return false;
+        }
+    }
+    if ($post->post_status !== 'publish') {
+        return false;
+    }
+    if (has_shortcode((string) $post->post_content, 'poke_hub_events')) {
+        return true;
+    }
+    $elementor = get_post_meta($post->ID, '_elementor_data', true);
+    if (is_string($elementor) && $elementor !== '' && strpos($elementor, 'poke_hub_events') !== false) {
+        return true;
+    }
+
+    return (bool) apply_filters('poke_hub_events_page_has_listing', false, $post);
+}
+
+/**
+ * Désactive le cache navigateur / indique aux proxies de revalider souvent (utile si Nginx respecte Cache-Control).
+ */
+function poke_hub_events_send_no_cache_headers_for_listing_page(): void {
+    if (!apply_filters('poke_hub_events_send_no_cache_headers', true)) {
+        return;
+    }
+    if (!poke_hub_events_singular_page_has_events_shortcode()) {
+        return;
+    }
+    nocache_headers();
+}
+add_action('template_redirect', 'poke_hub_events_send_no_cache_headers_for_listing_page', 0);

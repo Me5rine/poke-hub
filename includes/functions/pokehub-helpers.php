@@ -124,6 +124,63 @@ function poke_hub_pokemon_get_table_prefix(): string {
 }
 
 /**
+ * URL de base du WordPress où vivent les tables `content_source` (même préfixe que
+ * `poke_hub_pokemon_get_table_prefix()` : special_events, content_go_pass, etc.).
+ * Lue depuis l’option `siteurl` de la table `{prefix}options` (même base SQL).
+ *
+ * @return string URL sans slash final, ou chaîne vide.
+ */
+function pokehub_content_source_get_remote_wp_base_url(): string {
+    global $wpdb;
+
+    static $resolved = false;
+    static $base     = '';
+
+    if ($resolved) {
+        return $base;
+    }
+    $resolved = true;
+
+    if (!function_exists('poke_hub_pokemon_get_table_prefix')) {
+        $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', '');
+        return $base;
+    }
+
+    $prefix = trim((string) poke_hub_pokemon_get_table_prefix());
+    if ($prefix === '' || !preg_match('/^[A-Za-z0-9_]+$/', $prefix)) {
+        $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', '');
+        return $base;
+    }
+
+    $options_table = $prefix . 'options';
+    if (function_exists('pokehub_table_exists') && !pokehub_table_exists($options_table)) {
+        $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', '');
+        return $base;
+    }
+
+    $options_table_esc = esc_sql($options_table);
+    $raw                 = $wpdb->get_var(
+        "SELECT option_value FROM `{$options_table_esc}` WHERE option_name = 'siteurl' LIMIT 1"
+    );
+    $raw = is_string($raw) ? trim($raw) : '';
+    if ($raw === '') {
+        $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', '');
+        return $base;
+    }
+
+    $parsed = wp_parse_url($raw);
+    if (empty($parsed['scheme']) || empty($parsed['host'])) {
+        $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', '');
+        return $base;
+    }
+
+    $base = untrailingslashit(esc_url_raw($raw));
+    $base = (string) apply_filters('pokehub_content_source_remote_wp_base_url', $base);
+
+    return $base;
+}
+
+/**
  * Table catalogue des types de bonus (source de vérité).
  * Si un préfixe Pokémon distant est défini, on lit depuis le site principal (remote_bonus_types).
  * Sinon on lit la table locale (bonus_types) sur le site principal.
@@ -676,6 +733,109 @@ function poke_hub_purge_nginx_cache($urls = null, $purge_all = false) {
 }
 
 /**
+ * Whether the current HTTP request URL should be merged into Nginx purge targets.
+ * Admin-ajax, REST and wp-admin would purge the wrong FastCGI cache entry.
+ */
+function poke_hub_should_append_request_uri_to_cache_purge(): bool {
+    if (defined('DOING_AJAX') && DOING_AJAX) {
+        return false;
+    }
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return false;
+    }
+    if (is_admin()) {
+        return false;
+    }
+    $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+    if ($uri === '') {
+        return false;
+    }
+    if (stripos($uri, 'admin-ajax.php') !== false || stripos($uri, 'admin-post.php') !== false) {
+        return false;
+    }
+    if (stripos($uri, '/wp-json/') !== false) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Permaliens des pages auto-créées (options) pour codes amis / Vivillon.
+ *
+ * @param array $shortcodes Tags demandés (ex. poke_hub_friend_codes).
+ * @return array<string>
+ */
+function poke_hub_get_autocreated_profile_page_urls_for_shortcodes(array $shortcodes): array {
+    $need = array_intersect(
+        ['poke_hub_friend_codes', 'poke_hub_vivillon'],
+        $shortcodes
+    );
+    if (empty($need)) {
+        return [];
+    }
+    $urls = [];
+    $option_keys = [
+        'poke_hub_user_profiles_page_friend-codes',
+        'poke_hub_user_profiles_page_vivillon',
+    ];
+    foreach ($option_keys as $opt) {
+        $pid = (int) get_option($opt, 0);
+        if ($pid > 0 && get_post_status($pid) === 'publish') {
+            $urls[] = get_permalink($pid);
+        }
+    }
+
+    return array_filter($urls);
+}
+
+/**
+ * Pages publiées dont les meta Elementor référencent un shortcode (contenu hors post_content).
+ *
+ * @param array $shortcodes Noms de shortcodes.
+ * @return array<string> Permaliens.
+ */
+function poke_hub_get_permalinks_from_elementor_meta_containing_shortcodes(array $shortcodes): array {
+    global $wpdb;
+
+    if (empty($shortcodes)) {
+        return [];
+    }
+    $conditions = [];
+    foreach ($shortcodes as $raw) {
+        $tag = sanitize_key((string) $raw);
+        if ($tag === '') {
+            continue;
+        }
+        $needle = '%' . $wpdb->esc_like($tag) . '%';
+        $conditions[] = $wpdb->prepare('pm.meta_value LIKE %s', $needle);
+    }
+    if (empty($conditions)) {
+        return [];
+    }
+    $where_meta = implode(' OR ', $conditions);
+    $sql = "SELECT DISTINCT pm.post_id
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id AND p.post_status = 'publish'
+            WHERE pm.meta_key = '_elementor_data'
+              AND ({$where_meta})
+            LIMIT 100";
+    $ids = $wpdb->get_col($sql);
+    if (empty($ids)) {
+        return [];
+    }
+    $urls = [];
+    foreach ($ids as $id) {
+        $id = (int) $id;
+        if ($id > 0) {
+            $urls[] = get_permalink($id);
+        }
+    }
+
+    return array_filter($urls);
+}
+
+/**
  * Find pages/posts containing specific shortcodes and return their URLs
  * Useful for purging cache of pages that display dynamic content
  * 
@@ -719,9 +879,18 @@ function poke_hub_get_pages_with_shortcodes(array $shortcodes) {
             }
         }
     }
+
+    foreach (poke_hub_get_autocreated_profile_page_urls_for_shortcodes($shortcodes) as $u) {
+        $urls[] = $u;
+    }
+    foreach (poke_hub_get_permalinks_from_elementor_meta_containing_shortcodes($shortcodes) as $u) {
+        $urls[] = $u;
+    }
+
+    $urls = apply_filters('poke_hub_purge_cache_urls_for_shortcodes', $urls, $shortcodes);
     
     // Remove duplicates and return
-    return array_unique(array_filter($urls));
+    return array_values(array_unique(array_filter($urls)));
 }
 
 /**
@@ -755,10 +924,10 @@ function poke_hub_purge_module_cache(array $shortcodes, ?string $cache_group = n
         }
     }
     
-    // Also include current page if we're on a page with one of these shortcodes
-    if (isset($_SERVER['REQUEST_URI'])) {
-        $current_url = home_url($_SERVER['REQUEST_URI']);
-        if (!in_array($current_url, $urls, true)) {
+    // Inclure l’URL courante seulement sur le front (pas admin-ajax / REST), pour ne pas purger la mauvaise clé FastCGI.
+    if (poke_hub_should_append_request_uri_to_cache_purge() && isset($_SERVER['REQUEST_URI'])) {
+        $current_url = home_url(wp_unslash($_SERVER['REQUEST_URI']));
+        if ($current_url && !in_array($current_url, $urls, true)) {
             $urls[] = $current_url;
         }
     }

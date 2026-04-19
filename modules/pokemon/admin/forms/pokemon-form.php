@@ -492,15 +492,13 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     );
     ?>
 <div class="wrap">
+    <?php poke_hub_admin_back_to_list_bar($back_url); ?>
     <h1>
         <?php
         echo $is_edit
             ? esc_html__('Edit Pokémon', 'poke-hub')
             : esc_html__('Add Pokémon', 'poke-hub');
         ?>
-        <a href="<?php echo esc_url($back_url); ?>" class="page-title-action">
-            <?php esc_html_e('Back to list', 'poke-hub'); ?>
-        </a>
     </h1>
 
     <form method="post">

@@ -21,44 +21,106 @@ function pokehub_blocks_go_pass_metabox_type_slug(): string {
 }
 
 /**
- * @return array<int, array{id:int, label:string}>
+ * Libellé d’affichage (FR prioritaire) pour une ligne special_events.
+ *
+ * @param array<string, mixed> $row
  */
-function pokehub_blocks_go_pass_metabox_event_options(): array {
+function pokehub_blocks_go_pass_metabox_row_label(array $row): string {
+    $id       = (int) ($row['id'] ?? 0);
+    $label_fr = isset($row['title_fr']) ? (string) $row['title_fr'] : '';
+    $label_en = isset($row['title_en']) ? (string) $row['title_en'] : '';
+    $label    = $label_fr !== '' ? $label_fr : ($label_en !== '' ? $label_en : (string) ($row['title'] ?? ''));
+    if ($label === '' && $id > 0) {
+        $label = '#' . $id;
+    }
+
+    return $label;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function pokehub_blocks_go_pass_metabox_get_go_pass_row(int $event_id): ?array {
     global $wpdb;
-    if (!function_exists('pokehub_get_table')) {
-        return [];
+    if ($event_id <= 0 || !function_exists('pokehub_get_table')) {
+        return null;
     }
     $table = pokehub_get_table('special_events');
     if ($table === '' || (function_exists('pokehub_table_exists') && !pokehub_table_exists($table))) {
-        return [];
+        return null;
     }
     $slug = pokehub_blocks_go_pass_metabox_type_slug();
-    $rows = $wpdb->get_results(
+    $row  = $wpdb->get_row(
         $wpdb->prepare(
-            "SELECT id, title, title_en, title_fr FROM {$table} WHERE event_type = %s ORDER BY start_ts DESC LIMIT 200",
+            "SELECT id, title, title_en, title_fr FROM {$table} WHERE id = %d AND event_type = %s LIMIT 1",
+            $event_id,
             $slug
         ),
         ARRAY_A
     );
-    if (!is_array($rows)) {
-        return [];
-    }
-    $out = [];
-    foreach ($rows as $row) {
-        $id = (int) ($row['id'] ?? 0);
-        if ($id <= 0) {
-            continue;
-        }
-        $label_fr = isset($row['title_fr']) ? (string) $row['title_fr'] : '';
-        $label_en = isset($row['title_en']) ? (string) $row['title_en'] : '';
-        $label    = $label_fr !== '' ? $label_fr : ($label_en !== '' ? $label_en : (string) ($row['title'] ?? ''));
-        if ($label === '') {
-            $label = '#' . $id;
-        }
-        $out[] = ['id' => $id, 'label' => $label];
+
+    return is_array($row) ? $row : null;
+}
+
+/**
+ * Titre temporaire pour un Pass GO créé depuis la metabox : événement (meta / Me5rine) avant le titre d’article WP.
+ *
+ * @param int    $post_id
+ * @param string $lab_event_title_from_client Valeur lue dans le DOM (#admin_lab_event_box), éventuellement non encore enregistrée.
+ * @param string $article_title_from_client   Titre écran édition (fallback).
+ */
+function pokehub_blocks_go_pass_metabox_resolve_stub_title(int $post_id, string $lab_event_title_from_client = '', string $article_title_from_client = ''): string {
+    $lab = trim(wp_strip_all_tags($lab_event_title_from_client));
+    if ($lab !== '') {
+        return (string) apply_filters('pokehub_go_pass_metabox_stub_title', $lab, $post_id, 'lab_dom');
     }
 
-    return $out;
+    $meta = '';
+    if (function_exists('poke_hub_events_get_event_meta_title')) {
+        $meta = poke_hub_events_get_event_meta_title($post_id);
+    } else {
+        $keys = apply_filters(
+            'pokehub_go_pass_metabox_stub_title_meta_keys',
+            [
+                '_admin_lab_event_title_fr',
+                '_admin_lab_event_title_en',
+                '_admin_lab_event_title',
+                '_admin_lab_event_name',
+                '_event_title',
+            ],
+            $post_id
+        );
+        if (is_array($keys)) {
+            foreach ($keys as $key) {
+                if (!is_string($key) || $key === '') {
+                    continue;
+                }
+                $raw = get_post_meta($post_id, $key, true);
+                if (!is_string($raw)) {
+                    continue;
+                }
+                $raw = trim(wp_strip_all_tags($raw));
+                if ($raw !== '') {
+                    $meta = $raw;
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($meta !== '') {
+        return (string) apply_filters('pokehub_go_pass_metabox_stub_title', $meta, $post_id, 'post_meta');
+    }
+
+    $headline = trim(wp_strip_all_tags($article_title_from_client));
+    if ($headline !== '') {
+        return (string) apply_filters('pokehub_go_pass_metabox_stub_title', $headline, $post_id, 'article_headline');
+    }
+
+    $pt = get_post($post_id);
+    $wp = $pt ? wp_strip_all_tags(get_the_title($pt)) : '';
+
+    return (string) apply_filters('pokehub_go_pass_metabox_stub_title', $wp, $post_id, 'wp_post_title');
 }
 
 function pokehub_blocks_add_go_pass_metabox(): void {
@@ -92,17 +154,17 @@ function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
         }
     }
 
-    $options = pokehub_blocks_go_pass_metabox_event_options();
+    $selected_row = $event_id > 0 ? pokehub_blocks_go_pass_metabox_get_go_pass_row($event_id) : null;
     ?>
     <p>
         <label for="pokehub_go_pass_special_event_id"><strong><?php esc_html_e('GO Pass event', 'poke-hub'); ?></strong></label><br>
-        <select name="pokehub_go_pass_special_event_id" id="pokehub_go_pass_special_event_id" class="widefat pokehub-go-pass-linked-select" style="width:100%;max-width:100%;">
+        <select name="pokehub_go_pass_special_event_id" id="pokehub_go_pass_special_event_id" class="widefat pokehub-go-pass-linked-select" style="width:100%;max-width:100%;" data-placeholder="<?php echo esc_attr(__('Search GO Pass by name…', 'poke-hub')); ?>">
             <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
-            <?php foreach ($options as $opt) : ?>
-                <option value="<?php echo esc_attr((string) (int) $opt['id']); ?>" <?php selected($event_id, (int) $opt['id']); ?>>
-                    <?php echo esc_html((string) $opt['label']); ?>
+            <?php if ($selected_row) : ?>
+                <option value="<?php echo esc_attr((string) (int) ($selected_row['id'] ?? 0)); ?>" selected>
+                    <?php echo esc_html(pokehub_blocks_go_pass_metabox_row_label($selected_row)); ?>
                 </option>
-            <?php endforeach; ?>
+            <?php endif; ?>
         </select>
     </p>
     <p>
@@ -113,9 +175,10 @@ function pokehub_blocks_render_go_pass_metabox(WP_Post $post): void {
         </select>
     </p>
     <p>
-        <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-events&action=add_go_pass')); ?>" class="button button-secondary" target="_blank" rel="noopener noreferrer">
+        <button type="button" class="button button-secondary" id="pokehub-go-pass-create-inline">
             <?php esc_html_e('Create a new GO Pass', 'poke-hub'); ?>
-        </a>
+        </button>
+        <span id="pokehub-go-pass-create-inline-hint" class="description" style="display:none;margin-left:8px;"></span>
     </p>
     <?php
 }
@@ -158,7 +221,7 @@ function pokehub_blocks_save_go_pass_metabox($post_id): void {
 add_action('save_post', 'pokehub_blocks_save_go_pass_metabox');
 
 /**
- * Select2 sur le choix du Pass GO (recherche par nom) — écran d’édition d’article.
+ * Select2 + AJAX (recherche par nom) + création inline — écran d’édition d’article.
  */
 function pokehub_blocks_go_pass_metabox_enqueue_assets(string $hook): void {
     if (!in_array($hook, ['post.php', 'post-new.php'], true)) {
@@ -184,20 +247,33 @@ function pokehub_blocks_go_pass_metabox_enqueue_assets(string $hook): void {
         true
     );
 
-    wp_add_inline_script(
-        'select2',
-        'jQuery(function($) {
-            var \$sel = $("#pokehub_go_pass_special_event_id");
-            if (!\$sel.length || typeof \$sel.select2 !== "function") { return; }
-            \$sel.select2({
-                width: "100%",
-                language: {
-                    noResults: function() { return "' . esc_js(__('No results', 'poke-hub')) . '"; },
-                    searching: function() { return "' . esc_js(__('Searching…', 'poke-hub')) . '"; }
-                }
-            });
-        });',
-        'after'
+    wp_enqueue_script(
+        'pokehub-go-pass-metabox-admin',
+        POKE_HUB_URL . 'assets/js/pokehub-go-pass-metabox-admin.js',
+        ['jquery', 'select2'],
+        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0',
+        true
+    );
+
+    global $post;
+    $post_id = isset($post->ID) ? (int) $post->ID : 0;
+
+    wp_localize_script(
+        'pokehub-go-pass-metabox-admin',
+        'pokehubGoPassMetabox',
+        [
+            'ajaxUrl'     => admin_url('admin-ajax.php'),
+            'nonce'       => wp_create_nonce('pokehub_go_pass_metabox_ajax'),
+            'postId'      => $post_id,
+            'placeholder' => __('Search GO Pass by name…', 'poke-hub'),
+            'strings'     => [
+                'noResults'    => __('No results', 'poke-hub'),
+                'searching'    => __('Searching…', 'poke-hub'),
+                'needsPostId'  => __('Save the post as a draft first, then try again.', 'poke-hub'),
+                'createFailed' => __('Could not create or link the GO Pass.', 'poke-hub'),
+                'editPassLabel' => __('Edit this GO Pass (opens in a new tab)', 'poke-hub'),
+            ],
+        ]
     );
 }
 add_action('admin_enqueue_scripts', 'pokehub_blocks_go_pass_metabox_enqueue_assets', 20);

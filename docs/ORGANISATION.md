@@ -9,6 +9,7 @@ Ce guide explique comment organiser le code dans le plugin Poké HUB pour mainte
 ```
 poke-hub/
 ├── includes/              # Code partagé entre modules
+│   ├── admin-ui.php      # UI admin partagée (ex. barre « retour à la liste », styles `pokehub-admin-back-bar`) — voir docs/ADMIN_FORM_UX.md
 │   ├── functions/        # Helpers globaux (toujours chargés avec le plugin, hors modules) : ex. pokehub-inline-svg.php, pokehub-pokemon-type-icon.php, pokemon-public-helpers.php — voir docs/INLINE_SVG.md
 │   ├── settings/         # Gestion des paramètres (modules : source unique dans settings-modules.php)
 │   ├── content/          # Helpers tables de contenu (content_eggs, content_quests, etc.) + éditeur quêtes partagé
@@ -135,6 +136,7 @@ modules/blocks/
 ## 🔍 Références
 
 - [Index de la documentation](./README.md)
+- [Formulaires admin (UX liste / retour)](./ADMIN_FORM_UX.md)
 - [Charte rédactionnelle](./REDACTION.md)
 - [Architecture des Blocs](./blocks/ARCHITECTURE.md)
 - [Types de Blocs](./blocks/BLOCK_TYPES.md)

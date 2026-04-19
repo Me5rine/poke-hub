@@ -89,6 +89,7 @@ function pokehub_render_go_pass_event_form(string $mode = 'add', ?object $event 
 
     ?>
     <div class="wrap">
+        <?php poke_hub_admin_back_to_list_bar(pokehub_events_admin_list_url()); ?>
         <h1><?php echo esc_html($page_title); ?></h1>
         <p class="description"><?php esc_html_e('Event type is fixed to the remote GO Pass slug. Fill in ranks: one row per rank (or bonus milestone).', 'poke-hub'); ?></p>
 

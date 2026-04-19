@@ -101,7 +101,7 @@ function pokehub_bonus_types_admin_handle_requests(): void {
 
     if ($id > 0) {
         $wpdb->update($table, $data, ['id' => $id], ['%s', '%s', '%s', '%s'], ['%d']);
-        wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'updated', 'edit' => $id]));
+        wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'updated']));
         exit;
     }
 
@@ -111,7 +111,7 @@ function pokehub_bonus_types_admin_handle_requests(): void {
         wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'error']));
         exit;
     }
-    wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'created', 'edit' => $new_id]));
+    wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'created']));
     exit;
 }
 add_action('admin_init', 'pokehub_bonus_types_admin_handle_requests');
@@ -207,8 +207,8 @@ function pokehub_render_bonus_types_admin_page(): void {
             $preview_slug = $f_slug;
             $preview_alt = $f_title_fr !== '' ? $f_title_fr : ($f_title_en !== '' ? $f_title_en : $preview_slug);
             ?>
+            <?php poke_hub_admin_back_to_list_bar(pokehub_bonus_types_admin_url()); ?>
             <h2><?php echo $edit_id > 0 ? esc_html__('Edit bonus type', 'poke-hub') : esc_html__('New bonus type', 'poke-hub'); ?></h2>
-            <p><a href="<?php echo esc_url(pokehub_bonus_types_admin_url()); ?>">&larr; <?php echo esc_html__('Back to list', 'poke-hub'); ?></a></p>
 
             <form method="post" class="pokehub-bonus-type-form" action="<?php echo esc_url(pokehub_bonus_types_admin_url()); ?>">
                 <?php wp_nonce_field('pokehub_bonus_types_save'); ?>

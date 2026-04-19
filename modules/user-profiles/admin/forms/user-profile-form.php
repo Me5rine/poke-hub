@@ -49,10 +49,8 @@ function poke_hub_render_user_profile_form($user_id) {
 
     ?>
     <div class="wrap">
+        <?php poke_hub_admin_back_to_list_bar(admin_url('admin.php?page=poke-hub-user-profiles')); ?>
         <h1><?php echo esc_html(sprintf(__('Edit Profile: %s', 'poke-hub'), $user->display_name)); ?></h1>
-        <p class="description">
-            <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
-        </p>
 
         <form method="post" action="" id="poke-hub-profile-admin-form">
             <?php wp_nonce_field('poke_hub_save_profile', 'poke_hub_profile_nonce'); ?>
@@ -278,13 +276,13 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
 
     ?>
     <div class="wrap">
+        <?php poke_hub_admin_back_to_list_bar(admin_url('admin.php?page=poke-hub-user-profiles')); ?>
         <h1><?php echo esc_html(sprintf(__('Edit Profile: %s', 'poke-hub'), $user ? $user->display_name : __('Anonymous Profile', 'poke-hub'))); ?></h1>
         <p class="description">
             <strong><?php _e('Profile Type:', 'poke-hub'); ?></strong> <?php echo esc_html($profile_type_label); ?><br>
             <?php if (!empty($profile['discord_id'])) : ?>
                 <strong><?php _e('Discord ID:', 'poke-hub'); ?></strong> <?php echo esc_html($profile['discord_id']); ?><br>
             <?php endif; ?>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=poke-hub-user-profiles')); ?>">&larr; <?php _e('Back to list', 'poke-hub'); ?></a>
         </p>
 
         <form method="post" action="" id="poke-hub-profile-admin-form">

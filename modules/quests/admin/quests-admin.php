@@ -32,7 +32,7 @@ function poke_hub_quests_handle_save_quest() {
     $raw = isset($_POST['pokehub_quests']) && is_array($_POST['pokehub_quests']) ? $_POST['pokehub_quests'] : [];
     $cleaned = pokehub_quests_clean_from_request($raw);
     pokehub_content_save_quests($row->source_type, (int) $row->source_id, $cleaned);
-    wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&action=edit&id=' . $id . '&updated=1'));
+    wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&updated=1'));
     exit;
 }
 add_action('admin_init', 'poke_hub_quests_handle_save_quest', 5);
@@ -59,7 +59,7 @@ function poke_hub_quests_handle_save_quest_group() {
     if (function_exists('pokehub_save_quest_group')) {
         if ($action === 'update' && $id > 0) {
             pokehub_save_quest_group($data, $id);
-            wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quest_groups&ph_action=edit&id=' . $id . '&updated=1'));
+            wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quest_groups&updated=1'));
         } else {
             pokehub_save_quest_group($data, 0);
             wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quest_groups&added=1'));
@@ -87,7 +87,7 @@ function poke_hub_quests_handle_add_global() {
     }
     $existing = pokehub_content_get_quests_row('global_pool', 0);
     if ($existing) {
-        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&action=edit&id=' . (int) $existing->id));
+        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&quest_global_exists=1'));
         exit;
     }
     pokehub_content_save_quests('global_pool', 0, []);
@@ -95,7 +95,7 @@ function poke_hub_quests_handle_add_global() {
     $tbl = pokehub_get_table('content_quests');
     $row = $wpdb->get_row($wpdb->prepare("SELECT id FROM {$tbl} WHERE source_type = 'global_pool' AND source_id = 0 ORDER BY id DESC LIMIT 1"));
     if ($row) {
-        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&action=edit&id=' . (int) $row->id));
+        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&quest_set_created=1'));
     } else {
         wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests'));
     }
@@ -133,7 +133,7 @@ function poke_hub_quests_handle_add_with_source() {
     }
     $existing = pokehub_content_get_quests_row($source_type, $source_id);
     if ($existing) {
-        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&action=edit&id=' . (int) $existing->id));
+        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&quest_set_exists=1'));
         exit;
     }
     pokehub_content_save_quests($source_type, $source_id, []);
@@ -145,7 +145,7 @@ function poke_hub_quests_handle_add_with_source() {
         $source_id
     ));
     if ($row) {
-        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&action=edit&id=' . (int) $row->id));
+        wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests&quest_set_created=1'));
     } else {
         wp_safe_redirect(admin_url('admin.php?page=poke-hub-quests&ph_section=quests'));
     }
@@ -262,8 +262,17 @@ function poke_hub_quests_render_quests_tab($action, $edit_id) {
     $add_url = add_query_arg(['page' => 'poke-hub-quests', 'ph_section' => 'quests', 'action' => 'add'], admin_url('admin.php'));
     ?>
     <p class="description"><?php esc_html_e('Quest sets are linked to a source: global pool or local content (post, event). The quests block displays the quests for the current content.', 'poke-hub'); ?></p>
-    <?php if (isset($_GET['updated'])) : ?>
+    <?php if (!empty($_GET['updated'])) : ?>
         <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Quests updated.', 'poke-hub'); ?></p></div>
+    <?php endif; ?>
+    <?php if (!empty($_GET['quest_set_created'])) : ?>
+        <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Quest set created.', 'poke-hub'); ?></p></div>
+    <?php endif; ?>
+    <?php if (!empty($_GET['quest_set_exists'])) : ?>
+        <div class="notice notice-info is-dismissible"><p><?php esc_html_e('A quest set for this source already exists. Edit it from the list.', 'poke-hub'); ?></p></div>
+    <?php endif; ?>
+    <?php if (!empty($_GET['quest_global_exists'])) : ?>
+        <div class="notice notice-info is-dismissible"><p><?php esc_html_e('The global quest pool already exists. Edit it from the list.', 'poke-hub'); ?></p></div>
     <?php endif; ?>
     <p>
         <a href="<?php echo esc_url($add_url); ?>" class="button button-primary"><?php esc_html_e('Add quest set', 'poke-hub'); ?></a>
@@ -309,7 +318,7 @@ function poke_hub_quests_render_add_form() {
         'post_status'=> 'publish',
     ]);
     ?>
-    <p><a href="<?php echo esc_url($list_url); ?>" class="button"><?php esc_html_e('&larr; Back to list', 'poke-hub'); ?></a></p>
+    <?php poke_hub_admin_back_to_list_bar($list_url); ?>
     <h2><?php esc_html_e('Add quest set', 'poke-hub'); ?></h2>
     <?php if (isset($_GET['error']) && $_GET['error'] === 'missing_post') : ?>
         <div class="notice notice-error"><p><?php esc_html_e('Please select content.', 'poke-hub'); ?></p></div>
@@ -371,7 +380,7 @@ function poke_hub_quests_render_quest_edit($content_quest_id) {
     if (isset($_GET['updated'])) {
         echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Quests updated.', 'poke-hub') . '</p></div>';
     }
-    echo '<p><a href="' . esc_url($back_url) . '" class="button">' . esc_html__('&larr; Retour à la liste', 'poke-hub') . '</a></p>';
+    poke_hub_admin_back_to_list_bar($back_url);
     echo '<h2>' . esc_html__('Edit quest set', 'poke-hub') . ' — ' . wp_kses_post(poke_hub_quests_source_label($row->source_type, $row->source_id)) . '</h2>';
     ?>
     <form method="post" action="<?php echo esc_url($form_url); ?>">
@@ -441,7 +450,11 @@ function poke_hub_quests_render_quest_groups_tab($edit_id) {
         }
     }
     $groups = function_exists('pokehub_get_quest_groups') ? pokehub_get_quest_groups() : [];
+    $quest_groups_list_url = add_query_arg(['page' => 'poke-hub-quests', 'ph_section' => 'quest_groups'], admin_url('admin.php'));
     ?>
+    <?php if ($action === 'edit' && $edit_id > 0) : ?>
+        <?php poke_hub_admin_back_to_list_bar($quest_groups_list_url); ?>
+    <?php endif; ?>
     <p class="description"><?php esc_html_e('Categories to group quests (e.g. Catches, Throws). Used as section titles with optional color.', 'poke-hub'); ?></p>
     <?php if (isset($_GET['deleted'])) : ?>
         <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Group deleted.', 'poke-hub'); ?></p></div>

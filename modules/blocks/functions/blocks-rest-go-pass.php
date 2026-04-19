@@ -85,7 +85,9 @@ function pokehub_go_pass_rest_list_items(WP_REST_Request $request) {
             'end_ts'      => (int) ($row['end_ts'] ?? 0),
             'tier_count'  => $tier_count,
             'has_content' => $tier_count > 0,
-            'edit_url'    => admin_url('admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . $id),
+            'edit_url'    => function_exists('pokehub_go_pass_admin_edit_url')
+                ? pokehub_go_pass_admin_edit_url($id)
+                : admin_url('admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . $id),
             'public_url'  => function_exists('poke_hub_special_event_get_url')
                 ? poke_hub_special_event_get_url((string) ($row['slug'] ?? ''))
                 : '',
@@ -128,7 +130,9 @@ function pokehub_go_pass_rest_create_item(WP_REST_Request $request) {
     return rest_ensure_response(
         [
             'id'       => $id,
-            'edit_url' => admin_url('admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . $id),
+            'edit_url' => function_exists('pokehub_go_pass_admin_edit_url')
+                ? pokehub_go_pass_admin_edit_url($id)
+                : admin_url('admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . $id),
         ]
     );
 }

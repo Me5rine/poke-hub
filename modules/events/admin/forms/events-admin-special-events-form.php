@@ -85,6 +85,7 @@ function pokehub_render_special_event_form(
 
     ?>
     <div class="wrap">
+        <?php poke_hub_admin_back_to_list_bar(pokehub_events_admin_list_url()); ?>
         <h1><?php echo esc_html($page_title); ?></h1>
 
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="pokehub-special-event-form">

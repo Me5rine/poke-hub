@@ -84,7 +84,7 @@ function poke_hub_eggs_handle_form() {
         $pool_id = (int) $wpdb->insert_id;
         if ($pool_id > 0) {
             poke_hub_eggs_save_pool_pokemon($pool_id, $pokemon_table);
-            wp_safe_redirect(add_query_arg(['ph_msg' => 'saved', 'edit' => $pool_id], $redirect_base));
+            wp_safe_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
         } else {
             wp_safe_redirect(add_query_arg('ph_msg', 'error', $redirect_base));
         }
@@ -100,7 +100,7 @@ function poke_hub_eggs_handle_form() {
     $wpdb->update($pools_table, $pool_data, ['id' => $pool_id], $format, ['%d']);
     poke_hub_eggs_save_pool_pokemon($pool_id, $pokemon_table);
 
-    wp_safe_redirect(add_query_arg(['ph_msg' => 'updated', 'edit' => $pool_id], $redirect_base));
+    wp_safe_redirect(add_query_arg('ph_msg', 'updated', $redirect_base));
     exit;
 }
 add_action('admin_init', 'poke_hub_eggs_handle_form');
@@ -490,10 +490,8 @@ function poke_hub_eggs_render_edit_form($pool_id) {
     $back_url = add_query_arg('page', 'poke-hub-eggs', admin_url('admin.php'));
     ?>
     <div class="wrap">
-        <h1>
-            <?php echo $pool_id > 0 ? esc_html__('Edit pool', 'poke-hub') : esc_html__('Add pool', 'poke-hub'); ?>
-            <a href="<?php echo esc_url($back_url); ?>" class="page-title-action"><?php esc_html_e('Back to list', 'poke-hub'); ?></a>
-        </h1>
+        <?php poke_hub_admin_back_to_list_bar($back_url); ?>
+        <h1><?php echo $pool_id > 0 ? esc_html__('Edit pool', 'poke-hub') : esc_html__('Add pool', 'poke-hub'); ?></h1>
 
         <form method="post">
             <?php wp_nonce_field('poke_hub_eggs_edit_pool'); ?>

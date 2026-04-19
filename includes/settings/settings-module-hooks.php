@@ -89,6 +89,12 @@ add_action('update_option_poke_hub_active_modules', function ($old_value, $new_v
         do_action("poke_hub_{$module}_module_deactivated");
     }
 
+    if (in_array('events', $deactivated, true)) {
+        while ($ts = wp_next_scheduled('poke_hub_events_front_cache_purge')) {
+            wp_unschedule_event($ts, 'poke_hub_events_front_cache_purge');
+        }
+    }
+
     // Historique
     update_option('poke_hub_last_active_modules', $new_value);
 

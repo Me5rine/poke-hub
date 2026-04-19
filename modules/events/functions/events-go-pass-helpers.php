@@ -30,6 +30,53 @@ function pokehub_is_go_pass_special_event($row_or_slug): bool {
 }
 
 /**
+ * URL d’édition admin d’un Pass GO (`poke-hub-events` → edit_go_pass).
+ * Si le module **Events** n’est pas actif ici, pointe vers le site qui porte les tables
+ * content_source (option `siteurl` du préfixe Pokémon / Réglages > Sources).
+ *
+ * @param int $event_id ID `special_events`.
+ */
+function pokehub_go_pass_admin_edit_url(int $event_id): string {
+    $event_id = (int) $event_id;
+    if ($event_id <= 0) {
+        return '';
+    }
+
+    $path = 'admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . $event_id;
+
+    if (function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('events')) {
+        return admin_url($path);
+    }
+
+    $base = function_exists('pokehub_content_source_get_remote_wp_base_url')
+        ? pokehub_content_source_get_remote_wp_base_url()
+        : '';
+    if ($base !== '') {
+        return trailingslashit($base) . 'wp-admin/' . $path;
+    }
+
+    if (!function_exists('pokehub_events_get_remote_wp_base_url')) {
+        $helpers = defined('POKE_HUB_PATH') ? POKE_HUB_PATH . 'modules/events/functions/events-admin-helpers.php' : '';
+        if ($helpers !== '' && is_readable($helpers)) {
+            require_once $helpers;
+        }
+    }
+    if (function_exists('pokehub_events_get_remote_wp_base_url')) {
+        $base = pokehub_events_get_remote_wp_base_url();
+        if ($base !== '') {
+            return trailingslashit($base) . 'wp-admin/' . $path;
+        }
+    }
+
+    $base = (string) apply_filters('pokehub_go_pass_admin_edit_base_url', '', $event_id);
+    if ($base !== '') {
+        return trailingslashit(untrailingslashit(esc_url_raw($base))) . '/wp-admin/' . $path;
+    }
+
+    return admin_url($path);
+}
+
+/**
  * @return string[]
  */
 function pokehub_go_pass_textarea_to_lines($text): array {
@@ -1553,7 +1600,7 @@ function pokehub_render_go_pass_html(object $event): string {
             if ($display_ranks === []) :
                 $edit_url = '';
                 if (function_exists('current_user_can') && current_user_can('manage_options')) {
-                    $edit_url = admin_url('admin.php?page=poke-hub-events&action=edit_go_pass&event_id=' . (int) $event->id);
+                    $edit_url = pokehub_go_pass_admin_edit_url((int) $event->id);
                 }
                 ?>
                 <div class="pokehub-go-pass-track pokehub-go-pass-track--empty">
@@ -1659,12 +1706,70 @@ function pokehub_go_pass_get_special_event_row_by_id(int $id) {
 }
 
 /**
+ * Timestamps début / fin d’événement pour un article (Me5rine LAB + metas Poké HUB).
+ *
+ * @return array{start_ts: int, end_ts: int} Zéros si introuvable ou incohérent.
+ */
+function pokehub_go_pass_resolve_date_range_from_host_post(int $post_id): array {
+    if ($post_id <= 0) {
+        return ['start_ts' => 0, 'end_ts' => 0];
+    }
+
+    $start = (int) get_post_meta($post_id, '_admin_lab_event_start', true);
+    $end   = (int) get_post_meta($post_id, '_admin_lab_event_end', true);
+    if ($start > 0 && $end > 0 && $end >= $start) {
+        return ['start_ts' => $start, 'end_ts' => $end];
+    }
+
+    if (!function_exists('poke_hub_events_get_post_dates')) {
+        $helpers = defined('POKE_HUB_PATH') ? POKE_HUB_PATH . 'modules/events/functions/events-helpers.php' : '';
+        if ($helpers !== '' && is_readable($helpers)) {
+            require_once $helpers;
+        }
+    }
+    if (function_exists('poke_hub_events_get_post_dates')) {
+        $d = poke_hub_events_get_post_dates($post_id);
+        $st = isset($d['start_ts']) && $d['start_ts'] !== null ? (int) $d['start_ts'] : 0;
+        $en = isset($d['end_ts']) && $d['end_ts'] !== null ? (int) $d['end_ts'] : 0;
+        if ($st > 0 && $en > 0 && $en >= $st) {
+            return ['start_ts' => $st, 'end_ts' => $en];
+        }
+    }
+
+    $custom = apply_filters('pokehub_go_pass_host_post_date_range', null, $post_id);
+    if (is_array($custom) && isset($custom['start_ts'], $custom['end_ts'])) {
+        $st = (int) $custom['start_ts'];
+        $en = (int) $custom['end_ts'];
+        if ($st > 0 && $en > 0 && $en >= $st) {
+            return ['start_ts' => $st, 'end_ts' => $en];
+        }
+    }
+
+    return ['start_ts' => 0, 'end_ts' => 0];
+}
+
+/**
  * Crée un événement spécial Pass GO minimal + ligne content_go_pass (payload vide).
  *
+ * @param int $host_post_id Article WordPress lié : si > 0, réutilise début / fin d’événement (metas) quand disponibles.
  * @return int|WP_Error ID inséré ou erreur.
  */
-function pokehub_go_pass_create_empty_special_event(string $title_en = '', string $title_fr = '') {
+function pokehub_go_pass_create_empty_special_event(string $title_en = '', string $title_fr = '', int $host_post_id = 0) {
     global $wpdb;
+
+    if (!function_exists('pokehub_generate_unique_event_slug')) {
+        $admin_helpers = defined('POKE_HUB_PATH') ? POKE_HUB_PATH . 'modules/events/functions/events-admin-helpers.php' : '';
+        if ($admin_helpers !== '' && is_readable($admin_helpers)) {
+            require_once $admin_helpers;
+        }
+    }
+    if (!function_exists('pokehub_generate_unique_event_slug')) {
+        return new WP_Error(
+            'missing_slug_helper',
+            __('Event slug helper is not available.', 'poke-hub'),
+            ['status' => 500]
+        );
+    }
 
     $events_table       = pokehub_get_table('special_events');
     $remote_posts_table = pokehub_get_table('remote_posts');
@@ -1704,6 +1809,19 @@ function pokehub_go_pass_create_empty_special_event(string $title_en = '', strin
     $now = current_time('timestamp');
     $end = $now + (int) (30 * DAY_IN_SECONDS);
 
+    $mode_row = 'local';
+    if ($host_post_id > 0) {
+        $range = pokehub_go_pass_resolve_date_range_from_host_post($host_post_id);
+        if ($range['start_ts'] > 0 && $range['end_ts'] > 0) {
+            $now = $range['start_ts'];
+            $end = $range['end_ts'];
+        }
+        $m = get_post_meta($host_post_id, '_event_mode', true);
+        if ($m === 'fixed' || $m === 'local') {
+            $mode_row = $m;
+        }
+    }
+
     $event_type = sanitize_title(pokehub_go_pass_event_type_slug());
 
     $data = [
@@ -1715,7 +1833,7 @@ function pokehub_go_pass_create_empty_special_event(string $title_en = '', strin
         'event_type'              => $event_type,
         'start_ts'                => $now,
         'end_ts'                  => $end,
-        'mode'                    => 'local',
+        'mode'                    => $mode_row,
         'recurring'               => 0,
         'recurring_freq'          => 'weekly',
         'recurring_interval'      => 1,

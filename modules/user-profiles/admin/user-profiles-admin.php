@@ -122,7 +122,18 @@ function poke_hub_user_profiles_admin_ui() {
                 }
 
                 poke_hub_save_user_profile($user_id_to_save, $profile);
-                echo '<div class="notice notice-success is-dismissible"><p>' . __('Pokémon GO profile updated successfully', 'poke-hub') . '</p></div>';
+                $redirect_args = [
+                    'page'            => 'poke-hub-user-profiles',
+                    'profile_updated' => 1,
+                ];
+                $preserve_params = ['filter_team', 'filter_scatterbug_pattern', 's', 'orderby', 'order'];
+                foreach ($preserve_params as $param) {
+                    if (isset($_GET[$param]) && $_GET[$param] !== '') {
+                        $redirect_args[$param] = sanitize_text_field(wp_unslash((string) $_GET[$param]));
+                    }
+                }
+                wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
+                exit;
             } else {
                 echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($admin_error_message) . '</p></div>';
             }
@@ -188,6 +199,12 @@ function poke_hub_render_user_profiles_list() {
                     );
                     ?>
                 </p>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($_GET['profile_updated'])) : ?>
+            <div class="notice notice-success is-dismissible">
+                <p><?php esc_html_e('Pokémon GO profile updated successfully.', 'poke-hub'); ?></p>
             </div>
         <?php endif; ?>
 

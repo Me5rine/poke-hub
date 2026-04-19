@@ -926,8 +926,10 @@ function poke_hub_events_fetch_all(): array {
         ];
     }
 
-    // Stockage en cache pour 1 heure (3600s)
-    wp_cache_set($cache_key, $events, 'poke_hub_events', 3600);
+    // Cache objet court : les statuts / compte à rebours doivent suivre l’heure réelle (purge Nginx en complément).
+    $ttl = (int) apply_filters('poke_hub_events_fetch_all_cache_ttl', 90);
+    $ttl = max(30, min($ttl, 3600));
+    wp_cache_set($cache_key, $events, 'poke_hub_events', $ttl);
 
     return $events;
 }
@@ -1306,21 +1308,62 @@ function poke_hub_events_get_by_status(string $status = 'all', array $args = [])
 }
 
 /**
+ * Titres d’événement stockés en post meta (Me5rine LAB / Poké HUB), sans repli sur le titre WordPress.
+ *
+ * @param int $post_id
+ * @return string Chaîne vide si aucune meta pertinente.
+ */
+function poke_hub_events_get_event_meta_title(int $post_id): string {
+    if ($post_id <= 0) {
+        return '';
+    }
+
+    $filtered = apply_filters('poke_hub_events_event_meta_title', null, $post_id);
+    if (is_string($filtered)) {
+        $filtered = trim(wp_strip_all_tags($filtered));
+        if ($filtered !== '') {
+            return $filtered;
+        }
+    }
+
+    $default_keys = [
+        '_admin_lab_event_title_fr',
+        '_admin_lab_event_title_en',
+        '_admin_lab_event_title',
+        '_admin_lab_event_name',
+        '_event_title',
+    ];
+    $keys = apply_filters('poke_hub_events_event_meta_title_keys', $default_keys, $post_id);
+    if (!is_array($keys)) {
+        $keys = $default_keys;
+    }
+
+    foreach ($keys as $key) {
+        if (!is_string($key) || $key === '') {
+            continue;
+        }
+        $raw = get_post_meta($post_id, $key, true);
+        if (!is_string($raw)) {
+            continue;
+        }
+        $raw = trim(wp_strip_all_tags($raw));
+        if ($raw !== '') {
+            return $raw;
+        }
+    }
+
+    return '';
+}
+
+/**
  * Récupère le titre d'un événement.
- * Priorité à la méta personnalisée `_event_title`, sinon titre natif du post.
+ * Priorité aux metas d’événement (dont Me5rine LAB), sinon titre natif du post.
  *
  * @param int $post_id
  * @return string
  */
 function poke_hub_events_get_event_title(int $post_id): string {
-    $meta_title = get_post_meta($post_id, '_event_title', true);
-
-    if (is_string($meta_title)) {
-        $meta_title = trim($meta_title);
-    } else {
-        $meta_title = '';
-    }
-
+    $meta_title = poke_hub_events_get_event_meta_title($post_id);
     if ($meta_title !== '') {
         return $meta_title;
     }

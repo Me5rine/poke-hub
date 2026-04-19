@@ -57,7 +57,7 @@ L’enregistrement est géré dans `modules/blocks/functions/blocks-register.php
 
 - **Définition des blocs** : `modules/blocks/blocks/{nom-du-bloc}/` (block.json, index.js, render.php)
 - **Rendu / données** : selon le bloc — events, bonus, pokemon, ou helpers dans `modules/blocks/functions/`
-- **Meta boxes** : `modules/blocks/admin/` (GO Pass, Collection Challenges, Études spéciales, etc.). La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif.
+- **Meta boxes** : `modules/blocks/admin/` (GO Pass, Collection Challenges, Études spéciales, etc.). La metabox **GO Pass** (`blocks-go-pass-metabox.php`) utilise Select2 + **admin-ajax** (`pokehub_go_pass_metabox_search`, `pokehub_go_pass_metabox_create_and_link` dans `blocks-admin-ajax.php`) et le script `assets/js/pokehub-go-pass-metabox-admin.js`. La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif.
 
 Pour la source de vérité des types de bonus (site principal, local/distant), le rendu SVG/raster et les **variables CSS des vignettes** (`--pokehub-bonus-icon-*` dans `poke-hub-bonus-front.css`), voir **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)** et **[POKEHUB_CSS_CLASSES.md](../POKEHUB_CSS_CLASSES.md)**.
 

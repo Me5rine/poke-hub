@@ -8,6 +8,7 @@ Sauf **README.md** (cet index) et **REDACTION.md**, les pages Markdown sous `doc
 
 ## 📌 Changements récents (architecture)
 
+- **Admin — formulaires** : après sauvegarde réussie, retour **systématique vers la liste** de la page (Pokémon / quêtes / œufs / bonus / profils, cohérent avec les événements) ; lien **Retour à la liste** homogène et plus visible (`poke_hub_admin_back_to_list_bar()`, styles `pokehub-admin-back-bar` dans `includes/admin-ui.php`). Détail : [ADMIN_FORM_UX.md](./ADMIN_FORM_UX.md).
 - **Blocs — titres & CSS** : les titres principaux (`h2.pokehub-block-title`) sont unifiés sur le style **Field Research** (rouge `#b91c1c`, gauche, majuscules, `letter-spacing`). Règles dans `assets/css/poke-hub-blocks-front.css` ; même logique dupliquée dans `poke-hub-events-front.css` ; chargement éditeur via `enqueue_block_editor_assets`. Voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](./blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 - **Bloc New Pokémon / évolutions** : pastilles de types (icône stable, extension à droite) ; **bonbons** affichés selon la **famille** (racine de lignée + exceptions bébés Togepi / Tyrogue / Toxel + liste Pichu, Élekid, etc.). Filtre `pokehub_pokemon_slug_uses_parent_line_candy`. Détail : [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](./blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 - **Images / bonbons** : conventions raster (WebP → PNG → JPG), types en SVG depuis les sources — voir [POKEMON_IMAGES.md](./POKEMON_IMAGES.md) et l’onglet Sources en admin.
@@ -48,6 +49,7 @@ La documentation générale se trouve à la racine du dossier `docs/` :
 - **[CSS_RULES.md](./CSS_RULES.md)** - Règles CSS complètes pour les formulaires
 - **[FRONT_CSS.md](./FRONT_CSS.md)** - Règles CSS unifiées pour les éléments front-end
 - **[ADMIN_CSS.md](./ADMIN_CSS.md)** - Règles CSS unifiées pour l’administration
+- **[ADMIN_FORM_UX.md](./ADMIN_FORM_UX.md)** - Formulaires admin : redirection vers la liste après sauvegarde, lien « Retour à la liste », helpers (`poke_hub_admin_back_to_list_bar`, `pokehub_events_admin_list_url`)
 - **[TABLE_CSS.md](./TABLE_CSS.md)** - Règles CSS pour les tableaux
 - **[PLUGIN_COPY_GUIDE.md](./PLUGIN_COPY_GUIDE.md)** - Guide : Fichiers à copier pour réutiliser la structure
 - **[SELECT2_INITIALIZATION.md](./SELECT2_INITIALIZATION.md)** - Documentation de l'initialisation Select2

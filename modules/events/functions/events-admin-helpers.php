@@ -191,3 +191,24 @@ function pokehub_generate_unique_event_slug(string $base_slug, int $exclude_id =
         $i++;
     }
 }
+
+/**
+ * URL de la page admin « liste des événements » (conserve les filtres présents dans l’URL).
+ */
+function pokehub_events_admin_list_url(): string {
+    $url = add_query_arg(['page' => 'poke-hub-events'], admin_url('admin.php'));
+    $preserve = ['event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order'];
+    foreach ($preserve as $param) {
+        if (!isset($_GET[$param]) || $_GET[$param] === '' || $_GET[$param] === '-1') {
+            continue;
+        }
+        if ($param === 's') {
+            $url = add_query_arg($param, sanitize_text_field(wp_unslash((string) $_GET[$param])), $url);
+        } elseif (in_array($param, ['paged', 'orderby', 'order'], true)) {
+            $url = add_query_arg($param, sanitize_key((string) $_GET[$param]), $url);
+        } else {
+            $url = add_query_arg($param, sanitize_text_field(wp_unslash((string) $_GET[$param])), $url);
+        }
+    }
+    return $url;
+}
