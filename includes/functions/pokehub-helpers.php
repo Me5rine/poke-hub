@@ -646,6 +646,121 @@ function pokehub_table_ready_cached(string $table_name): bool {
  * @return string HTML de la pagination (vide si total_pages <= 1)
  */
 /**
+ * Racine du cache FastCGI Nginx (ex. /run/nginx-cache), alignée sur Nginx Helper si défini.
+ */
+function poke_hub_nginx_fastcgi_cache_root(): string {
+    $path = '';
+    if (defined('RT_WP_NGINX_HELPER_CACHE_PATH')) {
+        $path = (string) constant('RT_WP_NGINX_HELPER_CACHE_PATH');
+    }
+    $path = apply_filters('poke_hub_nginx_fastcgi_cache_root', $path);
+
+    return rtrim(trim((string) $path), '/\\');
+}
+
+/**
+ * Clés de cache FastCGI type fastcgi_cache_key "$scheme$request_method$host$request_uri".
+ *
+ * @return array<int, string>
+ */
+function poke_hub_nginx_fastcgi_cache_key_candidates_from_url(string $url): array {
+    $parts = wp_parse_url($url);
+    if (empty($parts['host'])) {
+        return [];
+    }
+    $scheme = isset($parts['scheme']) ? strtolower((string) $parts['scheme']) : 'https';
+    $host = strtolower((string) $parts['host']);
+    $path = isset($parts['path']) ? (string) $parts['path'] : '/';
+    if ($path === '' || $path[0] !== '/') {
+        $path = '/' . ltrim($path, '/');
+    }
+    $query = isset($parts['query']) && (string) $parts['query'] !== '' ? '?' . $parts['query'] : '';
+
+    $paths = [$path];
+    if ($path !== '/' && substr($path, -1) !== '/') {
+        $paths[] = $path . '/';
+    } elseif (strlen($path) > 1 && substr($path, -1) === '/') {
+        $t = rtrim($path, '/');
+        $paths[] = ($t === '') ? '/' : $t;
+    }
+    $paths = array_values(array_unique($paths));
+
+    $schemes = [$scheme];
+    if ($scheme === 'https') {
+        $schemes[] = 'http';
+    } elseif ($scheme === 'http') {
+        $schemes[] = 'https';
+    }
+    $schemes = array_values(array_unique($schemes));
+
+    $keys = [];
+    foreach ($schemes as $sch) {
+        foreach ($paths as $p) {
+            $keys[] = $sch . 'GET' . $host . $p . $query;
+        }
+    }
+
+    return array_values(array_unique($keys));
+}
+
+/**
+ * Chemin fichier cache pour md5 (levels=1:2, nom de fichier = hash complet).
+ */
+function poke_hub_nginx_fastcgi_cache_file_for_hash(string $cache_root_real, string $hash): string {
+    $hash = strtolower($hash);
+    if (strlen($hash) !== 32 || !ctype_xdigit($hash)) {
+        return '';
+    }
+    $l1 = substr($hash, -1);
+    $l2 = substr($hash, -3, 2);
+
+    return $cache_root_real . DIRECTORY_SEPARATOR . $l1 . DIRECTORY_SEPARATOR . $l2 . DIRECTORY_SEPARATOR . $hash;
+}
+
+/**
+ * Supprime les entrées FastCGI correspondant aux URLs (complément fiable à rt_wp_nginx_helper_purge_url depuis l’admin).
+ *
+ * @param array<int, string> $urls
+ * @return int Nombre de fichiers supprimés
+ */
+function poke_hub_delete_nginx_fastcgi_cache_files_for_urls(array $urls): int {
+    if (!apply_filters('poke_hub_supplement_nginx_fastcgi_file_cache_delete', true)) {
+        return 0;
+    }
+    $root = poke_hub_nginx_fastcgi_cache_root();
+    if ($root === '' || !is_dir($root)) {
+        return 0;
+    }
+    $root_real = realpath($root);
+    if ($root_real === false) {
+        return 0;
+    }
+    $deleted = 0;
+    foreach ($urls as $url) {
+        $url = trim((string) $url);
+        if ($url === '') {
+            continue;
+        }
+        foreach (poke_hub_nginx_fastcgi_cache_key_candidates_from_url($url) as $key) {
+            $hash = md5($key);
+            $file = poke_hub_nginx_fastcgi_cache_file_for_hash($root_real, $hash);
+            if ($file === '' || !is_file($file)) {
+                continue;
+            }
+            $real_file = realpath($file);
+            if ($real_file === false || strpos($real_file, $root_real) !== 0) {
+                continue;
+            }
+            if (@unlink($real_file)) {
+                ++$deleted;
+            }
+        }
+    }
+
+    return $deleted;
+}
+
+/**
  * Purge Nginx Helper cache for specific URLs or patterns
  * This is a global function that can be used across all modules (events, user-profiles, etc.)
  * 
@@ -699,20 +814,23 @@ function poke_hub_purge_nginx_cache($urls = null, $purge_all = false) {
     if (empty($urls_to_purge)) {
         return false;
     }
-    
-    // Try to purge specific URLs
+
+    $helper_purged = false;
     if (function_exists('rt_wp_nginx_helper_purge_url')) {
         foreach ($urls_to_purge as $url) {
             rt_wp_nginx_helper_purge_url($url);
         }
-        return true;
-    }
-    
-    // Alternative: Try action hook for URL-specific purge
-    if (has_action('rt_nginx_helper_purge_url')) {
+        $helper_purged = true;
+    } elseif (has_action('rt_nginx_helper_purge_url')) {
         foreach ($urls_to_purge as $url) {
             do_action('rt_nginx_helper_purge_url', $url);
         }
+        $helper_purged = true;
+    }
+
+    $files_deleted = poke_hub_delete_nginx_fastcgi_cache_files_for_urls($urls_to_purge);
+
+    if ($helper_purged || $files_deleted > 0) {
         return true;
     }
     
