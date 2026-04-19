@@ -318,12 +318,12 @@ function poke_hub_purge_events_cache() {
 
 /**
  * Intervalle (secondes) pour la purge planifiée du cache liste événements (statuts / temps restant côté anonymes).
- * Défaut 60 s : compromis charge disque / fraîcheur pour le cache FastCGI Nginx.
+ * Défaut 45 s : limiter le risque qu’un événement reste dans la mauvaise section (HTML figé).
  *
  * @return int Entre 30 et 86400.
  */
 function poke_hub_events_front_cache_purge_interval_seconds(): int {
-    $interval = (int) apply_filters('poke_hub_events_front_cache_purge_interval', MINUTE_IN_SECONDS);
+    $interval = (int) apply_filters('poke_hub_events_front_cache_purge_interval', 45);
 
     return max(30, min($interval, DAY_IN_SECONDS));
 }

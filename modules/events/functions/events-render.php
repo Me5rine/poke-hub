@@ -309,10 +309,13 @@ function poke_hub_events_render_list(array $events): void {
     ?>
 <script>
 (function() {
-    // Timestamp serveur (PHP)
-    var serverNow = <?php echo time(); ?>;
-    var clientNow = Math.floor(Date.now() / 1000);
-    var offset    = serverNow - clientNow;
+    // « Maintenant » pour le compte à rebours : horloge cliente uniquement.
+    // Ne pas utiliser time() PHP ici : le HTML peut être servi depuis un cache Nginx/edge
+    // vieux de plusieurs heures/jours ; un ancrage serveur figé fausse le délai (écarts PC vs mobile).
+    // start_ts / end_ts sont déjà des timestamps Unix absolus.
+    function nowUnixSeconds() {
+        return Math.floor(Date.now() / 1000);
+    }
 
     // Libellés traduits côté PHP
     var labelCurrentTpl     = <?php echo json_encode(esc_html__('Ends in %s', 'poke-hub')); ?>;
@@ -370,7 +373,7 @@ function poke_hub_events_render_list(array $events): void {
     var container = scriptEl ? scriptEl.parentElement : document;
 
     function refreshEventTimers() {
-        var now   = Math.floor(Date.now() / 1000) + offset;
+        var now   = nowUnixSeconds();
         var cards = container.querySelectorAll('.pokehub-event-card');
 
         cards.forEach(function(card, idx) {

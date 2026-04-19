@@ -350,6 +350,31 @@ function poke_hub_get_user_profile($user_id = null, $discord_id = null) {
 }
 
 /**
+ * Indique si les données soumises modifient ce qui apparaît ou se filtre sur les pages
+ * codes amis / Vivillon (hors champs purement internes comme l’XP seul).
+ *
+ * @param array<string,mixed> $profile Tableau tel que passé à poke_hub_save_user_profile().
+ */
+function poke_hub_profile_submission_affects_public_friend_listings(array $profile): bool {
+    static $listing_keys = [
+        'friend_code',
+        'team',
+        'country',
+        'scatterbug_pattern',
+        'pokemon_go_username',
+        'reasons',
+        'friend_code_public',
+    ];
+    foreach ($listing_keys as $key) {
+        if (array_key_exists($key, $profile)) {
+            return true;
+        }
+    }
+
+    return (bool) apply_filters('poke_hub_profile_submission_affects_public_friend_listings', false, $profile);
+}
+
+/**
  * Save Pokémon GO user profile.
  *
  * @param int|null   $user_id WordPress User ID (optional)
@@ -766,11 +791,11 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
         return false;
     }
 
-    // If friend_code was updated, purge Nginx Helper cache so the change appears immediately
-    if (isset($profile['friend_code'])) {
-        if (function_exists('poke_hub_purge_module_cache')) {
-            poke_hub_purge_module_cache(['poke_hub_friend_codes', 'poke_hub_vivillon']);
-        }
+    // Purger les pages liste si un champ visible / filtrable a été soumis (pays, équipe, motif, etc.).
+    if (function_exists('poke_hub_profile_submission_affects_public_friend_listings')
+        && poke_hub_profile_submission_affects_public_friend_listings($profile)
+        && function_exists('poke_hub_purge_module_cache')) {
+        poke_hub_purge_module_cache(['poke_hub_friend_codes', 'poke_hub_vivillon']);
     }
 
     // Sync country with Ultimate Member (country is the single source of truth)

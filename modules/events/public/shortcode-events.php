@@ -94,6 +94,14 @@ function poke_hub_shortcode_events($atts) {
         return '<p>' . esc_html__('Events module is not loaded.', 'poke-hub') . '</p>';
     }
 
+    // Même URL = un seul fichier Nginx pour tous les appareils ; il faut éviter qu’il reste « figé »
+    // (sections En cours / À venir / Passées calculées en PHP au moment du MISS).
+    if (apply_filters('poke_hub_events_send_nocache_headers_on_shortcode_output', true) && !headers_sent()) {
+        nocache_headers();
+        // Aide certains reverse proxies / Nginx à ne pas conserver cette réponse en cache de page.
+        header('X-Accel-Expires: 0');
+    }
+
     // 🔁 Récupérer les types enfants pour la barre de filtre (si event_type_parent est défini)
     $child_types = [];
     if (!empty($atts['event_type_parent']) && function_exists('poke_hub_events_get_child_event_types')) {
