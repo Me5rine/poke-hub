@@ -289,9 +289,10 @@ function poke_hub_pokemon_handle_egg_types_form() {
     }
 
     if ($slug === '') {
-        $base_for_slug = $name_en !== '' ? $name_en : $name_fr;
-        $slug = sanitize_title($base_for_slug);
+        $slug = pokehub_slug_base_from_two_strings($name_en, $name_fr, 'egg-type');
     }
+
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_egg_type' ? 0 : $id, 'slug', 'id', 'egg-type');
 
     $extra = [
         'image_url'         => $image_url,

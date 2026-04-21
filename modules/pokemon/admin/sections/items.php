@@ -114,14 +114,13 @@ class Poke_Hub_Pokemon_Items_List_Table extends WP_List_Table {
     }
 
     public function column_image_url($item) {
-        $extra = [];
-        if (!empty($item->extra)) {
-            $decoded = json_decode($item->extra, true);
-            if (is_array($decoded)) {
-                $extra = $decoded;
+        $url = '';
+        if (function_exists('pokehub_get_item_data_by_id')) {
+            $item_data = pokehub_get_item_data_by_id((int) $item->id);
+            if (is_array($item_data) && !empty($item_data['image_url'])) {
+                $url = (string) $item_data['image_url'];
             }
         }
-        $url = $extra['image_url'] ?? '';
 
         if (!$url) {
             return '&mdash;';
@@ -291,7 +290,6 @@ function poke_hub_pokemon_handle_items_form() {
     $name_fr   = isset($_POST['name_fr']) ? sanitize_text_field(wp_unslash($_POST['name_fr'])) : '';
     $name_en   = isset($_POST['name_en']) ? sanitize_text_field(wp_unslash($_POST['name_en'])) : '';
     $slug      = isset($_POST['slug']) ? sanitize_title(wp_unslash($_POST['slug'])) : '';
-    $image_url = isset($_POST['image_url']) ? esc_url_raw(wp_unslash($_POST['image_url'])) : '';
 
     // 🔹 Descriptions
     $description_fr = isset($_POST['description_fr'])
@@ -309,13 +307,28 @@ function poke_hub_pokemon_handle_items_form() {
 
     // Slug auto depuis FR ou EN
     if ($slug === '') {
-        $base_for_slug = $name_fr !== '' ? $name_fr : $name_en;
-        $slug = sanitize_title($base_for_slug);
+        $slug = pokehub_slug_base_from_two_strings($name_fr, $name_en, 'item');
     }
 
-    $extra = [
-        'image_url' => $image_url,
-    ];
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_item' ? 0 : $id, 'slug', 'id', 'item');
+
+    $extra = [];
+    if ($action === 'update_item' && $id > 0) {
+        $existing_extra_raw = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT extra FROM {$table} WHERE id = %d LIMIT 1",
+                $id
+            )
+        );
+        if (is_string($existing_extra_raw) && $existing_extra_raw !== '') {
+            $existing_extra = json_decode($existing_extra_raw, true);
+            if (is_array($existing_extra)) {
+                $extra = $existing_extra;
+            }
+        }
+    }
+    // Désactive l'ancienne URL manuelle : rendu auto depuis le slug + sources d'images.
+    unset($extra['image_url']);
 
     $data = [
         'slug'           => $slug,
@@ -323,7 +336,7 @@ function poke_hub_pokemon_handle_items_form() {
         'name_en'        => $name_en,
         'description_fr' => $description_fr,
         'description_en' => $description_en,
-        'extra'          => wp_json_encode($extra),
+        'extra'          => !empty($extra) ? wp_json_encode($extra) : '',
     ];
     $format = ['%s', '%s', '%s', '%s', '%s', '%s'];
 

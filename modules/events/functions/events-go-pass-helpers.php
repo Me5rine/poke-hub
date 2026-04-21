@@ -457,7 +457,7 @@ function pokehub_go_pass_render_reward_lis_html(array $tier_or_milestone, string
  * Données structurées pour une carte récompense (rendu battle pass).
  *
  * @param array<string, mixed> $reward
- * @return array{type_class:string,title:string,subtitle:string,qty:string,img:string,featured:bool}|null
+ * @return array{type_class:string,title:string,subtitle:string,qty:string,img:string,img_html:string,featured:bool}|null
  */
 function pokehub_go_pass_reward_card_data(array $reward): ?array {
     $n = pokehub_go_pass_normalize_reward_array($reward);
@@ -470,6 +470,7 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
     $qty_label    = '×' . (function_exists('number_format_i18n') ? number_format_i18n($qty) : (string) $qty);
     $featured     = !empty($n['featured']);
     $img          = '';
+    $img_html     = '';
     $title        = '';
     $subtitle     = '';
     $type_class   = 'pokehub-go-pass-card--' . preg_replace('/[^a-z0-9_-]/', '', $type);
@@ -477,9 +478,19 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
     switch ($type) {
         case 'xp':
             $title = __('XP', 'poke-hub');
+            if (function_exists('pokehub_render_reward_object_icon_img')) {
+                $img_html = pokehub_render_reward_object_icon_img(['type' => 'xp'], [
+                    'alt' => __('XP', 'poke-hub'),
+                ]);
+            }
             break;
         case 'stardust':
             $title = __('Stardust', 'poke-hub');
+            if (function_exists('pokehub_render_reward_object_icon_img')) {
+                $img_html = pokehub_render_reward_object_icon_img(['type' => 'stardust'], [
+                    'alt' => __('Stardust', 'poke-hub'),
+                ]);
+            }
             break;
         case 'item':
             $iid = (int) ($n['item_id'] ?? 0);
@@ -488,6 +499,19 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
                 $it = pokehub_get_item_data_by_id($iid);
                 if ($it) {
                     $title = (string) ($it['name'] ?? $it['name_fr'] ?? $it['name_en'] ?? $title);
+                    if (!empty($it['image_url'])) {
+                        $img = (string) $it['image_url'];
+                    }
+                    if (function_exists('pokehub_render_reward_object_icon_img')) {
+                        $img_html = pokehub_render_reward_object_icon_img(
+                            [
+                                'type' => 'item',
+                                'item_id' => $iid,
+                                'item_name' => $title,
+                            ],
+                            ['alt' => $title]
+                        );
+                    }
                 }
             }
             break;
@@ -597,6 +621,7 @@ function pokehub_go_pass_reward_card_data(array $reward): ?array {
         'subtitle'   => $subtitle,
         'qty'        => $qty_label,
         'img'        => $img,
+        'img_html'   => $img_html,
         'featured'   => $featured,
     ];
 
@@ -613,7 +638,7 @@ function pokehub_go_pass_deluxe_lock_svg(): string {
 }
 
 /**
- * @param array{type_class:string,title:string,subtitle:string,qty:string,img:string,featured:bool} $data
+ * @param array{type_class:string,title:string,subtitle:string,qty:string,img:string,img_html:string,featured:bool} $data
  * @param string                                                                                    $side free|premium
  */
 function pokehub_go_pass_render_reward_card_html(array $data, string $side): string {
@@ -621,7 +646,9 @@ function pokehub_go_pass_render_reward_card_html(array $data, string $side): str
     $side_theme = ($side === 'premium') ? 'deluxe' : 'basic';
     $feat_class = !empty($data['featured']) ? ' pokehub-go-pass-card--featured' : '';
     $img_html   = '';
-    if (!empty($data['img'])) {
+    if (!empty($data['img_html'])) {
+        $img_html = '<div class="pokehub-go-pass-card__visual">' . (string) $data['img_html'] . '</div>';
+    } elseif (!empty($data['img'])) {
         $img_html = '<div class="pokehub-go-pass-card__visual"><img src="' . esc_url((string) $data['img']) . '" alt="" loading="lazy" decoding="async" width="80" height="80"></div>';
     } else {
         $img_html = '<div class="pokehub-go-pass-card__visual pokehub-go-pass-card__visual--placeholder" aria-hidden="true"><span class="pokehub-go-pass-card__glyph"></span></div>';
@@ -687,6 +714,7 @@ function pokehub_go_pass_render_reward_cards_column_html(array $tier_or_mileston
                 'subtitle'   => '',
                 'qty'        => '',
                 'img'        => '',
+                'img_html'   => '',
                 'featured'   => false,
             ];
             $html .= pokehub_go_pass_render_reward_card_html($data, $side);
@@ -1757,13 +1785,10 @@ function pokehub_go_pass_resolve_date_range_from_host_post(int $post_id): array 
 function pokehub_go_pass_create_empty_special_event(string $title_en = '', string $title_fr = '', int $host_post_id = 0) {
     global $wpdb;
 
-    if (!function_exists('pokehub_generate_unique_event_slug')) {
-        $admin_helpers = defined('POKE_HUB_PATH') ? POKE_HUB_PATH . 'modules/events/functions/events-admin-helpers.php' : '';
-        if ($admin_helpers !== '' && is_readable($admin_helpers)) {
-            require_once $admin_helpers;
-        }
-    }
-    if (!function_exists('pokehub_generate_unique_event_slug')) {
+    $slug_helper_ok = function_exists('pokehub_ensure_events_admin_helpers_loaded')
+        ? pokehub_ensure_events_admin_helpers_loaded()
+        : function_exists('pokehub_generate_unique_event_slug');
+    if (!$slug_helper_ok) {
         return new WP_Error(
             'missing_slug_helper',
             __('Event slug helper is not available.', 'poke-hub'),

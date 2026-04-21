@@ -358,7 +358,7 @@ function poke_hub_pokemon_handle_biomes_form() {
     }
 
     if ($slug === '') {
-        $slug = sanitize_title($name_en);
+        $slug = pokehub_slug_base_from_two_strings($name_en, $name_fr, 'biome');
     }
 
     if ($slug === '') {
@@ -366,17 +366,14 @@ function poke_hub_pokemon_handle_biomes_form() {
         exit;
     }
 
-    $slug_conflict = (int) $wpdb->get_var(
-        $wpdb->prepare(
-            "SELECT id FROM {$table} WHERE slug = %s AND id != %d",
-            $slug,
-            $action === 'update_biome' ? $id : 0
-        )
+    $slug = pokehub_unique_slug_for_table(
+        $table,
+        $slug,
+        $action === 'update_biome' ? $id : 0,
+        'slug',
+        'id',
+        'biome'
     );
-    if ($slug_conflict > 0) {
-        wp_safe_redirect(add_query_arg('ph_msg', 'slug_exists', $redirect_base));
-        exit;
-    }
 
     $data = [
         'slug'        => $slug,
@@ -497,8 +494,6 @@ function poke_hub_pokemon_admin_biomes_screen() {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('English and French names are required.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_slug') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Could not build a valid slug.', 'poke-hub') . '</p></div>';
-        } elseif ($msg === 'slug_exists') {
-            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('This slug is already used by another biome.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_id') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Invalid biome ID.', 'poke-hub') . '</p></div>';
         }

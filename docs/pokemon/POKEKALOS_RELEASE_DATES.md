@@ -16,7 +16,7 @@ Ce document décrit l’import des **dates de sortie** (normal, shiny, shadow, d
 
 ## Outil d’import (admin)
 
-Menu **Poké HUB > Outils temporaires** :
+**Emplacement** : **Poké HUB → Temporary tools**, onglet **Dates (Pokekalos)** (`tab=pokekalos`). Vue d’ensemble de cette page (autres onglets, désactivation du menu) : [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md).
 
 - **Import dates de sortie Pokekalos** : formulaire avec :
   - **Mode simulation (dry-run)** : affiche les actions sans modifier la base.
@@ -25,7 +25,7 @@ Menu **Poké HUB > Outils temporaires** :
   - **Délai (secondes)** : pause entre chaque requête vers Pokekalos (par défaut 1).
 - Le résultat (log) s’affiche sous le formulaire après exécution.
 
-Ce menu est **temporaire** : une fois les imports terminés, le fichier `includes/admin-tools.php` et son `require` dans `poke-hub.php` peuvent être retirés.
+Le sous-menu **Temporary tools** peut être **masqué** sans retirer le code : **Poké HUB → Settings → General** → section **Temporary tools (admin)** (option `poke_hub_temporary_tools_enabled`, activée par défaut). L’import reste disponible via le **script CLI** ci-dessous si besoin.
 
 ## Script CLI
 
@@ -78,7 +78,7 @@ php scripts/import-pokekalos-release-dates.php --limit=50 --skip-existing --dela
 | `includes/functions/pokehub-pokekalos-release-parser.php` | Parse le HTML des notes Pokekalos et extrait les clés normal, shiny, shadow, dynamax, gigantamax. |
 | `includes/functions/pokehub-pokekalos-import.php` | Logique d’import : `poke_hub_run_pokekalos_import($options)`. Utilisée par le CLI et par l’admin. |
 | `includes/functions/pokehub-helpers.php` | `poke_hub_normalize_release_date($date)` pour le format YYYY-MM-DD. |
-| `includes/admin-tools.php` | Menu « Outils temporaires » et formulaire d’import (module temporaire). |
+| `includes/admin-tools.php` | Page **Temporary tools** (onglets, import Pokekalos depuis l’admin). Voir [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md). |
 | `scripts/import-pokekalos-release-dates.php` | Script CLI qui appelle `poke_hub_run_pokekalos_import()`. |
 
 ## Admin Pokémon : dates de sortie

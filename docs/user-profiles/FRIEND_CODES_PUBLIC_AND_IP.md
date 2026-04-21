@@ -1,6 +1,6 @@
 # Codes amis publics, IP et visiteurs non connectés
 
-Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_friend_codes]` et `[poke_hub_vivillon]`), le stockage de l’IP et l’administration.
+Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_friend_codes]` et `[poke_hub_vivillon]`), le stockage de l’IP et l’administration. Pour la **purge du cache de page** (Nginx) et le comportement côté visiteurs anonymes, voir [CACHE_AND_NGINX_PURGE.md](../CACHE_AND_NGINX_PURGE.md).
 
 ## Colonne `anonymous_ip` (table `user_profiles`)
 

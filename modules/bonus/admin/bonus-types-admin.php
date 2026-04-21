@@ -72,7 +72,7 @@ function pokehub_bonus_types_admin_handle_requests(): void {
     $slug_manual = isset($_POST['slug_manual']) && (string) wp_unslash($_POST['slug_manual']) === '1';
     $slug_raw = isset($_POST['slug']) ? sanitize_title(wp_unslash($_POST['slug'])) : '';
     if (!$slug_manual || $slug_raw === '') {
-        $slug_raw = sanitize_title($title_en);
+        $slug_raw = pokehub_slug_base_from_names($title_en, $title_fr, 'bonus');
     }
     $description = isset($_POST['description']) ? wp_kses_post(wp_unslash($_POST['description'])) : '';
 
@@ -81,16 +81,7 @@ function pokehub_bonus_types_admin_handle_requests(): void {
         exit;
     }
 
-    // Unicité du slug (hors ligne courante si édition)
-    $dup = (int) $wpdb->get_var($wpdb->prepare(
-        "SELECT id FROM {$table} WHERE slug = %s AND id != %d LIMIT 1",
-        $slug_raw,
-        $id
-    ));
-    if ($dup > 0) {
-        wp_safe_redirect(pokehub_bonus_types_admin_url(['ph_bonus_msg' => 'duplicate', 'edit' => $id > 0 ? $id : 'new']));
-        exit;
-    }
+    $slug_raw = pokehub_unique_slug_for_table($table, $slug_raw, $id, 'slug', 'id', 'bonus');
 
     $data = [
         'title_en'      => $title_en,
@@ -143,7 +134,6 @@ function pokehub_render_bonus_types_admin_page(): void {
         'updated'   => ['success', __('Bonus type updated.', 'poke-hub')],
         'deleted'   => ['success', __('Bonus type deleted.', 'poke-hub')],
         'missing'   => ['error', __('English name, French name and slug are required.', 'poke-hub')],
-        'duplicate' => ['error', __('This slug is already in use.', 'poke-hub')],
         'nonce'     => ['error', __('Security check failed.', 'poke-hub')],
         'error'     => ['error', __('Could not save.', 'poke-hub')],
     ];
@@ -159,15 +149,6 @@ function pokehub_render_bonus_types_admin_page(): void {
     }
 
     $is_new = ($edit_id === 0 && isset($_GET['edit']) && sanitize_key(wp_unslash($_GET['edit'])) === 'new') || ($msg === 'missing' && isset($_GET['edit']) && sanitize_key(wp_unslash($_GET['edit'])) === 'new');
-    if ($msg === 'duplicate' && isset($_GET['edit'])) {
-        $dup_edit = (int) $_GET['edit'];
-        if ($dup_edit > 0) {
-            $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $dup_edit));
-            $edit_id = $dup_edit;
-        } else {
-            $is_new = true;
-        }
-    }
 
     ?>
     <div class="wrap pokehub-bonus-types-admin">

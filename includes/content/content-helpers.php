@@ -4,7 +4,7 @@
 // Les dates (start_ts, end_ts) sont dupliquées ; la mise à jour des dates d'un event/post doit appeler pokehub_content_sync_dates_for_source().
 //
 // Lieu d'enregistrement unique : même préfixe que les tables Pokémon (poke_hub_pokemon_remote_prefix).
-// Centralise : Pokémon nature, field research, habitats, bonus, nouveaux Pokémon, special research, collection challenges, œufs.
+// Centralise : Pokémon nature, field research, habitats, bonus, nouveaux Pokémon, special research, collection challenges, œufs, boutique avatar.
 
 if (!defined('ABSPATH')) {
     exit;
@@ -113,6 +113,8 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         'content_day_pokemon_hours',
         'content_raids',
         'content_go_pass',
+        'content_shop_avatar',
+        'content_shop_sticker',
     ];
 
     foreach ($tables_with_dates as $key) {
@@ -140,32 +142,17 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         )) > 0;
 
         if (!$table_exists) {
-            if (!$content_tables_ensured && class_exists('Pokehub_DB') && function_exists('pokehub_get_table')) {
-                // Tente une (re)création des tables de contenu manquantes.
+            if (!$content_tables_ensured && function_exists('pokehub_get_table') && function_exists('pokehub_install_tables_for_modules')) {
+                // Tente une (re)création des tables de contenu manquantes (préfixe = source Pokémon / contenu).
                 try {
-                    // Certains blocs (ex: Day Pokémon Hours / Featured Hours) utilisent des tables
-                    // de "content" qui ne sont créées que si le module `blocks` est inclus.
-                    Pokehub_DB::getInstance()->createTables(['events', 'eggs', 'quests', 'blocks']);
+                    pokehub_install_tables_for_modules(
+                        ['events', 'eggs', 'quests', 'blocks', 'shop-items'],
+                        ['try_require_db_class' => !class_exists('Pokehub_DB')]
+                    );
                 } catch (Throwable $t) {
                     // ignore; la table pourrait rester manquante dans certains setups.
                 }
                 $content_tables_ensured = true;
-            } elseif (!$content_tables_ensured && !class_exists('Pokehub_DB') && function_exists('pokehub_get_table')) {
-                // Si la classe n'est pas encore chargée, on tente de la charger.
-                try {
-                    $db_file = dirname(__DIR__) . '/pokehub-db.php';
-                    if (file_exists($db_file)) {
-                        require_once $db_file;
-                    }
-                    if (class_exists('Pokehub_DB')) {
-                        // Certains blocs (ex: Day Pokémon Hours / Featured Hours) utilisent des tables
-                        // de "content" qui ne sont créées que si le module `blocks` est inclus.
-                        Pokehub_DB::getInstance()->createTables(['events', 'eggs', 'quests', 'blocks']);
-                        $content_tables_ensured = true;
-                    }
-                } catch (Throwable $t) {
-                    // ignore
-                }
             }
 
             $table_exists = (int) $wpdb->get_var($wpdb->prepare(
@@ -3701,4 +3688,230 @@ function pokehub_content_get_featured_hours_classic_events_entries_for_parent(in
     });
 
     return $out;
+}
+
+// --- Boutique avatar (articles) ---
+
+/**
+ * Ligne content_shop_avatar pour une source.
+ *
+ * @param string $source_type
+ * @param int    $source_id
+ * @return object|null
+ */
+function pokehub_content_get_shop_avatar_row($source_type, $source_id) {
+    global $wpdb;
+    $table = pokehub_get_table('content_shop_avatar');
+    if (!$table) {
+        return null;
+    }
+    return $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$table} WHERE source_type = %s AND source_id = %d LIMIT 1",
+        (string) $source_type,
+        (int) $source_id
+    ));
+}
+
+/**
+ * Données boutique avatar pour une source.
+ *
+ * @return array{hero_attachment_id: int, item_ids: int[]}
+ */
+function pokehub_content_get_shop_avatar($source_type, $source_id) {
+    $row = pokehub_content_get_shop_avatar_row($source_type, $source_id);
+    if (!$row) {
+        return ['hero_attachment_id' => 0, 'item_ids' => []];
+    }
+    global $wpdb;
+    $entries_tbl = pokehub_get_table('content_shop_avatar_entries');
+    if (!$entries_tbl) {
+        return ['hero_attachment_id' => (int) ($row->hero_attachment_id ?? 0), 'item_ids' => []];
+    }
+    $entries = $wpdb->get_results($wpdb->prepare(
+        "SELECT shop_avatar_item_id FROM {$entries_tbl} WHERE content_shop_avatar_id = %d ORDER BY sort_order ASC, id ASC",
+        (int) $row->id
+    ));
+    $ids = [];
+    foreach ((array) $entries as $e) {
+        $iid = (int) $e->shop_avatar_item_id;
+        if ($iid > 0) {
+            $ids[] = $iid;
+        }
+    }
+    return [
+        'hero_attachment_id' => (int) ($row->hero_attachment_id ?? 0),
+        'item_ids'           => $ids,
+    ];
+}
+
+/**
+ * Enregistre la sélection boutique avatar + image d’en-tête (pièce jointe WP).
+ *
+ * @param string   $source_type
+ * @param int      $source_id
+ * @param int[]    $item_ids
+ * @param int      $hero_attachment_id
+ */
+function pokehub_content_save_shop_avatar($source_type, $source_id, array $item_ids, $hero_attachment_id = 0) {
+    global $wpdb;
+    $main_tbl    = pokehub_get_table('content_shop_avatar');
+    $entries_tbl = pokehub_get_table('content_shop_avatar_entries');
+    if (!$main_tbl || !$entries_tbl) {
+        return;
+    }
+    $dates = pokehub_content_get_dates_for_source($source_type, $source_id);
+    $row   = pokehub_content_get_shop_avatar_row($source_type, $source_id);
+    $hero_attachment_id = (int) $hero_attachment_id;
+    if ($hero_attachment_id > 0 && function_exists('get_post')) {
+        $att = get_post($hero_attachment_id);
+        if (!$att || $att->post_type !== 'attachment') {
+            $hero_attachment_id = 0;
+        }
+    }
+
+    $item_ids = array_values(array_filter(array_map('intval', $item_ids), static function ($id) {
+        return $id > 0;
+    }));
+
+    if ($row) {
+        $wpdb->update($main_tbl, [
+            'start_ts'            => $dates['start_ts'],
+            'end_ts'              => $dates['end_ts'],
+            'hero_attachment_id'  => $hero_attachment_id,
+            'updated_at'          => current_time('mysql'),
+        ], ['id' => $row->id], ['%d', '%d', '%d', '%s'], ['%d']);
+        $content_id = (int) $row->id;
+        $wpdb->query($wpdb->prepare("DELETE FROM {$entries_tbl} WHERE content_shop_avatar_id = %d", $content_id));
+    } else {
+        $wpdb->insert($main_tbl, [
+            'source_type'          => (string) $source_type,
+            'source_id'            => (int) $source_id,
+            'start_ts'             => $dates['start_ts'],
+            'end_ts'               => $dates['end_ts'],
+            'hero_attachment_id'   => $hero_attachment_id,
+        ], ['%s', '%d', '%d', '%d', '%d']);
+        $content_id = (int) $wpdb->insert_id;
+    }
+
+    $sort = 0;
+    foreach ($item_ids as $iid) {
+        $wpdb->insert($entries_tbl, [
+            'content_shop_avatar_id' => $content_id,
+            'shop_avatar_item_id'    => $iid,
+            'sort_order'               => $sort++,
+        ], ['%d', '%d', '%d']);
+    }
+}
+
+// --- Stickers en jeu (articles) ---
+
+/**
+ * Ligne content_shop_sticker pour une source.
+ *
+ * @param string $source_type
+ * @param int    $source_id
+ * @return object|null
+ */
+function pokehub_content_get_shop_sticker_row($source_type, $source_id) {
+    global $wpdb;
+    $table = pokehub_get_table('content_shop_sticker');
+    if (!$table) {
+        return null;
+    }
+    return $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$table} WHERE source_type = %s AND source_id = %d LIMIT 1",
+        (string) $source_type,
+        (int) $source_id
+    ));
+}
+
+/**
+ * Données stickers en jeu pour une source.
+ *
+ * @return array{hero_attachment_id: int, item_ids: int[]}
+ */
+function pokehub_content_get_shop_sticker($source_type, $source_id) {
+    $row = pokehub_content_get_shop_sticker_row($source_type, $source_id);
+    if (!$row) {
+        return ['hero_attachment_id' => 0, 'item_ids' => []];
+    }
+    global $wpdb;
+    $entries_tbl = pokehub_get_table('content_shop_sticker_entries');
+    if (!$entries_tbl) {
+        return ['hero_attachment_id' => (int) ($row->hero_attachment_id ?? 0), 'item_ids' => []];
+    }
+    $entries = $wpdb->get_results($wpdb->prepare(
+        "SELECT shop_sticker_item_id FROM {$entries_tbl} WHERE content_shop_sticker_id = %d ORDER BY sort_order ASC, id ASC",
+        (int) $row->id
+    ));
+    $ids = [];
+    foreach ((array) $entries as $e) {
+        $iid = (int) $e->shop_sticker_item_id;
+        if ($iid > 0) {
+            $ids[] = $iid;
+        }
+    }
+    return [
+        'hero_attachment_id' => (int) ($row->hero_attachment_id ?? 0),
+        'item_ids'           => $ids,
+    ];
+}
+
+/**
+ * Enregistre la sélection stickers + image d’en-tête (pièce jointe WP).
+ *
+ * @param string   $source_type
+ * @param int      $source_id
+ * @param int[]    $item_ids
+ * @param int      $hero_attachment_id
+ */
+function pokehub_content_save_shop_sticker($source_type, $source_id, array $item_ids, $hero_attachment_id = 0) {
+    global $wpdb;
+    $main_tbl    = pokehub_get_table('content_shop_sticker');
+    $entries_tbl = pokehub_get_table('content_shop_sticker_entries');
+    if (!$main_tbl || !$entries_tbl) {
+        return;
+    }
+    $dates = pokehub_content_get_dates_for_source($source_type, $source_id);
+    $row   = pokehub_content_get_shop_sticker_row($source_type, $source_id);
+    $hero_attachment_id = (int) $hero_attachment_id;
+    if ($hero_attachment_id > 0 && function_exists('get_post')) {
+        $att = get_post($hero_attachment_id);
+        if (!$att || $att->post_type !== 'attachment') {
+            $hero_attachment_id = 0;
+        }
+    }
+
+    $item_ids = array_values(array_filter(array_map('intval', $item_ids), static function ($id) {
+        return $id > 0;
+    }));
+
+    if ($row) {
+        $wpdb->update($main_tbl, [
+            'start_ts'            => $dates['start_ts'],
+            'end_ts'              => $dates['end_ts'],
+            'hero_attachment_id'  => $hero_attachment_id,
+            'updated_at'          => current_time('mysql'),
+        ], ['id' => $row->id], ['%d', '%d', '%d', '%s'], ['%d']);
+        $content_id = (int) $row->id;
+        $wpdb->query($wpdb->prepare("DELETE FROM {$entries_tbl} WHERE content_shop_sticker_id = %d", $content_id));
+    } else {
+        $wpdb->insert($main_tbl, [
+            'source_type'          => (string) $source_type,
+            'source_id'            => (int) $source_id,
+            'start_ts'             => $dates['start_ts'],
+            'end_ts'               => $dates['end_ts'],
+            'hero_attachment_id'   => $hero_attachment_id,
+        ], ['%s', '%d', '%d', '%d', '%d']);
+        $content_id = (int) $wpdb->insert_id;
+    }
+
+    $sort = 0;
+    foreach ($item_ids as $iid) {
+        $wpdb->insert($entries_tbl, [
+            'content_shop_sticker_id' => $content_id,
+            'shop_sticker_item_id'    => $iid,
+            'sort_order'              => $sort++,
+        ], ['%d', '%d', '%d']);
+    }
 }

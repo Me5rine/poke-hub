@@ -45,6 +45,7 @@ Les chaînes affichées côté PHP (render, shortcodes, admin) sont déjà dans 
 - **Modules :** chaque module (quests, collections, blocks, events, bonus, pokemon, games, user-profiles, eggs, etc.) utilise `__()`, `_e()`, `esc_html_e()`, etc. avec le text domain `poke-hub`
 - **Collections (vue grille)** : libellés du filtre d’affichage et du message d’aide dans `modules/collections/public/collections-shortcode.php` (sources en anglais, ex. *Show in grid*, *Owned*, *For trade*, *Missing*, *Select at least one status…*). Le sens **métier** en français (possédé, à l’échange, manquant, filtre **Afficher dans la grille**) est aligné sur **docs/COLLECTIONS_MODULE.md** (section *Statuts d’une entrée*).
 - **Blocs :** `modules/blocks/blocks/*/block.json` (title, description en anglais) ; le rendu PHP des blocs utilise aussi les fonctions de traduction
+- **Shop highlights (front) :** `modules/blocks/blocks/shop-avatar-highlights/render.php`, `shop-sticker-highlights/render.php` — phrases d’accroche, sous-titres des tuiles, libellés d’accessibilité ; helpers `pokehub_shop_highlights_resolve_event_label()` / `pokehub_shop_highlights_collect_item_display_names()` dans `modules/blocks/functions/blocks-helpers.php` (chaîne de repli `this event`, etc.)
 
 ## Bonnes pratiques pour le code
 

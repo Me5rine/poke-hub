@@ -73,6 +73,8 @@ Couverture appliquée : GO Pass, Day Pokémon Hours (incluant la génération de
 
 **Exemple :** `<!--wp:pokehub/event-dates {"autoDetect":true} /-->`
 
+**Rendu front (wrapper)** : le wrapper `.pokehub-event-dates-block-wrapper` reçoit un habillage type « carte » (fond léger, bordure, ombre, padding) pour mieux séparer le titre et la ligne de chips **sans** séparateur horizontal entre le titre et les tuiles début/fin — les chips elles-mêmes ne sont pas modifiées. Styles : `assets/css/poke-hub-blocks-front.css`.
+
 #### Bloc "Event Quests" (`pokehub/event-quests`)
 
 Affiche les quêtes et récompenses du contenu courant (article ou événement). Les données viennent des tables de contenu (`content_quests`, `content_quest_lines`), remplies via **Poké HUB → Quêtes** (ensemble lié à un contenu) ou via la metabox quêtes sur le post (module Events).
@@ -80,9 +82,10 @@ Affiche les quêtes et récompenses du contenu courant (article ou événement).
 - **Dépendance d’enregistrement :** module **Events** (le bloc ne dépend pas du module Quêtes).
 - **Gestion des quêtes :** menu **Poké HUB → Quêtes** (module Quêtes) ; la metabox sur les articles reste fournie par le module Events.
 - **Aperçu replié des récompenses Pokémon :** maximum **3** mini-tuiles, puis un badge **`+N`** pour le nombre de Pokémon supplémentaires non affichés.
-- **Compteurs d’aperçu :** le badge **`×M`** continue d’indiquer les lignes de récompenses non-Pokémon (objets, poussière, etc.) en plus de l’aperçu Pokémon.
+- **Compteurs d’aperçu (récompenses non-Pokémon) :** s’il n’y a **qu’une** ligne non-Pokémon, le badge affiche la **quantité réelle** (`×500`, etc.). S’il y en a **plusieurs**, le badge reste compact : **`Other × M`** (nombre de lignes), avec `title` explicite — évite la confusion avec une quantité unique.
 - **Lisibilité visuelle :** en mode replié, les lignes sont contraintes pour garder une hauteur homogène ; sur mobile, l’aperçu reste sur une seule ligne avec défilement horizontal si nécessaire.
-- **CP min/max :** les libellés sont affichés en version compacte (`CP max`, `CP min`) avec intitulé complet au survol (`title`) pour éviter les retours à la ligne.
+- **Récompenses non-Pokémon (détail déplié) :** quand une icône / image est affichée (poussière, XP, objet, ressources avec visuel), le texte à côté est réduit à **`×quantité`** pour éviter le doublon avec l’icône.
+- **CP min/max :** deux pastilles en **colonne** (label au-dessus de la valeur), **CP min à gauche** puis **CP max à droite** ; le min est visuellement plus discret ; libellés en majuscules courtes (`CP MIN` / `CP MAX`) avec `title` pour le détail niveau 15.
 
 **Attributs :** selon le bloc (souvent `autoDetect`). Voir l’éditeur ou le `block.json` du bloc.
 
@@ -131,6 +134,8 @@ Affiche les habitats avec leurs Pokémon et horaires (données événement).
 Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons, objets, etc.).  
 **Bonbons** : l’icône / le libellé suivent la **famille de bonbons** (racine de lignée + règles bébés GO), pas uniquement l’espèce précédente dans la chaîne — voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 
+**Tuiles Pokémon (carte d’étape)** : chaque carte d’espèce est **carrée** (`aspect-ratio: 1/1`), avec une taille de tuile un peu plus grande que l’historique pour mettre en valeur les nouveautés ; disposition proche des cartes « Pokémon sauvage » (image + nom, espacement bas du nom dans la tuile). Styles : `assets/css/poke-hub-new-pokemon-evolutions-front.css`.
+
 **Attributs :**
 - `autoDetect` (boolean, défaut: `true`) : Données depuis les meta du post
 - `pokemonIds` (array) : IDs de Pokémon à afficher (si pas en auto)
@@ -142,6 +147,12 @@ Affiche les nouveaux Pokémon avec lignée d’évolution et conditions (bonbons
 Affiche les Pokémon par jour avec horaires (données de la metabox **Day Pokémon Hours** / *Featured Pokémon Hours*).
 
 **Attributs :** `contentType` (défaut `featured_hours` pour les heures vedette / Spotlight), `title` (titre du bloc, optionnel) — voir `block.json`.
+
+**Mode `featured_hours` (front)** — piste horizontale de tuiles type carte Pokémon sauvage + bandeau date/heure sous la carte :
+
+- **Une seule piste** : tous les créneaux (jours différents ou horaires différents) s’enchaînent dans la même grille, avec **espacement homogène** (gauche / droite / entre tuiles) via `gap` + `padding` sur `.pokehub-day-pokemon-hours-featured-track` (`assets/css/poke-hub-blocks-front.css`).
+- **Plusieurs Pokémon sur un même créneau** : une tuile **plus large** (span 2, 3 ou 4 colonnes selon le nombre d’images affichées), **hauteur de carte alignée** sur la tuile solo (variable `--pokehub-featured-tile-size`). À l’intérieur : **répétition du duo image + nom** par Pokémon (même logique visuelle que la tuile solo), icônes **shiny / régional par Pokémon** sur chaque image si besoin ; au-delà des emplacements visibles, badge **`+N`** sur le dernier slot.
+- **Taille d’image** : fixée de façon identique pour solo et multi dans ce contexte (surcharge `.pokehub-day-pokemon-hours-spotlight-tile .pokehub-wild-pokemon-image-wrapper`).
 
 **Données « featured » / Spotlight :**
 
@@ -184,6 +195,31 @@ Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, qu
 
 **Styles :** `assets/css/poke-hub-special-research-front.css`
 
+#### Bloc « Avatar shop highlights » (`pokehub/shop-avatar-highlights`)
+
+Affiche une **couverture** (média WordPress), un **paragraphe d’accroche** (liste des noms d’articles boutique avatar + nom d’événement résolu), puis une **grille de tuiles** (même gabarit carré que Wild Pokémon : `.pokehub-wild-pokemon-card`, etc.).
+
+- **Dépendances :** module **shop-items** actif (tables catalogue + contenu) ; le bloc n’est enregistré que si le schéma requis existe (`pokehub_blocks_shop_avatar_schema_ready()` dans `modules/blocks/functions/blocks-helpers.php`).
+- **Données :** `content_shop_avatar` + `content_shop_avatar_entries` + `shop_avatar_items` (lecture via `pokehub_content_get_shop_avatar()`, `poke_hub_shop_avatar_get_items_by_ids()`).
+- **Éditeur :** metabox **Avatar shop (block)** (`modules/blocks/admin/blocks-shop-avatar-metabox.php`) — sélection d’items (Select2 + AJAX), **création rapide** inline (champs EN / FR optionnel + bouton, pas de `window.prompt`), image de couverture, lien optionnel vers **Poké HUB → Shop** pour les administrateurs. AJAX : `modules/blocks/admin/blocks-shop-avatar-metabox-ajax.php`. JS : `modules/blocks/admin/js/pokehub-shop-avatar-metabox-admin.js`.
+- **Texte d’accroche (front) :** chaînes en **anglais** dans `__()` ; le **nom d’événement** est résolu par `pokehub_shop_highlights_resolve_event_label()` (`pokehub_event`, liaison Pass GO → `special_events`, sinon titre du post, repli `this event`) — voir [TRANSLATION.md](TRANSLATION.md).
+- **Sous-titre au-dessus des tuiles :** `Avatar items in this event` (traduisible).
+
+**Attributs :** `autoDetect` (boolean, défaut `true`) — aligné sur les autres blocs « contenu post ».
+
+**Styles :** `assets/css/poke-hub-blocks-front.css` (`.pokehub-shop-highlights-*`, panneau, ligne d’accroche, zone tuiles).
+
+#### Bloc « In-game sticker highlights » (`pokehub/shop-sticker-highlights`)
+
+Même principe que le bloc avatar, pour les **stickers en jeu** : couverture, paragraphe (noms + disponibilité boutique / PokéStops / Gifts + événement), tuiles carrées.
+
+- **Dépendances :** module **shop-items** ; schéma `pokehub_blocks_shop_sticker_schema_ready()`.
+- **Données :** `content_shop_sticker` + `content_shop_sticker_entries` + `shop_sticker_items`.
+- **Éditeur :** metabox **In-game stickers (block)** (`blocks-shop-sticker-metabox.php` + AJAX + `pokehub-shop-sticker-metabox-admin.js`).
+- **Sous-titre des tuiles :** `Stickers in this event`.
+
+**Styles :** même feuille `poke-hub-blocks-front.css`.
+
 ## 🎨 Styles CSS
 
 Les styles sont chargés par le module **Blocks** (`modules/blocks/blocks.php`).
@@ -195,6 +231,7 @@ Les styles sont chargés par le module **Blocks** (`modules/blocks/blocks.php`).
 - **New Pokémon - Evolution Lines** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
 - **Collection Challenges** : `assets/css/poke-hub-collection-challenges-front.css`
 - **Special Research** : `assets/css/poke-hub-special-research-front.css`
+- **Avatar shop / Sticker highlights** : règles dans `assets/css/poke-hub-blocks-front.css` (blocs `pokehub/shop-avatar-highlights`, `pokehub/shop-sticker-highlights` — panneau, accroche, tuiles ; réutilisation des classes Wild Pokémon pour les cartes).
 - **Icônes types / bonbons** : `pokehub-type-icons`, `poke-hub-candy-display.css` (selon contexte)
 
 ### Titres principaux (`.pokehub-block-title`)
@@ -273,13 +310,13 @@ Ces ratios sont affichés dans un badge circulaire rouge sur l'icône du bonus.
 
 ## 🗄️ Tables de contenu et source Pokémon (scope `content_source`)
 
-Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nature, field research, nouveaux Pokémon, special research, collection challenges) est enregistré dans des **tables de contenu** communes (`content_eggs`, `content_quests`, `content_bonus`, etc.), avec `source_type` = `post`, `special_event` ou `global_pool` et `source_id` = ID du post, de l’événement ou 0 pour un pool global.
+Tout le contenu des blocs (quêtes, bonus, habitats, œufs, Pokémon dans la nature, field research, nouveaux Pokémon, special research, collection challenges, **boutique avatar**, **stickers en jeu**) est enregistré dans des **tables de contenu** communes (`content_eggs`, `content_quests`, `content_bonus`, `content_shop_avatar`, `content_shop_sticker`, etc.), avec `source_type` = `post`, `special_event` ou `global_pool` et `source_id` = ID du post, de l’événement ou 0 pour un pool global.
 
 **Même préfixe que la source Pokémon :** ces tables utilisent le scope **`content_source`** : elles sont lues/écrites avec le **même préfixe** que les tables Pokémon. Le réglage à utiliser est **Réglages > Poké HUB > Sources > Pokémon table prefix (remote)** — il sert explicitement aux Pokémon et à tous les contenus (quêtes, bonus, habitats, œufs, etc.). Une seule base pour tout. Sur un site distant, renseigner ce préfixe avec celui du site principal pour que les blocs sauvegardent et affichent les données depuis le site principal.
 
-**Blocs indépendants du module Pokémon :** les blocs (œufs, quêtes, défis de collection, bonus, etc.) ne dépendent plus du module Pokémon pour être enregistrés ; ils requièrent en général le module **Events** (le bloc **Bonus** n’exige que le module **Blocks**). Utilisables en mode remote dès que la configuration Sources / préfixe est correcte.
+**Blocs indépendants du module Pokémon :** les blocs (œufs, quêtes, défis de collection, bonus, etc.) ne dépendent plus du module Pokémon pour être enregistrés ; ils requièrent en général le module **Events** (le bloc **Bonus** n’exige que le module **Blocks**). Les blocs **shop-avatar-highlights** et **shop-sticker-highlights** exigent le module **shop-items** (tables catalogue + contenu). Utilisables en mode remote dès que la configuration Sources / préfixe est correcte.
 
-**Metaboxes chargées par le module Blocks :** pour que les blocs restent configurables même sans activer tous les modules, le module Blocks charge lui-même les metaboxes nécessaires lorsque les modules dédiés sont inactifs : metabox **Bonus** (si module Bonus inactif), metabox **Eggs** (si module Eggs inactif). La metabox **Collection Challenges** est toujours gérée par le module Blocks et enregistre ses assets (Select2) si besoin.
+**Metaboxes chargées par le module Blocks :** pour que les blocs restent configurables même sans activer tous les modules, le module Blocks charge lui-même les metaboxes nécessaires lorsque les modules dédiés sont inactifs : metabox **Bonus** (si module Bonus inactif), metabox **Eggs** (si module Eggs inactif). La metabox **Collection Challenges** est toujours gérée par le module Blocks et enregistre ses assets (Select2) si besoin. Les metaboxes **Avatar shop (block)** et **In-game stickers (block)** sont dans `modules/blocks/admin/` et supposent le module **shop-items** (catalogue + tables de contenu) pour la création d’items et l’affichage des blocs.
 
 ## 📖 Voir aussi
 

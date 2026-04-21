@@ -60,17 +60,17 @@ if (!function_exists('pokehub_render_collection_challenge_rewards')) {
             $quantity = isset($reward['quantity']) ? (int) $reward['quantity'] : 1;
             
             if ($type === 'stardust') {
-                $stardust_icon_url = '';
-                $base_url = get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
-                $objects_path = get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/');
-                $base_url = rtrim($base_url, '/');
-                $objects_path = '/' . ltrim($objects_path, '/');
-                $stardust_icon_url = $base_url . $objects_path . 'stardust.png';
+                $stardust_icon_html = function_exists('pokehub_render_reward_object_icon_img')
+                    ? pokehub_render_reward_object_icon_img(
+                        ['type' => 'stardust'],
+                        ['alt' => __('Stardust', 'poke-hub')]
+                    )
+                    : '';
                 ?>
                 <div class="pokehub-collection-challenge-reward-item">
-                    <?php if ($stardust_icon_url) : ?>
+                    <?php if ($stardust_icon_html !== '') : ?>
                         <div class="pokehub-collection-challenge-reward-image">
-                            <img src="<?php echo esc_url($stardust_icon_url); ?>" alt="<?php esc_attr_e('Stardust', 'poke-hub'); ?>" />
+                            <?php echo $stardust_icon_html; ?>
                         </div>
                     <?php endif; ?>
                     <div class="pokehub-collection-challenge-reward-info">
@@ -81,17 +81,17 @@ if (!function_exists('pokehub_render_collection_challenge_rewards')) {
                 </div>
                 <?php
             } elseif ($type === 'xp') {
-                $xp_icon_url = '';
-                $base_url = get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
-                $objects_path = get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/');
-                $base_url = rtrim($base_url, '/');
-                $objects_path = '/' . ltrim($objects_path, '/');
-                $xp_icon_url = $base_url . $objects_path . 'xp.png';
+                $xp_icon_html = function_exists('pokehub_render_reward_object_icon_img')
+                    ? pokehub_render_reward_object_icon_img(
+                        ['type' => 'xp'],
+                        ['alt' => __('XP', 'poke-hub')]
+                    )
+                    : '';
                 ?>
                 <div class="pokehub-collection-challenge-reward-item">
-                    <?php if ($xp_icon_url) : ?>
+                    <?php if ($xp_icon_html !== '') : ?>
                         <div class="pokehub-collection-challenge-reward-image">
-                            <img src="<?php echo esc_url($xp_icon_url); ?>" alt="<?php esc_attr_e('XP', 'poke-hub'); ?>" />
+                            <?php echo $xp_icon_html; ?>
                         </div>
                     <?php endif; ?>
                     <div class="pokehub-collection-challenge-reward-info">
@@ -104,26 +104,23 @@ if (!function_exists('pokehub_render_collection_challenge_rewards')) {
             } elseif ($type === 'item' && !empty($reward['item_id'])) {
                 $item_data = function_exists('pokehub_get_item_data_by_id') ? pokehub_get_item_data_by_id((int) $reward['item_id']) : null;
                 $item_name = !empty($reward['item_name']) ? $reward['item_name'] : '';
-                $item_image_url = '';
+                $item_icon_html = function_exists('pokehub_render_reward_object_icon_img')
+                    ? pokehub_render_reward_object_icon_img($reward, ['alt' => $item_name])
+                    : '';
                 
                 if ($item_data) {
                     if (empty($item_name)) {
                         $item_name = $item_data['name_fr'] ?? $item_data['name_en'] ?? '';
                     }
-                    $extra = [];
-                    if (!empty($item_data['extra'])) {
-                        $decoded = json_decode($item_data['extra'], true);
-                        if (is_array($decoded)) {
-                            $extra = $decoded;
-                        }
+                    if ($item_icon_html === '' && function_exists('pokehub_render_reward_object_icon_img')) {
+                        $item_icon_html = pokehub_render_reward_object_icon_img($reward, ['alt' => $item_name]);
                     }
-                    $item_image_url = $extra['image_url'] ?? '';
                 }
                 ?>
                 <div class="pokehub-collection-challenge-reward-item">
-                    <?php if ($item_image_url) : ?>
+                    <?php if ($item_icon_html !== '') : ?>
                         <div class="pokehub-collection-challenge-reward-image">
-                            <img src="<?php echo esc_url($item_image_url); ?>" alt="<?php echo esc_attr($item_name); ?>" />
+                            <?php echo $item_icon_html; ?>
                         </div>
                     <?php endif; ?>
                     <div class="pokehub-collection-challenge-reward-info">

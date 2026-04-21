@@ -36,6 +36,7 @@ Module de gestion des profils Pokémon GO pour les utilisateurs WordPress.
 - **`SYNCHRONIZATION.md`** → Synchronisation avec subscription_accounts et Keycloak
 - **`README_DATA_CENTRALIZATION.md`** → Architecture de centralisation des données
 - **`FRIEND_CODES_PUBLIC_AND_IP.md`** → Codes amis en public (non connectés), colonne IP, admin, boutons Add/Update
+- **[CACHE_AND_NGINX_PURGE.md](../CACHE_AND_NGINX_PURGE.md)** → Purge cache page (Nginx) et listes codes amis / Vivillon après sauvegarde admin ou front
 
 ### 🎨 Documentation Générique (CSS)
 

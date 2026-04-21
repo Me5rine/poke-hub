@@ -113,11 +113,29 @@ add_action('admin_notices', function () {
 });
 
 /**
+ * Création du schéma à l’activation d’un module (en plus du passage admin_init).
+ */
+add_action('poke_hub_blocks_module_activated', static function (): void {
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['blocks']);
+    }
+}, 5);
+
+add_action('poke_hub_shop-items_module_activated', static function (): void {
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['shop-items']);
+    }
+}, 5);
+
+/**
  * Vérification / création des tables pour les modules qui en ont besoin.
  * Même méthode que Me5rine LAB :
  * - on inspecte les modules actifs
  * - on regarde si leurs tables existent
- * - si des tables manquent → Pokehub_DB::createTables() pour ces modules-là.
+ * - si des tables manquent → `pokehub_install_tables_for_modules()` (dbDelta, préfixe via `pokehub_get_table`).
+ *
+ * Sites satellite : retourner false via le filtre `pokehub_allow_auto_create_missing_tables`
+ * pour ne pas exécuter dbDelta ici (tables partagées déjà créées sur le site principal).
  */
 add_action('admin_init', function () {
 
@@ -211,6 +229,15 @@ add_action('admin_init', function () {
                 // Bloc "jour -> Pokémon(s) -> heures"
                 pokehub_get_table('content_day_pokemon_hours'),
                 pokehub_get_table('content_day_pokemon_hour_entries'),
+                pokehub_get_table('shop_avatar_categories'),
+                pokehub_get_table('shop_avatar_items'),
+                pokehub_get_table('shop_avatar_item_events'),
+                pokehub_get_table('content_shop_avatar'),
+                pokehub_get_table('content_shop_avatar_entries'),
+                pokehub_get_table('shop_sticker_items'),
+                pokehub_get_table('shop_sticker_item_events'),
+                pokehub_get_table('content_shop_sticker'),
+                pokehub_get_table('content_shop_sticker_entries'),
             ]
         ),
 
@@ -253,6 +280,24 @@ add_action('admin_init', function () {
             // Pass GO : payload (content_go_pass) + liaisons article → pass (go_pass_host_links)
             pokehub_get_table('content_go_pass'),
             pokehub_get_table('go_pass_host_links'),
+            pokehub_get_table('content_shop_avatar'),
+            pokehub_get_table('content_shop_avatar_entries'),
+            pokehub_get_table('content_shop_sticker'),
+            pokehub_get_table('content_shop_sticker_entries'),
+            pokehub_get_table('shop_sticker_items'),
+            pokehub_get_table('shop_sticker_item_events'),
+        ],
+
+        'shop-items' => [
+            pokehub_get_table('shop_avatar_categories'),
+            pokehub_get_table('shop_avatar_items'),
+            pokehub_get_table('shop_avatar_item_events'),
+            pokehub_get_table('content_shop_avatar'),
+            pokehub_get_table('content_shop_avatar_entries'),
+            pokehub_get_table('shop_sticker_items'),
+            pokehub_get_table('shop_sticker_item_events'),
+            pokehub_get_table('content_shop_sticker'),
+            pokehub_get_table('content_shop_sticker_entries'),
         ],
     ];
 
@@ -277,8 +322,8 @@ add_action('admin_init', function () {
         }
     }
 
-    if (!empty($modules_to_create)) {
-        Pokehub_DB::getInstance()->createTables($modules_to_create);
+    if (!empty($modules_to_create) && function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules($modules_to_create);
     }
     
     // Migration des colonnes recurring pour special_events (même si la table existe déjà)
@@ -293,6 +338,7 @@ add_action('admin_init', function () {
         $event_pokemon_table = pokehub_get_table('special_event_pokemon');
         if ($event_pokemon_table && ($wpdb->get_var("SHOW TABLES LIKE '{$event_pokemon_table}'") === $event_pokemon_table)) {
             Pokehub_DB::getInstance()->migrateEventPokemonGenderColumn();
+            Pokehub_DB::getInstance()->migrateSpecialEventPokemonFlagColumnsPublic();
         }
     }
     

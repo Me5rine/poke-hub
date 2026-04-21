@@ -9,7 +9,9 @@ modules/blocks/
 ├── blocks.php                    # Point d'entrée du module
 ├── admin/                        # Meta boxes pour certains blocs
 │   ├── collection-challenges-metabox.php   # Défis de collection (tables de contenu)
-│   └── special-research-metabox.php        # Études spéciales (tables de contenu)
+│   ├── special-research-metabox.php        # Études spéciales (tables de contenu)
+│   ├── blocks-shop-avatar-metabox.php       # Avatar shop (block) + AJAX + JS admin
+│   └── blocks-shop-sticker-metabox.php    # In-game stickers (block) + AJAX + JS admin
 ├── functions/
 │   ├── blocks-register.php      # Enregistrement de tous les blocs (bonus: requires [])
 │   ├── blocks-helpers.php       # Helpers génériques pour les blocs
@@ -27,7 +29,9 @@ modules/blocks/
 │   ├── new-pokemon-evolutions/  # Bloc "New Pokemon"
 │   ├── collection-challenges/   # Bloc "Défis de Collection"
 │   ├── special-research/        # Bloc "Études Spéciales"
-│   └── eggs/                    # Bloc "Œufs"
+│   ├── eggs/                    # Bloc "Œufs"
+│   ├── shop-avatar-highlights/  # Bloc boutique avatar (cover + texte + tuiles)
+│   └── shop-sticker-highlights/ # Bloc stickers en jeu
 └── docs/
     ├── README.md                # Index des blocs (ce dossier)
     ├── ARCHITECTURE.md          # Ce fichier
@@ -130,7 +134,9 @@ Voir le guide [QUICK_START.md](./QUICK_START.md) pour les étapes détaillées.
    ```
    Si un module requis est désactivé, le bloc n’est pas enregistré. Les données des blocs sont stockées dans les tables de contenu (scope `content_source`) : **même préfixe** que les tables Pokémon (Réglages > Sources > Pokémon table prefix (remote)) — une seule base pour les Pokémon et tous les contenus. Usage en mode remote sans le module Pokémon.
 
-**Metaboxes chargées par le module Blocks :** pour les blocs qui ont besoin d’une metabox (œufs, bonus, défis de collection), le module Blocks charge la metabox Eggs (depuis `modules/eggs/admin/eggs-metabox.php`) et la metabox Bonus lorsque les modules Eggs ou Bonus sont inactifs, afin que les blocs restent configurables.
+   **Cas particulier — blocs shop highlights :** `requires` peut rester `[]` dans le registre, mais l’enregistrement est **ignoré** si les tables attendues sont absentes (`pokehub_blocks_shop_avatar_schema_ready()` / `pokehub_blocks_shop_sticker_schema_ready()`). Le module **shop-items** doit être actif en pratique.
+
+**Metaboxes chargées par le module Blocks :** pour les blocs qui ont besoin d’une metabox (œufs, bonus, défis de collection, **avatar shop**, **stickers en jeu**), le module Blocks charge la metabox Eggs (depuis `modules/eggs/admin/eggs-metabox.php`) et la metabox Bonus lorsque les modules Eggs ou Bonus sont inactifs, afin que les blocs restent configurables. Les metaboxes boutique / stickers sont toujours dans `modules/blocks/admin/`.
 
 ## 🔍 Fichiers obsolètes (à supprimer)
 

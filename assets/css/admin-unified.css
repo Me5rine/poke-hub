@@ -1274,3 +1274,80 @@ table.me5rine-lab_page_admin-lab-remote-news .actions {
     }
 }
 
+/* ============================================
+   BOUTIQUE ADMIN — onglets regroupés (shop-items)
+   ============================================ */
+
+.poke-hub-shop-items-nav.nav-tab-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 6px 14px 0 0;
+    margin: 0 12px 0 0;
+    border-right: 1px solid #dcdcde;
+    min-height: 40px;
+    box-sizing: border-box;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__group--stickers {
+    border-right: 0;
+    margin-right: 0;
+    padding-right: 0;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__group-title {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #646970;
+    margin: 0 0 1px 1px;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__tabs .nav-tab {
+    margin-left: 0;
+    margin-right: 4px;
+}
+
+.poke-hub-shop-items-nav .poke-hub-shop-items-nav__tabs .nav-tab:last-child {
+    margin-right: 0;
+}
+
+@media screen and (max-width: 782px) {
+    .poke-hub-shop-items-nav.nav-tab-wrapper {
+        padding-top: 8px;
+    }
+
+    .poke-hub-shop-items-nav .poke-hub-shop-items-nav__group {
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid #dcdcde;
+        margin: 0 0 8px;
+        padding: 0 0 8px;
+    }
+
+    .poke-hub-shop-items-nav .poke-hub-shop-items-nav__group--stickers {
+        border-bottom: 0;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+}
+

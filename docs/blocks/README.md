@@ -33,7 +33,7 @@ Pour les metaboxes/blocs avec multi-sélection Pokémon, les valeurs peuvent êt
 
 Le backend normalise ces valeurs avec `pokehub_parse_post_pokemon_multiselect_tokens_with_genders()` (et, selon le flux, `pokehub_content_normalize_pokemon_ids_with_genders()`), puis conserve `pokemon_genders` de façon cohérente.
 
-Cette convention est appliquée aux principaux flux contenu : GO Pass, Day Pokémon Hours (et featured/spotlight générés), Eggs, Collection Challenges, Special Research, New Pokémon, Habitats, Field Research, Wild Pokémon, Special Events, Event Quests.
+Cette convention est appliquée aux principaux flux contenu : GO Pass, Day Pokémon Hours (et featured/spotlight générés), Eggs, Collection Challenges, Special Research, New Pokémon, Habitats, Field Research, Wild Pokémon, Special Events, Event Quests, Avatar shop / In-game stickers (metaboxes items).
 
 | Bloc | Nom (éditeur) | Modules requis | Description |
 |------|----------------|----------------|-------------|
@@ -48,6 +48,10 @@ Cette convention est appliquée aux principaux flux contenu : GO Pass, Day Poké
 | `pokehub/collection-challenges` | Collection Challenges | events | Défis de collection (tables de contenu) |
 | `pokehub/special-research` | Special Research | events | Études ponctuelles / spéciales / magistrales |
 | `pokehub/eggs` | Pokémon Eggs | events | Œufs par type (2 km, 5 km, etc.) et Pokémon ; post ou pool global |
+| `pokehub/shop-avatar-highlights` | Avatar shop highlights | shop-items | Couverture + texte + tuiles articles boutique avatar (metabox **Avatar shop (block)** sur `post` / `pokehub_event`) |
+| `pokehub/shop-sticker-highlights` | In-game sticker highlights | shop-items | Couverture + texte + tuiles stickers (metabox **In-game stickers (block)**) |
+
+> **Note :** dans `blocks-register.php`, le tableau `requires` pour ces deux blocs est vide, mais l’enregistrement est **court-circuité** si les tables requises sont absentes (`pokehub_blocks_shop_*_schema_ready()`). En pratique le module **shop-items** doit être actif.
 
 ## 🎯 Dépendances
 
@@ -57,7 +61,7 @@ L’enregistrement est géré dans `modules/blocks/functions/blocks-register.php
 
 - **Définition des blocs** : `modules/blocks/blocks/{nom-du-bloc}/` (block.json, index.js, render.php)
 - **Rendu / données** : selon le bloc — events, bonus, pokemon, ou helpers dans `modules/blocks/functions/`
-- **Meta boxes** : `modules/blocks/admin/` (GO Pass, Collection Challenges, Études spéciales, etc.). La metabox **GO Pass** (`blocks-go-pass-metabox.php`) utilise Select2 + **admin-ajax** (`pokehub_go_pass_metabox_search`, `pokehub_go_pass_metabox_create_and_link` dans `blocks-admin-ajax.php`) et le script `assets/js/pokehub-go-pass-metabox-admin.js`. La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif.
+- **Meta boxes** : `modules/blocks/admin/` (GO Pass, Collection Challenges, Études spéciales, **Avatar shop (block)**, **In-game stickers (block)**, etc.). La metabox **GO Pass** (`blocks-go-pass-metabox.php`) utilise Select2 + **admin-ajax** (`pokehub_go_pass_metabox_search`, `pokehub_go_pass_metabox_create_and_link` dans `blocks-admin-ajax.php`) et le script `assets/js/pokehub-go-pass-metabox-admin.js`. La metabox **Bonus** est chargée **uniquement** par le module Blocks (`modules/bonus/admin/bonus-metabox.php`), ainsi que les helpers bonus — le bloc Bonus ne dépend pas du module Bonus. La metabox **Eggs** est dans `modules/eggs/admin/eggs-metabox.php` et est aussi chargée par Blocks lorsque le module Eggs est inactif. Les metaboxes boutique avatar / stickers utilisent Select2, création d’items inline et AJAX dédiés (`blocks-shop-*-metabox*.php`, `pokehub-shop-*-metabox-admin.js`).
 
 Pour la source de vérité des types de bonus (site principal, local/distant), le rendu SVG/raster et les **variables CSS des vignettes** (`--pokehub-bonus-icon-*` dans `poke-hub-bonus-front.css`), voir **[BONUS_SOURCE_AND_BLOCKS.md](../BONUS_SOURCE_AND_BLOCKS.md)** et **[POKEHUB_CSS_CLASSES.md](../POKEHUB_CSS_CLASSES.md)**.
 

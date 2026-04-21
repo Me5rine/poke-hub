@@ -94,6 +94,17 @@ if (!function_exists('pokehub_field_research_count_other_reward_rows')) {
     }
 }
 
+if (!function_exists('pokehub_field_research_reward_quantity_label')) {
+    function pokehub_field_research_reward_quantity_label(array $reward): string {
+        $qty = (int) ($reward['quantity'] ?? 1);
+        $qty = max(1, $qty);
+        $formatted = function_exists('number_format_i18n')
+            ? number_format_i18n($qty)
+            : (string) $qty;
+        return '×' . $formatted;
+    }
+}
+
 if (!function_exists('pokehub_field_research_pokemon_badges')) {
     /**
      * @return array{show_shiny:bool, show_regional:bool, is_forced_shiny:bool}
@@ -206,6 +217,9 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
 
                 $pokemon_slots = pokehub_field_research_flatten_pokemon_slots($rewards);
                 $other_rows    = pokehub_field_research_count_other_reward_rows($rewards);
+                $other_rewards = array_values(array_filter($rewards, static function ($reward) {
+                    return ($reward['type'] ?? 'pokemon') !== 'pokemon';
+                }));
 
                 if ($pokemon_slots === [] && $other_rows === 0) {
                     continue;
@@ -274,7 +288,24 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                             <?php endif; ?>
 
                             <?php if ($other_rows > 0) : ?>
-                                <span class="pokehub-quest-preview-meta pokehub-quest-preview-other-count" title="<?php esc_attr_e('Number of non-Pokémon reward lines', 'poke-hub'); ?>">×<?php echo (int) $other_rows; ?></span>
+                                <?php
+                                $other_preview_value = '×' . (int) $other_rows;
+                                $other_preview_title = __('Number of non-Pokémon reward lines', 'poke-hub');
+                                if (count($other_rewards) === 1) {
+                                    $other_preview_value = pokehub_field_research_reward_quantity_label($other_rewards[0]);
+                                    $other_preview_title = __('Quantity of non-Pokémon reward', 'poke-hub');
+                                } else {
+                                    $rows_label = function_exists('number_format_i18n')
+                                        ? number_format_i18n($other_rows)
+                                        : (string) $other_rows;
+                                    $other_preview_value = sprintf(
+                                        /* translators: %s: number of non-Pokémon reward lines */
+                                        __('Other × %s', 'poke-hub'),
+                                        $rows_label
+                                    );
+                                }
+                                ?>
+                                <span class="pokehub-quest-preview-meta pokehub-quest-preview-other-count" title="<?php echo esc_attr($other_preview_title); ?>"><?php echo esc_html($other_preview_value); ?></span>
                             <?php endif; ?>
                         </div>
 
@@ -340,16 +371,16 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
 
                                         <?php if ($max_cp !== null || $min_cp !== null) : ?>
                                             <div class="pokehub-quest-reward-cp">
-                                                <?php if ($max_cp !== null) : ?>
-                                                    <div class="pokehub-quest-cp-box">
-                                                        <span class="pokehub-quest-cp-label" title="<?php esc_attr_e('Maximum CP at level 15', 'poke-hub'); ?>"><?php echo esc_html_x('CP max', 'Short label for maximum CP (level 15)', 'poke-hub'); ?></span>
-                                                        <span class="pokehub-quest-cp-value"><?php echo esc_html((string) $max_cp); ?></span>
-                                                    </div>
-                                                <?php endif; ?>
                                                 <?php if ($min_cp !== null) : ?>
-                                                    <div class="pokehub-quest-cp-box">
+                                                    <div class="pokehub-quest-cp-box pokehub-quest-cp-box--min">
                                                         <span class="pokehub-quest-cp-label" title="<?php esc_attr_e('Minimum CP at level 15', 'poke-hub'); ?>"><?php echo esc_html_x('CP min', 'Short label for minimum CP (level 15)', 'poke-hub'); ?></span>
                                                         <span class="pokehub-quest-cp-value"><?php echo esc_html((string) $min_cp); ?></span>
+                                                    </div>
+                                                <?php endif; ?>
+                                                <?php if ($max_cp !== null) : ?>
+                                                    <div class="pokehub-quest-cp-box pokehub-quest-cp-box--max">
+                                                        <span class="pokehub-quest-cp-label" title="<?php esc_attr_e('Maximum CP at level 15', 'poke-hub'); ?>"><?php echo esc_html_x('CP max', 'Short label for maximum CP (level 15)', 'poke-hub'); ?></span>
+                                                        <span class="pokehub-quest-cp-value"><?php echo esc_html((string) $max_cp); ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                             </div>
@@ -377,10 +408,21 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                                 }
                                 $resource_has_img = function_exists('pokehub_pokemon_candy_reward_markup_has_image')
                                     && pokehub_pokemon_candy_reward_markup_has_image($resource_html);
+                                $object_icon_html = '';
+                                if (in_array($o_type, ['stardust', 'xp', 'item'], true) && function_exists('pokehub_render_reward_object_icon_img')) {
+                                    $object_icon_html = pokehub_render_reward_object_icon_img($reward, [
+                                        'alt' => (string) pokehub_field_research_format_other_reward_line($reward),
+                                        'class' => 'pokehub-quest-reward-object-image',
+                                    ]);
+                                }
+                                $has_visual_icon = ($resource_html !== '' || $object_icon_html !== '');
+                                $compact_qty = pokehub_field_research_reward_quantity_label($reward);
                                 ?>
                                 <div class="pokehub-quest-reward-item pokehub-quest-reward-item--other<?php echo $resource_html !== '' ? ' pokehub-quest-reward-item--resource' : ''; ?>">
                                     <?php if ($resource_html !== '') : ?>
                                         <div class="pokehub-quest-reward-resource-visual"><?php echo $resource_html; ?></div>
+                                    <?php elseif ($object_icon_html !== '') : ?>
+                                        <div class="pokehub-quest-reward-resource-visual"><?php echo $object_icon_html; ?></div>
                                     <?php else : ?>
                                         <span class="pokehub-quest-reward-other-symbol" aria-hidden="true">✦</span>
                                     <?php endif; ?>
@@ -397,7 +439,13 @@ if (!function_exists('pokehub_blocks_render_event_quests')) {
                                             $lab = function_exists('pokehub_candy_resource_label_for_reward_type')
                                                 ? pokehub_candy_resource_label_for_reward_type($o_type)
                                                 : __('Candy', 'poke-hub');
-                                            echo esc_html($rn !== '' ? $rn . ' — ' . $lab : $lab);
+                                            if ($has_visual_icon) {
+                                                echo esc_html($compact_qty);
+                                            } else {
+                                                echo esc_html($rn !== '' ? $rn . ' — ' . $lab : $lab);
+                                            }
+                                        } elseif ($has_visual_icon) {
+                                            echo esc_html($compact_qty);
                                         } elseif ($resource_html === '') {
                                             echo esc_html(pokehub_field_research_format_other_reward_line($reward));
                                         }

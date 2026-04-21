@@ -17,6 +17,34 @@ function poke_hub_is_module_active(string $module): bool {
 }
 
 /**
+ * Charge `events-admin-helpers.php` si besoin (slug unique des événements spéciaux).
+ * Utile en AJAX / metabox quand le module Events n’a pas encore inclus ce fichier.
+ *
+ * @return bool true si {@see pokehub_generate_unique_event_slug()} existe après tentative.
+ */
+function pokehub_ensure_events_admin_helpers_loaded(): bool {
+    if (function_exists('pokehub_generate_unique_event_slug')) {
+        return true;
+    }
+    $candidates = [];
+    if (defined('POKE_HUB_PATH')) {
+        $candidates[] = rtrim((string) POKE_HUB_PATH, '/\\') . '/modules/events/functions/events-admin-helpers.php';
+    }
+    if (defined('POKE_HUB_MODULES_DIR')) {
+        $candidates[] = rtrim((string) POKE_HUB_MODULES_DIR, '/\\') . '/events/functions/events-admin-helpers.php';
+    }
+    foreach (array_unique(array_filter($candidates)) as $path) {
+        if (is_readable($path)) {
+            require_once $path;
+            if (function_exists('pokehub_generate_unique_event_slug')) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Helper générique pour récupérer le registry des modules.
  * Wrapper sur poke_hub_get_modules_registry() pour éviter les erreurs fatales.
  *
@@ -395,6 +423,19 @@ function pokehub_get_table(string $key): string {
         // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
         'content_day_pokemon_hours'       => ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hours'],
         'content_day_pokemon_hour_entries'=> ['scope' => 'content_source', 'suffix' => 'content_day_pokemon_hour_entries'],
+        'shop_avatar_categories'          => ['scope' => 'content_source', 'suffix' => 'shop_avatar_categories'],
+        'shop_avatar_items'               => ['scope' => 'content_source', 'suffix' => 'shop_avatar_items'],
+        'shop_avatar_item_events'         => ['scope' => 'content_source', 'suffix' => 'shop_avatar_item_events'],
+        'content_shop_avatar'             => ['scope' => 'content_source', 'suffix' => 'content_shop_avatar'],
+        'content_shop_avatar_entries'     => ['scope' => 'content_source', 'suffix' => 'content_shop_avatar_entries'],
+        'pokehub_content_shop_avatar'     => ['scope' => 'content_source', 'suffix' => 'content_shop_avatar'],
+        'pokehub_content_shop_avatar_entries' => ['scope' => 'content_source', 'suffix' => 'content_shop_avatar_entries'],
+        'shop_sticker_items'               => ['scope' => 'content_source', 'suffix' => 'shop_sticker_items'],
+        'shop_sticker_item_events'         => ['scope' => 'content_source', 'suffix' => 'shop_sticker_item_events'],
+        'content_shop_sticker'             => ['scope' => 'content_source', 'suffix' => 'content_shop_sticker'],
+        'content_shop_sticker_entries'     => ['scope' => 'content_source', 'suffix' => 'content_shop_sticker_entries'],
+        'pokehub_content_shop_sticker'     => ['scope' => 'content_source', 'suffix' => 'content_shop_sticker'],
+        'pokehub_content_shop_sticker_entries' => ['scope' => 'content_source', 'suffix' => 'content_shop_sticker_entries'],
         // Alias ancien format (évite double préfixe si du code appelle get_table('pokehub_content_*'))
         'pokehub_content_eggs' => ['scope' => 'content_source', 'suffix' => 'content_eggs'],
         'pokehub_content_egg_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_egg_pokemon'],
@@ -1203,4 +1244,54 @@ function poke_hub_normalize_release_date(string $date): string {
         return $d->format('Y-m-d');
     }
     return '';
+}
+
+/**
+ * Installe ou met à jour le schéma SQL (dbDelta) pour une liste de modules Poké HUB.
+ *
+ * Délègue à `Pokehub_DB::createTables()` : les noms de tables résolus passent par `pokehub_get_table()`
+ * (préfixe WordPress local, source contenu / Pokémon, tables remote events, etc.).
+ *
+ * @param array<int, string> $modules Slugs de modules (ex. 'blocks', 'shop-items', 'events', 'pokemon').
+ * @param array{
+ *   skip_allow_filter?: bool,
+ *   try_require_db_class?: bool
+ * } $options skip_allow_filter : ignorer `pokehub_allow_auto_create_missing_tables`. try_require_db_class : charger `pokehub-db.php` si la classe `Pokehub_DB` est absente.
+ * @return bool true si `createTables` a été exécuté.
+ */
+function pokehub_install_tables_for_modules(array $modules, array $options = []): bool {
+    $clean = [];
+    foreach ($modules as $m) {
+        if (!is_string($m)) {
+            continue;
+        }
+        $t = trim($m);
+        if ($t !== '') {
+            $clean[] = $t;
+        }
+    }
+    $clean = array_values(array_unique($clean));
+    if ($clean === []) {
+        return false;
+    }
+
+    $skip_filter = !empty($options['skip_allow_filter']);
+    if (!$skip_filter && !apply_filters('pokehub_allow_auto_create_missing_tables', true)) {
+        return false;
+    }
+
+    if (!class_exists('Pokehub_DB') && !empty($options['try_require_db_class']) && defined('POKE_HUB_INCLUDES_DIR')) {
+        $db_file = POKE_HUB_INCLUDES_DIR . 'pokehub-db.php';
+        if (is_string($db_file) && file_exists($db_file)) {
+            require_once $db_file;
+        }
+    }
+
+    if (!class_exists('Pokehub_DB')) {
+        return false;
+    }
+
+    Pokehub_DB::getInstance()->createTables($clean);
+
+    return true;
 }

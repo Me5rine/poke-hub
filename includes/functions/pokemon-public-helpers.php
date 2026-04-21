@@ -1843,7 +1843,7 @@ function pokehub_get_item_data_by_id(int $item_id): ?array {
     
     $row = $wpdb->get_row(
         $wpdb->prepare(
-            "SELECT id, name_fr, name_en
+            "SELECT id, slug, name_fr, name_en, extra
              FROM {$items_table}
              WHERE id = %d
              LIMIT 1",
@@ -1867,6 +1867,30 @@ function pokehub_get_item_data_by_id(int $item_id): ?array {
     }
     
     $row['name'] = $name;
+
+    $slug = isset($row['slug']) ? sanitize_title((string) $row['slug']) : '';
+    if ($slug === '') {
+        $slug = sanitize_title($name_en !== '' ? $name_en : $name_fr);
+    }
+    $row['slug'] = $slug;
+
+    $image_chain = function_exists('pokehub_get_object_asset_url_chain')
+        ? pokehub_get_object_asset_url_chain($slug)
+        : [];
+    $image_url = $image_chain[0] ?? '';
+
+    if ($image_url === '' && !empty($row['extra'])) {
+        $decoded_extra = json_decode((string) $row['extra'], true);
+        if (is_array($decoded_extra) && !empty($decoded_extra['image_url'])) {
+            $image_url = esc_url_raw((string) $decoded_extra['image_url']);
+            if ($image_url !== '' && $image_chain === []) {
+                $image_chain = [$image_url];
+            }
+        }
+    }
+
+    $row['image_url']   = $image_url;
+    $row['image_chain'] = $image_chain;
     return $row;
 }
 
@@ -2424,6 +2448,8 @@ function poke_hub_get_assets_bucket_base_url(): string {
 function poke_hub_get_assets_path(string $asset_type): string {
     $paths = [
         'icons' => get_option('poke_hub_assets_path_icons', '/pokemon-go/icons/'),
+        'objects' => get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/'),
+        'items' => get_option('poke_hub_assets_path_items', '/pokemon-go/items/'),
         'habitats' => get_option('poke_hub_assets_path_habitats', '/pokemon-go/habitats/'),
         'bonus' => get_option('poke_hub_assets_path_bonus', '/pokemon-go/bonus/'),
         'types' => get_option('poke_hub_assets_path_types', '/pokemon-go/types/'),
@@ -2513,6 +2539,78 @@ function poke_hub_get_raster_asset_url_chain(string $asset_type, string $slug): 
     }
 
     return $out;
+}
+
+/**
+ * Chaîne d'URLs pour les objets : slug.webp puis slug.png.
+ *
+ * @return string[]
+ */
+function pokehub_get_object_asset_url_chain(string $slug): array {
+    $slug = sanitize_title($slug);
+    if ($slug === '') {
+        return [];
+    }
+    $items_webp = poke_hub_get_asset_url('items', $slug, 'webp');
+    $items_png  = poke_hub_get_asset_url('items', $slug, 'png');
+    $obj_webp   = poke_hub_get_asset_url('objects', $slug, 'webp');
+    $obj_png    = poke_hub_get_asset_url('objects', $slug, 'png');
+
+    return array_values(array_unique(array_filter([$items_webp, $items_png, $obj_webp, $obj_png])));
+}
+
+/**
+ * Slug d'icône d'objet pour une récompense (stardust/xp/item).
+ */
+function pokehub_get_reward_object_slug(array $reward): string {
+    $type = isset($reward['type']) ? sanitize_key((string) $reward['type']) : '';
+    if ($type === 'stardust' || $type === 'xp') {
+        return $type;
+    }
+    if ($type !== 'item') {
+        return '';
+    }
+
+    $item_id = isset($reward['item_id']) ? (int) $reward['item_id'] : 0;
+    if ($item_id > 0 && function_exists('pokehub_get_item_data_by_id')) {
+        $item_data = pokehub_get_item_data_by_id($item_id);
+        if (is_array($item_data) && !empty($item_data['slug'])) {
+            return sanitize_title((string) $item_data['slug']);
+        }
+    }
+
+    $fallback_name = isset($reward['item_name']) ? (string) $reward['item_name'] : '';
+    return sanitize_title($fallback_name);
+}
+
+/**
+ * Rendu <img> d'une récompense d'objet avec fallback raster automatique.
+ *
+ * @param array<string,mixed> $reward
+ * @param array<string,mixed> $args
+ */
+function pokehub_render_reward_object_icon_img(array $reward, array $args = []): string {
+    $slug = pokehub_get_reward_object_slug($reward);
+    if ($slug === '') {
+        return '';
+    }
+
+    $args = wp_parse_args(
+        $args,
+        [
+            'alt' => '',
+            'class' => '',
+            'loading' => 'lazy',
+            'decoding' => 'async',
+        ]
+    );
+
+    $chain = pokehub_get_object_asset_url_chain($slug);
+    if ($chain === []) {
+        return '';
+    }
+
+    return '<img src="' . esc_url($chain[0]) . '" alt="' . esc_attr((string) $args['alt']) . '" data-ph-raster="' . esc_attr(wp_json_encode($chain)) . '" />';
 }
 
 /**

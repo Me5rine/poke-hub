@@ -113,7 +113,7 @@ if (!function_exists('pokehub_render_block_title')) {
 /*
  * Clés $block_key pour pokehub_render_block_title() / filtre pokehub_block_title_icon_svg :
  * bonus, collection-challenges, day-pokemon-hours, eggs, event-dates, event-quests,
- * go-pass, habitats, new-pokemon-evolutions, special-research, wild-pokemon.
+ * go-pass, habitats, new-pokemon-evolutions, shop-avatar-highlights, shop-sticker-highlights, special-research, wild-pokemon.
  *
  * Exemple (thème enfant) :
  *

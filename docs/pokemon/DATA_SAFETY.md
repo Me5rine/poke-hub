@@ -65,6 +65,7 @@ Fichiers principaux : `modules/pokemon/functions/pokemon-import-game-master.php`
 - Conserve les autres clés de `extra`.
 - Si `skip_existing` est activé, les dates déjà renseignées ne sont pas remplacées.
 - Si `extra` est invalide ou qu'aucune différence n'est détectée : pas d'update.
+- L’écran admin correspond à l’onglet **Dates (Pokekalos)** de **Temporary tools** ; ce sous-menu peut être désactivé dans **Réglages → General** sans changer le comportement du CLI (voir [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md)).
 
 ## Liens d'attaques Pokémon
 

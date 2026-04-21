@@ -1653,7 +1653,8 @@ function poke_hub_special_event_get_pokemon_rows(int $event_id): array {
     
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT pokemon_id, gender
+            "SELECT pokemon_id, gender,
+                    is_forced_shadow, is_forced_shiny, is_worldwide_override, region_note
              FROM {$table}
              WHERE event_id = %d",
             $event_id
@@ -1668,9 +1669,13 @@ function poke_hub_special_event_get_pokemon_rows(int $event_id): array {
     $out = [];
     foreach ($rows as $row) {
         $out[] = [
-            'pokemon_id' => (int) $row['pokemon_id'],
-            'gender'     => !empty($row['gender']) ? sanitize_text_field($row['gender']) : null,
-            'attacks'    => [], // Pour plus tard si tu veux pré-cocher les attaques
+            'pokemon_id'               => (int) $row['pokemon_id'],
+            'gender'                   => !empty($row['gender']) ? sanitize_text_field($row['gender']) : null,
+            'is_forced_shadow'         => !empty($row['is_forced_shadow']) ? 1 : 0,
+            'is_forced_shiny'          => !empty($row['is_forced_shiny']) ? 1 : 0,
+            'is_worldwide_override'    => !empty($row['is_worldwide_override']) ? 1 : 0,
+            'region_note'              => isset($row['region_note']) ? (string) $row['region_note'] : '',
+            'attacks'                  => [], // Pour plus tard si tu veux pré-cocher les attaques
         ];
     }
     

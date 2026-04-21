@@ -24,6 +24,9 @@ $modules_config = function_exists('poke_hub_get_modules_config') ? poke_hub_get_
 // Option : suppression des données à la désinstallation
 $delete_data = get_option('poke_hub_delete_data_on_uninstall', false);
 
+// Sous-menu « Outils temporaires » dans l’admin Poké HUB
+$temporary_tools_enabled = get_option('poke_hub_temporary_tools_enabled', true);
+
 // Restriction éventuelle du cleanup
 $can_manage_cleanup = true;
 ?>
@@ -112,6 +115,24 @@ $can_manage_cleanup = true;
             <p><?php _e('Data deletion on uninstall is only available on the main site.', 'poke-hub'); ?></p>
         </div>
     <?php endif; ?>
+
+    <h2><?php _e('Temporary tools (admin)', 'poke-hub'); ?></h2>
+    <p><?php _e('The Poké HUB submenu « Temporary tools » hosts one-off imports (Pokekalos dates, Fandom recurring events, etc.). Disable it when you do not need these screens.', 'poke-hub'); ?></p>
+    <table class="form-table">
+        <tr valign="top">
+            <th scope="row"><?php _e('Show Temporary tools', 'poke-hub'); ?></th>
+            <td>
+                <input type="hidden" name="poke_hub_temporary_tools_enabled" value="0" />
+                <label>
+                    <input type="checkbox"
+                           name="poke_hub_temporary_tools_enabled"
+                           value="1"
+                        <?php checked((bool) $temporary_tools_enabled, true); ?> />
+                    <?php _e('Enable the « Temporary tools » submenu under Poké HUB.', 'poke-hub'); ?>
+                </label>
+            </td>
+        </tr>
+    </table>
 
     <h2><?php _e('Module Settings', 'poke-hub'); ?></h2>
     <p><?php _e('Configure settings for individual modules. These settings apply when modules are activated.', 'poke-hub'); ?></p>

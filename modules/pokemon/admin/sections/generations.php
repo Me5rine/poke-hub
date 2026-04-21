@@ -394,8 +394,7 @@ function poke_hub_pokemon_handle_generations_form() {
     }
 
     if ($slug === '') {
-        $base = $name_en !== '' ? $name_en : $name_fr;
-        $slug = sanitize_title($base);
+        $slug = pokehub_slug_base_from_two_strings($name_en, $name_fr, 'generation');
     }
 
     if ($gen_number < 0) {
@@ -407,6 +406,8 @@ function poke_hub_pokemon_handle_generations_form() {
 
     $table = pokehub_get_table('pokemon_generations');
     $now   = current_time('mysql');
+
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_generation' ? 0 : $id, 'slug', 'id', 'generation');
 
     $data = [
         'slug'              => $slug,

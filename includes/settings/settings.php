@@ -37,6 +37,17 @@ function poke_hub_register_settings() {
         ]
     );
 
+    // Sous-menu admin « Outils temporaires » (imports ponctuels, etc.)
+    register_setting(
+        'poke_hub_settings',
+        'poke_hub_temporary_tools_enabled',
+        [
+            'type'              => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default'           => true,
+        ]
+    );
+
     // User Profiles: création automatique des pages
     register_setting(
         'poke_hub_settings',

@@ -46,15 +46,19 @@ Le rendu replié des quêtes Field Research suit des contraintes visuelles pour 
 
 - L’aperçu Pokémon affiche **3 mini-tuiles maximum**.
 - Si plus de 3 Pokémon sont présents, un badge **`+N`** indique les Pokémon supplémentaires non affichés.
-- Le badge **`×M`** continue d’indiquer le nombre de lignes de récompenses non-Pokémon.
+- **Récompenses non-Pokémon :** une seule ligne → badge **`×quantité`** réelle ; plusieurs lignes → badge **`Other × M`** (nombre de lignes) + `title` explicatif.
 - La zone d’aperçu est forcée sur **une seule ligne** pour éviter les variations de hauteur entre quêtes.
 - Sur petit écran, l’aperçu reste mono-ligne avec défilement horizontal si besoin.
 
+### Récompenses non-Pokémon (détail déplié)
+
+- Si une **icône / image** est affichée à côté du libellé (poussière, XP, objet, ressources avec visuel), le texte affiché est **`×quantité`** uniquement (pas de répétition du nom de la ressource à côté de l’icône).
+
 ### Règles CP (détail de récompense)
 
-- Les libellés CP sont compacts : **`CP max`** et **`CP min`**.
-- Les pastilles CP sont alignées en ligne (label + valeur) pour limiter la largeur.
-- Le libellé complet reste disponible via `title` (ex. « Maximum CP at level 15 »), pour conserver le contexte sans casser la mise en page.
+- Deux pastilles **`CP min`** puis **`CP max`** (ordre gauche → droite), chacune en **colonne** : label au-dessus, valeur en dessous.
+- Le **min** est visuellement atténué (fond / texte plus clairs) pour mettre le max en avant.
+- Libellés courts en **majuscules** (`CP MIN` / `CP MAX`) ; le détail niveau 15 reste dans les attributs `title`.
 
 ### Fichiers concernés
 

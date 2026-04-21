@@ -1,0 +1,23 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/shop-sticker-highlights",
+	"title": "In-game sticker highlights",
+	"category": "pokehub",
+	"icon": "smiley",
+	"description": "Highlights in-game sticker shop items with a hero image and item tiles.",
+	"keywords": ["sticker", "shop", "boutique", "pokehub"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"autoDetect": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}

@@ -1265,6 +1265,18 @@ Tous les éléments admin utilisent maintenant ces classes génériques. Pour mo
 <span class="admin-lab-status-pending">⏳ Pending</span>
 ```
 
+## Poké HUB — page Shop (onglets regroupés)
+
+Dans `assets/css/admin-unified.css` : styles pour la page admin **Poké HUB → Shop** (`poke-hub-shop-items`, module `shop-items`).
+
+- **Conteneur :** `.poke-hub-shop-items-nav.nav-tab-wrapper` — flex, groupes visuels.
+- **Groupe :** `.poke-hub-shop-items-nav__group`, variantes `--avatar` / `--stickers`.
+- **Titre de groupe :** `.poke-hub-shop-items-nav__group-title` (petit libellé au-dessus des onglets *Items* / *Categories* ou *Stickers*).
+- **Ligne d’onglets :** `.poke-hub-shop-items-nav__tabs` — `nav-tab` WordPress à l’intérieur.
+- **Mobile :** media query empilant les groupes (même fichier).
+
+Implémentation PHP : `modules/shop-items/shop-items.php` (`poke_hub_shop_items_admin_render_list_frame_start`).
+
 ## Notes
 
 - Les styles admin restent dans le plugin (pas dans le thème)

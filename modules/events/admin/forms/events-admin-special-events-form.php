@@ -153,7 +153,11 @@ function pokehub_render_special_event_form(
                 <tr>
                     <th><label for="event_type"><?php esc_html_e('Event type', 'poke-hub'); ?></label></th>
                     <td>
-                        <select id="event_type" name="event[event_type]" required>
+                        <select id="event_type"
+                                name="event[event_type]"
+                                class="pokehub-event-type-select2"
+                                data-placeholder="<?php echo esc_attr__('Search event type...', 'poke-hub'); ?>"
+                                required>
                             <option value=""><?php esc_html_e('Select a type', 'poke-hub'); ?></option>
                             <?php foreach (poke_hub_events_get_all_event_types() as $type) : ?>
                                 <option value="<?php echo esc_attr($type->slug); ?>"
@@ -352,7 +356,8 @@ function pokehub_render_special_event_form(
                             <?php foreach ($pokemon_list as $p) : ?>
                                 <option value="<?php echo esc_attr($p['id']); ?>"
                                         data-name-fr="<?php echo esc_attr($p['name_fr'] ?? ''); ?>"
-                                        data-name-en="<?php echo esc_attr($p['name_en'] ?? ''); ?>">
+                                        data-name-en="<?php echo esc_attr($p['name_en'] ?? ''); ?>"
+                                        data-is-regional="<?php echo !empty($p['is_regional']) ? '1' : '0'; ?>">
                                     <?php
                                     echo esc_html(
                                         sprintf(
@@ -382,6 +387,28 @@ function pokehub_render_special_event_form(
                         </p>
                     </div>
 
+                    <div class="pokehub-pokemon-flags" style="margin-top:10px;padding-top:8px;border-top:1px solid #ddd;">
+                        <p class="description" style="margin-bottom:6px;"><?php esc_html_e('Variantes & disponibilité (optionnel)', 'poke-hub'); ?></p>
+                        <label style="display:block;margin-bottom:4px;">
+                            <input type="checkbox" class="pokehub-force-shadow" value="1" />
+                            <?php esc_html_e('Shadow forcé', 'poke-hub'); ?>
+                        </label>
+                        <label style="display:block;margin-bottom:4px;">
+                            <input type="checkbox" class="pokehub-force-shiny" value="1" />
+                            <?php esc_html_e('Shiny forcé', 'poke-hub'); ?>
+                        </label>
+                        <input type="hidden" class="pokehub-region-note-legacy" value="" />
+                        <div class="pokehub-worldwide-override-wrap" style="display:none;margin-top:6px;padding-top:6px;border-top:1px dashed #c3c4c7;">
+                            <label style="display:block;margin-bottom:4px;">
+                                <input type="checkbox" class="pokehub-worldwide-override" value="1" />
+                                <?php esc_html_e('Disponibilité mondiale (exception)', 'poke-hub'); ?>
+                            </label>
+                            <p class="description" style="margin:0;">
+                                <?php esc_html_e('La zone d’apparition d’un régional est définie dans la base Pokémon. Cochez uniquement si cet événement le rend disponible partout alors qu’il ne l’est pas normalement.', 'poke-hub'); ?>
+                            </p>
+                        </div>
+                    </div>
+
                     <div class="pokehub-pokemon-attacks">
                         <p class="description">
                             <?php esc_html_e('Select special moves for this Pokémon (if any).', 'poke-hub'); ?>
@@ -407,6 +434,7 @@ function pokehub_render_special_event_form(
                                         <option value="<?php echo esc_attr($p['id']); ?>"
                                                 data-name-fr="<?php echo esc_attr($p['name_fr'] ?? ''); ?>"
                                                 data-name-en="<?php echo esc_attr($p['name_en'] ?? ''); ?>"
+                                                data-is-regional="<?php echo !empty($p['is_regional']) ? '1' : '0'; ?>"
                                             <?php selected($prow['pokemon_id'], $p['id']); ?>>
                                             <?php
                                             echo esc_html(
@@ -435,6 +463,28 @@ function pokehub_render_special_event_form(
                                 <p class="description" style="margin-top: 4px;">
                                     <?php esc_html_e('Force a specific gender for this Pokémon. Only relevant for Pokémon with gender dimorphism.', 'poke-hub'); ?>
                                 </p>
+                            </div>
+
+                            <div class="pokehub-pokemon-flags" style="margin-top:10px;padding-top:8px;border-top:1px solid #ddd;">
+                                <p class="description" style="margin-bottom:6px;"><?php esc_html_e('Variantes & disponibilité (optionnel)', 'poke-hub'); ?></p>
+                                <label style="display:block;margin-bottom:4px;">
+                                    <input type="checkbox" class="pokehub-force-shadow" value="1" <?php checked(!empty($prow['is_forced_shadow'])); ?> />
+                                    <?php esc_html_e('Shadow forcé', 'poke-hub'); ?>
+                                </label>
+                                <label style="display:block;margin-bottom:4px;">
+                                    <input type="checkbox" class="pokehub-force-shiny" value="1" <?php checked(!empty($prow['is_forced_shiny'])); ?> />
+                                    <?php esc_html_e('Shiny forcé', 'poke-hub'); ?>
+                                </label>
+                                <input type="hidden" class="pokehub-region-note-legacy" value="<?php echo esc_attr((string) ($prow['region_note'] ?? '')); ?>" />
+                                <div class="pokehub-worldwide-override-wrap" style="display:none;margin-top:6px;padding-top:6px;border-top:1px dashed #c3c4c7;">
+                                    <label style="display:block;margin-bottom:4px;">
+                                        <input type="checkbox" class="pokehub-worldwide-override" value="1" <?php checked(!empty($prow['is_worldwide_override'])); ?> />
+                                        <?php esc_html_e('Disponibilité mondiale (exception)', 'poke-hub'); ?>
+                                    </label>
+                                    <p class="description" style="margin:0;">
+                                        <?php esc_html_e('La zone d’apparition d’un régional est définie dans la base Pokémon. Cochez uniquement si cet événement le rend disponible partout alors qu’il ne l’est pas normalement.', 'poke-hub'); ?>
+                                    </p>
+                                </div>
                             </div>
 
                             <div class="pokehub-pokemon-attacks">

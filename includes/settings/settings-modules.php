@@ -26,6 +26,7 @@ function poke_hub_get_modules_config(): array {
         'eggs'          => ['path' => 'eggs/eggs.php',            'label' => 'Eggs'],
         'blocks'        => ['path' => 'blocks/blocks.php',        'label' => 'Blocks'],
         'collections'   => ['path' => 'collections/collections.php', 'label' => 'Pokémon GO Collections'],
+        'shop-items'      => ['path' => 'shop-items/shop-items.php', 'label' => 'Avatar shop items'],
     ];
 }
 

@@ -48,6 +48,12 @@ function pokehub_blocks_register_all() {
         'go-pass' => [
             'requires' => [],
         ],
+        'shop-avatar-highlights' => [
+            'requires' => [],
+        ],
+        'shop-sticker-highlights' => [
+            'requires' => [],
+        ],
     ];
     
     foreach ($blocks as $block_name => $config) {
@@ -65,7 +71,14 @@ function pokehub_blocks_register_all() {
         if (!$all_active) {
             continue;
         }
-        
+
+        if ($block_name === 'shop-avatar-highlights' && (!function_exists('pokehub_blocks_shop_avatar_schema_ready') || !pokehub_blocks_shop_avatar_schema_ready())) {
+            continue;
+        }
+        if ($block_name === 'shop-sticker-highlights' && (!function_exists('pokehub_blocks_shop_sticker_schema_ready') || !pokehub_blocks_shop_sticker_schema_ready())) {
+            continue;
+        }
+
         // Enregistrer le bloc avec protection du callback de rendu
         $block_path = POKE_HUB_BLOCKS_PATH . '/blocks/' . $block_name;
         $block_json = $block_path . '/block.json';

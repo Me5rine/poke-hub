@@ -1,5 +1,7 @@
 # Bonus : source de vérité et bloc (module Blocks uniquement)
 
+**Module Bonus (activation, menu catalogue, shortcodes)** : voir [bonus/README.md](./bonus/README.md).
+
 ## Vue d’ensemble
 
 - **Types de bonus** : une seule source de vérité, sur le **site principal** (même principe que les Pokémon).

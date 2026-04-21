@@ -463,6 +463,8 @@ function poke_hub_pokemon_handle_backgrounds_form() {
         $slug = sanitize_title($title);
     }
 
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_background' ? 0 : $id, 'slug', 'id', 'background');
+
     $extra = [
         'image_url' => $image_url,
     ];

@@ -1,6 +1,6 @@
 # Initialisation Select2
 
-Ce document décrit les différentes méthodes utilisées pour initialiser Select2 dans le plugin Me5rine LAB. Utilisez ce guide comme référence pour implémenter Select2 dans de nouveaux modules.
+Ce document décrit surtout les méthodes d’initialisation Select2 héritées du **Me5rine LAB** (classe `.admin-lab-select2`, etc.). Le **plugin Poké HUB** réutilise les mêmes principes sur d’autres écrans, mais certains cas (ex. **types d’événement** du module Events) ont un **chemin d’enqueue et un script dédiés** : voir la section **[Poké HUB — Types d’événement](#pokehub-select2-event-types)** ci-dessous et la doc du module [events/README.md](./events/README.md#event-type-select2-admin).
 
 ## Table des matières
 
@@ -12,6 +12,7 @@ Ce document décrit les différentes méthodes utilisées pour initialiser Selec
 6. [Initialisation par classe CSS (ancienne méthode)](#initialisation-par-classe-css-ancienne-méthode)
 7. [Configuration des options](#configuration-des-options)
 8. [Empêcher l'initialisation sur certains selects](#empêcher-linitialisation-sur-certains-selects)
+9. [Poké HUB — Types d’événement (module Events)](#pokehub-select2-event-types)
 
 ---
 
@@ -531,6 +532,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
 ---
 
+<a id="pokehub-select2-event-types"></a>
+
+## Poké HUB — Types d’événement (module Events)
+
+Ce cas **ne** repose **pas** sur la classe `.admin-lab-select2` (script Me5rine LAB décrit plus haut). Il est géré **dans le plugin Poké HUB** pour des listes d’options très longues (taxonomie distante `event_type`).
+
+| Élément | Fichier / remarque |
+|--------|---------------------|
+| Initialisation JS | `assets/js/pokehub-special-events-admin.js` — `initEventTypeSelect2` / `initAllEventTypeSelect2` |
+| Enqueue (admin) | `modules/events/events.php` — Select2 **4.1.0-rc.0** (jsDelivr) + script ci-dessus sur **Poké HUB → Events** et sur **`post.php` / `post-new.php`** |
+| Champs couverts | `#event_type` (`pokehub-event-type-select2`), filtre liste `#filter-by-event-type`, tout `<select>` dont `name` ou `id` contient `event_type`, classes `pokehub-event-type-select` ; observer sur `#admin_lab_event_box` si DOM dynamique |
+| Ancien code | Plus d’`wp_add_inline_script('select2', …)` uniquement pour le filtre : tout est centralisé dans le JS du plugin |
+
+Documentation complète (comportement, obsolète, `PokeHubSpecialEvents`, `wp.media`) : **[events/README.md](./events/README.md#event-type-select2-admin)**.
+
+---
+
 ## Checklist pour implémenter Select2
 
 Lorsque vous ajoutez Select2 à un nouveau module :
@@ -562,6 +580,8 @@ Lorsque vous ajoutez Select2 à un nouveau module :
 - **Select2 JS** : `4.0.13` (CDN : `https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js`)
 
 **Note** : Certains modules utilisent aussi `https://cdn.jsdelivr.net/npm/select2@4.0.13/` qui est équivalent.
+
+**Poké HUB — module Events** (et quelques autres écrans du même plugin) : **Select2 `4.1.0-rc.0`** via jsDelivr, tel qu’enregistré dans `modules/events/events.php` (voir section [Poké HUB — Types d’événement](#pokehub-select2-event-types) ci-dessus).
 
 ---
 

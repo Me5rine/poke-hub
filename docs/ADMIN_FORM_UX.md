@@ -41,7 +41,7 @@ Pour que le retour reprenne les filtres de la liste (statut, source, type, reche
 | Bonus | `modules/bonus/admin/bonus-types-admin.php` |
 | Profils | `modules/user-profiles/admin/user-profiles-admin.php`, `modules/user-profiles/admin/forms/user-profile-form.php` |
 | Événements (liste URL) | `modules/events/functions/events-admin-helpers.php` |
-| Événements (formulaires) | `modules/events/admin/forms/events-admin-special-events-form.php`, `events-admin-go-pass-form.php` |
+| Événements (formulaires) | `modules/events/admin/forms/events-admin-special-events-form.php`, `events-admin-go-pass-form.php` ; **Select2 « type d’événement »** (liste + metabox article) : `assets/js/pokehub-special-events-admin.js`, enqueue `modules/events/events.php` — [events/README.md](./events/README.md#event-type-select2-admin) |
 | Régions géographiques (admin Pokémon / réglages) | `includes/settings/forms/regional-region-form.php` |
 
 Pour le **CSS générique** des formulaires admin (classes `admin-lab-*`, variables), voir [ADMIN_CSS.md](./ADMIN_CSS.md).

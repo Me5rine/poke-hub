@@ -136,60 +136,30 @@ add_filter('pokehub_remote_events_edit_url', function ($url, $item) {
 function pokehub_generate_unique_event_slug(string $base_slug, int $exclude_id = 0): string {
     global $wpdb;
 
-    $slug = sanitize_title($base_slug);
-    if ($slug === '') {
-        $slug = 'event';
-    }
-
-    $unique_slug = $slug;
-    $i           = 1;
-
-    // Table des special events (locale)
     $events_table = pokehub_get_table('special_events');
-
-    // Table des posts DISTANTS (events JV Actu)
-    // via notre helper générique
     $remote_posts_table = pokehub_get_table('remote_posts');
-
-    // Fallback de sécurité si jamais le helper renvoie une chaîne vide
     if ($remote_posts_table === '') {
         $remote_posts_table = $wpdb->posts;
     }
 
-    while (true) {
-        // 1) Slug déjà utilisé par un special event (sauf l'event en cours d'édition)
-        $exists_special = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT id 
-                 FROM {$events_table}
-                 WHERE slug = %s
-                   AND id != %d
-                 LIMIT 1",
-                $unique_slug,
-                $exclude_id
-            )
-        );
-
-        // 2) Slug déjà utilisé comme post_name dans la table distante
-        $exists_remote = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT ID 
-                 FROM {$remote_posts_table}
-                 WHERE post_name = %s
-                 LIMIT 1",
-                $unique_slug
-            )
-        );
-
-        if (!$exists_special && !$exists_remote) {
-            // 🎯 Slug vraiment libre → on le renvoie
-            return $unique_slug;
-        }
-
-        // Sinon on incrémente : slug, slug-1, slug-2, etc.
-        $unique_slug = $slug . '-' . $i;
-        $i++;
-    }
+    return pokehub_unique_slug_across_table_specs(
+        $base_slug,
+        [
+            [
+                'table'          => $events_table,
+                'slug_column'    => 'slug',
+                'id_column'      => 'id',
+                'ignore_row_id'  => $exclude_id,
+            ],
+            [
+                'table'          => $remote_posts_table,
+                'slug_column'    => 'post_name',
+                'id_column'      => 'ID',
+                'ignore_row_id'  => 0,
+            ],
+        ],
+        'event'
+    );
 }
 
 /**

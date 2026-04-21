@@ -859,8 +859,7 @@ function poke_hub_pokemon_handle_attacks_form() {
     }
 
     if ($slug === '') {
-        $base = $name_en !== '' ? $name_en : $name_fr;
-        $slug = sanitize_title($base);
+        $slug = pokehub_slug_base_from_two_strings($name_en, $name_fr, 'move');
     }
 
     $table_attacks = pokehub_get_table('attacks');
@@ -899,6 +898,8 @@ function poke_hub_pokemon_handle_attacks_form() {
     $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
         ? poke_hub_pokemon_encode_extra_json($extra, $existing_extra_raw)
         : wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $slug = pokehub_unique_slug_for_table($table_attacks, $slug, $action === 'add_move' ? 0 : $id, 'slug', 'id', 'move');
 
     $data = [
         'slug'     => $slug,

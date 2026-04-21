@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.2.8
+Version: 2.2.9
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -38,6 +38,7 @@ define('POKE_HUB_INCLUDES_DIR', POKE_HUB_PATH . 'includes/');
 
 // Charger les fichiers nécessaires
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-helpers.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-slug-helpers.php';
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-encryption.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-modules.php';
@@ -289,7 +290,7 @@ add_action('admin_menu', 'poke_hub_admin_menu');
  * Pages rattachées au menu Poké HUB
  */
 function poke_hub_admin_pages() {
-    return [
+    $pages = [
         'poke-hub',
         'poke-hub-settings',
         'poke-hub-pokemon',
@@ -297,7 +298,13 @@ function poke_hub_admin_pages() {
         'poke-hub-user-profiles',
         'poke-hub-games',
         'poke-hub-bonus-types',
+        'poke-hub-shop-items',
+        'poke-hub-tools',
     ];
+    if (function_exists('poke_hub_temporary_tools_enabled') && !poke_hub_temporary_tools_enabled()) {
+        $pages = array_values(array_diff($pages, ['poke-hub-tools']));
+    }
+    return $pages;
 }
 
 /**
@@ -472,6 +479,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-user-profiles',
         'poke-hub-games',
         'poke-hub-bonus-types',
+        'poke-hub-shop-items',
     ];
     
     $page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';

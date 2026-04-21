@@ -55,17 +55,12 @@ function poke_hub_pokemon_items_edit_form($edit_row = null) {
         }
     }
 
-    // Décodage extra pour récupérer l'image
-    $extra     = [];
-    $image_url = '';
-    if ($is_edit && !empty($edit_row->extra)) {
-        $decoded = json_decode($edit_row->extra, true);
-        if (is_array($decoded)) {
-            $extra = $decoded;
+    $auto_image_url = '';
+    if ($is_edit && function_exists('pokehub_get_item_data_by_id')) {
+        $item_data = pokehub_get_item_data_by_id((int) $edit_row->id);
+        if (is_array($item_data) && !empty($item_data['image_url'])) {
+            $auto_image_url = (string) $item_data['image_url'];
         }
-    }
-    if (isset($extra['image_url'])) {
-        $image_url = (string) $extra['image_url'];
     }
 
     $back_url = add_query_arg(
@@ -154,15 +149,18 @@ function poke_hub_pokemon_items_edit_form($edit_row = null) {
                 <h3><?php esc_html_e('Item Image', 'poke-hub'); ?></h3>
                 
                 <div class="admin-lab-form-group">
-                    <label for="image_url"><?php esc_html_e('Image URL', 'poke-hub'); ?></label>
-                    <input type="url" id="image_url" name="image_url" value="<?php echo esc_attr($image_url); ?>" />
-                    <p class="description"><?php esc_html_e('Full URL to the item icon (e.g. S3 bucket, CDN…).', 'poke-hub'); ?></p>
-                    
-                    <?php if ($image_url) : ?>
+                    <p class="description"><?php esc_html_e('Image URL is generated automatically from image sources and item slug: slug.webp (fallback slug.png).', 'poke-hub'); ?></p>
+                    <?php if (!empty($slug)) : ?>
+                        <p><code><?php echo esc_html($slug); ?>.webp</code> → <code><?php echo esc_html($slug); ?>.png</code></p>
+                    <?php endif; ?>
+
+                    <?php if ($auto_image_url) : ?>
                         <div style="margin-top: 10px;">
-                            <img src="<?php echo esc_url($image_url); ?>" alt="" 
+                            <img src="<?php echo esc_url($auto_image_url); ?>" alt=""
                                  style="width:64px;height:64px;object-fit:contain;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />
                         </div>
+                    <?php else : ?>
+                        <p class="description"><?php esc_html_e('Preview unavailable until the item is saved with a slug.', 'poke-hub'); ?></p>
                     <?php endif; ?>
                 </div>
             </div>

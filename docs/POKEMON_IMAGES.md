@@ -76,6 +76,35 @@ Les images **bonbon** et **bonbon XL** utilisent les clés `{slug}-candy` et `{s
 
 Pour **quel slug** est utilisé sur les lignées d’évolution (famille de bonbons, bébés), voir [blocks/BLOCK_STYLES_AND_BEHAVIOR.md](./blocks/BLOCK_STYLES_AND_BEHAVIOR.md).
 
+## Objets du catalogue (items), XP, Stardust et récompenses de quête
+
+Les icônes des récompenses **item**, **XP** et **Stardust** (Field Research, Special Research, Collection Challenges, Pass GO, etc.) ne sont plus construites à la main avec une URL fixe type `…/objects/stardust.png`. Elles suivent le **bucket** + les chemins définis dans **Réglages > Poké HUB > Sources** (section *Image Sources*).
+
+### Chemins dans Sources
+
+- **Items** (`poke_hub_assets_path_items`, ex. `/pokemon-go/items/`) : dossier principal pour les icônes d’objets et les récompenses **XP** / **Stardust** (fichiers **`xp`** et **`stardust`**).
+- **Objects** (`poke_hub_assets_path_objects`, ex. `/pokemon-go/objects/`) : dossier **secondaire** ; les URLs y sont encore essayées en repli si le fichier n’existe pas sous **Items** (compatibilité avec d’anciens déploiements CDN).
+
+### Convention de fichiers
+
+Pour une clé de fichier `slug` (ex. `lucky-egg`, ou les slugs fixes **`xp`** et **`stardust`**) :
+
+1. **`slug.webp`** (prioritaire)
+2. **`slug.png`** (repli)
+
+Le front utilise la chaîne raster globale (`data-ph-raster` + script de repli de format, comme pour les bonus en raster) via `poke_hub_render_bucket_raster_img()` lorsque c’est disponible.
+
+### Helpers (`includes/functions/pokemon-public-helpers.php`)
+
+- **`poke_hub_get_assets_path('items')`** : lit `poke_hub_assets_path_items`.
+- **`pokehub_get_object_asset_url_chain(string $slug)`** : retourne les URLs uniques **Items** puis **Objects** (`webp` puis `png` pour chaque dossier).
+- **`pokehub_render_reward_object_icon_img(array $reward, array $args = [])`** : rend la balise `<img>` pour une ligne de récompense (`type` = `item` | `xp` | `stardust`) à partir du slug catalogue ou des slugs fixes `xp` / `stardust`.
+- **`pokehub_get_item_data_by_id(int $item_id)`** : en plus de `id`, `name_*`, `name`, retourne aussi **`slug`**, **`image_url`** (première URL de la chaîne calculée) et **`image_chain`** (tableau d’URLs pour repli). Si une ancienne valeur **`extra.image_url`** existe encore en base, elle sert de **dernier repli** lorsque le bucket ne fournit rien pour le slug.
+
+### Admin module Pokémon — catalogue items
+
+L’édition d’un item (**Pokémon > Items**) ne propose plus de champ **« Image URL »** manuel : l’aperçu et l’affichage front s’appuient sur le **slug** de l’objet et le dossier **Items** (puis **Objects**) du bucket. À l’enregistrement, une éventuelle clé **`image_url`** dans `extra` n’est plus conservée (le reste de `extra` est préservé).
+
 ## Configuration
 
 ### Paramètres dans l'administration
@@ -84,6 +113,8 @@ Les URLs sont configurées dans :
 **Réglages > Poké HUB > Sources** (onglet "Sources")
 
 - **Assets bucket base URL** + chemin **Pokémon** (section *Image Sources*) : seule source principale des sprites (`{clé}.png`). Sans bucket renseigné, les helpers renvoient une URL vide.
+- **Items** (section *Image Sources*) : chemin des icônes d’objets et des récompenses XP / Stardust (`slug.webp` → `slug.png`), avec repli sur le dossier **Objects** si besoin.
+- **Objects** (section *Image Sources*) : autres objets ou repli pour les mêmes slugs.
 - **Pokémon assets fallback base URL** (section *Pokémon Sources*) : racine alternative ; les chemins et noms de fichiers doivent correspondre à ceux de la source principale.
 
 Il n’existe plus d’option ni de constante dédiée « URL Pokémon seule » : tout passe par le bucket + le chemin Pokémon. Une ancienne option `poke_hub_pokemon_assets_base_url` éventuellement présente en base n’est plus lue par le plugin ; vous pouvez la supprimer manuellement si besoin.

@@ -311,9 +311,10 @@ function poke_hub_pokemon_handle_weathers_form() {
 
     // Slug auto depuis FR ou EN
     if ($slug === '') {
-        $base_for_slug = $name_fr !== '' ? $name_fr : $name_en;
-        $slug = sanitize_title($base_for_slug);
+        $slug = pokehub_slug_base_from_two_strings($name_fr, $name_en, 'weather');
     }
+
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_weather' ? 0 : $id, 'slug', 'id', 'weather');
 
     $extra = [
         'image_url' => $image_url,

@@ -12,6 +12,7 @@ $delete_data = get_option( 'poke_hub_delete_data_on_uninstall', false );
 if ( ! $delete_data ) {
     delete_option( 'poke_hub_active_modules' );
     delete_option( 'poke_hub_delete_data_on_uninstall' );
+    delete_option( 'poke_hub_temporary_tools_enabled' );
     return;
 }
 

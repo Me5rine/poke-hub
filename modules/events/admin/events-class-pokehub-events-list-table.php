@@ -20,6 +20,36 @@ class PokeHub_Events_List_Table extends WP_List_Table {
         ]);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * Le parent retourne false dès que {@see $_REQUEST['filter_action']} est non vide,
+     * ce qui annule toute action groupée si ce paramètre traîne (URL, extension, etc.).
+     * On ne bloque que lorsqu’il n’y a ni choix bulk (action / action2) ni cases cochées.
+     */
+    public function current_action() {
+        if (isset($_REQUEST['filter_action']) && !empty($_REQUEST['filter_action'])) {
+            $a1 = isset($_REQUEST['action']) ? (string) $_REQUEST['action'] : '';
+            $a2 = isset($_REQUEST['action2']) ? (string) $_REQUEST['action2'] : '';
+            $bulk_selected = ($a1 !== '' && $a1 !== '-1') || ($a2 !== '' && $a2 !== '-1');
+            $ids = isset($_REQUEST['event_ids']) && is_array($_REQUEST['event_ids'])
+                ? array_filter(array_map('intval', $_REQUEST['event_ids']))
+                : [];
+            if (!$bulk_selected && !$ids) {
+                return false;
+            }
+        }
+
+        if (isset($_REQUEST['action']) && '-1' !== (string) $_REQUEST['action']) {
+            return (string) $_REQUEST['action'];
+        }
+        if (isset($_REQUEST['action2']) && '-1' !== (string) $_REQUEST['action2']) {
+            return (string) $_REQUEST['action2'];
+        }
+
+        return false;
+    }
+
     public function get_columns() {
         return [
             'cb'      => '<input type="checkbox" />',
@@ -571,21 +601,28 @@ class PokeHub_Events_List_Table extends WP_List_Table {
             'deleted' => count($ids),
         ];
         
-        // Préserver les filtres
-        if (!empty($_GET['event_status'])) {
-            $redirect_args['event_status'] = sanitize_key($_GET['event_status']);
+        // Préserver les filtres (GET ou corps de requête)
+        if (!empty($_REQUEST['event_status'])) {
+            $redirect_args['event_status'] = sanitize_key(wp_unslash((string) $_REQUEST['event_status']));
         }
-        if (!empty($_GET['event_source'])) {
-            $redirect_args['event_source'] = sanitize_key($_GET['event_source']);
+        if (!empty($_REQUEST['event_source'])) {
+            $redirect_args['event_source'] = sanitize_key(wp_unslash((string) $_REQUEST['event_source']));
         }
-        if (!empty($_GET['event_type'])) {
-            $redirect_args['event_type'] = sanitize_text_field($_GET['event_type']);
+        if (!empty($_REQUEST['event_type'])) {
+            $redirect_args['event_type'] = sanitize_text_field(wp_unslash((string) $_REQUEST['event_type']));
         }
-        if (!empty($_GET['s'])) {
-            $redirect_args['s'] = sanitize_text_field($_GET['s']);
+        $search_after = isset($_REQUEST['s']) ? trim(wp_unslash((string) $_REQUEST['s'])) : '';
+        if ($search_after !== '') {
+            $redirect_args['s'] = sanitize_text_field($search_after);
         }
-        if (!empty($_GET['paged'])) {
-            $redirect_args['paged'] = (int) $_GET['paged'];
+        if (!empty($_REQUEST['paged'])) {
+            $redirect_args['paged'] = (int) $_REQUEST['paged'];
+        }
+        if (!empty($_REQUEST['orderby'])) {
+            $redirect_args['orderby'] = sanitize_key(wp_unslash((string) $_REQUEST['orderby']));
+        }
+        if (!empty($_REQUEST['order']) && strtolower((string) $_REQUEST['order']) === 'asc') {
+            $redirect_args['order'] = 'asc';
         }
         
         wp_redirect(add_query_arg($redirect_args, admin_url('admin.php')));

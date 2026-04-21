@@ -382,12 +382,12 @@ function poke_hub_pokemon_handle_regions_form() {
     }
 
     if ($slug === '') {
-        // On génère le slug à partir du EN si dispo, sinon FR.
-        $base = $name_en !== '' ? $name_en : $name_fr;
-        $slug = sanitize_title($base);
+        $slug = pokehub_slug_base_from_two_strings($name_en, $name_fr, 'region');
     }
 
     $table = pokehub_get_table('pokemon_regions');
+
+    $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_region' ? 0 : $id, 'slug', 'id', 'region');
 
     $data = [
         'name_en'    => $name_en,

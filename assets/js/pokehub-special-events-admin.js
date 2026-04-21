@@ -2,6 +2,49 @@
 
 jQuery(function ($) {
 
+    function initEventTypeSelect2($select) {
+        if (!$select.length || typeof $.fn.select2 === 'undefined') {
+            return;
+        }
+
+        // Eviter la double initialisation.
+        if ($select.hasClass('select2-hidden-accessible')) {
+            return;
+        }
+
+        var placeholder = $select.data('placeholder') || 'Search event type...';
+        var width = $select.attr('id') === 'filter-by-event-type' ? '200px' : '100%';
+
+        $select.select2({
+            placeholder: placeholder,
+            allowClear: true,
+            width: width,
+            language: {
+                noResults: function () {
+                    return 'No results found';
+                },
+                searching: function () {
+                    return 'Searching...';
+                }
+            }
+        });
+    }
+
+    function initAllEventTypeSelect2() {
+        // Formulaire d'ajout/édition des événements spéciaux.
+        initEventTypeSelect2($('#event_type.pokehub-event-type-select2'));
+
+        // Filtre de type sur la liste des événements.
+        initEventTypeSelect2($('#filter-by-event-type.pokehub-event-type-select'));
+
+        // Couverture large en admin : tout select lié à event_type.
+        $('select[name*="event_type"], select[id*="event_type"], .pokehub-event-type-select2, .pokehub-event-type-select').each(function () {
+            initEventTypeSelect2($(this));
+        });
+    }
+
+    initAllEventTypeSelect2();
+
     // Fonction helper pour la recherche multilingue (utiliser la version globale si disponible)
     var pokehubMultilingualMatcher = window.pokehubMultilingualMatcher || function(params, data) {
         // Si aucun terme de recherche, afficher toutes les options
@@ -98,7 +141,21 @@ jQuery(function ($) {
                 initPokemonSelect2($select);
             }
         });
+        $('.pokehub-event-pokemon-row:not(.template)').each(function () {
+            pokehubSyncRegionalOverrideRow($(this));
+        });
     }, 100);
+
+    // Certains champs du metabox article peuvent être injectés dynamiquement.
+    if (window.MutationObserver && document.getElementById('admin_lab_event_box')) {
+        var eventTypeObserver = new MutationObserver(function () {
+            initAllEventTypeSelect2();
+        });
+        eventTypeObserver.observe(document.getElementById('admin_lab_event_box'), {
+            childList: true,
+            subtree: true
+        });
+    }
 
     function addPokemonRow() {
         const $wrapper = $('#pokehub-event-pokemon-wrapper');
@@ -136,6 +193,7 @@ jQuery(function ($) {
             }
             
             initPokemonSelect2($newSelect);
+            pokehubSyncRegionalOverrideRow($row);
         }, 50);
     }
 
@@ -146,6 +204,29 @@ jQuery(function ($) {
         $wrapper.append($row);
     }
 
+    /**
+     * Affiche la case « disponibilité mondiale » uniquement pour les Pokémon marqués régionaux en base.
+     */
+    function pokehubSyncRegionalOverrideRow($row) {
+        const $sel = $row.find('.pokehub-pokemon-select');
+        const $wrap = $row.find('.pokehub-worldwide-override-wrap');
+        const el = $sel[0];
+        const opt = el && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+        const pokemonId = $sel.val();
+        if (!pokemonId || !opt) {
+            $wrap.hide();
+            $wrap.find('.pokehub-worldwide-override').prop('checked', false);
+            return;
+        }
+        const regional = opt.getAttribute('data-is-regional') === '1';
+        if (regional) {
+            $wrap.show();
+        } else {
+            $wrap.hide();
+            $wrap.find('.pokehub-worldwide-override').prop('checked', false);
+        }
+    }
+
     // Délégation : changement de Pokémon → charger les attaques spéciales et afficher/masquer le champ gender
     $('#pokehub-event-pokemon-wrapper').on('change', '.pokehub-pokemon-select', function () {
         const $select = $(this);
@@ -153,6 +234,8 @@ jQuery(function ($) {
         const $row = $select.closest('.pokehub-event-pokemon-row');
         const $attacksContainer = $row.find('.pokehub-pokemon-attacks');
         const $genderContainer = $row.find('.pokehub-pokemon-gender');
+
+        pokehubSyncRegionalOverrideRow($row);
 
         $attacksContainer.empty();
 
@@ -273,10 +356,14 @@ jQuery(function ($) {
             });
 
             const gender = $row.find('.pokehub-pokemon-gender-select').val() || null;
-            
+
             pokemons.push({
                 pokemon_id: pokemonId,
                 gender: gender,
+                is_forced_shadow: $row.find('.pokehub-force-shadow').is(':checked') ? 1 : 0,
+                is_forced_shiny: $row.find('.pokehub-force-shiny').is(':checked') ? 1 : 0,
+                is_worldwide_override: $row.find('.pokehub-worldwide-override').is(':checked') ? 1 : 0,
+                region_note: ($row.find('.pokehub-region-note-legacy').val() || '').trim(),
                 attacks: attacks
             });
         });

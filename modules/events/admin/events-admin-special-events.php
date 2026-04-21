@@ -17,10 +17,13 @@ function pokehub_render_special_events_page() {
         wp_die(__('You are not allowed to access this page.', 'poke-hub'));
     }
 
-    // Nettoyer l'URL si c'est une soumission de formulaire avec des paramètres inutiles
-    // (filtrage ou action en masse)
-    if ((isset($_GET['filter_action']) && !empty($_GET['filter_action'])) || 
-        (isset($_GET['bulk_action']) && !empty($_GET['bulk_action']))) {
+    // Nettoyer l'URL après un clic sur « Filtrer » uniquement (pas une action groupée : action / action2 / event_ids).
+    $events_list_bulk_get = (
+        (!empty($_GET['action']) && (string) $_GET['action'] !== '-1')
+        || (!empty($_GET['action2']) && (string) $_GET['action2'] !== '-1')
+        || (!empty($_GET['event_ids']) && is_array($_GET['event_ids']))
+    );
+    if (!$events_list_bulk_get && isset($_GET['filter_action']) && !empty($_GET['filter_action'])) {
         
         $clean_params = [];
         $useful_params = ['page', 'event_status', 'event_source', 'event_type', 's', 'paged', 'orderby', 'order', 'added', 'updated', 'deleted'];
@@ -355,36 +358,42 @@ function pokehub_render_special_events_page() {
         
         <script type="text/javascript">
         jQuery(document).ready(function($) {
-            // Nettoyer l'URL après soumission du formulaire de filtrage
+            // Nettoyer l’URL uniquement quand on clique sur « Filtrer » (filter_action).
+            // Ne pas intercepter les actions groupées (doaction / action2) ni la recherche, sinon
+            // action, action2 et event_ids[] ne sont jamais envoyés → suppression multiple sans effet.
             $('#pokehub-events-filter-form').on('submit', function(e) {
+                var submitter = e.originalEvent && e.originalEvent.submitter;
+                if (!submitter || submitter.name !== 'filter_action') {
+                    return;
+                }
+
                 var $form = $(this);
                 var params = {};
-                
-                // Récupérer uniquement les paramètres utiles et non vides
+
                 $form.find('input, select').each(function() {
                     var $field = $(this);
                     var name = $field.attr('name');
                     var value = $field.val();
-                    
-                    // Ignorer les champs sans nom, les valeurs vides, et les paramètres WordPress inutiles
+                    var type = ($field.attr('type') || '').toLowerCase();
+
                     if (!name || !value || value === '' || value === '-1') {
                         return;
                     }
-                    
-                    // Ignorer les paramètres WordPress de sécurité et les actions vides
+                    if (type === 'checkbox' && !$field.is(':checked')) {
+                        return;
+                    }
+
                     if (name.indexOf('_wp') === 0 || name === 'action' || name === 'action2' || name === 'filter_action') {
                         return;
                     }
-                    
+
                     params[name] = value;
                 });
-                
-                // Construire la nouvelle URL propre
+
                 var baseUrl = '<?php echo esc_js(admin_url('admin.php')); ?>';
                 var queryString = $.param(params);
                 var cleanUrl = baseUrl + (queryString ? '?' + queryString : '');
-                
-                // Rediriger vers l'URL propre
+
                 window.location.href = cleanUrl;
                 e.preventDefault();
                 return false;
@@ -545,14 +554,19 @@ add_action('admin_post_pokehub_save_special_event', function () {
                 $gender = sanitize_text_field((string) $p['gender']);
             }
 
+            $insert_p = [
+                'event_id'              => $event_id,
+                'pokemon_id'            => $pokemon_id,
+                'gender'                => $gender,
+                'is_forced_shadow'      => !empty($p['is_forced_shadow']) ? 1 : 0,
+                'is_forced_shiny'       => !empty($p['is_forced_shiny']) ? 1 : 0,
+                'is_worldwide_override' => !empty($p['is_worldwide_override']) ? 1 : 0,
+                'region_note'           => isset($p['region_note']) ? sanitize_text_field((string) $p['region_note']) : '',
+            ];
             $wpdb->insert(
                 $event_pokemon_table,
-                [
-                    'event_id'   => $event_id,
-                    'pokemon_id' => $pokemon_id,
-                    'gender'     => $gender,
-                ],
-                ['%d', '%d', '%s']
+                $insert_p,
+                ['%d', '%d', '%s', '%d', '%d', '%d', '%s']
             );
 
             if (!empty($p['attacks']) && is_array($p['attacks'])) {

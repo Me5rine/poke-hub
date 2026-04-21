@@ -157,6 +157,9 @@ add_action('wp_ajax_pokehub_go_pass_metabox_create_and_link', function (): void 
     if (!function_exists('pokehub_go_pass_create_empty_special_event')) {
         wp_send_json_error(['message' => __('Pass GO helpers are not available.', 'poke-hub')], 500);
     }
+    if (function_exists('pokehub_ensure_events_admin_helpers_loaded')) {
+        pokehub_ensure_events_admin_helpers_loaded();
+    }
 
     $table_ok = function_exists('pokehub_get_table') && function_exists('pokehub_table_exists')
         && pokehub_get_table('go_pass_host_links') !== ''

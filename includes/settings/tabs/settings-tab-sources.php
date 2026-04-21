@@ -42,12 +42,15 @@ $assets_path_habitats = get_option('poke_hub_assets_path_habitats', '/pokemon-go
 $assets_path_icons = get_option('poke_hub_assets_path_icons', '/pokemon-go/icons/');
 $assets_path_mega_energies = get_option('poke_hub_assets_path_mega_energies', '/pokemon-go/mega-energies/');
 $assets_path_objects = get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/');
+$assets_path_items = get_option('poke_hub_assets_path_items', '/pokemon-go/items/');
 $assets_path_pokemon = get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/');
 $assets_path_raids = get_option('poke_hub_assets_path_raids', '/pokemon-go/raids/');
 $assets_path_teams = get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/');
 $assets_path_types = get_option('poke_hub_assets_path_types', '/pokemon-go/types/');
 $assets_path_vivillon = get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/');
 $assets_path_weathers = get_option('poke_hub_assets_path_weathers', '/pokemon-go/weathers/');
+$assets_path_avatar_shop = get_option('poke_hub_assets_path_avatar_shop', '/pokemon-go/avatar-shop/');
+$assets_path_in_game_stickers = get_option('poke_hub_assets_path_in_game_stickers', '/pokemon-go/in-game-stickers/');
 
 // Pokémon images fallback base URL (bucket secondaire, même clés de fichiers)
 $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base_url', '');
@@ -121,6 +124,9 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     if (isset($_POST['poke_hub_assets_path_objects'])) {
         update_option('poke_hub_assets_path_objects', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_objects'])));
     }
+    if (isset($_POST['poke_hub_assets_path_items'])) {
+        update_option('poke_hub_assets_path_items', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_items'])));
+    }
     if (isset($_POST['poke_hub_assets_path_pokemon'])) {
         update_option('poke_hub_assets_path_pokemon', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_pokemon'])));
     }
@@ -138,6 +144,12 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     }
     if (isset($_POST['poke_hub_assets_path_weathers'])) {
         update_option('poke_hub_assets_path_weathers', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_weathers'])));
+    }
+    if (isset($_POST['poke_hub_assets_path_avatar_shop'])) {
+        update_option('poke_hub_assets_path_avatar_shop', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_avatar_shop'])));
+    }
+    if (isset($_POST['poke_hub_assets_path_in_game_stickers'])) {
+        update_option('poke_hub_assets_path_in_game_stickers', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_in_game_stickers'])));
     }
 
     if (isset($_POST['poke_hub_pokemon_assets_fallback_base_url'])) {
@@ -350,7 +362,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/eggs/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                    <?php _e('WebP / PNG: slug.webp → slug.png', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -393,6 +405,20 @@ foreach ($messages as $msg) {
                                     placeholder="/pokemon-go/mega-energies/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
                                     <?php _e('WebP / PNG / JPG: slug.webp → slug.png → slug.jpg', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Items', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_items"
+                                    value="<?php echo esc_attr($assets_path_items); ?>"
+                                    class="regular-text"
+                                    placeholder="/pokemon-go/items/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('WebP / PNG: slug.webp → slug.png (used for item rewards, including XP and Stardust).', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
@@ -494,6 +520,34 @@ foreach ($messages as $msg) {
                                     placeholder="/pokemon-go/weathers/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
                                     <?php _e('SVG: slug.svg', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Avatar shop', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_avatar_shop"
+                                    value="<?php echo esc_attr($assets_path_avatar_shop); ?>"
+                                    class="regular-text"
+                                    placeholder="/pokemon-go/avatar-shop/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('Raster: slug.webp preferred, slug.png fallback (same folder as item slug).', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('In-game stickers', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_in_game_stickers"
+                                    value="<?php echo esc_attr($assets_path_in_game_stickers); ?>"
+                                    class="regular-text"
+                                    placeholder="/pokemon-go/in-game-stickers/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('Raster: slug.webp preferred, slug.png fallback (same folder as item slug).', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

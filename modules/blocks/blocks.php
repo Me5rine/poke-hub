@@ -24,8 +24,8 @@ add_action('init', function() {
     /**
      * Chargement des fichiers du module
      */
+    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-helpers.php';    // Helpers (schéma shop, etc.) — avant blocks-register
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-register.php';   // Enregistrement des blocs
-    require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-helpers.php';    // Helpers pour les blocs
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-title-helpers.php'; // Titres + icône SVG optionnelle
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-field-research.php'; // Field Research (rendu bloc event-quests)
     require_once POKE_HUB_BLOCKS_PATH . '/functions/blocks-quests-helpers.php'; // Helpers quêtes (données post)
@@ -64,6 +64,28 @@ add_action('init', function() {
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-featured-pokemon-hours-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-go-pass-metabox.php';
     require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-go-pass-post-guard.php';
+
+    // Blocs / métaboxes shop : uniquement module Blocks + schéma SQL présent (pas de dépendance au module shop-items).
+    if (function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('blocks')) {
+        if (function_exists('pokehub_blocks_shop_avatar_schema_ready') && pokehub_blocks_shop_avatar_schema_ready()) {
+            if (!function_exists('poke_hub_shop_avatar_get_items_by_ids')) {
+                require_once POKE_HUB_PATH . 'modules/shop-items/includes/shop-avatar-helpers.php';
+            }
+            if (is_admin()) {
+                require_once POKE_HUB_BLOCKS_PATH . '/admin/blocks-shop-avatar-metabox-ajax.php';
+            }
+            require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-shop-avatar-metabox.php';
+        }
+        if (function_exists('pokehub_blocks_shop_sticker_schema_ready') && pokehub_blocks_shop_sticker_schema_ready()) {
+            if (!function_exists('poke_hub_shop_sticker_get_items_by_ids')) {
+                require_once POKE_HUB_PATH . 'modules/shop-items/includes/shop-sticker-helpers.php';
+            }
+            if (is_admin()) {
+                require_once POKE_HUB_BLOCKS_PATH . '/admin/blocks-shop-sticker-metabox-ajax.php';
+            }
+            require_once POKE_HUB_PATH . 'modules/blocks/admin/blocks-shop-sticker-metabox.php';
+        }
+    }
 
     // Debug file is optional - only load if needed for troubleshooting
     // Uncomment the line below if you need to debug block registration:

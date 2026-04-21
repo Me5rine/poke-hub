@@ -9,18 +9,23 @@ Ce guide explique comment organiser le code dans le plugin Poké HUB pour mainte
 ```
 poke-hub/
 ├── includes/              # Code partagé entre modules
+│   ├── admin-tools.php   # Page admin « Temporary tools » (imports ponctuels : Pokekalos, onglets vers outils events) — voir docs/ADMIN_TEMPORARY_TOOLS.md
 │   ├── admin-ui.php      # UI admin partagée (ex. barre « retour à la liste », styles `pokehub-admin-back-bar`) — voir docs/ADMIN_FORM_UX.md
-│   ├── functions/        # Helpers globaux (toujours chargés avec le plugin, hors modules) : ex. pokehub-inline-svg.php, pokehub-pokemon-type-icon.php, pokemon-public-helpers.php — voir docs/INLINE_SVG.md
+│   ├── functions/        # Helpers globaux (toujours chargés avec le plugin, hors modules) : ex. pokehub-helpers.php (purge Nginx / cache page), pokehub-inline-svg.php, pokehub-pokemon-type-icon.php, pokemon-public-helpers.php — voir docs/INLINE_SVG.md, docs/CACHE_AND_NGINX_PURGE.md
 │   ├── settings/         # Gestion des paramètres (modules : source unique dans settings-modules.php)
 │   ├── content/          # Helpers tables de contenu (content_eggs, content_quests, etc.) + éditeur quêtes partagé
 │   └── ...
 ├── modules/              # Modules fonctionnels
-│   ├── events/           # Module Événements
-│   ├── bonus/            # Module Bonus
-│   ├── blocks/           # Module Blocs Gutenberg
-│   ├── pokemon/          # Module Pokémon
-│   ├── quests/           # Module Quêtes (menu Quêtes, onglets Quêtes / Catégories de quêtes ; indépendant d’Events)
-│   ├── eggs/             # Module Œufs (admin pools, shortcode ; metabox aussi chargée par Blocks si inactif)
+│   ├── events/           # Module Événements — voir docs/events/README.md
+│   ├── bonus/            # Module Bonus (catalogue types, shortcodes) — voir docs/bonus/README.md + docs/BONUS_SOURCE_AND_BLOCKS.md
+│   ├── blocks/           # Module Blocs Gutenberg — voir docs/blocks/README.md
+│   ├── pokemon/          # Module Pokémon — voir docs/pokemon/README.md
+│   ├── quests/           # Module Quêtes — voir docs/quests/README.md
+│   ├── eggs/             # Module Œufs — voir docs/eggs/README.md (metabox aussi chargée par Blocks si inactif)
+│   ├── collections/      # Collections GO — voir docs/collections/README.md
+│   ├── shop-items/       # Boutique avatar (items + catégories) + stickers en jeu ; écran admin unifié Shop ; données des blocs shop highlights — voir docs/shop-items/README.md
+│   ├── user-profiles/    # Profils UM, codes amis — voir docs/user-profiles/README.md
+│   ├── games/            # Pokedle, leaderboard (module en évolution ; pas de docs/ dédié pour l’instant)
 │   └── ...
 ├── assets/               # Ressources statiques
 │   ├── css/

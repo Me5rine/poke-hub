@@ -331,6 +331,7 @@ Le module Events gère les événements spéciaux de Pokémon GO, avec support p
 
 - **Taxonomie hiérarchique** : Organisation en parent/enfant
 - **Filtrage** : Filtrage par type d'événement
+- **Admin — recherche par nom** : sur la page **Poké HUB → Events** et dans l’éditeur d’article (`post.php` / `post-new.php`), les listes de **type d’événement** (formulaire spécial, filtre de liste, champs metabox dont le `name` / `id` contient `event_type`) passent en **Select2** avec saisie pour filtrer les options. Implémentation : `assets/js/pokehub-special-events-admin.js`, enqueue dans `modules/events/events.php`. Référence détaillée : [docs/events/README.md](docs/events/README.md#event-type-select2-admin).
 - **Sources distantes** : Récupération depuis d'autres sites WordPress
 - **Slugs** : Gestion des slugs pour les URLs
 
@@ -377,6 +378,7 @@ Accédez à **Poké HUB** > **Events** pour :
 
 - **Liste des événements** : Table avec filtres et recherche
 - **Création/Édition** : Formulaire complet pour gérer les événements
+- **Type d’événement** : liste longue gérée en **Select2** (recherche), y compris sur l’éditeur d’article pour les champs concernés — voir [docs/events/README.md](docs/events/README.md#event-type-select2-admin)
 - **Pokémon associés** : Sélection multiple de Pokémon
 - **Bonus associés** : Sélection de bonus
 - **Attaques spéciales** : Gestion des attaques exclusives
@@ -937,7 +939,7 @@ Objets/Items (pierres, leurres, etc.).
 - `description_en`, `description_fr` : Descriptions multilingues
 - `image_id` : ID de l'image (média WordPress)
 - `game_key` : Clé du jeu (`pokemon_go`)
-- `extra` : Données supplémentaires
+- `extra` : Données supplémentaires (les icônes affichées côté site ne reposent plus sur une URL manuelle dans `extra` : elles sont dérivées du **`slug`** + le dossier **Items** puis **Objects** configurés dans **Réglages > Poké HUB > Sources** — voir `docs/POKEMON_IMAGES.md`)
 
 #### Table : `{prefix}_pokehub_pokemon_backgrounds`
 

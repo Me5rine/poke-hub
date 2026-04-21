@@ -51,6 +51,7 @@ class Pokehub_DB {
             || in_array('eggs', $active_modules, true)
             || in_array('quests', $active_modules, true)
             || in_array('blocks', $active_modules, true)
+            || in_array('shop-items', $active_modules, true)
         ) {
             $this->createContentTables();
         }
@@ -863,6 +864,7 @@ class Pokehub_DB {
         
         // Migration : ajouter la colonne gender si elle n'existe pas
         $this->migrateSpecialEventPokemonGenderColumn($event_pokemon_table);
+        $this->migrateSpecialEventPokemonFlagColumns($event_pokemon_table);
 
         // Liaison stable Spotlight / Day Pokémon Hours (post parent)
         $this->migrateSpecialEventsContentSourceColumns($events_table);
@@ -1078,6 +1080,48 @@ class Pokehub_DB {
     }
 
     /**
+     * Migration : colonnes Shadow / Shiny / override mondial / note régionale sur special_event_pokemon.
+     *
+     * @param string $table_name Nom complet de la table
+     */
+    private function migrateSpecialEventPokemonFlagColumns(string $table_name): void {
+        global $wpdb;
+        $table_exists = ($wpdb->get_var('SHOW TABLES LIKE \'' . esc_sql($table_name) . '\'') === $table_name);
+        if (!$table_exists) {
+            return;
+        }
+        $cols = [
+            'is_forced_shadow'      => "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = afficher / traiter en Shadow pour cet événement'",
+            'is_forced_shiny'       => "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = shiny forcé pour cet événement'",
+            'is_worldwide_override' => "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = disponible partout (ignore le caractère régional pour ce créneau)'",
+            'region_note'           => "TEXT NULL COMMENT 'Texte wiki ou libellé régional pour ce Pokémon sur cet événement'",
+        ];
+        foreach ($cols as $col => $def) {
+            $exists = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                    DB_NAME,
+                    $table_name,
+                    $col
+                )
+            );
+            if ($exists === 0) {
+                $wpdb->query("ALTER TABLE `{$table_name}` ADD COLUMN `{$col}` {$def}");
+            }
+        }
+    }
+
+    /**
+     * Migration publique : colonnes flags Pokémon événement spécial.
+     */
+    public function migrateSpecialEventPokemonFlagColumnsPublic(): void {
+        $t = pokehub_get_table('special_event_pokemon');
+        if ($t) {
+            $this->migrateSpecialEventPokemonFlagColumns($t);
+        }
+    }
+
+    /**
      * Migration unique : renommer les tables de contenu qui avaient un double préfixe "pokehub"
      * (ex. actu_pokehub_pokehub_content_special_research_steps -> actu_pokehub_content_special_research_steps).
      * Si la table au bon nom existe déjà (vide), on la supprime puis on renomme l'ancienne.
@@ -1096,6 +1140,10 @@ class Pokehub_DB {
             'content_collection_challenges', 'content_collection_challenge_items', 'content_bonus', 'content_bonus_entries',
             'content_wild_pokemon', 'content_wild_pokemon_entries', 'content_new_pokemon', 'content_new_pokemon_entries',
             'content_raids', 'content_raid_bosses', 'content_go_pass',
+            'shop_avatar_categories', 'shop_avatar_items', 'shop_avatar_item_events',
+            'content_shop_avatar', 'content_shop_avatar_entries',
+            'shop_sticker_items', 'shop_sticker_item_events',
+            'content_shop_sticker', 'content_shop_sticker_entries',
             // Bloc "jour -> Pokémon(s) -> heures" (raids/oeufs/encens/leurres/heure vedette/quêtes...)
             'content_day_pokemon_hours', 'content_day_pokemon_hour_entries',
         ];
@@ -1169,6 +1217,15 @@ class Pokehub_DB {
         $raid_bosses_tbl   = pokehub_get_table('content_raid_bosses');
         $go_pass_tbl       = pokehub_get_table('content_go_pass');
         $go_pass_host_tbl  = pokehub_get_table('go_pass_host_links');
+        $shop_avatar_cat_tbl = pokehub_get_table('shop_avatar_categories');
+        $shop_avatar_items_tbl = pokehub_get_table('shop_avatar_items');
+        $shop_avatar_item_events_tbl = pokehub_get_table('shop_avatar_item_events');
+        $content_shop_avatar_tbl = pokehub_get_table('content_shop_avatar');
+        $content_shop_avatar_entries_tbl = pokehub_get_table('content_shop_avatar_entries');
+        $shop_sticker_items_tbl = pokehub_get_table('shop_sticker_items');
+        $shop_sticker_item_events_tbl = pokehub_get_table('shop_sticker_item_events');
+        $content_shop_sticker_tbl = pokehub_get_table('content_shop_sticker');
+        $content_shop_sticker_entries_tbl = pokehub_get_table('content_shop_sticker_entries');
 
         $sql_eggs = "CREATE TABLE {$eggs_tbl} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1479,6 +1536,117 @@ class Pokehub_DB {
             KEY pass_lookup (pass_source_type, pass_source_id)
         ) {$charset_collate};";
 
+        $sql_shop_avatar_categories = "CREATE TABLE {$shop_avatar_cat_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(191) NOT NULL DEFAULT '',
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug),
+            KEY sort_order (sort_order)
+        ) {$charset_collate};";
+
+        $sql_shop_avatar_items = "CREATE TABLE {$shop_avatar_items_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            category_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            slug VARCHAR(191) NOT NULL DEFAULT '',
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug),
+            KEY category_id (category_id)
+        ) {$charset_collate};";
+
+        $sql_shop_avatar_item_events = "CREATE TABLE {$shop_avatar_item_events_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            item_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            special_event_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY item_id (item_id),
+            KEY special_event_id (special_event_id),
+            UNIQUE KEY item_event (item_id, special_event_id)
+        ) {$charset_collate};";
+
+        $sql_content_shop_avatar = "CREATE TABLE {$content_shop_avatar_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            hero_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_content_shop_avatar_entries = "CREATE TABLE {$content_shop_avatar_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_shop_avatar_id BIGINT UNSIGNED NOT NULL,
+            shop_avatar_item_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_shop_avatar_id (content_shop_avatar_id),
+            KEY shop_avatar_item_id (shop_avatar_item_id)
+        ) {$charset_collate};";
+
+        $sql_shop_sticker_items = "CREATE TABLE {$shop_sticker_items_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            slug VARCHAR(191) NOT NULL DEFAULT '',
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY slug (slug)
+        ) {$charset_collate};";
+
+        $sql_shop_sticker_item_events = "CREATE TABLE {$shop_sticker_item_events_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            item_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            special_event_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY item_id (item_id),
+            KEY special_event_id (special_event_id),
+            UNIQUE KEY item_event (item_id, special_event_id)
+        ) {$charset_collate};";
+
+        $sql_content_shop_sticker = "CREATE TABLE {$content_shop_sticker_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            hero_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts)
+        ) {$charset_collate};";
+
+        $sql_content_shop_sticker_entries = "CREATE TABLE {$content_shop_sticker_entries_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            content_shop_sticker_id BIGINT UNSIGNED NOT NULL,
+            shop_sticker_item_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY content_shop_sticker_id (content_shop_sticker_id),
+            KEY shop_sticker_item_id (shop_sticker_item_id)
+        ) {$charset_collate};";
+
         dbDelta($sql_eggs);
         dbDelta($sql_egg_pokemon);
         dbDelta($sql_quest_groups);
@@ -1516,6 +1684,17 @@ class Pokehub_DB {
         dbDelta($sql_raid_bosses);
         dbDelta($sql_go_pass);
         dbDelta($sql_go_pass_host);
+        dbDelta($sql_shop_avatar_categories);
+        dbDelta($sql_shop_avatar_items);
+        dbDelta($sql_shop_avatar_item_events);
+        dbDelta($sql_content_shop_avatar);
+        dbDelta($sql_content_shop_avatar_entries);
+        dbDelta($sql_shop_sticker_items);
+        dbDelta($sql_shop_sticker_item_events);
+        dbDelta($sql_content_shop_sticker);
+        dbDelta($sql_content_shop_sticker_entries);
+
+        $this->migrateShopAvatarItemsDropImageOverrideColumn($shop_avatar_items_tbl);
 
         $egg_gender_col = $wpdb->get_var($wpdb->prepare(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'gender'",
@@ -1667,6 +1846,30 @@ class Pokehub_DB {
             " FROM `{$legacy_table}`";
 
         $wpdb->query($insert_sql);
+    }
+
+    /**
+     * Supprime la colonne image_override_url (remplacée par les seuls fichiers bucket slug.webp / .png).
+     */
+    private function migrateShopAvatarItemsDropImageOverrideColumn(string $table): void {
+        global $wpdb;
+        if ($table === '') {
+            return;
+        }
+        $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        if ($found !== $table) {
+            return;
+        }
+        $col = $wpdb->get_var($wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'image_override_url'",
+            DB_NAME,
+            $table
+        ));
+        if (empty($col)) {
+            return;
+        }
+        $wpdb->query("ALTER TABLE `{$table}` DROP COLUMN `image_override_url`");
     }
 
     /**

@@ -45,7 +45,7 @@ Toutes les classes listées ici commencent par ce préfixe pour limiter les conf
 - `.event-date-middle` - Séparateur entre les dates (···)
 
 #### Bloc Dates
-- `.pokehub-event-dates-block-wrapper` - Wrapper du bloc Gutenberg pour les dates d'événement
+- `.pokehub-event-dates-block-wrapper` - Wrapper du bloc Gutenberg : habillage type carte (fond, bordure, ombre, padding) ; **pas** de séparateur entre le titre « Date » et la ligne de chips
 - `.pokehub-event-dates-block` - Bloc Gutenberg pour les dates d'événement (contenu)
 - `.pokehub-event-dates-block .event-dates-row` - Ligne de dates dans le bloc
 - `.pokehub-event-dates-block .event-date-chip` - Chip de date dans le bloc
@@ -102,6 +102,27 @@ Les SVG **inline** sont teintés via `currentColor` sur les formes (`path`, `cir
 
 ### Module Quêtes (Event Quests)
 
+#### Bloc Gutenberg `pokehub/event-quests` (liste actuelle)
+
+Fichier principal des styles : `assets/css/poke-hub-blocks-front.css`.
+
+- `.pokehub-event-quests-block-wrapper` — wrapper du bloc
+- `.pokehub-event-quests-list` — liste `<ul>` des quêtes
+- `.pokehub-quest-item` — une quête (`<li>`)
+- `.pokehub-quest-main` — ligne repliée (tâche + aperçu + chevron)
+- `.pokehub-quest-task` / `.pokehub-quest-task-placeholder` — texte de la tâche
+- `.pokehub-quest-rewards-preview` — bandeau d’aperçu (tuiles Pokémon + métas)
+- `.pokehub-quest-preview-more` — badge `+N` (Pokémon au-delà des 3 vignettes)
+- `.pokehub-quest-preview-other-count` — une ligne non-Pokémon : quantité réelle ; plusieurs lignes : libellé **`Other × M`**
+- `.pokehub-quest-toggle` — ouverture / fermeture du détail
+- `.pokehub-quest-details` — zone dépliée
+- `.pokehub-quest-rewards-list` — grille des récompenses détaillées
+- `.pokehub-quest-reward-item--pokemon` / `.pokehub-quest-reward-item--other` — ligne Pokémon vs autre
+- `.pokehub-field-research-preview-tile` / `.pokehub-field-research-detail-tile` — tuiles (réutilise `.pokehub-wild-pokemon-card`)
+- `.pokehub-quest-reward-cp` — conteneur flex des deux pastilles CP
+- `.pokehub-quest-cp-box` / `.pokehub-quest-cp-box--min` / `.pokehub-quest-cp-box--max` — pastille min (gauche, plus discrète) puis max (droite), label au-dessus (`.pokehub-quest-cp-label`, `text-transform: uppercase` en CSS) et valeur (`.pokehub-quest-cp-value`)
+- `.pokehub-quest-reward-resource-visual` — icône / visuel bonbon, objet, etc. ; si présent, le nom affiché dans `.pokehub-quest-reward-name` peut être réduit à **`×quantité`**
+
 #### Conteneurs Principaux
 - `.pokehub-event-quests-block-wrapper` - Wrapper du bloc Gutenberg des quêtes
 - `.event-field-research-list` - Liste des quêtes de terrain (⚠️ Note: pas de préfixe `pokehub-` pour compatibilité)
@@ -151,6 +172,19 @@ Les SVG **inline** sont teintés via `currentColor` sur les formes (`path`, `cir
 #### Éditeur Gutenberg
 - `.pokehub-wild-pokemon-block-editor` - Styles spécifiques à l'éditeur
 - `.pokehub-wild-pokemon-preview` - Aperçu dans l'éditeur
+
+### Shop highlights (avatar + stickers en jeu)
+
+Fichier : `assets/css/poke-hub-blocks-front.css`.
+
+- `.pokehub-shop-highlights` — modificateur sur le wrapper du bloc (`pokehub-shop-avatar-highlights-block` ou `pokehub-shop-sticker-highlights-block`).
+- `.pokehub-shop-highlights-panel` — carte (fond, bordure, ombre) englobant l’accroche et les tuiles.
+- `.pokehub-shop-highlights-lead` — ligne du haut (flex) : image + paragraphe.
+- `.pokehub-shop-highlights-lead__figure` — zone image (contain, largeur max).
+- `.pokehub-shop-highlights-lead__text` — paragraphe d’accroche.
+- `.pokehub-shop-highlights-panel__tiles` — zone liste sous le séparateur.
+- `.pokehub-shop-highlights-panel__tiles-title` — sous-titre au-dessus de la grille.
+- `.pokehub-shop-highlights-items` — modificateur sur `.pokehub-wild-pokemon-grid` (tuiles carrées héritées des classes Wild Pokémon).
 
 ## Variables CSS
 

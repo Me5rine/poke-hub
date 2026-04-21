@@ -65,6 +65,7 @@ function pokehub_get_all_pokemon_for_select(): array {
                 p.name_fr,
                 p.name_en,
                 p.form_variant_id,
+                p.extra,
                 COALESCE(fv.label, fv.form_slug, '') AS form,
                 COALESCE(fv.category, 'normal') AS form_category
          FROM {$pokemon_table} p
@@ -72,10 +73,29 @@ function pokehub_get_all_pokemon_for_select(): array {
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );
-    if (is_array($rows) && !empty($rows) && function_exists('pokehub_sort_pokemon_select_rows')) {
+    if (!is_array($rows)) {
+        return [];
+    }
+
+    if (!empty($rows) && function_exists('pokehub_sort_pokemon_select_rows')) {
         pokehub_sort_pokemon_select_rows($rows);
     }
-    
+
+    if ($rows !== []) {
+        foreach ($rows as &$row) {
+            $extra = [];
+            if (!empty($row['extra'])) {
+                $decoded = json_decode((string) $row['extra'], true);
+                if (is_array($decoded)) {
+                    $extra = $decoded;
+                }
+            }
+            $row['is_regional'] = !empty($extra['regional']['is_regional']) ? 1 : 0;
+            unset($row['extra']);
+        }
+        unset($row);
+    }
+
     // Construire le nom au format "nom-fr (nom-anglais)" si les deux sont disponibles
     foreach ($rows as &$row) {
         $name_fr = (string) ($row['name_fr'] ?? '');
