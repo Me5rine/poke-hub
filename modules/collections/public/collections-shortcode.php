@@ -14,7 +14,7 @@ function poke_hub_collections_output_pogo_search_block() {
         <summary class="me5rine-lab-title-medium"><?php esc_html_e('Pokémon GO: copy-paste search strings', 'poke-hub'); ?></summary>
         <div class="pokehub-collection-pogo-search-body">
             <p class="me5rine-lab-form-hint">
-                <?php esc_html_e('Build search queries you can paste into the Pokémon box search bar. The game limits how long a query can be, so the list is split into several lines (same logic as the official filters: regional tags, gigamax, etc.).', 'poke-hub'); ?>
+                <?php esc_html_e('Build search strings you can paste into the Pokémon search box. There is one comma-separated list per type (Standard, Alola, Mega, etc.) — a single copy block for each.', 'poke-hub'); ?>
             </p>
             <p class="me5rine-lab-form-hint">
                 <?php esc_html_e('Not covered yet: separate male / female for one species, “final evolutions only”, “final evos + babies only”, and other custom views—the tool only uses your current collection and each row’s name / form.', 'poke-hub'); ?>

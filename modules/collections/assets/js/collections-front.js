@@ -854,8 +854,7 @@
             .catch(function () {});
     }
 
-    /* --- Recherche in-game (Pokémon GO) : regroupement + phrases découpées --- */
-    var POGO_MAX_PHRASE_LEN = 200;
+    /* --- Recherche in-game (Pokémon GO) : une phrase / un bloc par type (groupe), liste complète en virgules --- */
     var POGO_GROUP_ORDER = ['base', 'alola', 'galar', 'paldea', 'hisui', 'mega', 'gigamax', 'dynamax', 'male', 'female', 'costume', 'other'];
     var POGO_PREFIX = {
         base: '',
@@ -976,25 +975,20 @@
         if (c !== 'normal' && c !== '' && c !== 'standard') return 'other';
         return 'base';
     }
-    function pogoBuildLines(prefix, nameArr) {
-        var out = [];
-        if (!nameArr || nameArr.length === 0) return out;
-        var cur = [];
-        for (var i = 0; i < nameArr.length; i++) {
-            var n = nameArr[i];
-            if (!n) continue;
-            var test = (prefix || '') + (cur.length ? cur.join(',') + ',' : '') + n;
-            if (test.length > POGO_MAX_PHRASE_LEN && cur.length > 0) {
-                out.push((prefix || '') + cur.join(','));
-                cur = [n];
-            } else {
-                cur.push(n);
-            }
+    /**
+     * Une seule chaîne par groupe (Standard, Alola, etc.) : noms en virgules, un seul champ à copier.
+     */
+    function pogoBuildSinglePhrasePerGroup(prefix, nameArr) {
+        if (!nameArr || nameArr.length === 0) {
+            return [];
         }
-        if (cur.length) {
-            out.push((prefix || '') + cur.join(','));
+        var body = nameArr.filter(function (x) {
+            return !!x;
+        }).join(',');
+        if (!body) {
+            return [];
         }
-        return out;
+        return [(prefix || '') + body];
     }
     function pogoT(key) {
         var t = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
@@ -1075,7 +1069,7 @@
             any = true;
             var label = pogoT(pogoGroupLabelKey(gkey, listBy));
             var prefix = POGO_PREFIX[gkey] !== undefined ? POGO_PREFIX[gkey] : '';
-            var lines = pogoBuildLines(prefix, names);
+            var lines = pogoBuildSinglePhrasePerGroup(prefix, names);
             var groupEl = document.createElement('div');
             groupEl.className = 'pokehub-pogo-search-group';
             groupEl.setAttribute('data-pogo-group', gkey);
