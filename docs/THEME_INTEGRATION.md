@@ -1,162 +1,54 @@
-# Guide d'Intégration dans le Thème
+# Intégration des styles CSS dans le thème WordPress
 
-Ce guide explique comment intégrer les styles CSS unifiés du plugin dans votre thème WordPress.
+## Référence actuelle (Me5rine Lab + Poké HUB)
 
-## 📋 Fichiers à Copier
+Pour le déploiement **Me5rine Lab** (thème enfant) avec Poké HUB, la procédure « copier FRONT_CSS.md à la main » a été remplacée par une **pilotage centralisé côté thème** (fichiers `css/poke-hub/`, ordre d’enqueue, filtre sur le plugin).
 
-Vous devez copier le contenu de ces fichiers dans votre thème :
+Lisez d’abord : **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)** — la section **« En bref — règle unique »** donne le tableau thème / plugin, le nom du filtre et un schéma ; le reste du fichier détaille l’ordre de cascade et les exceptions.
 
-1. **`docs/FRONT_CSS.md`** → Tous les styles front-end unifiés (boutons, tableaux, tuiles, pagination, filtres, etc.)
-2. **`docs/CSS_RULES.md`** → Styles des formulaires (si vous utilisez les formulaires)
-3. **`docs/PARTNER_MENU_CSS.md`** → Styles du menu partenaires (si vous utilisez le shortcode `[partner_menu]`)
+Côté thème, un court index du dossier CSS Poké HUB se trouve dans `css/poke-hub/README.md` (dépôt **me5rine-lab**).
 
-## 🎯 Méthode 1 : Fichier CSS dédié (Recommandé)
+## Autres thèmes (pas le bundle Me5rine)
 
-### Étape 1 : Créer le fichier CSS dans votre thème
+Si vous n’utilisez **pas** le dépôt du thème enfant (ou intégration partielle) :
 
-Créez un fichier `assets/css/me5rine-lab-unified.css` (ou `css/me5rine-lab-unified.css`) dans votre thème.
+1. Vous pouvez **copier** le contenu des blocs CSS documentés dans **[FRONT_CSS.md](./FRONT_CSS.md)** (éléments front généraux) et **[CSS_RULES.md](./CSS_RULES.md)** (formulaires) vers votre thème, comme décrit historiquement ci‑dessous.
+2. Si vous enfilez l’équivalent du lot front **dans le thème**, ajoutez `add_filter( 'poke_hub_load_default_plugin_front_css', '__return_false' );` pour éviter la double charge (voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
+3. Vérifiez l’**ordre** : thème de base → votre couche de composants → surcharges spécifiques aux modules Poké HUB.
 
-### Étape 2 : Copier le contenu
+### Méthode par fichier CSS dédié (générique)
 
-Copiez **TOUT le contenu** du fichier `docs/FRONT_CSS.md` (sauf les titres markdown) dans ce fichier CSS.
-
-**Important** : Copiez uniquement les blocs CSS entre les triple backticks (```css ... ```), pas les commentaires markdown.
-
-### Étape 3 : Enqueue le fichier dans functions.php
-
-Ajoutez ce code dans le `functions.php` de votre thème :
+1. Créer un fichier dans le thème, par ex. `assets/css/poke-hub-front-custom.css` (ou réutiliser un bundle existant).
+2. Y coller le **CSS** issu de `FRONT_CSS.md` / `CSS_RULES.md` (uniquement le contenu des blocs de code, pas le markdown autour).
+3. Enqueue dans `functions.php` :
 
 ```php
-/**
- * Charger les styles CSS unifiés Me5rine Lab
- */
-function mon_theme_enqueue_me5rine_lab_styles() {
-    // Charger le CSS unifié
+function mon_theme_enqueue_poke_hub_compat_styles() {
     wp_enqueue_style(
-        'me5rine-lab-unified',
-        get_template_directory_uri() . '/assets/css/me5rine-lab-unified.css',
-        [], // Pas de dépendances
-        '1.0.0' // Version (changez à chaque mise à jour)
+        'mon-theme-poke-hub-compat',
+        get_stylesheet_directory_uri() . '/assets/css/poke-hub-front-custom.css',
+        [ 'hello-elementor' ], // adapter les dépendances à votre thème parent
+        wp_get_theme()->get( 'Version' )
     );
 }
-add_action('wp_enqueue_scripts', 'mon_theme_enqueue_me5rine_lab_styles');
+add_action( 'wp_enqueue_scripts', 'mon_theme_enqueue_poke_hub_compat_styles', 20 );
 ```
 
-**Note** : Si votre fichier CSS est dans un autre emplacement, ajustez le chemin dans `get_template_directory_uri()`.
+4. Surcharger les variables (`:root` ou le sélecteur kit Elementor) **après** ce fichier si besoin.
 
-## 🎯 Méthode 2 : Intégrer dans style.css
+### Intégration dans `style.css` (générique)
 
-### Étape 1 : Copier le contenu
+Vous pouvez coller le contenu issu de `FRONT_CSS.md` en fin de `style.css` du thème. Contrôlez toutefois que l’**ordre** reste cohérent (parent puis enfant) et, si le plugin enque encore des feuilles front, tranchez avec le filtre `poke_hub_load_default_plugin_front_css` (voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
 
-Copiez **TOUT le contenu** du fichier `docs/FRONT_CSS.md` (sauf les titres markdown) à la fin de votre `style.css`.
+## Personnalisation des variables
 
-**Important** : Copiez uniquement les blocs CSS entre les triple backticks (```css ... ```), pas les commentaires markdown.
+Les variables unifiées (`--me5rine-lab-*`, etc.) sont décrites dans **FRONT_CSS.md** et, pour Me5rine Lab, générées / reliées à Elementor dans le `functions.php` du thème. Les surcharges doivent venir **après** le chargement de la couche de base.
 
-### Étape 2 : Vérifier l'ordre de chargement
+## Vérification
 
-Assurez-vous que votre `style.css` est chargé **après** les styles du plugin (le plugin charge déjà `global-colors.css`).
-
-## 🎨 Personnalisation des Variables CSS
-
-Toutes les variables CSS sont définies dans la section `:root` au début de `FRONT_CSS.md`. Vous pouvez les surcharger dans votre thème.
-
-### Exemple de surcharge dans votre thème
-
-Ajoutez ceci dans votre `style.css` ou dans un fichier CSS personnalisé :
-
-```css
-:root {
-    /* Surcharger les couleurs principales */
-    --me5rine-lab-primary: #1a4a5c;
-    --me5rine-lab-secondary: #0066cc;
-    
-    /* Surcharger les espacements */
-    --me5rine-lab-spacing-md: 20px;
-    --me5rine-lab-spacing-lg: 30px;
-    
-    /* Surcharger les rayons */
-    --me5rine-lab-radius-md: 10px;
-    --me5rine-lab-radius-lg: 15px;
-}
-```
-
-**Important** : Placez ces surcharges **après** le chargement du CSS unifié pour qu'elles prennent effet.
-
-## 📦 Structure Recommandée
-
-```
-votre-theme/
-├── style.css
-├── functions.php
-└── assets/
-    └── css/
-        ├── me5rine-lab-unified.css  ← Copier FRONT_CSS.md ici
-        └── theme-custom.css         ← Vos surcharges personnalisées
-```
-
-## ✅ Vérification
-
-Après l'intégration, vérifiez que :
-
-1. ✅ Le CSS est bien chargé (inspectez la page avec les outils développeur)
-2. ✅ Les variables CSS sont définies (vérifiez dans l'inspecteur)
-3. ✅ Les styles s'appliquent correctement aux éléments avec les classes `me5rine-lab-*`
-
-## 🔧 Exemple Complet
-
-### functions.php
-
-```php
-/**
- * Charger les styles CSS unifiés Me5rine Lab
- */
-function mon_theme_enqueue_me5rine_lab_styles() {
-    // CSS unifié (copié depuis FRONT_CSS.md)
-    wp_enqueue_style(
-        'me5rine-lab-unified',
-        get_template_directory_uri() . '/assets/css/me5rine-lab-unified.css',
-        [],
-        '1.0.0'
-    );
-    
-    // Vos surcharges personnalisées (optionnel)
-    wp_enqueue_style(
-        'me5rine-lab-theme-custom',
-        get_template_directory_uri() . '/assets/css/theme-custom.css',
-        ['me5rine-lab-unified'], // Dépend du CSS unifié
-        '1.0.0'
-    );
-}
-add_action('wp_enqueue_scripts', 'mon_theme_enqueue_me5rine_lab_styles');
-```
-
-### assets/css/theme-custom.css (optionnel)
-
-```css
-/* Surcharges personnalisées pour Me5rine Lab */
-:root {
-    --me5rine-lab-primary: #1a4a5c;
-    --me5rine-lab-secondary: #0066cc;
-    --me5rine-lab-spacing-md: 20px;
-}
-
-/* Styles spécifiques au thème si nécessaire */
-.me5rine-lab-form-button {
-    /* Vos surcharges ici */
-}
-```
-
-## 📝 Notes Importantes
-
-1. **Ordre de chargement** : Le CSS unifié doit être chargé **avant** vos surcharges personnalisées
-2. **Variables CSS** : Les variables utilisent des valeurs par défaut (ex: `var(--admin-lab-color-white, #ffffff)`) donc elles fonctionneront même si certaines variables ne sont pas définies
-3. **Mise à jour** : Quand le plugin est mis à jour, vérifiez si `FRONT_CSS.md` a changé et mettez à jour votre fichier CSS si nécessaire
-4. **Performance** : Un seul fichier CSS unifié est plus performant que plusieurs fichiers séparés
-
-## 🚀 Résultat
-
-Une fois intégré, tous les éléments front-end du plugin utiliseront automatiquement les styles unifiés définis dans votre thème. Une seule modification de variable CSS changera le style partout !
+- Inspecter le document : feuilles dans l’ordre attendu (parent → thème enfant → Poké HUB).
+- Pas de règles en double pour les mêmes handles si le filtre d’exclusion côté plugin est activé.
 
 ---
 
-*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md)*
+*Index de la documentation : [README du dossier docs](README.md) · [Charte rédactionnelle](REDACTION.md) · [CSS front thème / plugin : THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)*

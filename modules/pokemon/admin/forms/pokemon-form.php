@@ -231,6 +231,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     // Pokémon d'événement ou costumé : depuis extra ou dérivé de la forme (category = costume)
     $is_event_costumed = !empty($extra['is_event_costumed']);
 
+    // Espèce classée « bébé » (collections, règles communes) — `extra.is_baby`
+    $is_baby = !empty($extra['is_baby']);
+
     // ================================
     // Listes de référence
     // ================================
@@ -547,6 +550,15 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             <span><?php esc_html_e('Default form', 'poke-hub'); ?></span>
                         </label>
                         <p class="description"><?php esc_html_e('Only one form per Dex number should be marked as default.', 'poke-hub'); ?></p>
+                    </div>
+                </div>
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="is_baby" value="1" <?php checked($is_baby); ?> />
+                            <span><?php esc_html_e('Baby Pokémon', 'poke-hub'); ?></span>
+                        </label>
+                        <p class="description"><?php esc_html_e('Used e.g. for collection rules (include/exclude baby species).', 'poke-hub'); ?></p>
                     </div>
                 </div>
                 <div class="admin-lab-form-col">

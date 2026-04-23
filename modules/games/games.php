@@ -25,12 +25,7 @@ require_once __DIR__ . '/public/games-shortcode-leaderboard.php';
  */
 function poke_hub_games_assets() {
     // CSS principal
-    wp_enqueue_style(
-        'pokehub-games-style',
-        POKE_HUB_URL . 'assets/css/poke-hub-games.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    poke_hub_enqueue_bundled_front_style('pokehub-games-style', 'poke-hub-games.css', []);
 }
 add_action('wp_enqueue_scripts', 'poke_hub_games_assets');
 

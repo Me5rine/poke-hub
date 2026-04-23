@@ -242,13 +242,13 @@ If disabled, you will need to manually create pages with the shortcodes:
 - Pages creation: `modules/user-profiles/functions/user-profiles-pages.php`
 
 ### Assets
-- CSS: `assets/css/user-profiles-friend-codes.css` (centralized in main plugin assets)
+- CSS: styles **Me5rine** dans le thème `me5rine-lab/css/poke-hub/poke-hub-front.css` (dossier `css/poke-hub/parts/`, notamment `16-user-profiles-friend-codes.css`). Avec le filtre `poke_hub_load_default_plugin_front_css` à false, le plugin ne double plus les enqueues (voir `includes/functions/pokehub-front-styles-bridge.php`)
 - JavaScript: `assets/js/user-profiles-friend-codes.js` (centralized in main plugin assets)
 - JavaScript (Ultimate Member): `assets/js/poke-hub-user-profiles-um.js`
 
 ### Styling
 
-The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Additional specific styles are in `user-profiles-friend-codes.css`. For **notices** (success, error, warning, info), see `../POKEHUB_CSS_CLASSES.md` (section « Notices ») — red / green / orange / blue convention and usage in User Profiles pages.
+The shortcodes use global CSS classes `me5rine-lab-*` (see `../CSS_SYSTEM.md` at docs root). Specific list/card styles live in the theme bundle `css/poke-hub/parts/16-user-profiles-friend-codes.css` (not shipped in the plugin when using the Me5rine theme). For **notices** (success, error, warning, info), see `../POKEHUB_CSS_CLASSES.md` (section « Notices ») — red / green / orange / blue convention and usage in User Profiles pages.
 
 ---
 

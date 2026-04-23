@@ -55,7 +55,7 @@ function poke_hub_render_friend_codes_filters($args = []) {
     ?>
     <div class="me5rine-lab-form-block">
         <h3 class="me5rine-lab-title-medium"><?php echo esc_html($title); ?></h3>
-        <form method="get" action="">
+        <form method="get" action="" class="poke-hub-friend-codes-filter-form">
             <?php
             // Preserve other query vars
             foreach ($_GET as $key => $value) {

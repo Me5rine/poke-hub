@@ -8,6 +8,8 @@ Sauf **README.md** (cet index) et **REDACTION.md**, les pages Markdown sous `doc
 
 ## 📌 Changements récents (architecture)
 
+- **CSS front thème / plugin** : règle unique en tête de **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)** (*En bref* + diagramme) — le lot public est **dans le thème** Me5rine (`css/poke-hub/`) ; le plugin ne garde qu’un **minimum** (admin, etc.) quand le filtre `poke_hub_load_default_plugin_front_css` vaut `false`. Guide historique d’intégration : **THEME_INTEGRATION.md** ; README du dossier côté thème : *me5rine-lab* `css/poke-hub/README.md`.
+
 - **Admin — type d’événement (Select2)** : recherche par nom sur tous les selects pertinents (`event[event_type]`, filtre liste `#filter-by-event-type`, metabox article / champs dont le `name` ou l’`id` contient `event_type`). Assets Select2 + `pokehub-special-events-admin.js` aussi sur **`post.php` / `post-new.php`** ; plus d’`wp_add_inline_script` sur le filtre seul. Détail : [events/README.md](./events/README.md#event-type-select2-admin).
 - **Outils temporaires (admin)** : page **Poké HUB → Temporary tools** découpée en **onglets** (Pokekalos, heures Fandom, Lundi Max selon modules) ; option **Settings → General → Temporary tools** pour afficher ou masquer le sous-menu (`poke_hub_temporary_tools_enabled`). Documentation : [ADMIN_TEMPORARY_TOOLS.md](./ADMIN_TEMPORARY_TOOLS.md).
 - **Événements spéciaux — Pokémon** : la disponibilité **mondiale** (`is_worldwide_override`) n’est proposée en admin que pour les Pokémon **régionaux** en base (`extra.regional.is_regional` via `pokehub_get_all_pokemon_for_select()`). Pas de saisie manuelle des zones sur l’événement ; `region_note` reste géré en arrière-plan pour les données existantes (ex. imports). Détail : [events/README.md](./events/README.md) (section *Événements spéciaux — Pokémon de l’événement*).
@@ -50,7 +52,8 @@ La documentation générale se trouve à la racine du dossier `docs/` :
 - **[CACHE_AND_NGINX_PURGE.md](./CACHE_AND_NGINX_PURGE.md)** - Cache page Nginx (FastCGI), Redis objet, purge globale, événements, codes amis, filtres et branchement d’URLs
 - **[BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md)** - Bonus : source de vérité (site principal), bloc et metabox (module Blocks uniquement), schéma catalogue, SVG / raster, thème CSS (`--pokehub-bonus-icon-*`)
 - **[INLINE_SVG.md](./INLINE_SVG.md)** - SVG inline depuis le bucket (helpers globaux, types Pokémon, bonus, filtres)
-- **[THEME_INTEGRATION.md](./THEME_INTEGRATION.md)** - Guide d’intégration dans le thème WordPress
+- **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)** - CSS public : thème Me5rine vs plugin (tableau *En bref*, filtre, déqueue, schéma mermaid, exceptions), ordre d’enqueue, contenu de `assets/css/`
+- **[THEME_INTEGRATION.md](./THEME_INTEGRATION.md)** - Intégration thème (lien vers THEME_FRONT_CSS ; méthodes génériques via FRONT_CSS / CSS_RULES)
 - **[PLUGIN_INTEGRATION.md](./PLUGIN_INTEGRATION.md)** - Guide d’intégration pour utiliser les classes CSS dans d’autres plugins
 - **[POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md)** - Classes `pokehub-*` (blocs, collections, etc.) et lien avec le système *me5rine-lab*
 - **[CSS_SYSTEM.md](./CSS_SYSTEM.md)** - Documentation complète du système de classes CSS
@@ -128,13 +131,13 @@ La documentation spécifique à chaque module se trouve dans des sous-dossiers. 
 ### Pour les développeurs
 
 **Pour intégrer les styles dans votre thème WordPress :**
-1. Consultez [THEME_INTEGRATION.md](./THEME_INTEGRATION.md) - Guide complet étape par étape
+1. Lisez [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) (référence : Me5rine Lab, filtre, ordre)
+2. Puis [THEME_INTEGRATION.md](./THEME_INTEGRATION.md) (autres thèmes, copie FRONT_CSS si besoin)
 
 **Pour utiliser les classes dans votre plugin/thème :**
 1. Lisez [PLUGIN_INTEGRATION.md](./PLUGIN_INTEGRATION.md) pour comprendre la structure HTML
 2. Consultez [CSS_SYSTEM.md](./CSS_SYSTEM.md) pour la liste complète des classes
-3. Copiez le contenu de [CSS_RULES.md](./CSS_RULES.md) dans votre thème pour les formulaires
-4. Copiez le contenu de [FRONT_CSS.md](./FRONT_CSS.md) dans votre thème pour les éléments front-end
+3. Système de formulaires / front : [CSS_RULES.md](./CSS_RULES.md) et [FRONT_CSS.md](./FRONT_CSS.md) (souvent intégrés via le thème : voir THEME_FRONT_CSS)
 
 ### Pour la configuration des modules
 
@@ -147,7 +150,7 @@ Consultez la documentation dans le dossier correspondant au module (ex: `blocks/
 - [Organisation du plugin](./ORGANISATION.md)
 - [Cache Nginx / purge](./CACHE_AND_NGINX_PURGE.md)
 - [Bonus : source de vérité et bloc](./BONUS_SOURCE_AND_BLOCKS.md)
-- [Guide d’intégration dans le thème](./THEME_INTEGRATION.md)
+- [CSS public thème / plugin](./THEME_FRONT_CSS.md) · [Guide d’intégration dans le thème](./THEME_INTEGRATION.md)
 - [Système CSS](./CSS_SYSTEM.md)
 - [Classes pokehub-*](./POKEHUB_CSS_CLASSES.md)
 - [Blocs de contenu](./CONTENT_BLOCKS.md)

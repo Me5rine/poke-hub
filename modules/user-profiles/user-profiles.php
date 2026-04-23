@@ -213,7 +213,8 @@ add_action('poke_hub_user_profile_saved', function($user_id, $profile, $discord_
 
 /**
  * Front-end assets for Ultimate Member integration
- * Note: CSS is handled by the theme (see docs/user-profiles/CSS_RULES.md)
+ * Note: base form/profile CSS (me5rine-lab-*) in theme. Friend codes / Vivillon list styles: theme
+ * `css/poke-hub-user-profiles.css` (see docs/user-profiles/CSS_RULES.md).
  */
 function poke_hub_user_profiles_frontend_assets() {
     // Load only on Ultimate Member profile pages
@@ -474,13 +475,7 @@ function poke_hub_friend_codes_shortcode_assets() {
         true
     );
 
-    // Friend codes CSS
-    wp_enqueue_style(
-        'poke-hub-friend-codes',
-        POKE_HUB_URL . 'assets/css/user-profiles-friend-codes.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    // Styles des listes / cartes codes d'ami : thème me5rine-lab (css/poke-hub-user-profiles.css), pas de CSS dédié ici.
 
     // Shared country detection script (must be loaded before scripts that use it)
     wp_enqueue_script(

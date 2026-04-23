@@ -1,6 +1,6 @@
 # Classes CSS Poké HUB (`pokehub-`)
 
-Ce document décrit les classes CSS **spécifiques au plugin** (préfixe `pokehub-`) pour l’affichage front-end. Elles complètent les classes génériques `me5rine-lab-*` et `admin-lab-*`. Nommage produit / slug : voir **[REDACTION.md](./REDACTION.md)**.
+Ce document décrit les classes CSS **spécifiques au plugin** (préfixe `pokehub-`) pour l’affichage front-end. Elles complètent les classes génériques `me5rine-lab-*` et `admin-lab-*`. **Où est le CSS** : en production, le lot public est surtout dans le **thème** Me5rine (`css/poke-hub/`) — voir **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)**. Nommage produit / slug : voir **[REDACTION.md](./REDACTION.md)**.
 
 ## Préfixe des classes
 
@@ -414,11 +414,8 @@ Pour garder une cohérence visuelle, utiliser **toujours** les classes `me5rine-
 
 ## Fichiers CSS
 
-Les styles sont définis dans :
-- `assets/css/poke-hub-events-front.css` - Styles pour les événements et Pokémon sauvages
-- `assets/css/poke-hub-bonus-front.css` - Bonus (grille, shortcode, événements, variables `--pokehub-bonus-icon-*`)
-- `assets/css/poke-hub-special-events-single.css` - Styles pour les pages single d'événements
-- `assets/css/poke-hub-collections-front.css` - Styles du module Collections (front). `assets/theme/poke-hub-collections-theme.css` - Fichier à inclure dans le thème pour surcharges (dégradés, etc.)
+- **Thème Me5rine Lab (source de vérité front)** : le bundle `css/poke-hub/poke-hub-front.css` importe les `parts/*` (événements, bonus, blocs, collections, profils, etc.) ; `css/poke-hub/poke-hub-late-overrides.css` ferme la cascade. Détail : **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)**.
+- **Plugin** : `assets/css/` conserve surtout `global-colors.css`, l’**admin** et d’**éventuels** fichiers `poke-hub-*-front.css` si vous réactivez le lot packagé (`poke_hub_load_default_plugin_front_css` = `true` et présence des fichiers). Les noms historiques côté plugin (`poke-hub-events-front.css`, `poke-hub-bonus-front.css`, `poke-hub-collections-front.css`, etc.) correspondent aux morceaux reportés en `parts/` dans le thème.
 
 ---
 

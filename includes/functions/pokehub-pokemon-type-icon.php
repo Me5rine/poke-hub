@@ -52,15 +52,10 @@ function pokehub_render_pokemon_type_icon_html(string $icon_url, array $args = [
 add_action(
     'init',
     static function (): void {
-        if (!defined('POKE_HUB_URL') || !defined('POKE_HUB_VERSION')) {
+        if (!function_exists('poke_hub_register_bundled_front_style')) {
             return;
         }
-        wp_register_style(
-            'pokehub-type-icons',
-            POKE_HUB_URL . 'assets/css/poke-hub-type-icons.css',
-            [],
-            POKE_HUB_VERSION
-        );
+        poke_hub_register_bundled_front_style('pokehub-type-icons', 'poke-hub-type-icons.css', []);
     },
     20
 );

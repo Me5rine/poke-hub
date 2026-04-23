@@ -116,39 +116,28 @@ add_action('init', function() {
      * Enqueue des assets front-end pour les blocs
      */
     function pokehub_blocks_enqueue_frontend_assets() {
-        wp_enqueue_style('pokehub-type-icons');
+        if (wp_style_is('pokehub-type-icons', 'registered')) {
+            wp_enqueue_style('pokehub-type-icons');
+        }
 
-        wp_enqueue_style(
-            'pokehub-candy-display',
-            POKE_HUB_URL . 'assets/css/poke-hub-candy-display.css',
-            [],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('pokehub-candy-display', 'poke-hub-candy-display.css', []);
 
         // CSS pour le bloc new-pokemon-evolutions
         // Variables de couleur (thème / Elementor) — nécessaire pour quêtes dépliées, etc.
-        wp_enqueue_style(
-            'poke-hub-global-colors',
-            POKE_HUB_URL . 'assets/css/global-colors.css',
-            [],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
 
         // Styles front des blocs (dates / quests / habitats / wild / titres unifiés Field Research).
         // Chargé avant les CSS par bloc pour que les surcharges locales restent possibles.
-        wp_enqueue_style(
-            'pokehub-blocks-front-style',
-            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
-            ['poke-hub-global-colors', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('pokehub-blocks-front-style', 'poke-hub-blocks-front.css', [
+            'poke-hub-global-colors',
+            'pokehub-candy-display',
+        ]);
 
-        wp_enqueue_style(
-            'pokehub-new-pokemon-evolutions-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
-            ['pokehub-blocks-front-style', 'pokehub-type-icons', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('pokehub-new-pokemon-evolutions-front', 'poke-hub-new-pokemon-evolutions-front.css', [
+            'pokehub-blocks-front-style',
+            'pokehub-type-icons',
+            'pokehub-candy-display',
+        ]);
 
         // Toggle expand/collapse Field Research (bloc event-quests) — indépendant du module Events
         wp_enqueue_script(
@@ -161,36 +150,26 @@ add_action('init', function() {
 
         // Le bloc "bonus" a ses propres styles (contenus dans le module Bonus),
         // mais le bloc est utilisable même quand le module Bonus est inactif.
-        wp_enqueue_style(
-            'pokehub-bonus-style',
-            POKE_HUB_URL . 'assets/css/poke-hub-bonus-front.css',
-            ['pokehub-blocks-front-style'],
-            POKE_HUB_VERSION
-        );
-        
+        poke_hub_enqueue_bundled_front_style('pokehub-bonus-style', 'poke-hub-bonus-front.css', [
+            'pokehub-blocks-front-style',
+        ]);
+
         // CSS pour le bloc collection-challenges
-        wp_enqueue_style(
-            'pokehub-collection-challenges-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-collection-challenges-front.css',
-            ['pokehub-blocks-front-style', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
-        
+        poke_hub_enqueue_bundled_front_style('pokehub-collection-challenges-front', 'poke-hub-collection-challenges-front.css', [
+            'pokehub-blocks-front-style',
+            'pokehub-candy-display',
+        ]);
+
         // CSS pour le bloc special-research
-        wp_enqueue_style(
-            'pokehub-special-research-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-special-research-front.css',
-            ['pokehub-blocks-front-style', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('pokehub-special-research-front', 'poke-hub-special-research-front.css', [
+            'pokehub-blocks-front-style',
+            'pokehub-candy-display',
+        ]);
 
         // CSS pour le bloc eggs (utilisable en mode remote, ne dépend pas du module eggs)
-        wp_enqueue_style(
-            'pokehub-eggs-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-eggs-front.css',
-            ['pokehub-blocks-front-style'],
-            POKE_HUB_VERSION
-        );
+        poke_hub_enqueue_bundled_front_style('pokehub-eggs-front', 'poke-hub-eggs-front.css', [
+            'pokehub-blocks-front-style',
+        ]);
     }
     add_action('wp_enqueue_scripts', 'pokehub_blocks_enqueue_frontend_assets');
 
@@ -199,45 +178,27 @@ add_action('init', function() {
      * Nécessaire pour l’aperçu des blocs dynamiques (ServerSideRender).
      */
     add_action('enqueue_block_editor_assets', function () {
-        wp_enqueue_style(
+        poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
+        poke_hub_enqueue_bundled_front_style('pokehub-blocks-front-style', 'poke-hub-blocks-front.css', [
             'poke-hub-global-colors',
-            POKE_HUB_URL . 'assets/css/global-colors.css',
-            [],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style(
+        ]);
+        if (wp_style_is('pokehub-type-icons', 'registered')) {
+            wp_enqueue_style('pokehub-type-icons');
+        }
+        poke_hub_enqueue_bundled_front_style('pokehub-candy-display', 'poke-hub-candy-display.css', []);
+        poke_hub_enqueue_bundled_front_style('pokehub-new-pokemon-evolutions-front', 'poke-hub-new-pokemon-evolutions-front.css', [
             'pokehub-blocks-front-style',
-            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
-            ['poke-hub-global-colors'],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style('pokehub-type-icons');
-        wp_enqueue_style(
+            'pokehub-type-icons',
             'pokehub-candy-display',
-            POKE_HUB_URL . 'assets/css/poke-hub-candy-display.css',
-            [],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style(
-            'pokehub-new-pokemon-evolutions-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-new-pokemon-evolutions-front.css',
-            ['pokehub-blocks-front-style', 'pokehub-type-icons', 'pokehub-candy-display'],
-            POKE_HUB_VERSION
-        );
+        ]);
 
-        wp_register_style(
-            'pokehub-special-event-single',
-            POKE_HUB_URL . 'assets/css/poke-hub-special-events-single.css',
-            [],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style(
-            'pokehub-go-pass-block-front',
-            POKE_HUB_URL . 'assets/css/poke-hub-go-pass-block-front.css',
-            ['pokehub-blocks-front-style'],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style('pokehub-special-event-single');
+        poke_hub_register_bundled_front_style('pokehub-special-event-single', 'poke-hub-special-events-single.css', []);
+        poke_hub_enqueue_bundled_front_style('pokehub-go-pass-block-front', 'poke-hub-go-pass-block-front.css', [
+            'pokehub-blocks-front-style',
+        ]);
+        if (wp_style_is('pokehub-special-event-single', 'registered')) {
+            wp_enqueue_style('pokehub-special-event-single');
+        }
     });
     
     /**

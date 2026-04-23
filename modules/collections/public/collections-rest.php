@@ -120,9 +120,7 @@ add_action('rest_api_init', function () {
 
     register_rest_route('poke-hub/v1', '/collections/(?P<id>\d+)', [
         'methods'             => 'PATCH',
-        'permission_callback' => function () {
-            return is_user_logged_in();
-        },
+        'permission_callback' => '__return_true',
         'args'                => [
             'id'        => ['required' => true, 'type' => 'integer'],
             'name'      => ['type' => 'string'],
@@ -132,6 +130,7 @@ add_action('rest_api_init', function () {
         'callback'            => function (WP_REST_Request $request) {
             $collection_id = (int) $request['id'];
             $user_id       = get_current_user_id();
+            $ip            = function_exists('poke_hub_collections_get_client_ip') ? poke_hub_collections_get_client_ip() : '';
             $data          = [];
             if ($request->has_param('name')) {
                 $data['name'] = $request->get_param('name');
@@ -142,10 +141,13 @@ add_action('rest_api_init', function () {
             if ($request->has_param('is_public')) {
                 $data['is_public'] = $request->get_param('is_public');
             }
-            $result = poke_hub_collections_update($collection_id, $user_id, $data);
+            $result = poke_hub_collections_update($collection_id, $user_id, $data, $ip);
             if (!$result['success']) {
-                return new WP_REST_Response($result, 400);
+                $status = !empty($result['forbidden']) ? 403 : 400;
+
+                return new WP_REST_Response($result, $status);
             }
+
             return new WP_REST_Response($result, 200);
         },
     ]);

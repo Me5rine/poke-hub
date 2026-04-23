@@ -13,12 +13,9 @@ function pokehub_all_eggs_shortcode($atts) {
     if (!function_exists('pokehub_get_all_active_eggs_for_display') || !function_exists('pokehub_render_egg_type_section')) {
         return '<p>' . esc_html__('Eggs data is not available.', 'poke-hub') . '</p>';
     }
-    wp_enqueue_style(
-        'pokehub-eggs-front',
-        POKE_HUB_URL . 'assets/css/poke-hub-eggs-front.css',
-        [],
-        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0'
-    );
+    if (function_exists('poke_hub_enqueue_bundled_front_style')) {
+        poke_hub_enqueue_bundled_front_style('pokehub-eggs-front', 'poke-hub-eggs-front.css', []);
+    }
     $sections = pokehub_get_all_active_eggs_for_display();
     if (empty($sections)) {
         return '<p>' . esc_html__('No eggs available at the moment.', 'poke-hub') . '</p>';

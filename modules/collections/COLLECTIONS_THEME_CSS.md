@@ -1,10 +1,12 @@
 # Collections – CSS et thème
 
-Référence technique complémentaire à **[docs/README.md](../../docs/README.md)** et à la **[charte doc](../../docs/REDACTION.md)**.
+Référence technique complémentaire à **[docs/README.md](../../docs/README.md)**, à **[docs/THEME_FRONT_CSS.md](../../docs/THEME_FRONT_CSS.md)** (ordre thème / plugin) et à la **[charte doc](../../docs/REDACTION.md)**.
 
-**Emplacement du CSS** : le CSS front des collections est dans le **CSS global du plugin** : `assets/css/poke-hub-collections-front.css` (aucun fichier CSS dans le module). Un **fichier à inclure dans le thème** est fourni : `assets/theme/poke-hub-collections-theme.css` (voir ci‑dessous).
+**Emplacement du CSS (production Me5rine Lab)** : les styles spécifiques modules sont dans le thème enfant, sous **`css/poke-hub/parts/13-collections-front.css`**, importés par **`css/poke-hub/poke-hub-front.css`**. Les surcharges de variables (dégradés) sont dans **`parts/14-collections-theme.css`**. Un correctif de cascade final peut exister dans **`css/poke-hub/poke-hub-late-overrides.css`**. Aucun fichier CSS dans le dossier du module : tout passe par l’enchainement documenté dans THEME_FRONT_CSS.
 
-Le module Collections **réutilise au maximum les classes et variables du système CSS commun** du plugin. Voir en priorité :
+**Mode sans thème embarqué** : si `poke_hub_load_default_plugin_front_css` vaut `true` et que `assets/css/poke-hub-collections-front.css` est présent dans le plugin, il est enqueued comme auparavant.
+
+Le module Collections **réutilise au maximum les classes et variables du système CSS commun**. Voir en priorité :
 
 - **docs/FRONT_CSS.md** – variables `--me5rine-lab-*`, boutons, cartes, titres, dashboard, formulaires
 - **docs/CSS_RULES.md** – champs formulaire, labels, inputs, selects
@@ -28,7 +30,7 @@ Seules les variables suivantes sont propres au module (dégradé des cartes de l
 | `--pokehub-collections-card-overlay` | Overlay sombre sur la carte (rgba(0,0,0,0.7)) |
 | `--pokehub-collections-modal-backdrop` | Fond du modal (rgba(0,0,0,0.5)) |
 
-**Inclure directement dans le thème** : le plugin fournit `assets/theme/poke-hub-collections-theme.css`, à enqueue après `poke-hub-collections-front` (dépendance), ou à copier dans le thème. Ce fichier ne contient que les variables à surcharger.
+**Personnalisation dans le thème** : éditer `parts/14-collections-theme.css` (déjà importé par `poke-hub-front.css`) ou surcharger en CSS dans une couche chargée **après** `poke-hub-late-overrides` si besoin.
 
 Exemple dans le thème (ou via le fichier fourni) pour raccorder les cartes à la couleur primaire :
 

@@ -131,18 +131,12 @@ function pokehub_render_quests_by_groups(array $quests) {
  */
 function pokehub_render_all_active_quests() {
     if (!is_admin()) {
-        wp_enqueue_style(
-            'poke-hub-global-colors',
-            POKE_HUB_URL . 'assets/css/global-colors.css',
-            [],
-            POKE_HUB_VERSION
-        );
-        wp_enqueue_style(
-            'pokehub-blocks-front-style',
-            POKE_HUB_URL . 'assets/css/poke-hub-blocks-front.css',
-            ['poke-hub-global-colors'],
-            POKE_HUB_VERSION
-        );
+        if (function_exists('poke_hub_enqueue_bundled_front_style')) {
+            poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
+            poke_hub_enqueue_bundled_front_style('pokehub-blocks-front-style', 'poke-hub-blocks-front.css', [
+                'poke-hub-global-colors',
+            ]);
+        }
         wp_enqueue_script(
             'pokehub-events-quests',
             POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',

@@ -189,6 +189,7 @@ function poke_hub_collections_default_options(): array {
         'include_mega'           => true,
         'include_gigantamax'     => true,
         'include_dynamax'        => true,
+        'include_backgrounds'    => true,
         'include_special_attacks'=> false,
         'one_per_species'        => false,
         'group_by_generation'   => true,
@@ -196,6 +197,12 @@ function poke_hub_collections_default_options(): array {
         'display_mode'          => 'tiles',
         'public'                => false,
         'card_background_image_url' => '',
+        /* Affichage : symbole mâle/femelle (lignes forme gender) */
+        'show_gender_symbols'   => true,
+        /* Filtre pool : n’inclure que les espèces qui n’ont plus d’évolution en jeu */
+        'only_final_evolution'  => false,
+        /* Filtre pool : bébés (slug listé) — applicable si on n’est pas en « seulement finales ». */
+        'include_baby_pokemon'  => true,
     ];
 }
 
@@ -335,11 +342,38 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         if (empty($opts['include_dynamax'])) {
             $where[] = "(fv.category IS NULL OR fv.category = '' OR (fv.category != 'dynamax' AND fv.form_slug NOT LIKE '%dynamax%'))";
         }
+        // Sans « formes alternatives », on ne garde en général que la forme par défaut.
+        // Exception : lister mâle / femelle sur des entrées distinctes (variante category = gender) si demandé.
+        if (empty($opts['include_forms'])) {
+            if (!empty($opts['include_gender'])) {
+                $where[] = "(p.is_default = 1 OR LOWER(TRIM(COALESCE(fv.category, ''))) = 'gender')";
+            } else {
+                $where[] = 'p.is_default = 1';
+            }
+        }
+        if (empty($opts['include_gender'])) {
+            $where[] = "COALESCE(fv.category, '') != 'gender'";
+        }
+        if (empty($opts['include_backgrounds'])) {
+            $bg_links = pokehub_get_table('pokemon_background_pokemon_links');
+            if ($bg_links) {
+                $where[] = "NOT EXISTS (SELECT 1 FROM {$bg_links} l2 WHERE l2.pokemon_id = p.id)";
+            }
+        }
     }
 
-    // Une seule entrée par espèce (forme par défaut)
+    // Une seule entrée par espèce (forme par défaut) ; si « mâle/femelle » : garder chaque fiche de variante gender.
     if (!empty($opts['one_per_species'])) {
-        $where[] = '(p.is_default = 1 OR p.form_variant_id = 0)';
+        if (!empty($opts['include_gender'])) {
+            $where[] = "((p.is_default = 1 OR p.form_variant_id = 0) OR LOWER(TRIM(COALESCE(fv.category, ''))) = 'gender')";
+        } else {
+            $where[] = '(p.is_default = 1 OR p.form_variant_id = 0)';
+        }
+    }
+
+    $evolution_table = pokehub_get_table('pokemon_evolutions');
+    if ($evolution_table && !empty($opts['only_final_evolution'])) {
+        $where[] = "p.id NOT IN (SELECT DISTINCT e.base_pokemon_id FROM {$evolution_table} e WHERE e.base_pokemon_id > 0)";
     }
 
     $where_sql = implode(' AND ', $where);
@@ -388,6 +422,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 
     $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
                    COALESCE(fv.label, fv.form_slug, '') AS form_label,
+                   COALESCE(fv.form_slug, '') AS form_slug,
                    COALESCE(fv.category, 'normal') AS form_category,
                    {$gen_select}
             FROM {$pokemon_table} p
@@ -415,6 +450,11 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             if ($release_context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
                 if (pokehub_pokemon_can_be_shiny($pokemon_id)) {
                     $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
+                    if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
+                        $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
+                    } else {
+                        $row['is_baby'] = false;
+                    }
                     unset($row['extra']);
                     $filtered[] = $row;
                 }
@@ -423,6 +463,11 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 
             if (poke_hub_pokemon_is_released_in_go($pokemon_id, $release_context)) {
                 $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
+                if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
+                    $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
+                } else {
+                    $row['is_baby'] = false;
+                }
                 unset($row['extra']);
                 $filtered[] = $row;
             }
@@ -430,6 +475,11 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         $results = $filtered;
     } else {
         foreach ($results as &$row) {
+            if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
+                $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
+            } else {
+                $row['is_baby'] = false;
+            }
             unset($row['extra']);
         }
         unset($row);
@@ -444,6 +494,26 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 
     if ($category === 'gigantamax' && $results !== []) {
         $results = poke_hub_collections_merge_gigantamax_synthetic_pool($results);
+    }
+
+    if (empty($opts['include_baby_pokemon']) && $results !== []) {
+        $results = array_values(
+            array_filter(
+                $results,
+                static function (array $row) {
+                    return !poke_hub_collections_row_is_baby_pokemon($row);
+                }
+            )
+        );
+    }
+
+    if ($results !== []) {
+        foreach ($results as &$row) {
+            if (is_array($row)) {
+                $row['gender_display'] = poke_hub_collections_gender_display_for_row($row);
+            }
+        }
+        unset($row);
     }
 
     return poke_hub_collections_sort_pool_display($results);
@@ -860,7 +930,76 @@ function poke_hub_collections_sanitize_options(array $options): array {
     if (isset($options['card_background_image_url']) && is_string($options['card_background_image_url'])) {
         $options['card_background_image_url'] = esc_url_raw(trim($options['card_background_image_url']));
     }
+    $bool_keys = [
+        'include_national_dex', 'include_gender', 'include_forms', 'include_costumes', 'include_mega',
+        'include_gigantamax', 'include_dynamax', 'include_backgrounds', 'include_special_attacks',
+        'one_per_species', 'group_by_generation', 'generations_collapsed', 'public',
+        'show_gender_symbols', 'only_final_evolution', 'include_baby_pokemon',
+    ];
+    foreach ($bool_keys as $k) {
+        if (array_key_exists($k, $options)) {
+            $options[$k] = (bool) $options[$k];
+        }
+    }
+    if (array_key_exists('display_mode', $options) && is_string($options['display_mode'])) {
+        $options['display_mode'] = in_array($options['display_mode'], ['tiles', 'select'], true) ? $options['display_mode'] : 'tiles';
+    }
     return $options;
+}
+
+/**
+ * Slugs de repli (ancienne logique) si `extra.is_baby` n’est pas renseigné. Filtre : poke_hub_collections_baby_pokemon_slugs
+ *
+ * @return string[]
+ */
+function poke_hub_collections_baby_pokemon_slugs(): array {
+    $slugs = [
+        'pichu', 'cleffa', 'igglybuff', 'togepi', 'tyrogue', 'smoochum', 'elekid', 'magby',
+        'azurill', 'wynaut', 'budew', 'chingling', 'bonsly', 'mime-jr', 'happiny', 'mantyke', 'toxel',
+    ];
+    return array_unique(apply_filters('poke_hub_collections_baby_pokemon_slugs', $slugs));
+}
+
+/**
+ * Ligne pool : champ `is_baby` alimenté dans {@see poke_hub_collections_get_pool()} avant retrait d’`extra`.
+ * Sinon, repli sur {@see poke_hub_pokemon_is_baby_from_row()} si le JSON est encore présent.
+ *
+ * @param array $row Ligne pool (slug, is_baby, extra optionnel, …)
+ */
+function poke_hub_collections_row_is_baby_pokemon(array $row): bool {
+    if (array_key_exists('is_baby', $row)) {
+        return (bool) $row['is_baby'];
+    }
+    if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
+        return poke_hub_pokemon_is_baby_from_row($row);
+    }
+    $slug = strtolower((string) ($row['slug'] ?? ''));
+    if ($slug === '') {
+        return false;
+    }
+    if (strpos($slug, '-') !== false) {
+        $slug = substr($slug, 0, (int) strpos($slug, '-'));
+    }
+    $babies = poke_hub_collections_baby_pokemon_slugs();
+
+    return in_array($slug, $babies, true);
+}
+
+/**
+ * Symbole ♂/♀ pour une ligne d’attribut de forme (category gender) ou ''.
+ */
+function poke_hub_collections_gender_display_for_row(array $row): string {
+    if (strtolower((string) ($row['form_category'] ?? '')) !== 'gender') {
+        return '';
+    }
+    $fs = strtolower((string) ($row['form_slug'] ?? '') . ' ' . (string) ($row['form_label'] ?? ''));
+    if (strpos($fs, 'female') !== false || strpos($fs, 'femelle') !== false) {
+        return '♀';
+    }
+    if (strpos($fs, 'male') !== false) {
+        return '♂';
+    }
+    return '';
 }
 
 /**
@@ -998,18 +1137,24 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
 }
 
 /**
- * Met à jour une collection (nom, options, is_public). L'utilisateur doit en être propriétaire.
+ * Met à jour une collection (nom, options, is_public). Propriétaire compte ou collection anonyme (même IP).
  *
- * @param int   $collection_id
- * @param int   $user_id
- * @param array $data name, options, is_public (category non modifié pour éviter incohérence avec les items)
- * @return array { success, message }
+ * @param int         $collection_id
+ * @param int         $user_id
+ * @param array       $data  name, options, is_public (catégorie non modifiée)
+ * @param string|null $ip    IP client pour collections anonymes (ignoré si le propriétaire est un user connecté)
+ * @return array{ success: bool, message: string, forbidden?: bool }
  */
-function poke_hub_collections_update(int $collection_id, int $user_id, array $data): array {
+function poke_hub_collections_update(int $collection_id, int $user_id, array $data, ?string $ip = null): array {
     global $wpdb;
 
-    if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
-        return ['success' => false, 'message' => __('You cannot edit this collection.', 'poke-hub')];
+    $ipNorm = $ip !== null && $ip !== '' ? preg_replace('/[^0-9a-f.:]/', '', (string) $ip) : '';
+    if (!poke_hub_collections_can_edit($collection_id, $user_id, $ipNorm)) {
+        return [
+            'success'   => false,
+            'forbidden' => true,
+            'message'   => __('You cannot edit this collection.', 'poke-hub'),
+        ];
     }
 
     $collections_table = pokehub_get_table('collections');
@@ -1198,11 +1343,27 @@ function poke_hub_collections_get_public_by_slug(string $slug): ?array {
 }
 
 /**
- * Vérifie que l'utilisateur peut modifier la collection.
+ * Vérifie que l’utilisateur peut modifier la collection.
+ * Compte connecté : propriétaire uniquement. Hors ligne : $user_id = 0 et $ip = IP client alignée sur anonymous_ip.
+ *
+ * @param int    $collection_id
+ * @param int    $user_id       >0 = WP user, 0 = tenter l’accès collection anonyme (IP requise)
+ * @param string $ip            IP normalisée (même règle que {@see poke_hub_collections_get_client_ip()})
  */
-function poke_hub_collections_can_edit(int $collection_id, int $user_id): bool {
+function poke_hub_collections_can_edit(int $collection_id, int $user_id, string $ip = ''): bool {
     $col = poke_hub_collections_get_one($collection_id);
-    return $col && (int) $col['user_id'] === $user_id;
+    if (!$col) {
+        return false;
+    }
+    if ($user_id > 0) {
+        return (int) $col['user_id'] === $user_id;
+    }
+    if ($ip === '') {
+        return false;
+    }
+    $ip = preg_replace('/[^0-9a-f.:]/', '', (string) $ip);
+
+    return $ip !== '' && poke_hub_collections_can_edit_anonymous($collection_id, $ip);
 }
 
 /**

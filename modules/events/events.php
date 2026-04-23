@@ -36,23 +36,21 @@ require_once __DIR__ . '/public/events-front-routing.php';
  * Assets front (optionnel pour l'instant, mais prêt à être utilisé).
  */
 function poke_hub_events_assets() {
-    wp_enqueue_style(
-        'poke-hub-global-colors',
-        POKE_HUB_URL . 'assets/css/global-colors.css',
-        [],
-        POKE_HUB_VERSION
-    );
+    poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
     // CSS principal + Select2 (après les titres de blocs si le module Blocks est actif)
     $events_css_deps = ['poke-hub-global-colors'];
     if (wp_style_is('pokehub-blocks-front-style', 'registered')) {
         $events_css_deps[] = 'pokehub-blocks-front-style';
     }
-    wp_enqueue_style('pokehub-events-style', POKE_HUB_URL . 'assets/css/poke-hub-events-front.css', $events_css_deps, POKE_HUB_VERSION);
+    poke_hub_enqueue_bundled_front_style('pokehub-events-style', 'poke-hub-events-front.css', $events_css_deps);
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
 
     // CSS pour les pages d'événements spéciaux individuels
     if (get_query_var('pokehub_special_event')) {
-        wp_enqueue_style('pokehub-special-event-single', POKE_HUB_URL . 'assets/css/poke-hub-special-events-single.css', [], POKE_HUB_VERSION);
+        poke_hub_register_bundled_front_style('pokehub-special-event-single', 'poke-hub-special-events-single.css', []);
+        if (wp_style_is('pokehub-special-event-single', 'registered')) {
+            wp_enqueue_style('pokehub-special-event-single');
+        }
     }
 
     // JS Select2

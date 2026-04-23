@@ -77,6 +77,48 @@ function poke_hub_flush_scatterbug_patterns_cache(): void {
 }
 
 /**
+ * Indique si la ligne fiche correspond à un « bébé » (p. ex. pour les collections) :
+ * priorité à `extra.is_baby` (JSON en base), puis filtre de repli, puis liste de slugs historique.
+ *
+ * @param array<string, mixed> $row Au minimum `slug` ; `extra` peut être la chaîne JSON telle qu’en base.
+ */
+function poke_hub_pokemon_is_baby_from_row(array $row): bool {
+    $extra = $row['extra'] ?? null;
+    if (is_string($extra) && $extra !== '') {
+        $d = json_decode($extra, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+        if (is_array($d) && array_key_exists('is_baby', $d)) {
+            return (bool) $d['is_baby'];
+        }
+    } elseif (is_array($extra) && array_key_exists('is_baby', $extra)) {
+        return (bool) $extra['is_baby'];
+    }
+
+    $legacy = apply_filters('poke_hub_pokemon_is_baby_legacy', null, $row);
+    if (is_bool($legacy)) {
+        return $legacy;
+    }
+
+    if (function_exists('poke_hub_collections_baby_pokemon_slugs')) {
+        $babies = poke_hub_collections_baby_pokemon_slugs();
+    } else {
+        $babies = [
+            'pichu', 'cleffa', 'igglybuff', 'togepi', 'tyrogue', 'smoochum', 'elekid', 'magby',
+            'azurill', 'wynaut', 'budew', 'chingling', 'bonsly', 'mime-jr', 'happiny', 'mantyke', 'toxel',
+        ];
+    }
+
+    $slug = strtolower((string) ($row['slug'] ?? ''));
+    if ($slug === '') {
+        return false;
+    }
+    if (strpos($slug, '-') !== false) {
+        $slug = substr($slug, 0, (int) strpos($slug, '-'));
+    }
+
+    return in_array($slug, $babies, true);
+}
+
+/**
  * Get Scatterbug/Vivillon patterns from database.
  * Only returns patterns marked as regional (extra->regional->is_regional = true).
  * Patterns are stored as form variants for Scatterbug (dex_number 664) and Vivillon (dex_number 666).

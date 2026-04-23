@@ -93,26 +93,30 @@ $block_title_html = function_exists('pokehub_render_block_title')
     ? pokehub_render_block_title(__('Pass GO', 'poke-hub'), 'go-pass')
     : '<h2 class="pokehub-block-title">' . esc_html__('Pass GO', 'poke-hub') . '</h2>';
 
-if (!wp_style_is('pokehub-go-pass-block-front', 'registered')) {
-    wp_register_style(
+if (function_exists('poke_hub_register_bundled_front_style') && !wp_style_is('pokehub-go-pass-block-front', 'registered')) {
+    poke_hub_register_bundled_front_style(
         'pokehub-go-pass-block-front',
-        POKE_HUB_URL . 'assets/css/poke-hub-go-pass-block-front.css',
+        'poke-hub-go-pass-block-front.css',
         ['pokehub-blocks-front-style'],
         defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0.0'
     );
 }
-wp_enqueue_style('pokehub-go-pass-block-front');
+if (wp_style_is('pokehub-go-pass-block-front', 'registered')) {
+    wp_enqueue_style('pokehub-go-pass-block-front');
+}
 
 if ($variant === 'full') {
-    if (!wp_style_is('pokehub-special-event-single', 'registered')) {
-        wp_register_style(
+    if (function_exists('poke_hub_register_bundled_front_style') && !wp_style_is('pokehub-special-event-single', 'registered')) {
+        poke_hub_register_bundled_front_style(
             'pokehub-special-event-single',
-            POKE_HUB_URL . 'assets/css/poke-hub-special-events-single.css',
+            'poke-hub-special-events-single.css',
             [],
             defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0.0'
         );
     }
-    wp_enqueue_style('pokehub-special-event-single');
+    if (wp_style_is('pokehub-special-event-single', 'registered')) {
+        wp_enqueue_style('pokehub-special-event-single');
+    }
 }
 
 if ($variant === 'full' && function_exists('pokehub_render_go_pass_html')) {

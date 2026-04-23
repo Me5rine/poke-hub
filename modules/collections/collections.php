@@ -39,18 +39,26 @@ function poke_hub_collections_enqueue_front_assets() {
     do_action('poke_hub_collections_enqueue_assets');
 
     /* Même variables que les notices (notice-sucess, notice-warning) → global-colors.css en dépendance */
-    wp_enqueue_style(
+    poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
+    poke_hub_enqueue_bundled_front_style('poke-hub-collections-front', 'poke-hub-collections-front.css', [
         'poke-hub-global-colors',
-        POKE_HUB_URL . 'assets/css/global-colors.css',
-        [],
-        POKE_HUB_VERSION
-    );
-    wp_enqueue_style(
-        'poke-hub-collections-front',
-        POKE_HUB_URL . 'assets/css/poke-hub-collections-front.css',
-        ['poke-hub-global-colors'],
-        POKE_HUB_VERSION
-    );
+    ]);
+
+    // Réordonne en dernier (après thème) quand le lot plugin est actif ; sinon seul filet de secours
+    if (apply_filters('poke_hub_enqueue_collections_cascade_late', true)) {
+        $late = POKE_HUB_PATH . 'assets/css/poke-hub-collections-cascade-late.css';
+        if (is_readable($late)) {
+            $late_deps = function_exists('poke_hub_is_plugin_bundled_front_css_enabled') && poke_hub_is_plugin_bundled_front_css_enabled()
+                ? ['poke-hub-collections-front']
+                : [];
+            wp_enqueue_style(
+                'poke-hub-collections-cascade-late',
+                POKE_HUB_URL . 'assets/css/poke-hub-collections-cascade-late.css',
+                $late_deps,
+                POKE_HUB_VERSION
+            );
+        }
+    }
 
     wp_enqueue_script(
         'poke-hub-collections-front',
@@ -96,6 +104,27 @@ function poke_hub_collections_enqueue_front_assets() {
             'anonymousBannerOne'   => __('A collection was created from this connection (this device). Do you want to add it to your account?', 'poke-hub'),
             'anonymousBannerMany' => __('%d collections were created from this connection. Do you want to add them to your account?', 'poke-hub'),
             'generationOther'       => __('Other / unknown region', 'poke-hub'),
+            'pogoNoPool'            => __('The Pokémon list is not loaded yet, or the collection is empty.', 'poke-hub'),
+            'pogoEmptyStatus'      => __('No Pokémon match the selected status in this list.', 'poke-hub'),
+            'pogoCopy'              => __('Copy', 'poke-hub'),
+            'pogoCopied'            => __('Copied!', 'poke-hub'),
+            'pogoNudge'            => __('If a line does not work in the game, check the in-game name or update your game — filters change over time.', 'poke-hub'),
+            'pogoGroupBase'         => __('Standard (comma-separated names)', 'poke-hub'),
+            'pogoGroupBaseDex'      => __('Standard (comma-separated National Pokédex numbers)', 'poke-hub'),
+            'pogoGroupAlola'        => __('Alola: alola&…', 'poke-hub'),
+            'pogoGroupGalar'        => __('Galar: galar&…', 'poke-hub'),
+            'pogoGroupPaldea'      => __('Paldea: paldea&…', 'poke-hub'),
+            'pogoGroupHisui'        => __('Hisui: hisuian&…', 'poke-hub'),
+            'pogoGroupMega'         => __('Mega (comma-separated names)', 'poke-hub'),
+            'pogoGroupMegaDex'      => __('Mega (comma-separated National Pokédex numbers)', 'poke-hub'),
+            'pogoGroupGigamax'      => __('Gigantamax: gigamax&…', 'poke-hub'),
+            'pogoGroupDynamax'      => __('Dynamax: dynamax&…', 'poke-hub'),
+            'pogoGroupMale'         => __('Male: male&…', 'poke-hub'),
+            'pogoGroupFemale'      => __('Female: female&…', 'poke-hub'),
+            'pogoGroupCostume'     => __('Costumes / event forms (name list only, verify in-game)', 'poke-hub'),
+            'pogoGroupCostumeDex'  => __('Costumes / event forms (National Pokédex numbers, verify in-game)', 'poke-hub'),
+            'pogoGroupOther'        => __('Other variants (name list, verify in-game)', 'poke-hub'),
+            'pogoGroupOtherDex'     => __('Other variants (National Pokédex numbers, verify in-game)', 'poke-hub'),
         ],
     ]);
 }

@@ -1,0 +1,105 @@
+/**
+ * Cascade finale pour le module Collections (thème : voir css/poke-hub/poke-hub-late-overrides.css).
+ * Chargé sans dépendre du lot front plugin — utile quand poke_hub_load_default_plugin_front_css = false.
+ */
+
+.pokehub-collections-wrap.me5rine-lab-dashboard {
+    color: var(--me5rine-lab-text, #11161E);
+    min-height: auto;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+@media screen and (min-width: 783px) {
+    .pokehub-collections-wrap.me5rine-lab-dashboard {
+        border-left: none;
+    }
+}
+
+ul.pokehub-collections-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: var(--me5rine-lab-spacing-lg, 1.25rem);
+}
+
+@media (max-width: 900px) {
+    ul.pokehub-collections-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    ul.pokehub-collections-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+.pokehub-collections-grid > li.me5rine-lab-card:hover {
+    transform: none;
+}
+
+/* Section avancée : tout sauf <summary> masqué si fermé (plus robuste que cibler seulement .inner) */
+.pokehub-collections-advanced.me5rine-lab-form-block:not([open]) > :not(summary) {
+    display: none !important;
+}
+
+.pokehub-collections-advanced.me5rine-lab-form-block[open] > :not(summary) {
+    display: block !important;
+}
+
+.pokehub-collections-advanced-summary {
+    list-style: none;
+}
+
+.pokehub-collections-advanced-summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Recherche in-game (Pokémon GO) */
+.pokehub-pogo-search-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.6rem;
+    margin-bottom: 0.4rem;
+}
+.pokehub-pogo-search-line .pokehub-pogo-search-input {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+.pokehub-pogo-search-groups {
+    margin-top: 0.5rem;
+}
+.pokehub-pogo-search-group {
+    margin-bottom: 1rem;
+}
+.pokehub-pogo-search-group .pokehub-pogo-search-lines {
+    list-style: none;
+    margin: 0.35rem 0 0 0;
+    padding: 0;
+}
+
+/* Filtre « afficher dans la grille » (JS) — display plutôt que l’attribut hidden (compat navigateurs / thèmes) */
+.pokehub-collection-tile.pokehub-tile--filtered-out {
+    display: none !important;
+}
+.pokehub-collection-generation-block.pokehub-generation--all-filtered {
+    display: none !important;
+}
+
+/* Ligne nom + symbole mâle/femelle (formes « gender ») */
+.pokehub-collection-tile-line--name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: 100%;
+}
+.pokehub-collection-tile-gender {
+    flex-shrink: 0;
+    font-size: 1.05em;
+    line-height: 1;
+}

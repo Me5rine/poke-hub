@@ -105,7 +105,7 @@ Le bloc **Afficher dans la grille** ne change pas ces valeurs : il **filtre uniq
 - `modules/collections/functions/collections-helpers.php` — pool, CRUD collections/items.
 - `modules/collections/public/collections-shortcode.php` — shortcodes `[poke_hub_collections]` et `[poke_hub_collection_view]`.
 - `modules/collections/public/collections-rest.php` — API REST (pool, CRUD, items).
-- `assets/css/poke-hub-collections-front.css` — styles front (CSS global du plugin). `assets/theme/poke-hub-collections-theme.css` — fichier à inclure dans le thème pour surcharges. `modules/collections/assets/js/collections-front.js` — front.
+- Styles front : **dans le thème** Me5rine, `css/poke-hub/parts/13-collections-front.css` et `14-collections-theme.css` (importés par `poke-hub-front.css` ; priorité d’ordre : voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)). En mode plugin pur (`poke_hub_load_default_plugin_front_css` = true), le fichier `assets/css/poke-hub-collections-front.css` s’enfile s’il est présent. `modules/collections/assets/js/collections-front.js` — front.
 - `modules/collections/COLLECTIONS_THEME_CSS.md` — référence classes / variables (légende, filtre **Afficher dans la grille**, cartes liste). Chaînes traduisibles : **docs/TRANSLATION.md**. Conventions doc : **docs/REDACTION.md**.
 
 ## Mise en place d’une page

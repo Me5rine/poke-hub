@@ -28,7 +28,7 @@ poke-hub/
 │   ├── games/            # Pokedle, leaderboard (module en évolution ; pas de docs/ dédié pour l’instant)
 │   └── ...
 ├── assets/               # Ressources statiques
-│   ├── css/
+│   ├── css/              # Voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) (section *En bref*) : en prod Me5rine, le gros lot front *public* est dans le thème ; ici : surtout admin, global-colors, correctifs optionnels (ex. collections cascade-late)
 │   └── js/
 └── docs/                 # Documentation
 ```

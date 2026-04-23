@@ -1634,6 +1634,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
     // Pokémon d'événement ou costumé : si la forme a la catégorie "costume", c'est automatique ; sinon case à cocher
     $is_event_costumed = ($variant_category === 'costume') || !empty($_POST['is_event_costumed']);
 
+    // Bébé (extra.is_baby) — fiche éditable pour les règles « inclure bébés » (collections, etc.)
+    $is_baby = !empty($_POST['is_baby']);
+
     // Régional
     $regional_is_regional  = !empty($_POST['regional_is_regional']);
     $regional_description  = isset($_POST['regional_description']) ? wp_kses_post(wp_unslash($_POST['regional_description'])) : '';
@@ -1851,6 +1854,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     // Pokémon d'événement ou costumé (même notion)
     $extra['is_event_costumed']  = (bool) $is_event_costumed;
+    $extra['is_baby']            = (bool) $is_baby;
 
     // ---------- Bloc par jeu : Pokémon GO ----------
 

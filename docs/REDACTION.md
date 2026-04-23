@@ -67,7 +67,7 @@ En cas de doute sur un terme métier (collections, formes, événements), privil
 
 ## Cohérence avec l’existant
 
-- **CSS** : système commun `me5rine-lab-*` + classes `pokehub-*` — références **FRONT_CSS.md**, **CSS_SYSTEM.md**, **POKEHUB_CSS_CLASSES.md**, et fiches thème par module (ex. `modules/collections/COLLECTIONS_THEME_CSS.md`).
+- **CSS** : système commun `me5rine-lab-*` + classes `pokehub-*` — références **THEME_FRONT_CSS.md** (thème vs plugin, ordre de chargement), **FRONT_CSS.md**, **CSS_SYSTEM.md**, **POKEHUB_CSS_CLASSES.md**, et fiches thème par module (ex. `modules/collections/COLLECTIONS_THEME_CSS.md`).
 - **Traduction** : **TRANSLATION.md** ; ne pas dupliquer toute la politique i18n dans chaque module.
 
 ## Révision
