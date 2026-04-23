@@ -253,7 +253,17 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             $where[] = 'p.has_purified = 1';
             break;
         case 'gigantamax':
-            $where[] = "(fv.category = 'gigantamax' OR fv.form_slug LIKE '%gigantamax%')";
+            // Fiches forme Gigamax OU fiche (souvent forme par défaut) dont la date est dans extra → release.gigantamax
+            // (certaines bases n’ont pas de ligne « variante gigantamax » distincte, seulement le champ extra).
+            $where[] = "(
+                fv.category = 'gigantamax'
+                OR fv.form_slug LIKE '%gigantamax%'
+                OR (
+                    p.extra IS NOT NULL
+                    AND p.extra != ''
+                    AND TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
+                )
+            )";
             break;
         case 'dynamax':
             $where[] = "(fv.category = 'dynamax' OR fv.form_slug LIKE '%dynamax%' OR fv.form_slug = 'normal')";
@@ -404,15 +414,15 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             // Cas spécial shiny : propager la logique via pokehub_pokemon_can_be_shiny().
             if ($release_context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
                 if (pokehub_pokemon_can_be_shiny($pokemon_id)) {
+                    $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
                     unset($row['extra']);
                     $filtered[] = $row;
                 }
                 continue;
             }
 
-            $extra = isset($row['extra']) ? json_decode($row['extra'], true) : null;
-            $release = is_array($extra) ? trim((string) ($extra['release'][$release_context] ?? '')) : '';
-            if ($release !== '') {
+            if (poke_hub_pokemon_is_released_in_go($pokemon_id, $release_context)) {
+                $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
                 unset($row['extra']);
                 $filtered[] = $row;
             }
@@ -425,52 +435,303 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         unset($row);
     }
 
-    // Tri d'affichage harmonisé : génération -> dex -> nom -> base/costume/mega -> forme.
-    usort($results, static function (array $a, array $b): int {
-        $genA = isset($a['generation_number']) ? (int) $a['generation_number'] : 0;
-        $genB = isset($b['generation_number']) ? (int) $b['generation_number'] : 0;
-        if ($genA !== $genB) {
-            return $genA <=> $genB;
+    if (!poke_hub_collections_category_is_specific($category)
+        && !empty($opts['include_gigantamax'])
+        && $category !== 'gigantamax'
+        && $results !== []) {
+        $results = poke_hub_collections_apply_marked_synthetic_gigantamax($results);
+    }
+
+    if ($category === 'gigantamax' && $results !== []) {
+        $results = poke_hub_collections_merge_gigantamax_synthetic_pool($results);
+    }
+
+    return poke_hub_collections_sort_pool_display($results);
+}
+
+/**
+ * true si extra contient une date / valeur pour release.gigantamax (même règle que le WHERE SQL de la catégorie dédiée).
+ */
+function poke_hub_collections_row_has_gigantamax_release_in_extra(array $row): bool {
+    $extra = $row['extra'] ?? null;
+    if (!is_string($extra) || $extra === '') {
+        return false;
+    }
+    $data = json_decode($extra, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+    if (!is_array($data)) {
+        return false;
+    }
+    $g = $data['release']['gigantamax'] ?? null;
+    if (is_string($g)) {
+        return trim($g) !== '';
+    }
+    if (is_array($g)) {
+        return $g !== [];
+    }
+
+    return (bool) $g;
+}
+
+/**
+ * Avant supprimer le JSON extra : marque les fiches de base (sans variante G-Max en table) éligibles,
+ * pour {@see poke_hub_collections_apply_marked_synthetic_gigantamax()} (collections custom / shiny + « Afficher Gigantamax »).
+ */
+function poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row(array $row, string $category, array $opts): array {
+    if (poke_hub_collections_category_is_specific($category)
+        || empty($opts['include_gigantamax'])
+        || $category === 'gigantamax') {
+        return $row;
+    }
+    if (poke_hub_collections_gigantamax_row_is_real_form($row)) {
+        return $row;
+    }
+    if (!poke_hub_collections_row_has_gigantamax_release_in_extra($row)) {
+        return $row;
+    }
+    $pokemon_id = (int) ($row['id'] ?? 0);
+    if ($pokemon_id <= 0) {
+        return $row;
+    }
+    if (function_exists('poke_hub_pokemon_is_released_in_go') && !poke_hub_pokemon_is_released_in_go($pokemon_id, 'gigantamax')) {
+        return $row;
+    }
+    $row['__pokehub_c_gigantamax_src'] = 1;
+
+    return $row;
+}
+
+/**
+ * Remplace les fiches de base marquées par des entrées G-Max synthétiques (id 2100…),
+ * en évitant le doublon si une vraie forme G-Max est déjà dans le pool pour le même n° de dex.
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_collections_apply_marked_synthetic_gigantamax(array $rows): array {
+    if ($rows === []) {
+        return [];
+    }
+    $real_dex = [];
+    foreach ($rows as $r) {
+        if (!poke_hub_collections_gigantamax_row_is_real_form($r)) {
+            continue;
         }
-
-        $dexA = isset($a['dex_number']) ? (int) $a['dex_number'] : 0;
-        $dexB = isset($b['dex_number']) ? (int) $b['dex_number'] : 0;
-        if ($dexA !== $dexB) {
-            return $dexA <=> $dexB;
+        $dex = isset($r['dex_number']) ? (int) $r['dex_number'] : 0;
+        if ($dex > 0) {
+            $real_dex[$dex] = true;
         }
-
-        $nameA = trim((string) (($a['name_fr'] ?? '') !== '' ? $a['name_fr'] : ($a['name_en'] ?? '')));
-        $nameB = trim((string) (($b['name_fr'] ?? '') !== '' ? $b['name_fr'] : ($b['name_en'] ?? '')));
-        $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
-        $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
-        if ($nameAN !== $nameBN) {
-            return $nameAN <=> $nameBN;
+    }
+    $out       = [];
+    $seen_base = [];
+    foreach ($rows as $row) {
+        $mark = !empty($row['__pokehub_c_gigantamax_src']);
+        unset($row['__pokehub_c_gigantamax_src']);
+        if (poke_hub_collections_gigantamax_row_is_real_form($row)) {
+            $out[] = $row;
+            continue;
         }
-
-        $rankA = function_exists('pokehub_pokemon_select_category_rank')
-            ? pokehub_pokemon_select_category_rank((string) ($a['form_category'] ?? ''))
-            : 3;
-        $rankB = function_exists('pokehub_pokemon_select_category_rank')
-            ? pokehub_pokemon_select_category_rank((string) ($b['form_category'] ?? ''))
-            : 3;
-        if ($rankA !== $rankB) {
-            return $rankA <=> $rankB;
+        if (!$mark) {
+            $out[] = $row;
+            continue;
         }
-
-        $formA = trim((string) ($a['form_label'] ?? ''));
-        $formB = trim((string) ($b['form_label'] ?? ''));
-        $formAN = function_exists('mb_strtolower') ? mb_strtolower($formA, 'UTF-8') : strtolower($formA);
-        $formBN = function_exists('mb_strtolower') ? mb_strtolower($formB, 'UTF-8') : strtolower($formB);
-        if ($formAN !== $formBN) {
-            return $formAN <=> $formBN;
+        $base_id = (int) ($row['id'] ?? 0);
+        if ($base_id > 0 && isset($seen_base[$base_id])) {
+            continue;
         }
+        if ($base_id > 0) {
+            $seen_base[$base_id] = true;
+        }
+        $dex = isset($row['dex_number']) ? (int) $row['dex_number'] : 0;
+        if ($dex > 0 && !empty($real_dex[$dex])) {
+            continue;
+        }
+        $out[] = poke_hub_collections_gigantamax_build_synthetic_from_base_row($row);
+    }
 
-        $idA = isset($a['id']) ? (int) $a['id'] : 0;
-        $idB = isset($b['id']) ? (int) $b['id'] : 0;
-        return $idA <=> $idB;
-    });
+    return $out;
+}
 
-    return $results;
+/**
+ * ID d’enregistrement en collection (collection_items) pour un Gigamax « virtuel » dérivé d’une fiche de base
+ * (pas de variante gigantamax en table pokemon).
+ */
+function poke_hub_collections_gigantamax_synthetic_pokemon_id(int $base_pokemon_id): int {
+    $offset = 2100000000; // Réservé : hors plage des id auto-incrémentés habituels
+    return $offset + $base_pokemon_id;
+}
+
+/**
+ * @param int $pokemon_id ID possibly returned by {@see poke_hub_collections_gigantamax_synthetic_pokemon_id()}
+ */
+function poke_hub_collections_gigantamax_is_synthetic_pokemon_id(int $pokemon_id): bool {
+    return $pokemon_id >= 2100000000 && $pokemon_id < 2200000000;
+}
+
+/**
+ * Ligne de pool = vraie forme Gigantamax en base (variante) ?
+ */
+function poke_hub_collections_gigantamax_row_is_real_form(array $row): bool {
+    $cat = strtolower(trim((string) ($row['form_category'] ?? '')));
+    if ($cat === 'gigantamax') {
+        return true;
+    }
+    $slug = strtolower((string) ($row['slug'] ?? ''));
+    if ($slug !== '' && strpos($slug, 'gigantamax') !== false) {
+        return true;
+    }
+    $label = strtolower((string) ($row['form_label'] ?? ''));
+    return $label !== '' && strpos($label, 'gigantamax') !== false;
+}
+
+/**
+ * Construit une entrée de pool côté Gigamax quand seule la fiche d’évolution (ex. Florizarre) existe avec release.gigantamax dans extra.
+ */
+function poke_hub_collections_gigantamax_build_synthetic_from_base_row(array $base): array {
+    $base_id = (int) ($base['id'] ?? 0);
+    $slug    = trim((string) ($base['slug'] ?? ''), " \t\n\r\0\x0B");
+    if ($slug === '' || $slug === '0') {
+        $dex = isset($base['dex_number']) ? (int) $base['dex_number'] : 0;
+        if ($dex > 0) {
+            $slug = sprintf('%03d', $dex);
+        } else {
+            $slug = 'pokemon';
+        }
+    }
+    if (strpos($slug, 'gigantamax-') === 0) {
+        $gmax_slug = $slug;
+    } else {
+        $gmax_slug = 'gigantamax-' . $slug;
+    }
+    $name_fr_base = trim((string) ($base['name_fr'] ?? ''));
+    $name_en_base = trim((string) ($base['name_en'] ?? ''));
+    if ($name_fr_base !== '') {
+        $name_fr = $name_fr_base . ' Gigamax';
+    } elseif ($name_en_base !== '') {
+        $name_fr = $name_en_base . ' Gigamax';
+    } else {
+        $name_fr = 'Gigamax';
+    }
+    if ($name_en_base !== '') {
+        $name_en = 'Gigantamax ' . $name_en_base;
+    } else {
+        $name_en = $name_fr;
+    }
+    $out = $base;
+    unset($out['extra']);
+    $out['id']                 = poke_hub_collections_gigantamax_synthetic_pokemon_id($base_id);
+    $out['form_variant_id']   = 0;
+    $out['slug']              = $gmax_slug;
+    $out['name_fr']            = $name_fr;
+    $out['name_en']            = $name_en;
+    $out['form_category']      = 'gigantamax';
+    $out['form_label']         = 'Gigantamax';
+    $out['synthetic_gigantamax'] = true;
+    $out['gigantamax_base_pokemon_id'] = $base_id;
+
+    return (array) apply_filters('poke_hub_collections_synthetic_gigantamax_row', $out, $base);
+}
+
+/**
+ * Remplace les fiches non-Gigamax (seulement extra.release.gigantamax) par une tuile « gigantamax-slug » ;
+ * supprime le doublon si une vraie forme Gigamax existe déjà pour le même n° de Pokédex.
+ *
+ * @param array $rows Résultat filtré pour la catégorie gigantamax
+ * @return array
+ */
+function poke_hub_collections_merge_gigantamax_synthetic_pool(array $rows): array {
+    if ($rows === []) {
+        return [];
+    }
+    $real_gigantamax_dex = [];
+    foreach ($rows as $r) {
+        if (!poke_hub_collections_gigantamax_row_is_real_form($r)) {
+            continue;
+        }
+        $dex = isset($r['dex_number']) ? (int) $r['dex_number'] : 0;
+        if ($dex > 0) {
+            $real_gigantamax_dex[$dex] = true;
+        }
+    }
+    $out       = [];
+    $seen_base = [];
+    foreach ($rows as $row) {
+        if (poke_hub_collections_gigantamax_row_is_real_form($row)) {
+            $out[] = $row;
+            continue;
+        }
+        $base_id = (int) ($row['id'] ?? 0);
+        if ($base_id <= 0) {
+            continue;
+        }
+        if (isset($seen_base[$base_id])) {
+            continue;
+        }
+        $seen_base[$base_id] = true;
+        $dex = isset($row['dex_number']) ? (int) $row['dex_number'] : 0;
+        if ($dex > 0 && !empty($real_gigantamax_dex[$dex])) {
+            continue;
+        }
+        $out[] = poke_hub_collections_gigantamax_build_synthetic_from_base_row($row);
+    }
+
+    return $out;
+}
+
+/**
+ * Tri d’affichage harmonisé : génération -> dex -> nom -> base/costume/méga -> forme.
+ *
+ * @param array $rows
+ * @return array
+ */
+function poke_hub_collections_sort_pool_display(array $rows): array {
+    usort(
+        $rows,
+        static function (array $a, array $b): int {
+            $genA = isset($a['generation_number']) ? (int) $a['generation_number'] : 0;
+            $genB = isset($b['generation_number']) ? (int) $b['generation_number'] : 0;
+            if ($genA !== $genB) {
+                return $genA <=> $genB;
+            }
+
+            $dexA = isset($a['dex_number']) ? (int) $a['dex_number'] : 0;
+            $dexB = isset($b['dex_number']) ? (int) $b['dex_number'] : 0;
+            if ($dexA !== $dexB) {
+                return $dexA <=> $dexB;
+            }
+
+            $nameA = trim((string) (($a['name_fr'] ?? '') !== '' ? $a['name_fr'] : ($a['name_en'] ?? '')));
+            $nameB = trim((string) (($b['name_fr'] ?? '') !== '' ? $b['name_fr'] : ($b['name_en'] ?? '')));
+            $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
+            $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
+            if ($nameAN !== $nameBN) {
+                return $nameAN <=> $nameBN;
+            }
+
+            $rankA = function_exists('pokehub_pokemon_select_category_rank')
+                ? pokehub_pokemon_select_category_rank((string) ($a['form_category'] ?? ''))
+                : 3;
+            $rankB = function_exists('pokehub_pokemon_select_category_rank')
+                ? pokehub_pokemon_select_category_rank((string) ($b['form_category'] ?? ''))
+                : 3;
+            if ($rankA !== $rankB) {
+                return $rankA <=> $rankB;
+            }
+
+            $formA = trim((string) ($a['form_label'] ?? ''));
+            $formB = trim((string) ($b['form_label'] ?? ''));
+            $formAN = function_exists('mb_strtolower') ? mb_strtolower($formA, 'UTF-8') : strtolower($formA);
+            $formBN = function_exists('mb_strtolower') ? mb_strtolower($formB, 'UTF-8') : strtolower($formB);
+            if ($formAN !== $formBN) {
+                return $formAN <=> $formBN;
+            }
+
+            $idA = isset($a['id']) ? (int) $a['id'] : 0;
+            $idB = isset($b['id']) ? (int) $b['id'] : 0;
+            return $idA <=> $idB;
+        }
+    );
+
+    return $rows;
 }
 
 /**
@@ -501,6 +762,70 @@ function poke_hub_collections_group_pool_by_generation(array $pool): array {
         $out[$label] = $data['items'];
     }
     return $out;
+}
+
+/**
+ * Nombre d’entrées possédées par région / génération (mêmes clés que poke_hub_collections_group_pool_by_generation()).
+ *
+ * @param array $pool  Pool complet (poke_hub_collections_get_pool)
+ * @param array $items  pokemon_id => status
+ * @return array [ libellé_générations => [ 'owned' => int, 'total' => int ], ... ]
+ */
+function poke_hub_collections_get_generation_progress(array $pool, array $items): array {
+    $by_gen = poke_hub_collections_group_pool_by_generation($pool);
+    $out    = [];
+    foreach ($by_gen as $label => $gen_pool) {
+        $total = count($gen_pool);
+        $owned = 0;
+        foreach ($gen_pool as $p) {
+            $pid = (int) ($p['id'] ?? 0);
+            if (($items[$pid] ?? 'missing') === 'owned') {
+                $owned++;
+            }
+        }
+        $out[$label] = [
+            'owned' => $owned,
+            'total' => $total,
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Remet à zéro la progression d’une collection (tous les statuts = absents côté base : lignes supprimées).
+ *
+ * @param int         $collection_id
+ * @param int         $user_id
+ * @param string|null $ip
+ * @return array{ success: bool, message: string }
+ */
+function poke_hub_collections_reset_items(int $collection_id, int $user_id = 0, ?string $ip = null): array {
+    if ($user_id > 0) {
+        if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
+            return ['success' => false, 'message' => __('You cannot modify this collection.', 'poke-hub')];
+        }
+    } else {
+        if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
+            return ['success' => false, 'message' => __('You cannot modify this collection.', 'poke-hub')];
+        }
+    }
+
+    global $wpdb;
+
+    $items_table = pokehub_get_table('collection_items');
+    if (!$items_table) {
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
+    }
+
+    $r = $wpdb->delete($items_table, ['collection_id' => $collection_id], ['%d']);
+    if ($r === false) {
+        return ['success' => false, 'message' => __('Could not reset the collection.', 'poke-hub')];
+    }
+
+    return [
+        'success' => true,
+        'message' => __('Collection progress cleared.', 'poke-hub'),
+    ];
 }
 
 /**

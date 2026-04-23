@@ -95,6 +95,7 @@ function poke_hub_collections_enqueue_front_assets() {
             'shareImage'      => __('Image', 'poke-hub'),
             'anonymousBannerOne'   => __('A collection was created from this connection (this device). Do you want to add it to your account?', 'poke-hub'),
             'anonymousBannerMany' => __('%d collections were created from this connection. Do you want to add them to your account?', 'poke-hub'),
+            'generationOther'       => __('Other / unknown region', 'poke-hub'),
         ],
     ]);
 }

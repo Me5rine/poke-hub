@@ -249,7 +249,33 @@ function pokehub_get_pokemon_data_by_id(int $pokemon_id): ?array {
     if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table, $form_variants_table)) {
         return null;
     }
-    
+
+    // Gigamax « virtuel » (id 2100… + fiche de base) : pas de ligne en BDD avec cet id.
+    if (function_exists('poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id') && poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id($pokemon_id)) {
+        $base_id = function_exists('poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id')
+            ? poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id($pokemon_id)
+            : null;
+        if ($base_id === null || $base_id <= 0) {
+            return null;
+        }
+        $base = pokehub_get_pokemon_data_by_id($base_id);
+        if ($base === null || !function_exists('poke_hub_pokemon_gigantamax_build_synthetic_data_from_base')) {
+            return null;
+        }
+        $synth = poke_hub_pokemon_gigantamax_build_synthetic_data_from_base($base);
+        $name_fr = $synth['name_fr'] ?? '';
+        $name_en = $synth['name_en'] ?? '';
+        $name    = $name_fr;
+        if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+            $name = $name_fr . ' (' . $name_en . ')';
+        } elseif ($name_fr === '' && $name_en !== '') {
+            $name = $name_en;
+        }
+        $synth['name'] = $name;
+
+        return $synth;
+    }
+
     $row = $wpdb->get_row(
         $wpdb->prepare(
             "SELECT p.id, 
@@ -325,7 +351,14 @@ function pokehub_get_pokemon_cp_for_level(int $pokemon_id, int $level = 15): ?ar
     if (!pokehub_pokemon_tables_ready_for_query($use_remote, $pokemon_table)) {
         return null;
     }
-    
+
+    if (function_exists('poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id')) {
+        $base_for_cp = poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id($pokemon_id);
+        if ($base_for_cp !== null && $base_for_cp > 0) {
+            $pokemon_id = $base_for_cp;
+        }
+    }
+
     // Récupérer le champ extra
     $row = $wpdb->get_row(
         $wpdb->prepare("SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1", $pokemon_id)
@@ -725,9 +758,15 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
         return false;
     }
 
-    $release = $extra['release'][$context] ?? '';
+    $rel     = isset($extra['release']) && is_array($extra['release']) ? $extra['release'] : [];
+    $release = trim((string) ($rel[$context] ?? ''));
+    // Si la clé spécifique (Gigamax, Dynamax, Méga) n’est pas remplie dans les données, retomber sur
+    // la date « normale » : beaucoup de fiches ne dupliquent pas la date sur chaque clé.
+    if ($release === '' && in_array($context, ['mega', 'dynamax', 'gigantamax'], true)) {
+        $release = trim((string) ($rel['normal'] ?? ''));
+    }
 
-    return trim((string) $release) !== '';
+    return $release !== '';
 }
 
 /**
@@ -1318,7 +1357,7 @@ function pokehub_pokemon_select_category_rank(string $category): int {
     if (in_array($category, ['costume', 'costumed'], true)) {
         return 1;
     }
-    if ($category === 'mega') {
+    if ($category === 'mega' || $category === 'gigantamax') {
         return 2;
     }
     return 3;
@@ -1386,6 +1425,436 @@ function pokehub_pokemon_is_dimorphic_for_select(int $pokemon_id): bool {
     return $is_dimorphic;
 }
 
+// --- Gigamax « virtuel » (extra.release.gigantamax sur la fiche de base) : même IDs que le module collections ---
+
+/**
+ * @return int 2_100_000_000 + n° fiche de base (évite la collision avec les id SQL habituels)
+ */
+function poke_hub_pokemon_gigantamax_synthetic_pokemon_id(int $base_pokemon_id): int {
+    return 2100000000 + $base_pokemon_id;
+}
+
+/**
+ * Vérifie un id d’enregistrement (collections, contenus) pour un Gigamax sans ligne de variante en BDD.
+ */
+function poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id(int $pokemon_id): bool {
+    return $pokemon_id >= 2100000000 && $pokemon_id < 2200000000;
+}
+
+/**
+ * @return int|null Fiche de base si l’id est un Gigamax synthétique, sinon null
+ */
+function poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id(int $pokemon_id): ?int {
+    if (!poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id($pokemon_id)) {
+        return null;
+    }
+    return $pokemon_id - 2100000000;
+}
+
+/**
+ * Ligne SQL/jeu de champs = vraie forme Gigantamax en BDD (variante) ?
+ */
+function poke_hub_pokemon_gigantamax_row_is_real_form(array $row): bool {
+    $cat = strtolower(trim((string) ($row['form_category'] ?? '')));
+    if ($cat === 'gigantamax') {
+        return true;
+    }
+    $slug = strtolower((string) ($row['slug'] ?? ''));
+    if ($slug !== '' && strpos($slug, 'gigantamax') !== false) {
+        return true;
+    }
+    $label = strtolower((string) ($row['form_label'] ?? ''));
+    if ($label === '') {
+        $label = strtolower((string) ($row['form'] ?? ''));
+    }
+    return $label !== '' && strpos($label, 'gigantamax') !== false;
+}
+
+/**
+ * Paire name_fr / name_en + slug pour une entrée Gigamax dérivée d’une fiche de base.
+ */
+function poke_hub_pokemon_gigantamax_synthetic_label_and_slug_from_base(array $base): array {
+    $base_id = (int) ($base['id'] ?? 0);
+    $slug    = trim((string) ($base['slug'] ?? ''), " \t\n\r\0\x0B");
+    if ($slug === '' || $slug === '0') {
+        $dex = isset($base['dex_number']) ? (int) $base['dex_number'] : 0;
+        if ($dex > 0) {
+            $slug = sprintf('%03d', $dex);
+        } else {
+            $slug = 'pokemon';
+        }
+    }
+    if (strpos($slug, 'gigantamax-') === 0) {
+        $gmax_slug = $slug;
+    } else {
+        $gmax_slug = 'gigantamax-' . $slug;
+    }
+    $name_fr_base = trim((string) ($base['name_fr'] ?? ''));
+    $name_en_base = trim((string) ($base['name_en'] ?? ''));
+    if ($name_fr_base !== '') {
+        $name_fr = $name_fr_base . ' Gigamax';
+    } elseif ($name_en_base !== '') {
+        $name_fr = $name_en_base . ' Gigamax';
+    } else {
+        $name_fr = 'Gigamax';
+    }
+    if ($name_en_base !== '') {
+        $name_en = 'Gigantamax ' . $name_en_base;
+    } else {
+        $name_en = $name_fr;
+    }
+
+    return [
+        'name_fr'  => $name_fr,
+        'name_en'  => $name_en,
+        'slug'     => $gmax_slug,
+        'base_id'  => $base_id,
+    ];
+}
+
+/**
+ * Données « Pokémon » (pool collections, ressources) à partir d’une fiche de base.
+ *
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gigantamax_build_synthetic_data_from_base(array $base): array {
+    $labels = poke_hub_pokemon_gigantamax_synthetic_label_and_slug_from_base($base);
+    $out    = $base;
+    $bid = (int) ($base['id'] ?? 0);
+    if ($bid <= 0) {
+        return $out;
+    }
+    unset($out['extra']);
+    $out['id']              = poke_hub_pokemon_gigantamax_synthetic_pokemon_id($bid);
+    $out['form_variant_id'] = 0;
+    $out['slug']            = $labels['slug'];
+    $out['name_fr']         = $labels['name_fr'];
+    $out['name_en']         = $labels['name_en'];
+    $out['form_category']   = 'gigantamax';
+    if (!isset($out['form_label']) || (string) $out['form_label'] === '') {
+        $out['form_label'] = 'Gigantamax';
+    }
+    if (!isset($out['form']) || (string) $out['form'] === '') {
+        $out['form'] = (string) ($out['form_label'] ?? 'Gigantamax');
+    }
+    $out['synthetic_gigantamax']      = true;
+    $out['gigantamax_base_pokemon_id'] = $bid;
+
+    return (array) apply_filters('poke_hub_pokemon_synthetic_gigantamax_data', $out, $base);
+}
+
+/**
+ * Fiches de base avec date Gigamax dans extra mais sans variante G-Max en table (mise en cache requête).
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows(): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    if (!function_exists('pokehub_get_table')) {
+        $cache = [];
+        return $cache;
+    }
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        $cache = [];
+        return $cache;
+    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $pokemon_table     = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
+    if (!$pokemon_table || !$form_variants_table) {
+        $cache = [];
+        return $cache;
+    }
+    $sql  = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
+            COALESCE(fv.label, fv.form_slug, '') AS form,
+            COALESCE(fv.label, fv.form_slug, '') AS form_label,
+            COALESCE(fv.category, 'normal') AS form_category
+        FROM {$pokemon_table} p
+        LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+        WHERE p.extra IS NOT NULL AND p.extra != ''
+        AND TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
+        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR fv.form_slug LIKE %s )
+        ";
+    $like = '%gigantamax%';
+    $sql  = $wpdb->prepare($sql, $like);
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+    if (!is_array($rows) || $rows === []) {
+        $cache = [];
+        return $cache;
+    }
+    $filtered = [];
+    foreach ($rows as $r) {
+        if (poke_hub_pokemon_gigantamax_row_is_real_form($r)) {
+            continue;
+        }
+        $pid = (int) ($r['id'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        if (function_exists('poke_hub_pokemon_is_released_in_go') && !poke_hub_pokemon_is_released_in_go($pid, 'gigantamax')) {
+            continue;
+        }
+        $filtered[] = $r;
+    }
+    $cache = $filtered;
+    return $cache;
+}
+
+/**
+ * Ligne select2 pour un id Gigamax synthétique, ou null.
+ *
+ * @return array<string, mixed>|null
+ */
+function poke_hub_pokemon_gigantamax_select_item_from_synthetic_id(int $synthetic_id): ?array {
+    if (!poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id($synthetic_id)) {
+        return null;
+    }
+    $base_id = poke_hub_pokemon_gigantamax_synthetic_to_base_pokemon_id($synthetic_id);
+    if ($base_id === null || $base_id <= 0) {
+        return null;
+    }
+    if (!function_exists('pokehub_get_table')) {
+        return null;
+    }
+    global $wpdb;
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
+    if (!$pokemon_table || !$form_variants_table) {
+        return null;
+    }
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
+                COALESCE(fv.label, fv.form_slug, '') AS form,
+                COALESCE(fv.label, fv.form_slug, '') AS form_label,
+                COALESCE(fv.category, 'normal') AS form_category
+         FROM {$pokemon_table} p
+         LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+         WHERE p.id = %d LIMIT 1",
+            $base_id
+        ),
+        ARRAY_A
+    );
+    if (!is_array($row) || (int) ($row['id'] ?? 0) !== $base_id) {
+        return null;
+    }
+    if (poke_hub_pokemon_gigantamax_row_is_real_form($row)) {
+        return null;
+    }
+    if (function_exists('poke_hub_pokemon_is_released_in_go') && !poke_hub_pokemon_is_released_in_go($base_id, 'gigantamax')) {
+        return null;
+    }
+    $data = poke_hub_pokemon_gigantamax_build_synthetic_data_from_base($row);
+    return poke_hub_pokemon_gigantamax_data_to_select_item($data);
+}
+
+/**
+ * @param array $data Résultat de poke_hub_pokemon_gigantamax_build_synthetic_data_from_base
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gigantamax_data_to_select_item(array $data): array {
+    $dex   = isset($data['dex_number']) ? (int) $data['dex_number'] : 0;
+    $name_fr = $data['name_fr'] ?? '';
+    $name_en = $data['name_en'] ?? '';
+    $name    = $name_fr;
+    if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+        $name = $name_fr . ' (' . $name_en . ')';
+    } elseif ($name_fr === '' && $name_en !== '') {
+        $name = $name_en;
+    }
+    $text = $name;
+    if ($dex > 0) {
+        $text .= ' #' . str_pad((string) $dex, 3, '0', STR_PAD_LEFT);
+    }
+    $base = isset($data['gigantamax_base_pokemon_id']) ? (int) $data['gigantamax_base_pokemon_id'] : 0;
+    if ($base <= 0) {
+        $base = (int) ($data['id'] ?? 0) - 2100000000;
+    }
+
+    return [
+        'id'                   => (int) ($data['id'] ?? 0),
+        'text'                 => $text,
+        'name_fr'              => (string) $name_fr,
+        'name_en'              => (string) $name_en,
+        'dex_number'           => $dex,
+        'has_gender_dimorphism' => $base > 0 ? (pokehub_pokemon_is_dimorphic_for_select($base) ? 1 : 0) : 0,
+        'synthetic_gigantamax'  => 1,
+        'gigantamax_base_pokemon_id' => $base,
+    ];
+}
+
+/**
+ * @param array<int, array<string, mixed>> $rows Lignes triables (pokemon + form)
+ */
+function pokehub_append_synthetic_gigantamax_pokemon_to_select(array $rows, array $real_gigantamax_dex_map): array {
+    $bases  = poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows();
+    $append = [];
+    foreach ($bases as $base) {
+        $dex = isset($base['dex_number']) ? (int) $base['dex_number'] : 0;
+        if ($dex > 0 && !empty($real_gigantamax_dex_map[$dex])) {
+            continue;
+        }
+        $data = poke_hub_pokemon_gigantamax_build_synthetic_data_from_base($base);
+        $id   = (int) ($data['id'] ?? 0);
+        if ($id <= 0) {
+            continue;
+        }
+        $in_rows = false;
+        foreach ($rows as $e) {
+            if ((int) ($e['id'] ?? 0) === $id) {
+                $in_rows = true;
+                break;
+            }
+        }
+        if ($in_rows) {
+            continue;
+        }
+        $append[] = $data;
+    }
+    if ($append === []) {
+        return $rows;
+    }
+    $merged = array_merge($rows, $append);
+    pokehub_sort_pokemon_select_rows($merged);
+
+    return $merged;
+}
+
+/**
+ * Filtre une chaîne (recherche select) : nom FR/EN, texte, « gigantamax »
+ */
+function pokehub_pokemon_select_row_matches_search_string(array $item, string $search): bool {
+    $search = trim($search);
+    if ($search === '') {
+        return true;
+    }
+    $h = function_exists('mb_stripos') ? 'mb_stripos' : 'stripos';
+    $candidates = [
+        (string) ($item['text'] ?? ''),
+        (string) ($item['name_fr'] ?? ''),
+        (string) ($item['name_en'] ?? ''),
+        'Gigantamax', 'Gigamax',
+    ];
+    $needle = function_exists('mb_strtolower') ? mb_strtolower($search, 'UTF-8') : strtolower($search);
+    foreach ($candidates as $c) {
+        if ($c === '') {
+            continue;
+        }
+        $hc = function_exists('mb_strtolower') ? mb_strtolower($c, 'UTF-8') : strtolower($c);
+        if (strpos($hc, $needle) !== false) {
+            return true;
+        }
+    }
+    if (!empty($item['synthetic_gigantamax'])) {
+        if (strpos($needle, 'gigantamax') !== false || strpos($needle, 'gigamax') !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Découpe les ids de la REST / PHP : n° réels, 2 100 000 000+ (Gigamax fictif), "25|male", etc.
+ *
+ * @param array<int, int|string> $ids
+ * @return array{ int_for_sql: int[], gigantamax_synthetic: int[], gender_tokens: string[] }
+ */
+function pokehub_normalize_pokemon_for_select_id_tokens(array $ids): array {
+    $out = [
+        'int_for_sql'        => [],
+        'gigantamax_synthetic' => [],
+        'gender_tokens'      => [],
+    ];
+    foreach ($ids as $t) {
+        if (is_string($t) && preg_match('/^(\d+)\|(male|female)$/i', $t, $m)) {
+            $out['int_for_sql'][]  = (int) $m[1];
+            $out['gender_tokens'][] = $m[1] . '|' . strtolower($m[2]);
+            continue;
+        }
+        $n = (int) $t;
+        if ($n <= 0) {
+            continue;
+        }
+        if (function_exists('poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id') && poke_hub_pokemon_gigantamax_is_synthetic_pokemon_id($n)) {
+            $out['gigantamax_synthetic'][] = $n;
+        } else {
+            $out['int_for_sql'][] = $n;
+        }
+    }
+    $out['int_for_sql']         = array_values(array_unique($out['int_for_sql']));
+    $out['gigantamax_synthetic'] = array_values(array_unique($out['gigantamax_synthetic']));
+    $out['gender_tokens']       = array_values(array_unique($out['gender_tokens']));
+
+    return $out;
+}
+
+/**
+ * Ligne d’affichage unique pour Select2 (ligne BDD + entrées synthétiques Gigamax).
+ */
+function pokehub_pokemon_for_select_table_row_to_item(array $pokemon): array {
+    $pid         = (int) ($pokemon['id'] ?? 0);
+    $dex_number  = isset($pokemon['dex_number']) ? (int) $pokemon['dex_number'] : 0;
+    $name_fr     = $pokemon['name_fr'] ?? '';
+    $name_en     = $pokemon['name_en'] ?? '';
+    $base_gender = !empty($pokemon['gigantamax_base_pokemon_id'])
+        ? (int) $pokemon['gigantamax_base_pokemon_id']
+        : $pid;
+
+    $name = $name_fr;
+    if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
+        $name = $name_fr . ' (' . $name_en . ')';
+    } elseif ($name_fr === '' && $name_en !== '') {
+        $name = $name_en;
+    }
+
+    $text = $name;
+    if ($dex_number > 0) {
+        $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
+    }
+
+    $row = [
+        'id'                    => $pid,
+        'text'                  => $text,
+        'name_fr'               => $name_fr,
+        'name_en'               => $name_en,
+        'dex_number'            => $dex_number,
+        'has_gender_dimorphism' => pokehub_pokemon_is_dimorphic_for_select($base_gender) ? 1 : 0,
+    ];
+    if (!empty($pokemon['synthetic_gigantamax'])) {
+        $row['synthetic_gigantamax'] = 1;
+    }
+    if (!empty($pokemon['gigantamax_base_pokemon_id'])) {
+        $row['gigantamax_base_pokemon_id'] = (int) $pokemon['gigantamax_base_pokemon_id'];
+    }
+
+    return $row;
+}
+
+function pokehub_pokemon_gender_token_to_select_item(string $token, array $pokemon_id_to_item): ?array {
+    if (!preg_match('/^(\d+)\|(male|female)$/i', $token, $m)) {
+        return null;
+    }
+    $pid  = (int) $m[1];
+    $gend = strtolower($m[2]);
+    $base = $pokemon_id_to_item[$pid] ?? null;
+    if (!is_array($base) || (int) ($base['id'] ?? 0) !== $pid) {
+        return null;
+    }
+    $glabel = $gend === 'female' ? __('Female', 'poke-hub') : __('Male', 'poke-hub');
+    $text   = (string) ($base['text'] ?? '') . ' — ' . $glabel;
+
+    $out = $base;
+    $out['id']  = (string) $token;
+    $out['text'] = $text;
+
+    return $out;
+}
+
 /**
  * Récupère tous les Pokémon pour les sélecteurs Select2
  * 
@@ -1427,41 +1896,27 @@ function pokehub_get_pokemon_for_select(): array {
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
     $rows = $wpdb->get_results($sql, ARRAY_A);
-    
-    if (empty($rows)) {
+
+    if (empty($rows) || !is_array($rows)) {
         return [];
     }
     pokehub_sort_pokemon_select_rows($rows);
-    
+    $real_gigantamax_dex = [];
+    foreach ($rows as $r) {
+        if (poke_hub_pokemon_gigantamax_row_is_real_form($r)) {
+            $dn = isset($r['dex_number']) ? (int) $r['dex_number'] : 0;
+            if ($dn > 0) {
+                $real_gigantamax_dex[$dn] = true;
+            }
+        }
+    }
+    $rows = pokehub_append_synthetic_gigantamax_pokemon_to_select($rows, $real_gigantamax_dex);
+
     $result = [];
     foreach ($rows as $pokemon) {
-        $dex_number = isset($pokemon['dex_number']) ? (int) $pokemon['dex_number'] : 0;
-        $name_fr = $pokemon['name_fr'] ?? '';
-        $name_en = $pokemon['name_en'] ?? '';
-        
-        // Construire le nom au format "nom-fr (nom-anglais)" si les deux sont disponibles
-        $name = $name_fr;
-        if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
-            $name = $name_fr . ' (' . $name_en . ')';
-        } elseif ($name_fr === '' && $name_en !== '') {
-            $name = $name_en;
-        }
-        
-        $text = $name;
-        if ($dex_number > 0) {
-            $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
-        }
-        
-        $result[] = [
-            'id' => (int) $pokemon['id'],
-            'text' => $text,
-            'name_fr' => $name_fr,
-            'name_en' => $name_en,
-            'dex_number' => $dex_number,
-            'has_gender_dimorphism' => pokehub_pokemon_is_dimorphic_for_select((int) $pokemon['id']),
-        ];
+        $result[] = pokehub_pokemon_for_select_table_row_to_item($pokemon);
     }
-    
+
     return $result;
 }
 
@@ -1469,9 +1924,9 @@ function pokehub_get_pokemon_for_select(): array {
  * Récupère des Pokémon pour Select2 avec filtre optionnel par IDs et/ou recherche texte.
  * Utilisé par l’API REST (recherche) et pour n’afficher que les options présélectionnées en PHP.
  *
- * @param int[] $ids   IDs à retourner (si non vide, ignore $search).
- * @param string $search Terme de recherche (name_fr, name_en, dex_number).
- * @return array Format: [['id' => 1, 'text' => '...', 'name_fr' => '...', 'name_en' => '...', 'dex_number' => 25], ...]
+ * @param array<int, int|string> $ids IDs BDD, Gigamax « fictifs » (2,1G…), et jetons 123|male|female
+ * @param string                 $search Terme de recherche (name_fr, name_en, dex, Gigamax).
+ * @return array<int, array<string, mixed>>
  */
 function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search = '', bool $dimorphic_only = false): array {
     if (!function_exists('pokehub_get_table')) {
@@ -1482,71 +1937,139 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
         return [];
     }
     $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
-    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    $pokemon_table      = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
     $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
     if (!$pokemon_table || !$form_variants_table) {
         return [];
     }
+
+    $tok = pokehub_normalize_pokemon_for_select_id_tokens($ids);
     if (empty($ids) && $search === '') {
         return [];
     }
-    $where = ['1=1'];
-    $prepare_args = [];
-    if (!empty($ids)) {
-        $placeholders = implode(',', array_fill(0, count($ids), '%d'));
-        $where[] = "p.id IN ($placeholders)";
-        $prepare_args = array_merge($prepare_args, $ids);
+    if ($search === '' && empty($tok['int_for_sql']) && empty($tok['gigantamax_synthetic']) && empty($tok['gender_tokens'])) {
+        return [];
     }
-    if ($search !== '') {
-        $term = '%' . $wpdb->esc_like($search) . '%';
-        $where[] = '(p.name_fr LIKE %s OR p.name_en LIKE %s OR p.dex_number LIKE %s)';
-        $prepare_args = array_merge($prepare_args, [$term, $term, $term]);
-    }
-    $where_sql = implode(' AND ', $where);
-    $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
+
+    $rows = [];
+    if ($search !== '' || !empty($tok['int_for_sql'])) {
+        $where         = ['1=1'];
+        $prepare_args  = [];
+        if (!empty($tok['int_for_sql'])) {
+            $placeholders = implode(',', array_fill(0, count($tok['int_for_sql']), '%d'));
+            $where[]      = "p.id IN ({$placeholders})";
+            $prepare_args = array_merge($prepare_args, $tok['int_for_sql']);
+        }
+        if ($search !== '') {
+            $term = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(p.name_fr LIKE %s OR p.name_en LIKE %s OR p.dex_number LIKE %s)';
+            $prepare_args = array_merge($prepare_args, [$term, $term, $term]);
+        }
+        $where_sql = implode(' AND ', $where);
+        $sql       = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
             COALESCE(fv.label, fv.form_slug, '') AS form,
             COALESCE(fv.category, 'normal') AS form_category
             FROM {$pokemon_table} p
             LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
             WHERE {$where_sql}
             ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
-    if (!empty($prepare_args)) {
-        $sql = $wpdb->prepare($sql, $prepare_args);
+        if (!empty($prepare_args)) {
+            $sql = $wpdb->prepare($sql, $prepare_args);
+        }
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+        if (!is_array($rows)) {
+            $rows = [];
+        }
     }
-    $rows = $wpdb->get_results($sql, ARRAY_A);
-    if (empty($rows)) {
-        return [];
+
+    if ($rows !== []) {
+        pokehub_sort_pokemon_select_rows($rows);
     }
-    pokehub_sort_pokemon_select_rows($rows);
+    $real_gigantamax_dex = [];
+    foreach ($rows as $r) {
+        if (poke_hub_pokemon_gigantamax_row_is_real_form($r)) {
+            $dn = isset($r['dex_number']) ? (int) $r['dex_number'] : 0;
+            if ($dn > 0) {
+                $real_gigantamax_dex[$dn] = true;
+            }
+        }
+    }
+    $rows = pokehub_append_synthetic_gigantamax_pokemon_to_select($rows, $real_gigantamax_dex);
+
     $result = [];
     foreach ($rows as $pokemon) {
-        $pokemon_id = (int) $pokemon['id'];
-        $is_dimorphic = pokehub_pokemon_is_dimorphic_for_select($pokemon_id);
-        if ($dimorphic_only && !$is_dimorphic) {
+        $item = pokehub_pokemon_for_select_table_row_to_item($pokemon);
+        if ($dimorphic_only && empty($item['has_gender_dimorphism'])) {
             continue;
         }
-        $dex_number = isset($pokemon['dex_number']) ? (int) $pokemon['dex_number'] : 0;
-        $name_fr = $pokemon['name_fr'] ?? '';
-        $name_en = $pokemon['name_en'] ?? '';
-        $name = $name_fr;
-        if ($name_fr !== '' && $name_en !== '' && $name_fr !== $name_en) {
-            $name = $name_fr . ' (' . $name_en . ')';
-        } elseif ($name_fr === '' && $name_en !== '') {
-            $name = $name_en;
+        if ($search !== '' && !pokehub_pokemon_select_row_matches_search_string($item, $search)) {
+            continue;
         }
-        $text = $name;
-        if ($dex_number > 0) {
-            $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
-        }
-        $result[] = [
-            'id' => $pokemon_id,
-            'text' => $text,
-            'name_fr' => $name_fr,
-            'name_en' => $name_en,
-            'dex_number' => $dex_number,
-            'has_gender_dimorphism' => $is_dimorphic,
-        ];
+        $result[] = $item;
     }
+
+    $by_id = [];
+    foreach ($result as $it) {
+        $by_id[(int) $it['id']] = $it;
+    }
+    foreach ($tok['gigantamax_synthetic'] as $sid) {
+        if (isset($by_id[$sid])) {
+            continue;
+        }
+        $srow = poke_hub_pokemon_gigantamax_select_item_from_synthetic_id($sid);
+        if ($srow === null) {
+            continue;
+        }
+        if ($dimorphic_only && empty($srow['has_gender_dimorphism'])) {
+            continue;
+        }
+        if ($search !== '' && !pokehub_pokemon_select_row_matches_search_string($srow, $search)) {
+            continue;
+        }
+        $result[]   = $srow;
+        $by_id[$sid] = $srow;
+    }
+
+    $map = $by_id;
+    foreach ($tok['gender_tokens'] as $gtok) {
+        $gitem = pokehub_pokemon_gender_token_to_select_item($gtok, $map);
+        if ($gitem === null) {
+            continue;
+        }
+        if ($dimorphic_only && empty($gitem['has_gender_dimorphism'])) {
+            continue;
+        }
+        if ($search !== '' && !pokehub_pokemon_select_row_matches_search_string($gitem, $search)) {
+            continue;
+        }
+        $result[] = $gitem;
+    }
+
+    if ($search === '' && $ids !== []) {
+        $by_key = [];
+        foreach ($result as $it) {
+            $k = (string) ($it['id'] ?? '');
+            if ($k === '') {
+                continue;
+            }
+            $by_key[$k] = $it;
+        }
+        $ordered = [];
+        foreach ($ids as $t) {
+            if (is_string($t) && preg_match('/^(\d+)\|(male|female)$/i', $t, $m)) {
+                $k = $m[1] . '|' . strtolower($m[2]);
+            } else {
+                $k = (string) (int) $t;
+            }
+            if (isset($by_key[$k])) {
+                $ordered[] = $by_key[$k];
+            }
+        }
+        if ($ordered !== []) {
+            $result = $ordered;
+        }
+    }
+
     return $result;
 }
 

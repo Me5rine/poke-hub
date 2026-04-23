@@ -255,9 +255,39 @@ add_action('init', function() {
                 $ids_param = $request->get_param('ids');
                 $ids = [];
                 if (is_string($ids_param) && $ids_param !== '') {
-                    $ids = array_values(array_filter(array_map('intval', explode(',', $ids_param)), function($id) { return $id > 0; }));
+                    $parts = array_map('trim', explode(',', $ids_param));
+                    foreach ($parts as $p) {
+                        if ($p === '') {
+                            continue;
+                        }
+                        if (preg_match('/^(\d+)\|(male|female)$/i', $p, $m)) {
+                            $ids[] = $m[1] . '|' . strtolower($m[2]);
+                        } else {
+                            $n = (int) $p;
+                            if ($n > 0) {
+                                $ids[] = $n;
+                            }
+                        }
+                    }
                 } elseif (is_array($ids_param)) {
-                    $ids = array_values(array_filter(array_map('intval', $ids_param), function($id) { return $id > 0; }));
+                    foreach ($ids_param as $p) {
+                        if (is_string($p)) {
+                            $p = trim($p);
+                            if ($p === '') {
+                                continue;
+                            }
+                        } elseif (is_int($p) && $p <= 0) {
+                            continue;
+                        }
+                        if (is_string($p) && preg_match('/^(\d+)\|(male|female)$/i', $p, $m)) {
+                            $ids[] = $m[1] . '|' . strtolower($m[2]);
+                        } else {
+                            $n = (int) $p;
+                            if ($n > 0) {
+                                $ids[] = $n;
+                            }
+                        }
+                    }
                 }
                 $dimorphic_only = false;
                 $raw_dimorphic_only = $request->get_param('dimorphic_only');

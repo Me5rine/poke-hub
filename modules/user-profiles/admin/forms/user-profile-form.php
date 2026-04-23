@@ -106,6 +106,7 @@ function poke_hub_render_user_profile_form($user_id) {
                         </th>
                         <td>
                             <label>
+                                <input type="hidden" name="friend_code_public_present" value="1">
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" <?php checked($profile['friend_code_public'], true); ?>>
                                 <?php _e('Display friend code publicly on this profile', 'poke-hub'); ?>
                             </label>
@@ -341,6 +342,7 @@ function poke_hub_render_user_profile_form_by_id($profile_id) {
                         </th>
                         <td>
                             <label>
+                                <input type="hidden" name="friend_code_public_present" value="1">
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" <?php checked($profile['friend_code_public'], true); ?>>
                                 <?php _e('Display friend code publicly on this profile', 'poke-hub'); ?>
                             </label>

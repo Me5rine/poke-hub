@@ -376,16 +376,27 @@ function pokehub_fandom_recurring_parse_wikitext(string $wikitext, string $kind)
                         );
                         break;
                     }
-                    $name_fr = (string) $wpdb->get_var(
+                    $name_row = $wpdb->get_row(
                         $wpdb->prepare(
-                            "SELECT COALESCE(NULLIF(TRIM(name_fr), ''), TRIM(name_en)) FROM {$pokemon_table} WHERE id = %d",
+                            "SELECT TRIM(name_en) AS name_en, TRIM(name_fr) AS name_fr FROM {$pokemon_table} WHERE id = %d",
                             $pid
-                        )
+                        ),
+                        ARRAY_A
                     );
+                    $name_row  = is_array($name_row) ? $name_row : [];
+                    $name_en   = trim((string) ($name_row['name_en'] ?? ''));
+                    $name_fr   = trim((string) ($name_row['name_fr'] ?? ''));
+                    if ($name_fr === '') {
+                        $name_fr = $name_en !== '' ? $name_en : $wen;
+                    }
+                    if ($name_en === '') {
+                        $name_en = $wen;
+                    }
                     $wiki_disp = $sp['raw_wiki'] !== '' ? (string) $sp['raw_wiki'] : $wen;
                     $pokemon_rows[] = [
                         'wiki'                  => $wiki_disp,
                         'id'                    => $pid,
+                        'name_en'               => $name_en,
                         'name_fr'               => $name_fr,
                         'force_shadow'          => !empty($sp['force_shadow']) ? 1 : 0,
                         'force_shiny'           => !empty($sp['force_shiny']) ? 1 : 0,
@@ -489,6 +500,34 @@ function pokehub_fandom_recurring_parse_wikitext(string $wikitext, string $kind)
     return $entries;
 }
 
+/** @param string[] $parts */
+function pokehub_fandom_join_names_ampersand_list(array $parts): string {
+    $parts = array_values(
+        array_filter(
+            array_map(static function ($s): string {
+                return trim((string) $s);
+            }, $parts),
+            static function (string $s): bool {
+                return $s !== '';
+            }
+        )
+    );
+    $n = count($parts);
+    if ($n === 0) {
+        return '';
+    }
+    if ($n === 1) {
+        return $parts[0];
+    }
+    if ($n === 2) {
+        return $parts[0] . ' & ' . $parts[1];
+    }
+    $last = $parts[$n - 1];
+    $head  = array_slice($parts, 0, -1);
+
+    return implode(', ', $head) . ' & ' . $last;
+}
+
 /**
  * @param array<string, mixed> $row
  * @return int|string
@@ -542,17 +581,33 @@ function pokehub_fandom_recurring_insert_one(array $row) {
     }
 
     $pokemon_rows = is_array($row['pokemon_rows'] ?? null) ? $row['pokemon_rows'] : [];
-    $wiki_labels  = array_column($pokemon_rows, 'wiki');
-    $title_en     = $base_en . ' – ' . implode(', ', $wiki_labels);
-    $title_fr     = $base_fr . ' – ' . implode(
-        ', ',
-        array_map(
-            static function (array $r): string {
-                return (string) ($r['name_fr'] ?? $r['wiki'] ?? '');
-            },
-            $pokemon_rows
-        )
+    $en_labels    = array_map(
+        static function (array $r): string {
+            $ne = trim((string) ($r['name_en'] ?? ''));
+            if ($ne !== '') {
+                return $ne;
+            }
+            return trim((string) ($r['wiki'] ?? ''));
+        },
+        $pokemon_rows
     );
+    $fr_labels = array_map(
+        static function (array $r): string {
+            return (string) ($r['name_fr'] ?? $r['wiki'] ?? '');
+        },
+        $pokemon_rows
+    );
+    if ($kind === 'raid_hour') {
+        $names_en = pokehub_fandom_join_names_ampersand_list($en_labels);
+        $names_fr = pokehub_fandom_join_names_ampersand_list($fr_labels);
+        $title_en = trim($names_en . ' ' . $base_en);
+        $title_fr = trim($base_fr . ' ' . $names_fr);
+    } else {
+        $names_en = implode(', ', $en_labels);
+        $names_fr = implode(', ', $fr_labels);
+        $title_en = $base_en . ' – ' . $names_en;
+        $title_fr = $base_fr . ' – ' . $names_fr;
+    }
 
     if (!function_exists('pokehub_generate_unique_event_slug')) {
         if (!function_exists('pokehub_ensure_events_admin_helpers_loaded') || !pokehub_ensure_events_admin_helpers_loaded()) {

@@ -56,13 +56,15 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
             $profile = [
                 'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
                 'friend_code'         => $friend_code,
-                'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
                 'xp'                  => isset($_POST['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($_POST['xp']) : absint(preg_replace('/[^0-9]/', '', $_POST['xp']))) : 0,
                 'country'             => $country,
                 'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
                 'scatterbug_pattern'  => $scatterbug_pattern,
                 'reasons'             => isset($_POST['reasons']) && is_array($_POST['reasons']) ? array_map('sanitize_text_field', $_POST['reasons']) : [],
             ];
+            if (isset($_POST['friend_code_public_present'])) {
+                $profile['friend_code_public'] = isset($_POST['friend_code_public']) ? true : false;
+            }
 
             if (function_exists('poke_hub_save_user_profile')) {
                 $save_result = poke_hub_save_user_profile($user_id, $profile);
@@ -193,6 +195,7 @@ function poke_hub_render_user_profile($user_id, $can_edit) {
                             ?>
                             <input type="text" name="friend_code" id="friend_code" value="<?php echo esc_attr($formatted_friend_code); ?>" class="me5rine-lab-form-input" placeholder="1234 5678 9012" maxlength="14" pattern="[0-9\s]{0,14}" title="<?php esc_attr_e('The friend code must be exactly 12 digits (e.g., 1234 5678 9012)', 'poke-hub'); ?>">
                             <label class="me5rine-lab-form-checkbox-item" for="friend_code_public">
+                                <input type="hidden" name="friend_code_public_present" value="1">
                                 <input type="checkbox" name="friend_code_public" id="friend_code_public" value="1" class="me5rine-lab-form-checkbox" <?php checked($profile['friend_code_public'] ?? false, true); ?>>
                                 <span class="me5rine-lab-form-checkbox-icon">
                                     <i class="<?php echo (!empty($profile['friend_code_public'])) ? 'um-icon-android-checkbox' : 'um-icon-android-checkbox-outline-blank'; ?>"></i>

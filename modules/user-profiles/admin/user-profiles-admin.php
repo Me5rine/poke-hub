@@ -91,7 +91,6 @@ function poke_hub_user_profiles_admin_ui() {
                 $profile = [
                     'team'                => isset($_POST['team']) ? sanitize_text_field($_POST['team']) : '',
                     'friend_code'         => $friend_code,
-                    'friend_code_public'  => isset($_POST['friend_code_public']) ? true : false,
                     'xp'                  => isset($_POST['xp']) ? (function_exists('poke_hub_clean_xp') ? poke_hub_clean_xp($_POST['xp']) : absint(preg_replace('/[^0-9]/', '', $_POST['xp']))) : 0,
                     'country'             => isset($_POST['country']) ? sanitize_text_field($_POST['country']) : '',
                     'pokemon_go_username' => isset($_POST['pokemon_go_username']) ? sanitize_text_field($_POST['pokemon_go_username']) : '',
@@ -100,6 +99,12 @@ function poke_hub_user_profiles_admin_ui() {
                     // Lors d'une édition depuis l'admin, on ne doit pas écraser la dernière IP du client.
                     'preserve_anonymous_ip' => true,
                 ];
+
+                // Mettre à jour la visibilité seulement si le formulaire confirme
+                // explicitement qu'il gérait ce champ (durcissement anti-template incomplet).
+                if (isset($_POST['friend_code_public_present'])) {
+                    $profile['friend_code_public'] = isset($_POST['friend_code_public']) ? true : false;
+                }
 
                 // Admin override de la dernière IP (optionnel).
                 // - keep: ne rien faire

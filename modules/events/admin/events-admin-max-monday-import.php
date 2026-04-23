@@ -287,16 +287,27 @@ function pokehub_max_monday_parse_wikitext(string $wikitext): array {
                             $pokemon_rows = [];
                             break;
                         }
-                        $name_fr = (string) $wpdb->get_var(
+                        $name_row = $wpdb->get_row(
                             $wpdb->prepare(
-                                "SELECT COALESCE(NULLIF(TRIM(name_fr), ''), TRIM(name_en)) FROM {$pokemon_table} WHERE id = %d",
+                                "SELECT TRIM(name_en) AS name_en, TRIM(name_fr) AS name_fr FROM {$pokemon_table} WHERE id = %d",
                                 $pid
-                            )
+                            ),
+                            ARRAY_A
                         );
+                        $name_row  = is_array($name_row) ? $name_row : [];
+                        $name_en   = trim((string) ($name_row['name_en'] ?? ''));
+                        $name_fr   = trim((string) ($name_row['name_fr'] ?? ''));
+                        if ($name_fr === '') {
+                            $name_fr = $name_en !== '' ? $name_en : $wen;
+                        }
+                        if ($name_en === '') {
+                            $name_en = $wen;
+                        }
                         $wiki_disp = trim($raw_w) !== '' ? trim($raw_w) : $wen;
                         $pokemon_rows[] = [
                             'wiki'                  => $wiki_disp,
                             'id'                    => $pid,
+                            'name_en'               => $name_en,
                             'name_fr'               => $name_fr,
                             'force_shadow'          => !empty($mods['force_shadow']) ? 1 : 0,
                             'force_shiny'           => !empty($mods['force_shiny']) ? 1 : 0,
@@ -322,7 +333,7 @@ function pokehub_max_monday_parse_wikitext(string $wikitext): array {
                 $pokemon_id = 0;
                 $name_fr    = '';
                 if (!$skip && $pokemon_rows !== []) {
-                    $pokemon_en = implode(' · ', array_column($pokemon_rows, 'wiki'));
+                    $pokemon_en = implode(' · ', array_column($pokemon_rows, 'name_en'));
                     $pokemon_id = (int) $pokemon_rows[0]['id'];
                     $name_fr    = (string) $pokemon_rows[0]['name_fr'];
                 }
@@ -386,6 +397,7 @@ function pokehub_max_monday_insert_one(array $row) {
             [
                 'wiki'    => (string) ($row['pokemon_en_wiki'] ?? ''),
                 'id'      => (int) $row['pokemon_id'],
+                'name_en' => '',
                 'name_fr' => (string) ($row['name_fr'] ?? ''),
             ],
         ];
@@ -399,21 +411,40 @@ function pokehub_max_monday_insert_one(array $row) {
         if ($pid <= 0) {
             return __('Pokémon invalide.', 'poke-hub');
         }
-        $name_fr_db = (string) $wpdb->get_var(
+        $name_row = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT COALESCE(NULLIF(TRIM(name_fr), ''), TRIM(name_en)) FROM {$pokemon_table} WHERE id = %d LIMIT 1",
+                "SELECT TRIM(name_en) AS name_en, TRIM(name_fr) AS name_fr FROM {$pokemon_table} WHERE id = %d LIMIT 1",
                 $pid
-            )
+            ),
+            ARRAY_A
         );
-        if ($name_fr_db === '') {
+        $name_row  = is_array($name_row) ? $name_row : [];
+        $name_en   = trim((string) ($name_row['name_en'] ?? ''));
+        $name_fr   = trim((string) ($name_row['name_fr'] ?? ''));
+        if ($name_fr === '') {
+            $name_fr = $name_en !== '' ? $name_en : '';
+        }
+        if ($name_en === '') {
+            $name_en = trim((string) ($pr['wiki'] ?? ''));
+        }
+        if ($name_fr === '') {
+            $name_fr = $name_en;
+        }
+        if ($name_fr === '' && $name_en === '') {
             return __('Pokémon invalide.', 'poke-hub');
         }
-        $pokemon_rows[$i]['name_fr'] = $name_fr_db;
+        $pokemon_rows[$i]['name_en'] = $name_en;
+        $pokemon_rows[$i]['name_fr'] = $name_fr;
     }
 
-    $wikis_en = array_column($pokemon_rows, 'wiki');
-    $wikis_en = array_map('strval', $wikis_en);
-    $pokemon_en = implode(', ', $wikis_en);
+    $en_labels = array_map(
+        static function (array $pr): string {
+            $ne = trim((string) ($pr['name_en'] ?? ''));
+            return $ne !== '' ? $ne : trim((string) ($pr['wiki'] ?? ''));
+        },
+        $pokemon_rows
+    );
+    $pokemon_en = implode(', ', $en_labels);
 
     $names_fr = array_map(
         static function (array $pr): string {

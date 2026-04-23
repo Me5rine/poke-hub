@@ -212,6 +212,25 @@ add_action('rest_api_init', function () {
         },
     ]);
 
+    register_rest_route('poke-hub/v1', '/collections/(?P<id>\d+)/reset', [
+        'methods'             => 'POST',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'id' => ['required' => true, 'type' => 'integer'],
+        ],
+        'callback'            => function (WP_REST_Request $request) {
+            $collection_id = (int) $request['id'];
+            $user_id         = get_current_user_id();
+            $ip              = poke_hub_collections_get_client_ip();
+            if ($user_id > 0) {
+                $result = poke_hub_collections_reset_items($collection_id, $user_id);
+            } else {
+                $result = poke_hub_collections_reset_items($collection_id, 0, $ip);
+            }
+            return new WP_REST_Response($result, $result['success'] ? 200 : 400);
+        },
+    ]);
+
     register_rest_route('poke-hub/v1', '/collections/anonymous-by-ip', [
         'methods'             => 'GET',
         'permission_callback' => function () {

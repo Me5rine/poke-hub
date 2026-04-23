@@ -728,9 +728,10 @@ function poke_hub_save_user_profile($user_id = null, $profile = [], $discord_id 
                 $data['xp'] = (int) $existing_full_row['xp'];
             }
             
-            // Preserve friend_code_public if friend_code is not being updated
-            $friend_code_provided = array_key_exists('friend_code', $profile);
-            if (!$friend_code_provided && isset($existing_full_row['friend_code_public'])) {
+            // Preserve friend_code_public unless it was explicitly submitted.
+            // This prevents unrelated profile forms from forcing public visibility.
+            $friend_code_public_provided = array_key_exists('friend_code_public', $profile);
+            if (!$friend_code_public_provided && isset($existing_full_row['friend_code_public'])) {
                 $data['friend_code_public'] = (int) $existing_full_row['friend_code_public'];
             }
         }

@@ -219,12 +219,28 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         ?>
         <div class="pokehub-collection-view-wrap me5rine-lab-dashboard" data-local="1" data-collection-slug="<?php echo esc_attr($slug); ?>" data-can-edit="1">
             <header class="me5rine-lab-dashboard-header pokehub-collection-view-header">
-                <a href="<?php echo esc_url(remove_query_arg(['collection', 'id', 'view', 'local'])); ?>" class="pokehub-collection-back">&larr; <?php esc_html_e('Back to collections', 'poke-hub'); ?></a>
+                <div class="pokehub-collection-view-header-left">
+                    <a href="<?php echo esc_url(remove_query_arg(['collection', 'id', 'view', 'local'])); ?>" class="pokehub-collection-back">← <?php esc_html_e('Back to collections', 'poke-hub'); ?></a>
+                </div>
                 <div class="pokehub-collection-view-header-main">
                     <h2 class="me5rine-lab-title-large pokehub-collection-view-title pokehub-collection-local-title"><?php esc_html_e('Loading…', 'poke-hub'); ?></h2>
+                    <div class="pokehub-collection-stats pokehub-collection-local-stats">—</div>
+                </div>
+                <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
+                    <div class="pokehub-collections-reset-inline" data-reset-context="local">
+                        <div class="pokehub-collections-reset-step pokehub-collections-reset-step-initial">
+                            <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button-secondary button" disabled><?php esc_html_e('Reset progress', 'poke-hub'); ?></button>
+                        </div>
+                        <div class="pokehub-collections-reset-step pokehub-collections-reset-step-confirm" hidden>
+                            <p class="me5rine-lab-form-hint pokehub-collections-reset-hint"><?php esc_html_e('All entries will be shown as missing. You can change them again anytime.', 'poke-hub'); ?></p>
+                            <div class="pokehub-collections-reset-confirm-row">
+                                <button type="button" class="pokehub-collections-btn-reset-apply me5rine-lab-form-button button button-primary"><?php esc_html_e('Clear progress', 'poke-hub'); ?></button>
+                                <button type="button" class="pokehub-collections-btn-reset-dismiss me5rine-lab-form-button-secondary button"><?php esc_html_e('Back', 'poke-hub'); ?></button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </header>
-            <div class="pokehub-collection-stats pokehub-collection-local-stats">—</div>
             <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-label="<?php esc_attr_e('Filter Pokémon by status in the grid', 'poke-hub'); ?>">
                 <div class="pokehub-collection-status-filters-inner">
                     <span class="me5rine-lab-form-label pokehub-collection-status-filters-heading"><?php esc_html_e('Show in grid', 'poke-hub'); ?></span>
@@ -270,7 +286,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         exit;
     }
 
-    $pool    = poke_hub_collections_get_pool($collection['category'], $collection['options']);
+    $pool     = poke_hub_collections_get_pool($collection['category'], $collection['options']);
     $category = $collection['category'];
     if (in_array($category, ['background', 'background_shiny', 'background_special', 'background_places', 'background_shiny_special', 'background_shiny_places'], true)) {
         $only_shiny_active = in_array($category, ['background_shiny', 'background_shiny_special', 'background_shiny_places'], true);
@@ -282,6 +298,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         unset($p);
     }
     $items   = poke_hub_collections_get_items((int) $collection['id']);
+    $gen_progress = $pool ? poke_hub_collections_get_generation_progress($pool, $items) : [];
     $can_edit = ($user_id > 0 && (int) $collection['user_id'] === $user_id)
         || ((int) $collection['user_id'] === 0 && !empty($collection['anonymous_ip']) && poke_hub_collections_get_client_ip() === $collection['anonymous_ip']);
 
@@ -305,24 +322,37 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
          data-edit-options="<?php echo esc_attr(wp_json_encode($opts)); ?>"
          data-edit-is-public="<?php echo !empty($collection['is_public']) ? '1' : '0'; ?>">
         <div class="me5rine-lab-dashboard-header pokehub-collection-view-header">
-            <a href="<?php echo esc_url($collections_base); ?>" class="pokehub-collection-back">&larr; <?php esc_html_e('Back to my collections', 'poke-hub'); ?></a>
-            <div class="pokehub-collection-view-header-main">
-                <h2 class="me5rine-lab-title-large pokehub-collection-view-title"><?php echo esc_html($collection['name']); ?></h2>
+            <div class="pokehub-collection-view-header-left">
+                <a href="<?php echo esc_url($collections_base); ?>" class="pokehub-collection-back">← <?php esc_html_e('Back to my collections', 'poke-hub'); ?></a>
             </div>
-            <?php if ($can_edit) : ?>
-            <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
-                <button type="button" class="pokehub-collections-btn-edit-settings me5rine-lab-form-button-secondary button"><?php esc_html_e('Settings', 'poke-hub'); ?></button>
-                <button type="button" class="pokehub-collections-btn-share me5rine-lab-form-button button"><?php esc_html_e('Share', 'poke-hub'); ?></button>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <div class="pokehub-collection-stats">
             <?php
             $owned = count(array_filter($items, function ($s) { return $s === 'owned'; }));
             $total = count($pool);
             ?>
-            <span class="pokehub-collection-progress"><?php echo (int) $owned; ?> / <?php echo (int) $total; ?></span>
+            <div class="pokehub-collection-view-header-main">
+                <h2 class="me5rine-lab-title-large pokehub-collection-view-title"><?php echo esc_html($collection['name']); ?></h2>
+                <div class="pokehub-collection-stats">
+                    <span class="pokehub-collection-progress"><?php echo (int) $owned; ?> / <?php echo (int) $total; ?></span>
+                </div>
+            </div>
+            <?php if ($can_edit) : ?>
+            <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
+                <button type="button" class="pokehub-collections-btn-edit-settings me5rine-lab-form-button-secondary button"><?php esc_html_e('Settings', 'poke-hub'); ?></button>
+                <div class="pokehub-collections-reset-inline" data-reset-context="server">
+                    <div class="pokehub-collections-reset-step pokehub-collections-reset-step-initial">
+                        <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button-secondary button"><?php esc_html_e('Reset progress', 'poke-hub'); ?></button>
+                    </div>
+                    <div class="pokehub-collections-reset-step pokehub-collections-reset-step-confirm" hidden>
+                        <p class="me5rine-lab-form-hint pokehub-collections-reset-hint"><?php esc_html_e('All entries will be shown as missing. You can change them again anytime.', 'poke-hub'); ?></p>
+                        <div class="pokehub-collections-reset-confirm-row">
+                            <button type="button" class="pokehub-collections-btn-reset-apply me5rine-lab-form-button button button-primary"><?php esc_html_e('Clear progress', 'poke-hub'); ?></button>
+                            <button type="button" class="pokehub-collections-btn-reset-dismiss me5rine-lab-form-button-secondary button"><?php esc_html_e('Back', 'poke-hub'); ?></button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="pokehub-collections-btn-share me5rine-lab-form-button button"><?php esc_html_e('Share', 'poke-hub'); ?></button>
+            </div>
+            <?php endif; ?>
         </div>
 
         <?php if ($total > 0) : ?>
@@ -375,9 +405,11 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         ?>
         <div class="pokehub-collection-tiles" data-pool="<?php echo esc_attr(wp_json_encode($pool)); ?>" data-items="<?php echo esc_attr(wp_json_encode($items)); ?>">
             <?php foreach ($pool_by_gen as $gen_key => $gen_pool) : ?>
-                <?php if ($gen_key !== '') : ?>
+                <?php
+                $g_prog = $gen_progress[ $gen_key ] ?? [ 'owned' => 0, 'total' => count($gen_pool) ];
+                if ($gen_key !== '') : ?>
                     <details class="pokehub-collection-generation-block me5rine-lab-form-block" data-generation="<?php echo esc_attr($gen_key); ?>" <?php echo $gens_collapsed ? '' : ' open'; ?>>
-                        <summary class="me5rine-lab-title-medium"><?php echo esc_html($gen_key); ?></summary>
+                        <summary class="me5rine-lab-title-medium"><?php echo esc_html($gen_key); ?> <span class="pokehub-collection-gen-progress">(<?php echo (int) $g_prog['owned']; ?> / <?php echo (int) $g_prog['total']; ?>)</span></summary>
                         <div class="pokehub-collection-generation-tiles">
                 <?php endif; ?>
                 <?php foreach ($gen_pool as $p) :
@@ -387,13 +419,19 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         ? poke_hub_pokemon_get_image_url((object) $p, ['shiny' => $is_shiny_collection])
                         : '';
                     $bg_url = isset($p['background_image_url']) ? trim((string) $p['background_image_url']) : '';
+                    $dex_n = isset($p['dex_number']) ? (int) $p['dex_number'] : 0;
                 ?>
                 <div class="pokehub-collection-tile" data-pokemon-id="<?php echo (int) $p['id']; ?>" data-status="<?php echo esc_attr($status); ?>" tabindex="0" role="button">
                     <div class="pokehub-collection-tile-figure">
                         <?php if ($bg_url) : ?><div class="pokehub-collection-tile-bg" style="background-image: url(<?php echo esc_url($bg_url); ?>);" aria-hidden="true"></div><?php endif; ?>
                         <?php if ($img_src) : ?><img src="<?php echo esc_url($img_src); ?>" alt="" loading="lazy" /><?php endif; ?>
                     </div>
-                    <span class="pokehub-collection-tile-name"><?php echo esc_html($p['name_fr'] ?: $p['name_en']); ?></span>
+                    <div class="pokehub-collection-tile-text">
+                        <?php if ($dex_n > 0) : ?>
+                        <span class="pokehub-collection-tile-dex" aria-label="<?php echo esc_attr(sprintf(/* translators: %d = National Pokédex number */ __('Pokédex #%d', 'poke-hub'), $dex_n)); ?>">#<?php echo (int) $dex_n; ?></span>
+                        <?php endif; ?>
+                        <span class="pokehub-collection-tile-name"><?php echo esc_html($p['name_fr'] ?: $p['name_en']); ?></span>
+                    </div>
                     <span class="pokehub-collection-tile-status pokehub-status-<?php echo esc_attr($status); ?>"></span>
                 </div>
                 <?php endforeach; ?>
