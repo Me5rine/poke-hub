@@ -28,21 +28,49 @@ add_action('rest_api_init', function () {
                 $category,
                 ['shiny', 'costume_shiny', 'background_shiny', 'background_shiny_special', 'background_shiny_places'],
                 true
-            );
+            ) || ($category === 'custom' && !empty($options['only_shiny']));
             if (function_exists('poke_hub_pokemon_get_image_url')) {
                 foreach ($pool as &$p) {
-                    $pokemon_obj = (object) $p;
-                    $p['image_url'] = poke_hub_pokemon_get_image_url($pokemon_obj, [
-                        'shiny' => $is_shiny_category,
-                    ]);
+                    if (function_exists('poke_hub_collections_get_image_sources_for_pool_row')) {
+                        $srcs = poke_hub_collections_get_image_sources_for_pool_row($p, $is_shiny_category);
+                        $p['image_url'] = (string) ($srcs['primary'] !== '' ? $srcs['primary'] : $srcs['fallback']);
+                        if ($srcs['primary'] !== '' && $srcs['fallback'] !== '' && $srcs['primary'] !== $srcs['fallback']) {
+                            $p['image_url_fallback'] = $srcs['fallback'];
+                        }
+                    } elseif (function_exists('poke_hub_collections_get_image_url_for_pool_row')) {
+                        $p['image_url'] = poke_hub_collections_get_image_url_for_pool_row($p, $is_shiny_category);
+                    } else {
+                        $p['image_url'] = poke_hub_pokemon_get_image_url((object) $p, [
+                            'shiny' => $is_shiny_category,
+                        ]);
+                    }
                 }
                 unset($p);
             }
 
-            if (in_array($category, ['background', 'background_shiny', 'background_special', 'background_places', 'background_shiny_special', 'background_shiny_places'], true) && function_exists('poke_hub_collections_get_background_image_url_for_pokemon')) {
+            if (in_array($category, ['background', 'background_shiny', 'background_special', 'background_places', 'background_shiny_special', 'background_shiny_places'], true)
+                && (function_exists('poke_hub_collections_get_background_image_url_for_pool_row') || function_exists('poke_hub_collections_get_background_image_url_for_pokemon'))) {
                 $only_shiny_active = in_array($category, ['background_shiny', 'background_shiny_special', 'background_shiny_places'], true);
                 foreach ($pool as &$p) {
-                    $p['background_image_url'] = poke_hub_collections_get_background_image_url_for_pokemon((int) $p['id'], $only_shiny_active);
+                    if ( ! empty( $p['synthetic_go_background'] ) && ! empty( $p['background_image_url'] ) ) {
+                        continue;
+                    }
+                    if ( function_exists( 'poke_hub_collections_get_background_image_url_for_pool_row' ) ) {
+                        $p['background_image_url'] = poke_hub_collections_get_background_image_url_for_pool_row( $p, $category, $only_shiny_active );
+                    } else {
+                        if ( ! empty( $p['synthetic_sex_base_id'] ) ) {
+                            $pid = (int) $p['synthetic_sex_base_id'];
+                        } elseif ( ! empty( $p['gigantamax_base_pokemon_id'] ) ) {
+                            $pid = (int) $p['gigantamax_base_pokemon_id'];
+                        } elseif ( ! empty( $p['dynamax_base_pokemon_id'] ) ) {
+                            $pid = (int) $p['dynamax_base_pokemon_id'];
+                        } elseif ( ! empty( $p['synthetic_go_background_link_pokemon_id'] ) ) {
+                            $pid = (int) $p['synthetic_go_background_link_pokemon_id'];
+                        } else {
+                            $pid = (int) $p['id'];
+                        }
+                        $p['background_image_url'] = poke_hub_collections_get_background_image_url_for_pokemon( $pid, $only_shiny_active, 'base' );
+                    }
                 }
                 unset($p);
             }

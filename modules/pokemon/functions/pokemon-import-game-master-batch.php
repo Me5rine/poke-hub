@@ -119,6 +119,13 @@ if ( ! function_exists( 'poke_hub_gm_queue_next' ) ) {
  */
 if ( ! function_exists( 'poke_hub_gm_start_batch_import' ) ) {
     function poke_hub_gm_start_batch_import( string $path, bool $force = false, array $options = [] ) : void {
+        $current_status = get_option( POKE_HUB_GM_IMPORT_STATUS_OPT, [] );
+        $current_status = is_array( $current_status ) ? $current_status : [];
+        $current_state  = (string) ( $current_status['state'] ?? '' );
+        if ( in_array( $current_state, [ 'queued', 'running' ], true ) ) {
+            // Évite de re-queue en boucle si un import est déjà marqué en cours.
+            return;
+        }
 
         // Reset éventuel ancien state pour éviter les "barres bloquées"
         poke_hub_gm_state_reset();
@@ -130,6 +137,7 @@ if ( ! function_exists( 'poke_hub_gm_start_batch_import' ) ) {
             'step'       => 'queued',
             'started_at' => current_time( 'mysql' ),
             'updated_at' => current_time( 'mysql' ),
+            'file_size'  => file_exists( $path ) ? (int) @filesize( $path ) : 0,
             'errors'     => [],
             'progress'   => [
                 'phase' => 'queued',
@@ -160,6 +168,41 @@ if ( ! function_exists( 'poke_hub_gm_start_batch_import' ) ) {
  */
 if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
     add_action( 'poke_hub_run_gm_import_batch', function( $arg1 = null ) {
+        $completed = false;
+        register_shutdown_function( static function () use ( &$completed ) : void {
+            if ( $completed ) {
+                return;
+            }
+            $last_error = error_get_last();
+            if ( ! is_array( $last_error ) ) {
+                return;
+            }
+            $fatal_types = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ];
+            if ( ! in_array( (int) ( $last_error['type'] ?? 0 ), $fatal_types, true ) ) {
+                return;
+            }
+
+            $msg = (string) ( $last_error['message'] ?? 'Fatal error during import' );
+            $state = poke_hub_gm_state_get();
+            if ( empty( $state['errors'] ) || ! is_array( $state['errors'] ) ) {
+                $state['errors'] = [];
+            }
+            $state['errors'][] = [
+                'time' => current_time( 'mysql' ),
+                'step' => $state['step'] ?? 'unknown',
+                'msg'  => 'Fatal: ' . $msg,
+            ];
+            $state['updated_at'] = current_time( 'mysql' );
+            $state['progress']   = [ 'phase' => 'error', 'pct' => 100 ];
+            poke_hub_gm_state_set( $state );
+
+            poke_hub_gm_status_set( [
+                'state'    => 'error',
+                'ended_at' => current_time( 'mysql' ),
+                'message'  => 'Fatal: ' . $msg,
+            ] );
+            poke_hub_gm_release_lock();
+        } );
 
         $args  = is_array( $arg1 ) ? $arg1 : [];
         $state = poke_hub_gm_state_get();
@@ -267,6 +310,7 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
             poke_hub_gm_state_set( $state );
 
             poke_hub_gm_progress( 'done', 100, 'Done' );
+            $completed = true;
 
         } catch ( Throwable $e ) {
             $state = poke_hub_gm_state_get();
@@ -296,6 +340,7 @@ if ( ! has_action( 'poke_hub_run_gm_import_batch' ) ) {
             ] );
 
             poke_hub_gm_progress( 'error', 100, 'Error: ' . $e->getMessage() );
+            $completed = true;
 
         } finally {
             poke_hub_gm_release_lock();
@@ -348,6 +393,28 @@ if ( ! has_action( 'wp_ajax_poke_hub_gm_status' ) ) {
             $status['message'] = 'Idle';
 
             update_option( POKE_HUB_GM_IMPORT_STATUS_OPT, $status, false );
+        }
+
+        // Watchdog : si aucun update depuis 10 min, on force l'état "error" pour casser la boucle UI.
+        if ( in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued' ], true ) && ! empty( $state['updated_at'] ) ) {
+            $last_ts = strtotime( (string) $state['updated_at'] );
+            if ( $last_ts > 0 && ( time() - $last_ts ) > 600 ) {
+                $status['state']   = 'error';
+                $status['message'] = 'Import timeout/stalled. Check PHP memory/time limits and retry.';
+                $state['progress'] = [ 'phase' => 'error', 'pct' => 100 ];
+                if ( empty( $state['errors'] ) || ! is_array( $state['errors'] ) ) {
+                    $state['errors'] = [];
+                }
+                $state['errors'][] = [
+                    'time' => current_time( 'mysql' ),
+                    'step' => $state['step'] ?? 'unknown',
+                    'msg'  => 'Watchdog: import appears stalled (>10 minutes without progress).',
+                ];
+                $state['updated_at'] = current_time( 'mysql' );
+                update_option( POKE_HUB_GM_IMPORT_STATUS_OPT, $status, false );
+                update_option( POKE_HUB_GM_BATCH_STATE_OPT, $state, false );
+                poke_hub_gm_release_lock();
+            }
         }
 
         wp_send_json_success( [

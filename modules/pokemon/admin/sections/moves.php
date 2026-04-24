@@ -342,7 +342,7 @@ class Poke_Hub_Pokemon_attacks_List_Table extends WP_List_Table {
     }
 
     /**
-     * Colonne Category : Fast / Charged (cliquable pour filtrer).
+     * Colonne Category : Fast / Charged / GMAX (cliquable pour filtrer).
      */
     public function column_category($item) {
         $category = isset($item->category) ? sanitize_key($item->category) : '';
@@ -357,6 +357,9 @@ class Poke_Hub_Pokemon_attacks_List_Table extends WP_List_Table {
                 break;
             case 'charged':
                 $label = __('Charged move', 'poke-hub');
+                break;
+            case 'gmax':
+                $label = __('GMAX move', 'poke-hub');
                 break;
             default:
                 $label = $category;
@@ -443,6 +446,9 @@ class Poke_Hub_Pokemon_attacks_List_Table extends WP_List_Table {
                 <option value="charged" <?php selected($current_category, 'charged'); ?>>
                     <?php esc_html_e('Charged moves', 'poke-hub'); ?>
                 </option>
+                <option value="gmax" <?php selected($current_category, 'gmax'); ?>>
+                    <?php esc_html_e('GMAX moves', 'poke-hub'); ?>
+                </option>
             </select>
 
             <?php submit_button(__('Filter'), '', 'filter_action', false); ?>
@@ -461,7 +467,7 @@ class Poke_Hub_Pokemon_attacks_List_Table extends WP_List_Table {
 
         check_admin_referer('bulk-pokemon_moves');
 
-        if (empty($_POST['ids']) || !is_array($_POST['ids'])) {
+        if (empty($_REQUEST['ids']) || !is_array($_REQUEST['ids'])) {
             return;
         }
 
@@ -473,7 +479,7 @@ class Poke_Hub_Pokemon_attacks_List_Table extends WP_List_Table {
         $table_attacks = pokehub_get_table('attacks');
         $table_stats   = pokehub_get_table('attack_stats');
 
-        $ids = array_map('intval', $_POST['ids']);
+        $ids = array_map('intval', $_REQUEST['ids']);
         $ids = array_filter($ids);
 
         if ($ids) {
@@ -846,8 +852,8 @@ function poke_hub_pokemon_handle_attacks_form() {
         : [];
     $category   = isset($_POST['category']) ? sanitize_key($_POST['category']) : '';
 
-    // Normalisation catégorie : on limite à fast / charged / vide
-    $allowed_categories = ['fast', 'charged'];
+    // Normalisation catégorie : on limite aux catégories supportées (ou vide)
+    $allowed_categories = ['fast', 'charged', 'gmax'];
     if (!in_array($category, $allowed_categories, true)) {
         $category = '';
     }
@@ -1244,7 +1250,7 @@ function poke_hub_pokemon_admin_attacks_screen() {
         }
     }
     ?>
-    <form method="post">
+    <form method="get">
         <input type="hidden" name="page" value="poke-hub-pokemon" />
         <input type="hidden" name="ph_section" value="moves" />
         <?php

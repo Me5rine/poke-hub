@@ -77,7 +77,8 @@ function poke_hub_admin_tools_page() {
         $result = null;
     }
 
-    $events_on = function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('events');
+    $events_on  = function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('events');
+    $pokemon_on = function_exists('poke_hub_is_module_active') && poke_hub_is_module_active('pokemon');
 
     $tab_defs = [
         'pokekalos' => [
@@ -95,6 +96,14 @@ function poke_hub_admin_tools_page() {
         'max-monday' => [
             'label' => __('Lundi Max (Fandom)', 'poke-hub'),
             'show'  => $events_on && function_exists('pokehub_render_max_monday_import_section'),
+        ],
+        'gamemaster' => [
+            'label' => __('Game Master', 'poke-hub'),
+            'show'  => $pokemon_on,
+        ],
+        'translation' => [
+            'label' => __('Translation', 'poke-hub'),
+            'show'  => $pokemon_on,
         ],
     ];
 
@@ -199,6 +208,28 @@ function poke_hub_admin_tools_page() {
                 ?>
             </div>
         <?php endif; ?>
+
+            <?php if ($pokemon_on) : ?>
+                <div id="pokehub-tools-panel-gamemaster" class="pokehub-tools-panel" style="<?php echo $current_tab !== 'gamemaster' ? 'display:none;' : ''; ?>">
+                    <?php
+                    $gm_tab_file = __DIR__ . '/settings/tabs/settings-tab-gamemaster.php';
+                    if (file_exists($gm_tab_file)) {
+                        require $gm_tab_file;
+                    }
+                    ?>
+                </div>
+                <div id="pokehub-tools-panel-translation" class="pokehub-tools-panel" style="<?php echo $current_tab !== 'translation' ? 'display:none;' : ''; ?>">
+                    <?php
+                    if (!defined('POKE_HUB_TRANSLATION_TAB_CONTEXT')) {
+                        define('POKE_HUB_TRANSLATION_TAB_CONTEXT', 'tools');
+                    }
+                    $tr_tab_file = __DIR__ . '/settings/tabs/settings-tab-translation.php';
+                    if (file_exists($tr_tab_file)) {
+                        require $tr_tab_file;
+                    }
+                    ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <?php if ($result !== null) : ?>

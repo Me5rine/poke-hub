@@ -2,6 +2,8 @@
 
 Le module **pokemon** est le plus large : taxonomies (types, régions, générations, …), fiches espèces / formes, import **Game Master**, images, **biomes**, outils admin et helpers partagés par le reste du plugin.
 
+L’**import Game Master** et l’onglet **Translation** (données multilingues Pokémon) sont sous **Poké HUB → Temporary tools** — voir [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md).
+
 Ce **README** regroupe les liens vers les guides déjà rédigés dans `docs/pokemon/`.
 
 ## Pages de documentation
@@ -9,7 +11,7 @@ Ce **README** regroupe les liens vers les guides déjà rédigés dans `docs/pok
 | Document | Contenu principal |
 |----------|-------------------|
 | [BIOMES.md](./BIOMES.md) | Biomes GO : tables, admin, fiche Pokémon, helpers |
-| [DATA_SAFETY.md](./DATA_SAFETY.md) | Import GM, non-écrasement des données, règles de fusion |
+| [DATA_SAFETY.md](./DATA_SAFETY.md) | Import GM, non-écrasement des données, règles de fusion, heuristique **génération ↔ dex** (ex. G9 : 906–1026) |
 | [README-REGIONAL-AUTO-CONFIG.md](./README-REGIONAL-AUTO-CONFIG.md) | Configuration auto des Pokémon régionaux |
 | [POKEKALOS_RELEASE_DATES.md](./POKEKALOS_RELEASE_DATES.md) | Import dates de sortie (admin *Temporary tools* / CLI) |
 

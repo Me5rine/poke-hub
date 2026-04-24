@@ -8,36 +8,40 @@ Le plugin utilise le mot **« catégorie »** à deux endroits différents. Ce n
 
 **Où :** Poké HUB → Pokémon → **Formes**  
 **Table :** `pokemon_form_variants`  
-**Champ :** `category` — sélectionné via un **menu déroulant** en admin (plus de champ texte libre).
+**Champ :** `category` — libellé admin **« Form type »** (type logique de la forme), sélectionné via un **menu déroulant** (plus de champ texte libre, plus de **parent form** : le typage passe entièrement par cette valeur).
 
 Les **formes** sont des variantes globales (un registre partagé). Chaque forme a :
 - un **form_slug** (ex. `armored`, `fall-2019`, `halloween_2020`),
 - un **label** (nom affiché),
-- une **category** (type logique de la forme), choisie dans la liste ci‑dessous.
+- une **category** (type de forme), choisie dans la liste ci‑dessous ; l’**import Game Master** propose une valeur initiale (`poke_hub_pokemon_guess_form_type_from_gm`) que vous pouvez affiner à la main.
+- des **noms FR / EN** optionnels dans **`extra.names`** (`fr`, `en`) — saisis dans l’admin **Formes** ; le **label** sert de repli si une langue manque. Ces noms alimentent notamment les **préfixes** des phrases de recherche Pokémon GO du module Collections (`pogo_group_prefix_fr` / `pogo_group_prefix_en` sur le pool), selon la langue choisie par l’utilisateur sur le bloc GO. Voir **docs/COLLECTIONS_MODULE.md** (*Phrases GO : données serveur et langue*).
 
-### Valeurs de catégorie (menu déroulant)
+### Valeurs de type de forme (menu déroulant)
 
-| Valeur (slug) | Libellé affiché      |
-|---------------|----------------------|
-| `normal`      | Normal               |
-| `costume`     | Costume / Event      |
-| `clone`       | Clone                |
-| `regional`    | Regional             |
-| `shadow`      | Shadow               |
-| `purified`    | Purified             |
-| `mega`        | Mega                 |
-| `alola`       | Alola                |
-| `galar`       | Galar                |
-| `hisui`       | Hisui                |
-| `paldea`      | Paldea               |
+Aligné sur `modules/pokemon/admin/forms/form-form.php` (libellés en anglais dans le code, traduits à l’affichage) :
 
-Si une forme en base a une catégorie qui n’est pas dans cette liste (données anciennes), le formulaire affiche une option **« Other: &lt;valeur&gt; »**. En choisissant une catégorie standard (ex. **Costume / Event**) et en enregistrant, la valeur est migrée.
+| Valeur (slug)   | Rôle (résumé) |
+|-----------------|---------------|
+| `default`       | Forme standard / non classée ailleurs |
+| `regional`    | Variante régionale (Alola, Galar, Hisui, Paldea…) |
+| `fusion`        | Fusion (autre Pokémon requis) |
+| `switch_form`   | Changement de forme via inventaire (bonbons, poussière, objet, attaques…) |
+| `switch_battle` | Changement de forme en combat |
+| `costume`       | Costume / événement |
+| `clone`         | Clone |
+| `mega`          | Méga / Primo |
+| `visual`        | Forme surtout visuelle (motifs, Prismillon, Zarbi…) |
+| `special`       | Forme spéciale (stats différentes sans logique inventaire ci-dessus) |
+| `shadow`        | Obscur |
+| `purified`      | Purifié |
 
-**Costume / Event :** si vous choisissez cette catégorie pour une forme, tout Pokémon utilisant cette forme est considéré comme costumé/événement *via la forme* (sans avoir à cocher la case sur chaque fiche Pokémon).
+Si une forme en base a une valeur **hors liste** (données anciennes, ex. `normal`, `alola`, `galar`), le formulaire affiche une option **« Other: &lt;valeur&gt; »**. En choisissant un type standard et en enregistrant, la valeur est migrée.
+
+**Costume / event :** si vous choisissez ce type pour une forme, tout Pokémon utilisant cette forme est considéré comme costumé/événement *via la forme* (sans avoir à cocher la case sur chaque fiche Pokémon).
 
 En édition d’un **Pokémon** (fiche individuelle), vous assignez une **Forme / variant** (form_variant_id). Si cette forme a `category = 'costume'`, le Pokémon est considéré comme costumé *via la forme*. La case **« Event or costumed »** peut en plus être cochée manuellement sur la fiche ; le plugin considère qu’un Pokémon est costumé si au moins l’un des deux est vrai (forme costume ou case cochée).
 
-**En résumé :** la catégorie des formes sert à **typer la forme** (costume, normal, méga…). Les Pokémon qui utilisent une forme avec `category = 'costume'` sont donc des Pokémon costumés.
+**En résumé :** le **type de forme** sert à **classer la variante** (costume, fusion, changement inventaire, méga, etc.). Les Pokémon qui utilisent une forme avec `category = 'costume'` sont donc des Pokémon costumés.
 
 ### Association Pokémon ↔ événements
 
@@ -67,7 +71,9 @@ Quand vous créez une collection, vous choisissez une **catégorie de collection
 
 **En résumé :** la catégorie de **collection** sert à choisir **le type de collection** (ce qu’on collectionne). Le module s’en sert pour construire le **pool** (liste des Pokémon affichés) avec les bons filtres (formes, fonds, etc.).
 
-**Catégories « spécifiques »** : pour certaines catégories (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds…), la collection n’affiche **que** ce type. Les options « inclure Méga / Gigantamax / Dynamax / costumes » ne sont pas proposées (paramètres adaptatifs). Détails dans **docs/COLLECTIONS_MODULE.md** (sections *Catégories spécifiques* et *Statuts d’une entrée* ; vue grille, filtre **Afficher dans la grille**, légende des tuiles).
+**Catégories « spécifiques »** : pour certaines catégories (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds…), la collection n’affiche **que** ce type. Les options « inclure Méga / Gigantamax / Dynamax / costumes » ne sont pas proposées (paramètres adaptatifs). Détails dans **docs/COLLECTIONS_MODULE.md** (sections *Catégories spécifiques*, *Options de composition* — genre / symboles / doublon mâle-femelle collectionneur — *Statuts d’une entrée*, phrases GO ; vue grille, filtre **Afficher dans la grille**, légende des tuiles).
+
+**Options masquées par type de liste** : pour d’autres catégories (ex. liste préparamétrée Légendaire / Fabuleux / Ultra-chimères), certaines cases ou options de select sont retirées de l’UI car elles ne s’appliquent pas au pool. Référence : **docs/COLLECTIONS_MODULE.md** (*Options masquées par catégorie (UI)*), helpers `poke_hub_collections_settings_hidden_control_keys*`, attribut `data-collections-control`.
 
 ---
 

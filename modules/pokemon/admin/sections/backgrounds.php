@@ -277,7 +277,7 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
 
         check_admin_referer('bulk-pokemon_backgrounds');
 
-        if (empty($_POST['ids']) || !is_array($_POST['ids'])) {
+        if (empty($_REQUEST['ids']) || !is_array($_REQUEST['ids'])) {
             return;
         }
 
@@ -286,7 +286,7 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
         $links_table = pokehub_get_table('pokemon_background_pokemon_links');
         $events_table = pokehub_get_table('pokemon_background_events');
 
-        $ids = array_map('intval', $_POST['ids']);
+        $ids = array_map('intval', $_REQUEST['ids']);
         $ids = array_filter($ids);
 
         if (!$ids) {
@@ -419,6 +419,10 @@ function poke_hub_pokemon_handle_backgrounds_form() {
         return;
     }
 
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['pokemon'], ['skip_allow_filter' => true, 'try_require_db_class' => true]);
+    }
+
     global $wpdb;
     $table = pokehub_get_table('pokemon_backgrounds');
     $links_table = pokehub_get_table('pokemon_background_pokemon_links');
@@ -443,14 +447,34 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     $event_links = isset($_POST['event_links']) && is_array($_POST['event_links'])
         ? $_POST['event_links']
         : [];
-    $pokemon_ids_shiny_active = isset($_POST['pokemon_ids_shiny_active']) && is_array($_POST['pokemon_ids_shiny_active'])
-        ? array_map('intval', $_POST['pokemon_ids_shiny_active'])
-        : [];
-    $shiny_locked_ids = isset($_POST['shiny_locked_ids']) && is_array($_POST['shiny_locked_ids'])
-        ? array_map('intval', $_POST['shiny_locked_ids'])
-        : [];
-    // Union des deux listes (exclusives en UI) ; en cas de doublon on considère shiny lock
-    $pokemon_ids = array_values(array_unique(array_merge($pokemon_ids_shiny_active, $shiny_locked_ids)));
+    $read_post_id_list = static function ( string $key ): array {
+        if ( ! isset( $_POST[ $key ] ) ) {
+            return [];
+        }
+        $raw = wp_unslash( $_POST[ $key ] );
+        if ( is_array( $raw ) ) {
+            return array_values( array_filter( array_map( 'intval', $raw ), static function ( int $x ): bool {
+                return $x > 0;
+            } ) );
+        }
+        if ( is_string( $raw ) && $raw !== '' ) {
+            $id = (int) $raw;
+
+            return $id > 0 ? [ $id ] : [];
+        }
+        if ( is_int( $raw ) || is_float( $raw ) ) {
+            $id = (int) $raw;
+
+            return $id > 0 ? [ $id ] : [];
+        }
+
+        return [];
+    };
+    $pokemon_ids_shiny_active = $read_post_id_list( 'pokemon_ids_shiny_active' );
+    $shiny_locked_ids         = $read_post_id_list( 'shiny_locked_ids' );
+    $pokemon_ids_shadow       = $read_post_id_list( 'pokemon_ids_shadow' );
+    $pokemon_ids_dynamax      = $read_post_id_list( 'pokemon_ids_dynamax' );
+    $pokemon_ids_gigantamax   = $read_post_id_list( 'pokemon_ids_gigantamax' );
 
     // Validation
     if ($title === '') {
@@ -501,22 +525,15 @@ function poke_hub_pokemon_handle_backgrounds_form() {
             }
         }
 
-        // Insérer les liens Pokémon : shiny actif (0) ou shiny lock (1)
-        if ($background_id > 0 && !empty($pokemon_ids)) {
-            foreach ($pokemon_ids as $pokemon_id) {
-                if ($pokemon_id > 0) {
-                    $is_shiny_locked = in_array($pokemon_id, $shiny_locked_ids, true) ? 1 : 0;
-                    $wpdb->insert(
-                        $links_table,
-                        [
-                            'background_id'   => $background_id,
-                            'pokemon_id'      => $pokemon_id,
-                            'is_shiny_locked' => $is_shiny_locked,
-                        ],
-                        ['%d', '%d', '%d']
-                    );
-                }
-            }
+        if ( $background_id > 0 && function_exists( 'poke_hub_save_background_pokemon_links' ) ) {
+            poke_hub_save_background_pokemon_links(
+                $background_id,
+                $pokemon_ids_shiny_active,
+                $shiny_locked_ids,
+                $pokemon_ids_shadow,
+                $pokemon_ids_dynamax,
+                $pokemon_ids_gigantamax
+            );
         }
 
         wp_safe_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
@@ -551,23 +568,15 @@ function poke_hub_pokemon_handle_backgrounds_form() {
         }
     }
 
-    // Mettre à jour les liens Pokémon : shiny actif (0) ou shiny lock (1)
-    $wpdb->delete($links_table, ['background_id' => $id], ['%d']);
-    if (!empty($pokemon_ids)) {
-        foreach ($pokemon_ids as $pokemon_id) {
-            if ($pokemon_id > 0) {
-                $is_shiny_locked = in_array($pokemon_id, $shiny_locked_ids, true) ? 1 : 0;
-                $wpdb->insert(
-                    $links_table,
-                    [
-                        'background_id'   => $id,
-                        'pokemon_id'      => $pokemon_id,
-                        'is_shiny_locked' => $is_shiny_locked,
-                    ],
-                    ['%d', '%d', '%d']
-                );
-            }
-        }
+    if ( function_exists( 'poke_hub_save_background_pokemon_links' ) ) {
+        poke_hub_save_background_pokemon_links(
+            $id,
+            $pokemon_ids_shiny_active,
+            $shiny_locked_ids,
+            $pokemon_ids_shadow,
+            $pokemon_ids_dynamax,
+            $pokemon_ids_gigantamax
+        );
     }
 
     wp_safe_redirect(add_query_arg('ph_msg', 'updated', $redirect_base));
@@ -660,7 +669,7 @@ function poke_hub_pokemon_admin_backgrounds_screen() {
         }
     }
     ?>
-    <form method="post">
+    <form method="get">
         <input type="hidden" name="page" value="poke-hub-pokemon" />
         <input type="hidden" name="ph_section" value="backgrounds" />
         <?php

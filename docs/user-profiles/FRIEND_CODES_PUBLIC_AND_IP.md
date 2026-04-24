@@ -45,6 +45,22 @@ Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_
 - Si le profil a **déjà un code ami** enregistré, le titre et le bouton du formulaire affichent **« Update My Friend Code »** (traduisible) au lieu de **« Add My Friend Code »**.
 - L’IP du profil peut être mise à jour depuis le front si l’IP détectée diffère de la dernière valeur stockée.
 
+## Visibilité du code ami sur les listes publiques (`friend_code_public`)
+
+- **Colonne** : `user_profiles.friend_code_public` (0 = privé, 1 = public). Les soumissions depuis les pages **codes amis / Vivillon** mettent le code en **public** (comportement attendu pour ces formulaires).
+- **Listes** `[poke_hub_friend_codes]` et `[poke_hub_vivillon]` : la requête passe par `poke_hub_get_public_friend_codes()` qui n’affiche que les lignes **publiques** (valeur `1` ; les anciennes lignes avec `NULL` restent affichées pour compatibilité) et exclut les codes **masqués** après signalements (`friend_code_hidden`), lorsque ces colonnes existent.
+- **Profil membre** (shortcode `[poke_hub_user_profile]` et onglet UM `modules/user-profiles/templates/um-user-pokehub-profile.php`) : case à cocher du type *afficher mon code ami publiquement sur mon profil* — si elle est **décochée**, le code ne doit **pas** apparaître sur les listes publiques (ni en lecture seule sur le profil des autres visiteurs, selon le rendu du template).
+- **Admin** Poké HUB → User Profiles : champ **Friend Code Visibility** sur la fiche d’édition ; même règle pour l’inclusion dans les listes.
+
+### Durcissement des formulaires (`friend_code_public_present`)
+
+Pour éviter qu’un formulaire **incomplet** (thème surchargé, copie de template obsolète) n’envoie une sauvegarde **sans** intention explicite sur la visibilité :
+
+- Les formulaires fournis par le plugin envoient un champ caché **`friend_code_public_present`** avec la case `friend_code_public`.
+- **`poke_hub_save_user_profile()`** ne met à jour `friend_code_public` que lorsque cette intention est présente dans les données soumises ; sinon la valeur **déjà en base** est conservée sur une ligne existante (évite de repasser un profil privé en public par erreur).
+
+Si vous **personnalisez** un template de formulaire profil, reproduisez ce couple (champ caché + checkbox) ou n’incluez pas `friend_code_public` dans le tableau passé à `poke_hub_save_user_profile()` pour laisser la valeur existante inchangée.
+
 ## Drapeaux pays (selects + tuiles)
 
 - Les options pays injectent un attribut `data-icon="..."` quand une URL de drapeau est disponible.
@@ -71,7 +87,7 @@ Ce document décrit le comportement du formulaire public (shortcodes `[poke_hub_
 
 ## Fichiers principaux
 
-- Logique d’ajout / mise à jour : `modules/user-profiles/functions/user-profiles-friend-codes-helpers.php`
+- Logique d’ajout / mise à jour : `modules/user-profiles/functions/user-profiles-friend-codes-helpers.php` (dont `poke_hub_get_public_friend_codes()`)
 - Sauvegarde profil + IP : `modules/user-profiles/functions/user-profiles-helpers.php` (`poke_hub_save_user_profile`)
 - Formulaire : `modules/user-profiles/public/user-profiles-friend-codes-form.php`
 - Shortcodes : `user-profiles-friend-codes-shortcode.php`, `user-profiles-vivillon-shortcode.php`

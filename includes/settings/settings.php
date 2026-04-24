@@ -173,25 +173,13 @@ function poke_hub_settings_ui() {
     }
 
     $events_enabled  = in_array('events', $active_modules, true);
-    $pokemon_enabled = in_array('pokemon', $active_modules, true);
 
     // Onglet Sources toujours visible (sources image et préfixe Pokémon disponibles à l'activation)
     $sources_enabled     = true;
-    // Onglet Game Master visible seulement si le module Pokémon est actif
-    $gamemaster_enabled  = $pokemon_enabled;
-    // Onglet Translation visible si le module Pokémon est actif
-    $translation_enabled = $pokemon_enabled;
-
     // Liste des onglets autorisés
     $allowed_tabs = ['general'];
     if ($sources_enabled) {
         $allowed_tabs[] = 'sources';
-    }
-    if ($gamemaster_enabled) {
-        $allowed_tabs[] = 'gamemaster';
-    }
-    if ($translation_enabled) {
-        $allowed_tabs[] = 'translation';
     }
 
     // Si on demande un onglet non autorisé (ex: désactivation de pokemon
@@ -217,18 +205,6 @@ function poke_hub_settings_ui() {
                 . esc_html__('Sources', 'poke-hub') . '</a>';
     }
 
-    // Onglet Game Master (si Pokémon actif)
-    if ($gamemaster_enabled) {
-        echo '<a href="?page=poke-hub-settings&tab=gamemaster" class="nav-tab ' . ($active_tab === 'gamemaster' ? 'nav-tab-active' : '') . '">'
-                . esc_html__('Game Master', 'poke-hub') . '</a>';
-    }
-
-    // Onglet Translation (si module Pokémon actif)
-    if ($translation_enabled) {
-        echo '<a href="?page=poke-hub-settings&tab=translation" class="nav-tab ' . ($active_tab === 'translation' ? 'nav-tab-active' : '') . '">'
-                . esc_html__('Translation', 'poke-hub') . '</a>';
-    }
-
     echo '</nav>';
 
     // Inclusion des onglets
@@ -238,10 +214,6 @@ function poke_hub_settings_ui() {
         include $tabs_dir . 'settings-tab-general.php';
     } elseif ($active_tab === 'sources') {
         include $tabs_dir . 'settings-tab-sources.php';
-    } elseif ($active_tab === 'gamemaster') {
-        include $tabs_dir . 'settings-tab-gamemaster.php';
-    } elseif ($active_tab === 'translation') {
-        include $tabs_dir . 'settings-tab-translation.php';
     }
 
     echo '</div>';
@@ -255,6 +227,26 @@ add_action( 'wp_ajax_poke_hub_gm_status', function () {
 
     $status = get_option( 'poke_hub_gm_import_status', [] );
     $state  = get_option( 'poke_hub_gm_batch_state', [] );
+
+    if ( in_array( (string) ( $status['state'] ?? '' ), [ 'running', 'queued' ], true ) && ! empty( $state['updated_at'] ) ) {
+        $last_ts = strtotime( (string) $state['updated_at'] );
+        if ( $last_ts > 0 && ( time() - $last_ts ) > 600 ) {
+            $status['state']   = 'error';
+            $status['message'] = 'Import timeout/stalled. Check PHP memory/time limits and retry.';
+            $state['progress'] = [ 'phase' => 'error', 'pct' => 100 ];
+            if ( empty( $state['errors'] ) || ! is_array( $state['errors'] ) ) {
+                $state['errors'] = [];
+            }
+            $state['errors'][] = [
+                'time' => current_time( 'mysql' ),
+                'step' => $state['step'] ?? 'unknown',
+                'msg'  => 'Watchdog: import appears stalled (>10 minutes without progress).',
+            ];
+            $state['updated_at'] = current_time( 'mysql' );
+            update_option( 'poke_hub_gm_import_status', $status, false );
+            update_option( 'poke_hub_gm_batch_state', $state, false );
+        }
+    }
 
     wp_send_json_success( [
         'status' => $status,

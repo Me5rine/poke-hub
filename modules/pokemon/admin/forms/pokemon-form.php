@@ -227,12 +227,25 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     // Note: We read regional data from pokemon_regional_mappings table, not from extra['regional']
     // extra['regional'] only contains is_regional, description, and map_image_id
     $regional = is_array($extra['regional'] ?? null) ? $extra['regional'] : [];
+    $form_change_rules = is_array($extra['form_change_rules'] ?? null) ? $extra['form_change_rules'] : [];
 
     // Pokémon d'événement ou costumé : depuis extra ou dérivé de la forme (category = costume)
     $is_event_costumed = !empty($extra['is_event_costumed']);
+    $has_gmax_form     = !empty($extra['has_gmax_form']);
 
-    // Espèce classée « bébé » (collections, règles communes) — `extra.is_baby`
+    // `extra.is_baby` + `extra.species_special_group` : une seule liste en admin (name species_kind)
     $is_baby = !empty($extra['is_baby']);
+    $species_special_allowed = ['', 'legendary', 'mythical', 'ultra_beast'];
+    $species_special_group   = isset($extra['species_special_group']) ? sanitize_key((string) $extra['species_special_group']) : '';
+    if (!in_array($species_special_group, $species_special_allowed, true)) {
+        $species_special_group = '';
+    }
+    $species_kind = 'standard';
+    if ($is_baby) {
+        $species_kind = 'baby';
+    } elseif ($species_special_group !== '') {
+        $species_kind = $species_special_group;
+    }
 
     // ================================
     // Listes de référence
@@ -267,7 +280,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             $display = $fv->label !== '' ? $fv->label : $fv->form_slug;
 
             $meta = [];
-            if (!empty($fv->category) && $fv->category !== 'normal') {
+            if (!empty($fv->category) && !in_array((string) $fv->category, ['normal', 'default'], true)) {
                 $meta[] = $fv->category;
             }
             if (!empty($fv->group)) {
@@ -280,7 +293,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             $form_variant_labels[$fv->id] = [
                 'label'     => $display,
                 'form_slug' => $fv->form_slug,
-                'category'  => isset($fv->category) ? (string) $fv->category : 'normal',
+                'category'  => isset($fv->category) ? (string) $fv->category : 'default',
             ];
         }
     }
@@ -304,6 +317,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
 
     $all_fast_moves    = [];
     $all_charged_moves = [];
+    $all_gmax_moves    = [];
 
     if ($attacks_table && $attack_stats_table) {
         $rows = $wpdb->get_results("
@@ -343,6 +357,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 case 'charged':
                     $all_charged_moves[] = $entry;
                     break;
+                case 'gmax':
+                    $all_gmax_moves[] = $entry;
+                    break;
                 default:
                     // Autres catégories ignorées pour ce formulaire
                     break;
@@ -353,6 +370,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     // Attaques déjà liées à ce Pokémon (helper basé sur pokemon_attack_links)
     $current_fast_moves    = [];
     $current_charged_moves = [];
+    $current_gmax_moves    = [];
 
     if ($is_edit && function_exists('poke_hub_pokemon_get_pokemon_attacks')) {
         $attacks_data = poke_hub_pokemon_get_pokemon_attacks((int) $edit_row->id);
@@ -363,12 +381,19 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             if (!empty($attacks_data['charged']) && is_array($attacks_data['charged'])) {
                 $current_charged_moves = $attacks_data['charged'];
             }
+            if (!empty($attacks_data['gmax']) && is_array($attacks_data['gmax'])) {
+                $current_gmax_moves = $attacks_data['gmax'];
+            }
         }
+    }
+    if (!empty($current_gmax_moves)) {
+        $has_gmax_form = true;
     }
 
     // Index de départ pour JS
     $fast_index    = 0;
     $charged_index = 0;
+    $gmax_index    = 0;
 
     // ================================
     // Evolutions (si en édition)
@@ -554,11 +579,15 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
                 <div class="admin-lab-form-col">
                     <div class="admin-lab-form-group">
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="is_baby" value="1" <?php checked($is_baby); ?> />
-                            <span><?php esc_html_e('Baby Pokémon', 'poke-hub'); ?></span>
-                        </label>
-                        <p class="description"><?php esc_html_e('Used e.g. for collection rules (include/exclude baby species).', 'poke-hub'); ?></p>
+                        <label for="species_kind"><?php esc_html_e('Species kind (Dex)', 'poke-hub'); ?></label>
+                        <select name="species_kind" id="species_kind" style="max-width: 260px;">
+                            <option value="standard" <?php selected($species_kind, 'standard'); ?>><?php esc_html_e('Standard', 'poke-hub'); ?></option>
+                            <option value="baby" <?php selected($species_kind, 'baby'); ?>><?php esc_html_e('Baby', 'poke-hub'); ?></option>
+                            <option value="legendary" <?php selected($species_kind, 'legendary'); ?>><?php esc_html_e('Legendary', 'poke-hub'); ?></option>
+                            <option value="mythical" <?php selected($species_kind, 'mythical'); ?>><?php esc_html_e('Mythical', 'poke-hub'); ?></option>
+                            <option value="ultra_beast" <?php selected($species_kind, 'ultra_beast'); ?>><?php esc_html_e('Ultra Beast', 'poke-hub'); ?></option>
+                        </select>
+                        <p class="description"><?php esc_html_e('Used for collection rules and filtering (one category per species).', 'poke-hub'); ?></p>
                     </div>
                 </div>
                 <div class="admin-lab-form-col">
@@ -574,6 +603,15 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             </label>
                             <p class="description"><?php esc_html_e('Optional: check for event/costumed variant if the form category is not "Costume / Event".', 'poke-hub'); ?></p>
                         <?php endif; ?>
+                    </div>
+                </div>
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="has_gmax_form" value="1" <?php checked($has_gmax_form); ?> />
+                            <span><?php esc_html_e('Has Gigantamax form', 'poke-hub'); ?></span>
+                        </label>
+                        <p class="description"><?php esc_html_e('Auto-detected via Game Master mappings; editable manually if needed.', 'poke-hub'); ?></p>
                     </div>
                 </div>
             </div>
@@ -684,62 +722,40 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             <div class="pokehub-pokemon-sprite-preview-grid" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
                 <?php
                 $preview_cells = [];
-                $resolve_preview_sources = static function ($pokemon_obj, array $args = []) {
-                    if (function_exists('poke_hub_pokemon_get_image_sources')) {
-                        $srcs = poke_hub_pokemon_get_image_sources($pokemon_obj, $args);
-                        $primary = trim((string) ($srcs['primary'] ?? ''));
-                        $fallback = trim((string) ($srcs['fallback'] ?? ''));
-                        $src = $primary !== '' ? $primary : $fallback;
-                        return [
-                            'src'      => $src,
-                            'primary'  => $primary,
-                            'fallback' => $fallback,
-                        ];
-                    }
-
-                    $url = function_exists('poke_hub_pokemon_get_image_url')
-                        ? trim((string) poke_hub_pokemon_get_image_url($pokemon_obj, $args))
-                        : '';
-                    return [
-                        'src'      => $url,
-                        'primary'  => $url,
-                        'fallback' => '',
-                    ];
-                };
 
                 if ($has_gender_dimorphism) {
-                    $src_normal_male = $resolve_preview_sources($preview_pokemon, ['shiny' => false, 'gender' => 'male']);
+                    $src_normal_male = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Normal (male)', 'poke-hub'),
                         'src'   => $src_normal_male['src'],
                         'fallback' => $src_normal_male['fallback'],
                     ];
-                    $src_normal_female = $resolve_preview_sources($preview_pokemon, ['shiny' => false, 'gender' => 'female']);
+                    $src_normal_female = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Normal (female)', 'poke-hub'),
                         'src'   => $src_normal_female['src'],
                         'fallback' => $src_normal_female['fallback'],
                     ];
-                    $src_shiny_male = $resolve_preview_sources($preview_pokemon, ['shiny' => true, 'gender' => 'male']);
+                    $src_shiny_male = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => true, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Shiny (male)', 'poke-hub'),
                         'src'   => $src_shiny_male['src'],
                         'fallback' => $src_shiny_male['fallback'],
                     ];
-                    $src_shiny_female = $resolve_preview_sources($preview_pokemon, ['shiny' => true, 'gender' => 'female']);
+                    $src_shiny_female = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => true, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Shiny (female)', 'poke-hub'),
                         'src'   => $src_shiny_female['src'],
                         'fallback' => $src_shiny_female['fallback'],
                     ];
                 } else {
-                    $src_normal = $resolve_preview_sources($preview_pokemon, ['shiny' => false]);
+                    $src_normal = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false]);
                     $preview_cells[] = [
                         'label' => __('Normal', 'poke-hub'),
                         'src'   => $src_normal['src'],
                         'fallback' => $src_normal['fallback'],
                     ];
-                    $src_shiny = $resolve_preview_sources($preview_pokemon, ['shiny' => true]);
+                    $src_shiny = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => true]);
                     $preview_cells[] = [
                         'label' => __('Shiny', 'poke-hub'),
                         'src'   => $src_shiny['src'],
@@ -758,9 +774,12 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             height="96"
                             style="width:96px;height:96px;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;"
                             loading="lazy"
-                            <?php if (!empty($cell['fallback']) && $cell['fallback'] !== $cell['src']) : ?>
-                                onerror="this.onerror=null;this.src='<?php echo esc_js($cell['fallback']); ?>';"
-                            <?php endif; ?>
+                            <?php
+                            if (function_exists('poke_hub_pokemon_get_sprite_image_fallback_attr_html')) {
+                                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- attributs échappés dans le helper
+                                echo poke_hub_pokemon_get_sprite_image_fallback_attr_html($cell['src'], $cell['fallback']);
+                            }
+                            ?>
                         />
                     <?php else : ?>
                         <p class="description" style="margin:0;"><?php esc_html_e('No asset base URL configured.', 'poke-hub'); ?></p>
@@ -1298,6 +1317,75 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </div>
         </div>
 
+        <?php if (!empty($form_change_rules)) : ?>
+        <div class="admin-lab-form-section" style="margin-top:14px;">
+            <h2><?php esc_html_e('Form change rules (Game Master)', 'poke-hub'); ?></h2>
+            <p class="description">
+                <?php esc_html_e('Auto-imported conditions for form changes. These values come from Game Master and are read-only in this screen.', 'poke-hub'); ?>
+            </p>
+            <table class="widefat striped" style="max-width:1100px;">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Target form(s)', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Candy', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Stardust', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Item', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Item qty', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Quest requirement', 'poke-hub'); ?></th>
+                        <th><?php esc_html_e('Required moves', 'poke-hub'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($form_change_rules as $rule) : ?>
+                        <?php
+                        if (!is_array($rule)) {
+                            continue;
+                        }
+                        $target_forms = [];
+                        if (!empty($rule['available_form']) && is_array($rule['available_form'])) {
+                            foreach ($rule['available_form'] as $af) {
+                                $af = trim((string) $af);
+                                if ($af !== '') {
+                                    $target_forms[] = $af;
+                                }
+                            }
+                        }
+                        $required_moves = [];
+                        if (!empty($rule['required_cinematic_moves']) && is_array($rule['required_cinematic_moves'])) {
+                            foreach ($rule['required_cinematic_moves'] as $reqRow) {
+                                if (!is_array($reqRow) || empty($reqRow['requiredMoves']) || !is_array($reqRow['requiredMoves'])) {
+                                    continue;
+                                }
+                                foreach ($reqRow['requiredMoves'] as $mv) {
+                                    $mv = trim((string) $mv);
+                                    if ($mv !== '') {
+                                        $required_moves[] = $mv;
+                                    }
+                                }
+                            }
+                        }
+                        $required_moves = array_values(array_unique($required_moves));
+                        $candy_cost = isset($rule['candy_cost']) ? (int) $rule['candy_cost'] : 0;
+                        $stardust_cost = isset($rule['stardust_cost']) ? (int) $rule['stardust_cost'] : 0;
+                        $item = isset($rule['item']) ? (string) $rule['item'] : '';
+                        $item_qty = isset($rule['item_cost_count']) ? (int) $rule['item_cost_count'] : 0;
+                        $quest_requirement = isset($rule['quest_requirement']) ? (string) $rule['quest_requirement'] : '';
+                        ?>
+                        <tr>
+                            <td><code><?php echo esc_html(!empty($target_forms) ? implode(', ', $target_forms) : '—'); ?></code></td>
+                            <td><?php echo $candy_cost > 0 ? esc_html((string) $candy_cost) : '—'; ?></td>
+                            <td><?php echo $stardust_cost > 0 ? esc_html((string) $stardust_cost) : '—'; ?></td>
+                            <td><?php echo $item !== '' ? '<code>' . esc_html($item) . '</code>' : '—'; ?></td>
+                            <td><?php echo $item_qty > 0 ? esc_html((string) $item_qty) : '—'; ?></td>
+                            <td><?php echo $quest_requirement !== '' ? '<code>' . esc_html($quest_requirement) . '</code>' : '—'; ?></td>
+                            <td><code><?php echo esc_html(!empty($required_moves) ? implode(', ', $required_moves) : '—'); ?></code></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+
         <?php
         // ============================
         //  SECTION ATTAQUES
@@ -1525,11 +1613,71 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($has_gmax_form) : ?>
+            <div style="margin-top:18px;">
+                <h3><?php esc_html_e('Capacité GMAX', 'poke-hub'); ?></h3>
+                <?php if (empty($all_gmax_moves)) : ?>
+                    <em><?php esc_html_e('No GMAX moves found in attacks list. They are created by Game Master import.', 'poke-hub'); ?></em>
+                <?php else : ?>
+                    <table class="widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e('Attack', 'poke-hub'); ?></th>
+                                <th class="pokehub-col-remove"><?php esc_html_e('Remove', 'poke-hub'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody class="pokehub-gmax-moves-rows" data-next-index="<?php echo max(count($current_gmax_moves), 1); ?>">
+                            <?php if (!empty($current_gmax_moves)) : ?>
+                                <?php foreach ($current_gmax_moves as $gm) : ?>
+                                    <?php $attack_id = (int) ($gm['attack_id'] ?? 0); ?>
+                                    <tr>
+                                        <td>
+                                            <select class="admin-lab-field-select" name="gmax_moves[<?php echo (int) $gmax_index; ?>][attack_id]">
+                                                <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
+                                                <?php foreach ($all_gmax_moves as $move) : ?>
+                                                    <option value="<?php echo (int) $move->id; ?>" <?php selected($attack_id, (int) $move->id); ?>>
+                                                        <?php echo esc_html($move->label); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="button link-delete-row pokehub-remove-move-row">&times;</button>
+                                        </td>
+                                    </tr>
+                                    <?php $gmax_index++; ?>
+                                <?php endforeach; ?>
+                            <?php else : ?>
+                                <tr>
+                                    <td>
+                                        <select class="admin-lab-field-select" name="gmax_moves[0][attack_id]">
+                                            <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
+                                            <?php foreach ($all_gmax_moves as $move) : ?>
+                                                <option value="<?php echo (int) $move->id; ?>"><?php echo esc_html($move->label); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="button link-delete-row pokehub-remove-move-row">&times;</button>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    <p>
+                        <button type="button" class="button button-secondary pokehub-add-gmax-move">
+                            <?php esc_html_e('Add GMAX move', 'poke-hub'); ?>
+                        </button>
+                    </p>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         </div> <!-- Fin section admin-lab-form-section Attacks -->
 
         <?php
         // Templates pour JS (lignes vides)
-        if (!empty($all_fast_moves) || !empty($all_charged_moves)) :
+        if (!empty($all_fast_moves) || !empty($all_charged_moves) || !empty($all_gmax_moves)) :
             ob_start();
             ?>
             <tr>
@@ -1593,6 +1741,29 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </tr>
             <?php
             $charged_template = trim(ob_get_clean());
+
+            ob_start();
+            ?>
+            <tr>
+                <td>
+                    <select class="admin-lab-field-select" name="gmax_moves[__INDEX__][attack_id]">
+                        <option value="0"><?php esc_html_e('— Select move —', 'poke-hub'); ?></option>
+                        <?php foreach ($all_gmax_moves as $move) : ?>
+                            <option value="<?php echo (int) $move->id; ?>">
+                                <?php echo esc_html($move->label); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </td>
+                <td>
+                    <button type="button"
+                            class="button link-delete-row pokehub-remove-move-row">
+                        &times;
+                    </button>
+                </td>
+            </tr>
+            <?php
+            $gmax_template = trim(ob_get_clean());
 
         // Construire pokemon_label_map AVANT le template pour qu'il soit disponible
         $pokemon_label_map = [];
@@ -2652,7 +2823,7 @@ jQuery(function($) {
 });
 </script>
 
-<?php if ( ! empty( $all_fast_moves ) || ! empty( $all_charged_moves ) || ! empty( $all_pokemon_for_evo ) ) : ?>
+<?php if ( ! empty( $all_fast_moves ) || ! empty( $all_charged_moves ) || ! empty( $all_gmax_moves ) || ! empty( $all_pokemon_for_evo ) ) : ?>
     <script>
     (function() {
         function addRow(tbodySelector, templateHtml, dataAttrName) {
@@ -2719,6 +2890,13 @@ jQuery(function($) {
                 e.preventDefault();
                 var templateCharged = <?php echo wp_json_encode( isset( $charged_template ) ? $charged_template : '' ); ?>;
                 addRow('.pokehub-charged-moves-rows', templateCharged, 'data-next-index');
+            }
+
+            // Ajout gmax move
+            if (e.target && e.target.classList.contains('pokehub-add-gmax-move')) {
+                e.preventDefault();
+                var templateGmax = <?php echo wp_json_encode( isset( $gmax_template ) ? $gmax_template : '' ); ?>;
+                addRow('.pokehub-gmax-moves-rows', templateGmax, 'data-next-index');
             }
 
             // Ajout evolution

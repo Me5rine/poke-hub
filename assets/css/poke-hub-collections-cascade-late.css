@@ -1,6 +1,7 @@
 /**
  * Cascade finale pour le module Collections (thème : voir css/poke-hub/poke-hub-late-overrides.css).
  * Chargé sans dépendre du lot front plugin — utile quand poke_hub_load_default_plugin_front_css = false.
+ * Le bloc Pokémon GO (copy-paste) est stylé dans le thème : parts/13-collections-front.css.
  */
 
 .pokehub-collections-wrap.me5rine-lab-dashboard {
@@ -58,29 +59,10 @@ ul.pokehub-collections-grid {
     display: none;
 }
 
-/* Recherche in-game (Pokémon GO) */
-.pokehub-pogo-search-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.6rem;
-    margin-bottom: 0.4rem;
-}
-.pokehub-pogo-search-line .pokehub-pogo-search-input {
-    flex: 1 1 12rem;
-    min-width: 0;
-}
-.pokehub-pogo-search-groups {
-    margin-top: 0.5rem;
-}
-.pokehub-pogo-search-group {
-    margin-bottom: 1rem;
-}
-.pokehub-pogo-search-group .pokehub-pogo-search-lines {
-    list-style: none;
-    margin: 0.35rem 0 0 0;
-    padding: 0;
-}
+/*
+ * Bloc recherche Pokémon GO (copy-paste) : styles dans le thème
+ * css/poke-hub/parts/13-collections-front.css (section « Recherche in-game Pokémon GO »).
+ */
 
 /* Filtre « afficher dans la grille » (JS) — display plutôt que l’attribut hidden (compat navigateurs / thèmes) */
 .pokehub-collection-tile.pokehub-tile--filtered-out {
@@ -90,16 +72,64 @@ ul.pokehub-collections-grid {
     display: none !important;
 }
 
-/* Ligne nom + symbole mâle/femelle (formes « gender ») */
+/* Bloc nom : groupe centré, ♀/♂ collé au nom, sous-titre forme (ex. Gigamax) */
 .pokehub-collection-tile-line--name {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.25rem;
+    justify-content: center;
     width: 100%;
+    min-width: 0;
+}
+.pokehub-collection-tile-name-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.12rem;
+    width: 100%;
+    max-width: 100%;
+    min-height: 2.65em;
+    text-align: center;
+}
+.pokehub-collection-tile-name-row {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.2em;
+    vertical-align: top;
+}
+.pokehub-collection-tile-name-row .pokehub-collection-tile-name {
+    margin-top: 0;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-overflow: ellipsis;
+    text-align: center;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+.pokehub-collection-tile-name-row:has(.pokehub-collection-tile-gender) .pokehub-collection-tile-name {
+    max-width: calc(100% - 0.85em);
 }
 .pokehub-collection-tile-gender {
     flex-shrink: 0;
     font-size: 1.05em;
-    line-height: 1;
+    line-height: 1.15;
+    margin: 0;
+}
+.pokehub-collection-tile-form-line {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    font-weight: 600;
+    color: var(--me5rine-lab-text-muted, #5c6570);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

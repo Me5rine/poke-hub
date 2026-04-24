@@ -232,7 +232,7 @@ Les styles sont chargés par le module **Blocks** (`modules/blocks/blocks.php`).
 - **Collection Challenges** : `assets/css/poke-hub-collection-challenges-front.css`
 - **Special Research** : `assets/css/poke-hub-special-research-front.css`
 - **Avatar shop / Sticker highlights** : règles dans `assets/css/poke-hub-blocks-front.css` (blocs `pokehub/shop-avatar-highlights`, `pokehub/shop-sticker-highlights` — panneau, accroche, tuiles ; réutilisation des classes Wild Pokémon pour les cartes).
-- **Icônes types / bonbons** : `pokehub-type-icons`, `poke-hub-candy-display.css` (selon contexte)
+- **Icônes types / bonbons** : handle `pokehub-type-icons` → `assets/css/poke-hub-type-icons.css` (front si filtre plugin ; admin toujours via `poke-hub.php`) ; équivalent thème : `parts/02-type-icons.css` — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) ; bonbons : `poke-hub-candy-display.css` (selon contexte)
 
 ### Titres principaux (`.pokehub-block-title`)
 

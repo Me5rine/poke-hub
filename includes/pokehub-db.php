@@ -517,10 +517,12 @@ class Pokehub_DB {
             background_id BIGINT(20) UNSIGNED NOT NULL,
             pokemon_id BIGINT(20) UNSIGNED NOT NULL,
             is_shiny_locked TINYINT(1) NOT NULL DEFAULT 0,
+            link_kind VARCHAR(20) NOT NULL DEFAULT 'base',
             PRIMARY KEY (id),
             KEY background_id (background_id),
             KEY pokemon_id (pokemon_id),
-            UNIQUE KEY background_pokemon (background_id, pokemon_id)
+            KEY link_kind (link_kind),
+            UNIQUE KEY background_pokemon_kind (background_id, pokemon_id, link_kind)
         ) {$charset_collate};";
 
         // 16b) Liaison Background ↔ Événements (un fond peut être associé à plusieurs événements)
@@ -596,6 +598,8 @@ class Pokehub_DB {
         dbDelta($sql_biome_images);
         dbDelta($sql_biome_pokemon_links);
 
+        $this->migratePokemonBackgroundLinksAddLinkKind( $background_pokemon_links );
+
         // Migration : copier event_id/event_type des backgrounds vers pokemon_background_events (une seule fois)
         $migrated = get_option('pokehub_background_events_migrated', false);
         if (!$migrated) {
@@ -658,6 +662,53 @@ class Pokehub_DB {
         if ($regions_count === 0 && $mappings_count === 0) {
             $this->seedRegionalData();
         }
+    }
+
+    /**
+     * Table pokemon_background_pokemon_links : colonne link_kind (séparation classique / obscur / dynamax / gigamax).
+     * Toujours vérifier l’index unique sur (background_id, pokemon_id, link_kind) : certains rollouts
+     * n’ont ajouté que `link_kind` en gardant l’ancien UNIQUE (background_id, pokemon_id) → un seul lien / Pokémon / fond.
+     */
+    private function migratePokemonBackgroundLinksAddLinkKind( string $table ): void {
+        global $wpdb;
+        if ( $table === '' ) {
+            return;
+        }
+        if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+            return;
+        }
+        $col = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'link_kind'",
+            $wpdb->dbname,
+            $table
+        ) );
+        if ( empty( $col ) ) {
+            $old_uq = $wpdb->get_var( $wpdb->prepare(
+                'SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s LIMIT 1',
+                $wpdb->dbname,
+                $table,
+                'background_pokemon'
+            ) );
+            if ( ! empty( $old_uq ) ) {
+                $wpdb->query( "ALTER TABLE `{$table}` DROP INDEX `background_pokemon`" );
+            }
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `link_kind` VARCHAR(20) NOT NULL DEFAULT 'base' AFTER `is_shiny_locked`" );
+            $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `link_kind` (`link_kind`)" );
+        }
+        $this->ensureBackgroundPokemonLinkUniquePerKind( $table );
+    }
+
+    /**
+     * Délègue à {@see poke_hub_ensure_background_pokemon_link_unique_index()} (détecte tout UNIQUE sur 2 colonnes, pas seulement le nom `background_pokemon`).
+     */
+    private function ensureBackgroundPokemonLinkUniquePerKind( string $table ): void {
+        if ( $table === '' ) {
+            return;
+        }
+        if ( ! function_exists( 'poke_hub_ensure_background_pokemon_link_unique_index' ) ) {
+            return;
+        }
+        poke_hub_ensure_background_pokemon_link_unique_index();
     }
     
     /**

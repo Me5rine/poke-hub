@@ -13,7 +13,7 @@ Le module **user-profiles** couvre profils Ultimate Member, codes amis, shortcod
 | [README_DATA_CENTRALIZATION.md](./README_DATA_CENTRALIZATION.md) | Centralisation des données |
 | [SYNCHRONIZATION.md](./SYNCHRONIZATION.md) | Synchronisation |
 | [COUNTRIES-STORAGE-FORMAT.md](./COUNTRIES-STORAGE-FORMAT.md) | Format pays |
-| [FRIEND_CODES_PUBLIC_AND_IP.md](./FRIEND_CODES_PUBLIC_AND_IP.md) | Codes amis, IP, visiteurs |
+| [FRIEND_CODES_PUBLIC_AND_IP.md](./FRIEND_CODES_PUBLIC_AND_IP.md) | Codes amis, visibilité publique, IP, visiteurs |
 
 ## Rappels code
 

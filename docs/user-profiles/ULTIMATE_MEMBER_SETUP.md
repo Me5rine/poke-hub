@@ -30,6 +30,10 @@ Si vous avez l'extension **Ultimate Member - Profile Tabs** installée :
 
 L'onglet devrait maintenant apparaître et utiliser automatiquement notre code pour afficher le contenu.
 
+### Template Pokémon GO dans le thème
+
+Si vous avez **copié** `modules/user-profiles/templates/um-user-pokehub-profile.php` dans le thème (Ultimate Member), veillez à le **resynchroniser** avec la version du plugin lors des mises à jour : le formulaire inclut la case **visibilité publique du code ami** et le champ caché `friend_code_public_present`, alignés sur le shortcode `[poke_hub_user_profile]`. Sans cela, la visibilité peut ne plus correspondre à l’intention de l’utilisateur (voir `FRIEND_CODES_PUBLIC_AND_IP.md`).
+
 ## Méthode 2 : Configuration manuelle dans Ultimate Member
 
 Si vous n'avez pas l'extension Profile Tabs, vous pouvez créer l'onglet manuellement via les hooks WordPress :

@@ -6,7 +6,8 @@
  * `poke_hub_load_default_plugin_front_css` à `false` et le déqueue collecte les handles enregistrés ici.
  * Voir : docs/THEME_FRONT_CSS.md.
  *
- * Fichiers typiquement conservés côté plugin : `global-colors.css` (Gutenberg / notices), feuilles **admin** ;
+ * Fichiers typiquement conservés côté plugin : `global-colors.css` (Gutenberg / notices), feuilles **admin**,
+ * `poke-hub-type-icons.css` (icônes types ; **admin** : enqueue explicite dans `poke-hub.php`, indépendant du filtre) ;
  * le module Collections peut enfiler en plus `poke-hub-collections-cascade-late.css` (hors de cette liste, voir doc).
  *
  * Filtre : `poke_hub_load_default_plugin_front_css` (défaut : true).

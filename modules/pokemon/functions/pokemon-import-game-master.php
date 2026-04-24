@@ -30,6 +30,7 @@ if ( ! in_array( 'pokemon', $active_modules, true ) ) {
  * @param array  $seen_pokemon_slugs
  * @param array  $gender_index
  * @param array  $pokemon_index
+ * @param array  $form_costume_index [pokemonIdProto][formProtoUpper] => true (formSettings.forms[].isCostume)
  * @return array
  */
 function poke_hub_pokemon_import_from_pokemon_settings(
@@ -39,7 +40,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     array $stats,
     array &$seen_pokemon_slugs,
     array $gender_index = [],
-    array &$pokemon_index = []
+    array &$pokemon_index = [],
+    array $gmax_species = [],
+    array $species_with_explicit_normal_form = [],
+    array $form_costume_index = []
 ) {
     global $wpdb;
 
@@ -49,6 +53,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     if ( $pokemon_id_proto === '' ) {
         return $stats;
     }
+    $has_gmax_form = ! empty( $gmax_species[ (string) $pokemon_id_proto ] );
+    $has_explicit_normal_family = ! empty( $species_with_explicit_normal_form[ (string) $pokemon_id_proto ] );
 
     // Dex & génération
     $dex_number        = poke_hub_pokemon_gm_template_to_dex( $template_id );
@@ -56,22 +62,24 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     // Forme brute Niantic
     $form_proto   = $settings['form'] ?? '';
-    // ---------------------------------------------------------------------
-    // FIX: Beaucoup d’entrées GM dupliquent la forme "de base" via *_NORMAL
-    // (ex: V0032_POKEMON_NIDORAN_NORMAL avec form = NIDORAN_NORMAL).
-    // On veut une seule entrée => on traite *_NORMAL comme "pas de forme".
-    // ---------------------------------------------------------------------
-    if ( $form_proto !== '' ) {
-        $upper_form = strtoupper( (string) $form_proto );
 
-        if ( $upper_form === 'NORMAL' || $upper_form === 'FORM_NORMAL' || preg_match( '/_NORMAL$/', $upper_form ) ) {
-            $form_proto = '';
- // éviter qu’un mapping force un suffix
-        }
-    }
-
+    // Si l'espèce possède une forme NORMAL explicite (ex: Palkia/Dialga),
+    // l'entrée sans forme représente la "famille" (placeholder de regroupement).
+    $is_family_placeholder = ( $has_explicit_normal_family && $form_proto === '' );
     // Form slug : normalisation depuis le proto (plus de table form_mappings)
-    $form_slug = poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto );
+    // Certaines espèces (ex: Dialga/Palkia) ont une forme NORMAL explicite
+    // sans exposer formChange dans pokemonSettings.
+    $keep_normal_form = $has_explicit_normal_family;
+    $form_slug = poke_hub_pokemon_normalize_form_proto(
+        $pokemon_id_proto,
+        $form_proto,
+        array_merge(
+            $settings,
+            [
+                '__keep_normal_form' => $keep_normal_form ? 1 : 0,
+            ]
+        )
+    );
 
     // Nom humain de base
     $base_name = poke_hub_pokemon_gm_id_to_label( $pokemon_id_proto );
@@ -90,6 +98,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     // Normalisation du suffix
     $label_suffix = poke_hub_pokemon_normalize_form_label_suffix( $base_name, $label_suffix );
+    if ( $keep_normal_form && $form_slug === 'normal' ) {
+        // La forme NORMAL explicite doit s'afficher comme le nom canonique (sans "Normal").
+        $label_suffix = '';
+    }
 
     // Nom complet
     if ( $label_suffix !== '' ) {
@@ -109,16 +121,35 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     if ( $form_slug !== '' ) {
         $variant_label = $label_suffix !== '' ? $label_suffix : ucwords( str_replace( '-', ' ', $form_slug ) );
 
-        if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+        if ( function_exists( 'poke_hub_pokemon_get_form_variant_by_slug' ) ) {
+            $existing_variant = poke_hub_pokemon_get_form_variant_by_slug( $form_slug );
+            if ( is_array( $existing_variant ) && ! empty( $existing_variant['id'] ) ) {
+                $variant_id = (int) $existing_variant['id'];
+            }
+        }
+
+        if ( $variant_id <= 0 && function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+            $guess_settings = $settings;
+            $fproto_u = $form_proto !== '' ? strtoupper( (string) $form_proto ) : '';
+            if ( $fproto_u !== '' && ! empty( $form_costume_index[ (string) $pokemon_id_proto ][ $fproto_u ] ) ) {
+                $guess_settings['__isCostume'] = true;
+            }
+            if ( is_string( $template_id ) && stripos( $template_id, '_COPY' ) !== false ) {
+                $guess_settings['__isClone'] = true;
+            }
+            $auto_form_type = function_exists( 'poke_hub_pokemon_guess_form_type_from_gm' )
+                ? poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_proto, $form_slug, $guess_settings )
+                : 'default';
             $variant_id = poke_hub_pokemon_upsert_form_variant(
                 $form_slug,
                 $variant_label,
-                '', // category
+                $auto_form_type, // category = type de forme
                 '', // group
                 [
                     'pokemon_id_proto' => $pokemon_id_proto,
                     'form_proto'       => $form_proto,
                     'template_id'      => $template_id,
+                    'form_type'        => $auto_form_type,
                 ]
             );
         }
@@ -133,12 +164,24 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     // Slugs
     $slug_base = poke_hub_pokemon_gm_id_to_slug( $pokemon_id_proto );
     $slug      = $slug_base;
-    if ( $form_slug !== '' ) {
+    if ( $is_family_placeholder ) {
+        $slug = $slug_base . '-family';
+    } elseif ( $keep_normal_form && $form_slug === 'normal' ) {
+        $slug = $slug_base;
+    } elseif ( $form_slug !== '' ) {
         $slug .= '-' . $form_slug;
     }
 
-    // Pokémon de base = forme vide
-    $is_default = ( $form_slug === '' ) ? 1 : 0;
+    // Par défaut :
+    // - espèces avec famille explicite : la ligne "*-family" est la forme par défaut
+    // - autres espèces : forme vide = défaut
+    if ( $is_family_placeholder ) {
+        $is_default = 1;
+    } elseif ( $keep_normal_form && $form_slug === 'normal' ) {
+        $is_default = 0;
+    } else {
+        $is_default = ( $form_slug === '' ) ? 1 : 0;
+    }
 
     // Slug vu dans ce Game Master (stat)
     $seen_pokemon_slugs[$slug] = true;
@@ -311,6 +354,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'variant_category'   => $variant_category,
         'variant_group'      => $variant_group,
         'form_label_suffix'  => $label_suffix,
+        'has_gmax_form'      => $has_gmax_form,
 
         'gender'             => [
             'male'   => $gender_male,
@@ -362,6 +406,12 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     // === TEMP EVO START : on stocke aussi les tempEvoOverrides dans la forme de base ===
     if ( ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
         $extra['temp_evo_overrides'] = $settings['tempEvoOverrides'];
+    }
+    if ( function_exists( 'poke_hub_pokemon_extract_form_change_rules' ) ) {
+        $form_change_rules = poke_hub_pokemon_extract_form_change_rules( $settings );
+        if ( ! empty( $form_change_rules ) ) {
+            $extra['form_change_rules'] = $form_change_rules;
+        }
     }
     // === TEMP EVO END ===
 
@@ -527,6 +577,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $data = $data_with_fr;
     }
     // Si $row existe et name_fr est vide, on ne met pas name_fr dans $data pour ne pas écraser
+    if ( $row && function_exists( 'poke_hub_pokemon_gm_preserve_manual_pokemon_fields' ) ) {
+        $data = poke_hub_pokemon_gm_preserve_manual_pokemon_fields( $data, $row );
+    }
 
     if ( $row && function_exists( 'poke_hub_pokemon_gm_wpdb_data_only_changed_columns' ) ) {
         $data   = poke_hub_pokemon_gm_wpdb_data_only_changed_columns( $data, $row );
@@ -693,7 +746,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     }
 
     if ( $pokemon_id > 0 && ! empty( $type_ids ) ) {
-        poke_hub_pokemon_sync_pokemon_types_links( $pokemon_id, $type_ids );
+        poke_hub_pokemon_sync_pokemon_types_links( $pokemon_id, $type_ids, false );
         $stats['pokemon_type_links'] += count( $type_ids );
     }
 
@@ -819,7 +872,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
         $links = array_values( $attack_links_map );
         if ( ! empty( $links ) ) {
-            poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, $links, $tables );
+            poke_hub_pokemon_sync_pokemon_attack_links( $pokemon_id, $links, $tables, false );
             $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + count( $links );
         }
     }
@@ -885,13 +938,17 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             $mega_variant_category = 'special';
             if ( poke_hub_pokemon_is_temp_evo_mega( $temp_evo_id ) ) {
                 $mega_variant_category = 'mega';
-            } elseif ( poke_hub_pokemon_is_temp_evo_primal( $temp_evo_id ) ) {
-                $mega_variant_category = 'primal';
             }
 
             // Upsert variant (form_slug = mega, mega-x, primal, ...)
             $mega_variant_id = 0;
-            if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+            if ( function_exists( 'poke_hub_pokemon_get_form_variant_by_slug' ) ) {
+                $existing_mega_variant = poke_hub_pokemon_get_form_variant_by_slug( $temp_form_slug );
+                if ( is_array( $existing_mega_variant ) && ! empty( $existing_mega_variant['id'] ) ) {
+                    $mega_variant_id = (int) $existing_mega_variant['id'];
+                }
+            }
+            if ( $mega_variant_id <= 0 && function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
                 $mega_variant_id = poke_hub_pokemon_upsert_form_variant(
                     $temp_form_slug,
                     $temp_form_label,
@@ -979,6 +1036,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'variant_category'   => $mega_variant_category,
                 'variant_group'      => $mega_variant_group,
                 'form_label_suffix'  => $temp_form_label,
+                'has_gmax_form'      => $has_gmax_form,
 
                 'gender'             => [
                     'male'   => $gender_male,
@@ -1091,6 +1149,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 // Préserver un FR manuel existant si l'import n'en fournit pas.
                 unset( $mega_data['name_fr'] );
             }
+            if ( $mega_row && function_exists( 'poke_hub_pokemon_gm_preserve_manual_pokemon_fields' ) ) {
+                $mega_data = poke_hub_pokemon_gm_preserve_manual_pokemon_fields( $mega_data, $mega_row );
+            }
 
             // Ne pas réutiliser $format de la forme de base : l’ordre des colonnes diffère
             // (ex. sans name_fr sur update) → slug recevait %d et devenait 0 en base.
@@ -1147,7 +1208,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
 
             if ( $mega_pokemon_id > 0 && ! empty( $mega_type_ids ) ) {
-                poke_hub_pokemon_sync_pokemon_types_links( $mega_pokemon_id, $mega_type_ids );
+                poke_hub_pokemon_sync_pokemon_types_links( $mega_pokemon_id, $mega_type_ids, false );
                 $stats['pokemon_type_links'] += count( $mega_type_ids );
             }
 
@@ -1158,7 +1219,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 && ! empty( $tables['attacks'] )
                 && ! empty( $links )
             ) {
-                poke_hub_pokemon_sync_pokemon_attack_links( $mega_pokemon_id, $links, $tables );
+                poke_hub_pokemon_sync_pokemon_attack_links( $mega_pokemon_id, $links, $tables, false );
                 $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + count( $links );
             }
         }
@@ -1168,6 +1229,71 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     */
 
     return $stats;
+}
+
+/**
+ * Upsert non destructif d'une ligne attack_stats pour un context donné.
+ * Préserve l'extra existant si l'import n'en fournit pas.
+ */
+function poke_hub_pokemon_gm_upsert_attack_stat_context( string $stats_table, int $attack_id, string $context, array $payload ): void {
+    global $wpdb;
+
+    if ( $attack_id <= 0 || $stats_table === '' ) {
+        return;
+    }
+
+    $existing = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT id, extra FROM {$stats_table} WHERE attack_id = %d AND game_key = %s AND context = %s LIMIT 1",
+            $attack_id,
+            'pokemon_go',
+            $context
+        )
+    );
+
+    if ( $existing ) {
+        if ( array_key_exists( 'extra', $payload ) ) {
+            if ( $payload['extra'] === null && ! empty( $existing->extra ) ) {
+                $payload['extra'] = $existing->extra;
+            } elseif ( is_string( $payload['extra'] ) && $payload['extra'] !== '' && ! empty( $existing->extra ) ) {
+                $old_extra = json_decode( (string) $existing->extra, true );
+                $new_extra = json_decode( (string) $payload['extra'], true );
+                if ( is_array( $old_extra ) && is_array( $new_extra ) ) {
+                    $payload['extra'] = wp_json_encode(
+                        array_replace_recursive( $old_extra, $new_extra ),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    );
+                }
+            }
+        }
+
+        $wpdb->update(
+            $stats_table,
+            $payload,
+            [ 'id' => (int) $existing->id ],
+            [ '%d', '%f', '%f', '%d', '%d', '%d', '%d', '%s' ],
+            [ '%d' ]
+        );
+        return;
+    }
+
+    $wpdb->insert(
+        $stats_table,
+        array_merge(
+            [
+                'attack_id' => $attack_id,
+                'game_key'  => 'pokemon_go',
+                'context'   => $context,
+            ],
+            $payload
+        ),
+        [
+            '%d', '%s', '%s',
+            '%d', '%f', '%f',
+            '%d', '%d', '%d',
+            '%d', '%s',
+        ]
+    );
 }
 
 /**
@@ -1199,8 +1325,25 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
         return $stats;
     }
 
-    $slug          = poke_hub_pokemon_gm_id_to_slug( $movement_id );
-    $default_label = poke_hub_pokemon_gm_id_to_label( $movement_id );
+    // Catégorie globale du move : fast / charged / gmax
+    $is_gmax_move = ( strpos( (string) $movement_id, 'VN_BM_' ) === 0 );
+
+    // Pour les attaques GMAX, on utilise vfxName comme source lisible
+    // (ex: gmax_chistrike) au lieu du code interne VN_BM_xxx.
+    $slug_source  = $movement_id;
+    $label_source = $movement_id;
+    if ( $is_gmax_move ) {
+        $vfx_name = trim( (string) ( $settings['vfxName'] ?? '' ) );
+        if ( $vfx_name !== '' ) {
+            $slug_source  = $vfx_name;
+            $label_source = str_replace( '_', ' ', strtoupper( $vfx_name ) );
+            $label_source = str_ireplace( 'GMAX', 'G-Max', $label_source );
+            $label_source = ucwords( strtolower( $label_source ) );
+        }
+    }
+
+    $slug          = poke_hub_pokemon_gm_id_to_slug( $slug_source );
+    $default_label = poke_hub_pokemon_gm_id_to_label( $label_source );
     $names         = poke_hub_pokemon_get_i18n_names( 'moves', $slug, $default_label );
 
     // On mémorise le slug comme "vu" (statistique uniquement)
@@ -1219,8 +1362,11 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
     $dps        = ( $duration_s > 0 && $power > 0 ) ? ( $power / $duration_s ) : 0.0;
     $eps        = ( $duration_s > 0 && 0 !== $energy_delta ) ? ( $energy_delta / $duration_s ) : 0.0;
 
-    // Catégorie globale du move : fast / charged
-    $category = ( substr( $movement_id, -5 ) === '_FAST' ) ? 'fast' : 'charged';
+    if ( $is_gmax_move ) {
+        $category = 'gmax';
+    } else {
+        $category = ( substr( $movement_id, -5 ) === '_FAST' ) ? 'fast' : 'charged';
+    }
 
     // Cherche attaque existante
     $row = $wpdb->get_row(
@@ -1307,22 +1453,11 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
     }
 
     // Stats globales (duration, damage_window uniquement) - context = ""
-    $wpdb->delete(
+    poke_hub_pokemon_gm_upsert_attack_stat_context(
         $stats_table,
+        $attack_id,
+        '',
         [
-            'attack_id' => $attack_id,
-            'game_key'  => 'pokemon_go',
-            'context'   => '',
-        ],
-        [ '%d', '%s', '%s' ]
-    );
-
-    $wpdb->insert(
-        $stats_table,
-        [
-            'attack_id'              => $attack_id,
-            'game_key'               => 'pokemon_go',
-            'context'                => '',
             'damage'                 => 0,
             'dps'                    => 0.0,
             'eps'                    => 0.0,
@@ -1332,31 +1467,14 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
             'energy'                 => 0,
             'extra'                  => null,
         ],
-        [
-            '%d', '%s', '%s',
-            '%d', '%f', '%f',
-            '%d', '%d', '%d',
-            '%d', '%s',
-        ]
     );
 
     // Stats PvE (damage, dps, eps, energy) - context = "pve"
-    $wpdb->delete(
+    poke_hub_pokemon_gm_upsert_attack_stat_context(
         $stats_table,
+        $attack_id,
+        'pve',
         [
-            'attack_id' => $attack_id,
-            'game_key'  => 'pokemon_go',
-            'context'   => 'pve',
-        ],
-        [ '%d', '%s', '%s' ]
-    );
-
-    $wpdb->insert(
-        $stats_table,
-        [
-            'attack_id'              => $attack_id,
-            'game_key'               => 'pokemon_go',
-            'context'                => 'pve',
             'damage'                 => $power,
             'dps'                    => $dps,
             'eps'                    => $eps,
@@ -1366,12 +1484,6 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
             'energy'                 => $energy_delta,
             'extra'                  => null,
         ],
-        [
-            '%d', '%s', '%s',
-            '%d', '%f', '%f',
-            '%d', '%d', '%d',
-            '%d', '%s',
-        ]
     );
 
     $stats['pve_stats']++;
@@ -1380,7 +1492,11 @@ function poke_hub_pokemon_import_from_attack_settings( $template_id, array $sett
     if ( $type_slug !== '' ) {
         $type_id = poke_hub_pokemon_find_or_create_type( $type_slug, ucfirst( $type_slug ) );
         if ( $type_id > 0 ) {
-            poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            if ( function_exists( 'poke_hub_pokemon_import_sync_attack_types_links_non_destructive' ) ) {
+                poke_hub_pokemon_import_sync_attack_types_links_non_destructive( $attack_id, [ $type_id ] );
+            } else {
+                poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            }
             $stats['attack_type_links']++;
         }
     }
@@ -1581,16 +1697,6 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
 
     // Stats PvP (damage, dps, eps, energy) - context = "pvp"
     // Si durationTurns est présent et différent de la durée globale, on stocke duration_ms dans les stats PvP
-    $wpdb->delete(
-        $stats_table,
-        [
-            'attack_id' => $attack_id,
-            'game_key'  => 'pokemon_go',
-            'context'   => 'pvp',
-        ],
-        [ '%d', '%s', '%s' ]
-    );
-
     // Stocker duration_ms uniquement si elle diffère de la durée globale (si durationTurns était présent)
     $duration_ms_for_pvp = 0;
     if ( $turns > 0 && $duration_ms_pvp > 0 ) {
@@ -1615,12 +1721,11 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
     
     $pvp_extra = ! empty( $pvp_extra_data ) ? wp_json_encode( $pvp_extra_data ) : null;
 
-    $wpdb->insert(
+    poke_hub_pokemon_gm_upsert_attack_stat_context(
         $stats_table,
+        $attack_id,
+        'pvp',
         [
-            'attack_id'              => $attack_id,
-            'game_key'               => 'pokemon_go',
-            'context'                => 'pvp',
             'damage'                 => $power,
             'dps'                    => $dps,
             'eps'                    => $eps,
@@ -1630,12 +1735,6 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
             'energy'                 => $energy_delta,
             'extra'                  => $pvp_extra,
         ],
-        [
-            '%d', '%s', '%s',
-            '%d', '%f', '%f',
-            '%d', '%d', '%d',
-            '%d', '%s',
-        ]
     );
 
     $stats['pvp_stats']++;
@@ -1644,7 +1743,11 @@ function poke_hub_pokemon_import_from_combat_move( $template_id, array $combat_m
     if ( $type_slug !== '' ) {
         $type_id = poke_hub_pokemon_find_or_create_type( $type_slug, ucfirst( $type_slug ) );
         if ( $type_id > 0 ) {
-            poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            if ( function_exists( 'poke_hub_pokemon_import_sync_attack_types_links_non_destructive' ) ) {
+                poke_hub_pokemon_import_sync_attack_types_links_non_destructive( $attack_id, [ $type_id ] );
+            } else {
+                poke_hub_pokemon_sync_attack_types_links( $attack_id, [ $type_id ] );
+            }
             $stats['attack_type_links']++;
         }
     }
@@ -1675,6 +1778,14 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
 
     if ( function_exists( 'set_time_limit' ) ) {
         @set_time_limit( 300 );
+    }
+    if ( function_exists( 'ignore_user_abort' ) ) {
+        @ignore_user_abort( true );
+    }
+    if ( function_exists( 'wp_raise_memory_limit' ) ) {
+        wp_raise_memory_limit( 'admin' );
+    } elseif ( function_exists( 'ini_set' ) ) {
+        @ini_set( 'memory_limit', '512M' );
     }
 
     $json = poke_hub_pokemon_load_gamemaster_json( $source );
@@ -1736,6 +1847,151 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
 
     // Index global proto → id / forme (servira pour les évolutions)
     $pokemon_index = [];
+
+    // Mapping GMAX: [pokemonId][formKey] => move proto id
+    $gmax_move_mappings = [];
+    // Lookup move proto -> slug importé (priorité vfxName pour VN_BM_*).
+    $gmax_move_slug_by_proto = [];
+    // Set espèces ayant une version GMAX
+    $gmax_species = [];
+    // Set espèces avec forme NORMAL explicite dans formSettings (ex: Dialga/Palkia).
+    $species_with_explicit_normal_form = [];
+    // Agrégat depuis pokemonSettings : NORMAL explicite + au moins une forme non-NORMAL
+    // (formSettings ne liste pas toujours NORMAL, d'où collisions de slug sans ce complément).
+    $pokemon_forms_agg = [];
+    $form_costume_index = [];
+
+    // Prélecture du mapping GMAX (SOURDOUGH_MOVE_MAPPING_SETTINGS)
+    foreach ( $decoded as $entry ) {
+        if ( ! is_array( $entry ) ) {
+            continue;
+        }
+        $data = $entry['data'] ?? [];
+
+        if ( ! empty( $data['pokemonSettings'] ) && is_array( $data['pokemonSettings'] ) ) {
+            $ps           = $data['pokemonSettings'];
+            $poke_proto   = (string) ( $ps['pokemonId'] ?? '' );
+            $form_raw     = strtoupper( (string) ( $ps['form'] ?? '' ) );
+            if ( $poke_proto !== '' && $form_raw !== '' && $form_raw !== 'UNSET' && $form_raw !== 'FORM_UNSET' ) {
+                if ( ! isset( $pokemon_forms_agg[ $poke_proto ] ) ) {
+                    $pokemon_forms_agg[ $poke_proto ] = [
+                        'explicit_normal' => false,
+                        'non_normal'      => false,
+                    ];
+                }
+                if ( preg_match( '/_NORMAL$/', $form_raw ) || $form_raw === 'NORMAL' || $form_raw === 'FORM_NORMAL' ) {
+                    $pokemon_forms_agg[ $poke_proto ]['explicit_normal'] = true;
+                } else {
+                    $pokemon_forms_agg[ $poke_proto ]['non_normal'] = true;
+                }
+            }
+        }
+
+        if ( ! empty( $data['formSettings'] ) && is_array( $data['formSettings'] ) ) {
+            $form_settings = $data['formSettings'];
+            $pokemon_proto = (string) ( $form_settings['pokemon'] ?? '' );
+            $forms_list    = $form_settings['forms'] ?? [];
+            if ( $pokemon_proto !== '' && is_array( $forms_list ) ) {
+                $has_normal_form = false;
+                $has_other_form_change = false;
+                foreach ( $forms_list as $form_row ) {
+                    if ( ! is_array( $form_row ) ) {
+                        continue;
+                    }
+                    if ( ! empty( $form_row['isCostume'] ) ) {
+                        $form_for_costume = strtoupper( (string) ( $form_row['form'] ?? '' ) );
+                        if ( $form_for_costume !== '' ) {
+                            if ( ! isset( $form_costume_index[ $pokemon_proto ] ) ) {
+                                $form_costume_index[ $pokemon_proto ] = [];
+                            }
+                            $form_costume_index[ $pokemon_proto ][ $form_for_costume ] = true;
+                        }
+                    }
+                    $form_value = strtoupper( (string) ( $form_row['form'] ?? '' ) );
+                    if ( $form_value === '' ) {
+                        continue;
+                    }
+                    if ( preg_match( '/_NORMAL$/', $form_value ) || $form_value === 'NORMAL' || $form_value === 'FORM_NORMAL' ) {
+                        $has_normal_form = true;
+                    } else {
+                        // On ne conserve NORMAL que s'il existe au moins une vraie forme de changement.
+                        // Cela exclut les formes cosmétiques/régionales qui ne doivent pas créer "xxx-normal".
+                        $form_kind = function_exists( 'poke_hub_pokemon_guess_form_type_from_gm' )
+                            ? poke_hub_pokemon_guess_form_type_from_gm(
+                                $pokemon_proto,
+                                $form_value,
+                                '',
+                                [
+                                    '__isCostume' => ! empty( $form_row['isCostume'] ),
+                                ]
+                            )
+                            : '';
+                        $has_meaningful_normal_pair = in_array(
+                            $form_kind,
+                            [ 'switch_form', 'switch_battle', 'special', 'fusion' ],
+                            true
+                        );
+                        if ( ! $has_meaningful_normal_pair ) {
+                            // Fallback explicite: certaines espèces (ex: Palkia/Dialga) ont NORMAL + ORIGIN
+                            // sans signal complet côté settings, mais ORIGIN reste une vraie forme métier.
+                            if ( preg_match( '/_(ORIGIN|INCARNATE|THERIAN|RESOLUTE|BLADE|SHIELD|HERO|CROWNED|DUSK_MANE|DAWN_WINGS|BLACK|WHITE)$/', $form_value ) ) {
+                                $has_meaningful_normal_pair = true;
+                            }
+                        }
+                        if ( $has_meaningful_normal_pair ) {
+                            $has_other_form_change = true;
+                        }
+                    }
+                }
+                // NORMAL n'est une vraie forme que si l'espèce a aussi une forme "métier" (switch/fusion/special).
+                if ( $has_normal_form && $has_other_form_change ) {
+                    $species_with_explicit_normal_form[ $pokemon_proto ] = true;
+                }
+            }
+        }
+        if ( ! empty( $data['moveSettings'] ) && is_array( $data['moveSettings'] ) ) {
+            $move_settings = $data['moveSettings'];
+            $movement_id   = (string) ( $move_settings['movementId'] ?? '' );
+            if ( $movement_id !== '' && strpos( $movement_id, 'VN_BM_' ) === 0 ) {
+                $vfx_name = trim( (string) ( $move_settings['vfxName'] ?? '' ) );
+                $gmax_move_slug_by_proto[ $movement_id ] = $vfx_name !== ''
+                    ? poke_hub_pokemon_gm_id_to_slug( $vfx_name )
+                    : poke_hub_pokemon_gm_id_to_slug( $movement_id );
+            }
+        }
+        if ( empty( $data['sourdoughMoveMappingSettings']['mappings'] ) || ! is_array( $data['sourdoughMoveMappingSettings']['mappings'] ) ) {
+            continue;
+        }
+        foreach ( $data['sourdoughMoveMappingSettings']['mappings'] as $map_row ) {
+            if ( ! is_array( $map_row ) ) {
+                continue;
+            }
+            $pokemon_id_proto = (string) ( $map_row['pokemonId'] ?? '' );
+            $move_proto       = (string) ( $map_row['move'] ?? '' );
+            if ( $pokemon_id_proto === '' || $move_proto === '' ) {
+                continue;
+            }
+            $gmax_species[ $pokemon_id_proto ] = true;
+            $form_proto = (string) ( $map_row['form'] ?? '' );
+            $form_key = $form_proto;
+            if ( $form_key !== '' ) {
+                $upper_form = strtoupper( $form_key );
+                if ( $upper_form === 'NORMAL' || $upper_form === 'FORM_NORMAL' || preg_match( '/_NORMAL$/', $upper_form ) ) {
+                    $form_key = '';
+                }
+            }
+            if ( ! isset( $gmax_move_mappings[ $pokemon_id_proto ] ) ) {
+                $gmax_move_mappings[ $pokemon_id_proto ] = [];
+            }
+            $gmax_move_mappings[ $pokemon_id_proto ][ $form_key ] = $move_proto;
+        }
+    }
+
+    foreach ( $pokemon_forms_agg as $proto => $agg ) {
+        if ( ! empty( $agg['explicit_normal'] ) && ! empty( $agg['non_normal'] ) ) {
+            $species_with_explicit_normal_form[ $proto ] = true;
+        }
+    }
 
     if ( function_exists( 'poke_hub_gm_progress' ) ) {
         poke_hub_gm_progress( 'pass1_moves', 20, 'PASS 1: Moves' );
@@ -1799,16 +2055,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         $template_id = $entry['templateId'] ?? '';
         $data        = $entry['data'] ?? [];
 
-        // ---------------------------------------------------------------------
-        // FIX: Ignorer les templates se terminant par _NORMAL dans le templateId
-        // (ex: V0029_POKEMON_NIDORAN_NORMAL) car ce sont des doublons explicites
-        // de l'entrée de base (V0029_POKEMON_NIDORAN).
-        // Ces entrées créent des doublons lors de l'import.
-        // ---------------------------------------------------------------------
-        if ( preg_match( '/_NORMAL$/', $template_id ) ) {
-            continue;
-        }
-
         if ( isset( $data['pokemonSettings'] ) && is_array( $data['pokemonSettings'] ) && ! empty( $tables['pokemon'] ) ) {
             $stats = poke_hub_pokemon_import_from_pokemon_settings(
                 $template_id,
@@ -1817,9 +2063,58 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 $stats,
                 $seen_pokemon_slugs,
                 $gender_index,
-                $pokemon_index
+                $pokemon_index,
+                $gmax_species,
+                $species_with_explicit_normal_form,
+                $form_costume_index
             );
             continue;
+        }
+    }
+
+    // PASS 2C : lier attaques GMAX aux Pokémon importés
+    if ( ! empty( $gmax_move_mappings ) ) {
+        foreach ( $gmax_move_mappings as $pokemon_id_proto => $moves_by_form ) {
+            if ( empty( $pokemon_index[ $pokemon_id_proto ] ) || ! is_array( $moves_by_form ) ) {
+                continue;
+            }
+            foreach ( $moves_by_form as $form_key => $move_proto ) {
+                $target_info = $pokemon_index[ $pokemon_id_proto ][ $form_key ] ?? null;
+                if ( ! $target_info && isset( $pokemon_index[ $pokemon_id_proto ][''] ) ) {
+                    $target_info = $pokemon_index[ $pokemon_id_proto ][''];
+                }
+                if ( ! is_array( $target_info ) ) {
+                    continue;
+                }
+                $pokemon_id = (int) ( $target_info['pokemon_id'] ?? 0 );
+                if ( $pokemon_id <= 0 ) {
+                    continue;
+                }
+                $move_slug  = $gmax_move_slug_by_proto[ (string) $move_proto ] ?? poke_hub_pokemon_gm_id_to_slug( (string) $move_proto );
+                $attack_id  = poke_hub_pokemon_get_attack_id_by_slug( $move_slug, $tables );
+                if ( $attack_id <= 0 ) {
+                    continue;
+                }
+                poke_hub_pokemon_sync_pokemon_attack_links(
+                    $pokemon_id,
+                    [
+                        [
+                            'attack_id' => $attack_id,
+                            'role'      => 'gmax',
+                            'extra'     => wp_json_encode(
+                                [
+                                    'source' => 'sourdough_mapping',
+                                    'move_proto' => $move_proto,
+                                ],
+                                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                            ),
+                        ],
+                    ],
+                    $tables,
+                    false
+                );
+                $stats['pokemon_attack_links'] = ( $stats['pokemon_attack_links'] ?? 0 ) + 1;
+            }
         }
     }
 
@@ -1848,11 +2143,6 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
 
             $template_id = $entry['templateId'] ?? '';
             
-            // Ignorer les templates se terminant par _NORMAL (doublons)
-            if ( preg_match( '/_NORMAL$/', $template_id ) ) {
-                continue;
-            }
-
             $data = $entry['data'] ?? [];
             if ( empty( $data['pokemonSettings'] ) || ! is_array( $data['pokemonSettings'] ) ) {
                 continue;

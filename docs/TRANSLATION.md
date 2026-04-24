@@ -39,6 +39,12 @@ Les métadonnées des blocs (titre, description dans `block.json`) sont en angla
 
 Les chaînes affichées côté PHP (render, shortcodes, admin) sont déjà dans le système de traduction PHP classique.
 
+## Données Pokémon (noms FR/EN, etc.)
+
+Les **chaînes UI** du plugin restent en anglais dans le code (`__()`, etc., domaine `poke-hub`). À part :
+
+- L’écran d’édition des **traductions manquantes** sur les fiches Pokémon (noms multilingues en base, `name_fr`, etc.) se trouve sous **Poké HUB → Temporary tools** — onglet **Translation** (`tab=translation`), lorsque le **module Pokémon** est actif. Ce n’est pas l’écran des fichiers `.po` : c’est un outil **données** ; les règles de non-écrasement sont dans [pokemon/DATA_SAFETY.md](./pokemon/DATA_SAFETY.md).
+
 ## Où sont les chaînes
 
 - **Includes :** `includes/` (settings, admin-ui, content, helpers)

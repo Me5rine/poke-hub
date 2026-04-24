@@ -30,9 +30,8 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'cb'               => '<input type="checkbox" />',
             'form_slug'        => __('Form slug', 'poke-hub'),
             'label'            => __('Label', 'poke-hub'),
-            'category'         => __('Category', 'poke-hub'),
+            'category'         => __('Form type', 'poke-hub'),
             'group_key'        => __('Group key', 'poke-hub'),
-            'parent_form_slug' => __('Parent form', 'poke-hub'),
             'events'           => __('Events', 'poke-hub'),
         ];
     }
@@ -43,7 +42,6 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'label'            => ['label', true],
             'category'         => ['category', true],
             'group_key'        => ['group_key', true],
-            'parent_form_slug' => ['parent_form_slug', true],
         ];
     }
 
@@ -103,19 +101,12 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
     }
 
     public function column_category($item) {
-        return esc_html($item->category ?: 'normal');
+        return esc_html($item->category ?: 'default');
     }
 
     public function column_group_key($item) {
         // La colonne s'appelle 'group' dans la table (mot réservé MySQL)
         return esc_html(isset($item->group) ? $item->group : ($item->group_key ?? '—'));
-    }
-
-    public function column_parent_form_slug($item) {
-        $parent_form_slug = isset($item->parent_form_slug) ? $item->parent_form_slug : '';
-        return $parent_form_slug !== ''
-            ? '<code>' . esc_html($parent_form_slug) . '</code>'
-            : '—';
     }
 
     public function column_events($item) {
@@ -176,7 +167,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
 
         check_admin_referer('bulk-pokemon_forms');
 
-        if (empty($_POST['ids']) || !is_array($_POST['ids'])) {
+        if (empty($_REQUEST['ids']) || !is_array($_REQUEST['ids'])) {
             return;
         }
 
@@ -187,7 +178,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             return;
         }
 
-        $ids = array_map('intval', $_POST['ids']);
+        $ids = array_map('intval', $_REQUEST['ids']);
         $ids = array_filter($ids);
 
         if (!$ids) {
@@ -243,7 +234,6 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'label',
             'category',
             '`group`',
-            'parent_form_slug',
         ];
         if (!in_array($orderby, $allowed_orderby, true)) {
             $orderby = 'form_slug';
@@ -280,7 +270,6 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             : (int) $wpdb->get_var($sql_count);
 
         // Items - sélectionner explicitement toutes les colonnes disponibles
-        // Note: parent_form_slug peut ne pas exister dans toutes les installations
         $sql_items = "SELECT id, form_slug, label, category, `group`, extra FROM {$table} {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
         $params_items   = $params;
         $params_items[] = $per_page;
@@ -309,7 +298,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
  * Ici on gère :
  * - validation/sanitize
  * - appel à l'upsert (pour slug/category/group/label/extra)
- * - mise à jour de parent_form_slug
+ * - mise à jour du type de forme
  */
 function poke_hub_pokemon_handle_forms_form() {
     if (!is_admin()) {
@@ -358,28 +347,27 @@ function poke_hub_pokemon_handle_forms_form() {
     $label_raw        = isset($_POST['label']) ? wp_unslash($_POST['label']) : '';
     $category_raw     = isset($_POST['category']) ? wp_unslash($_POST['category']) : '';
     $group_key_raw    = isset($_POST['group_key']) ? wp_unslash($_POST['group_key']) : '';
-    $parent_slug_raw  = isset($_POST['parent_form_slug']) ? wp_unslash($_POST['parent_form_slug']) : '';
     $name_fr_raw      = isset($_POST['name_fr']) ? wp_unslash($_POST['name_fr']) : '';
     $name_en_raw      = isset($_POST['name_en']) ? wp_unslash($_POST['name_en']) : '';
     $event_links      = isset($_POST['event_links']) && is_array($_POST['event_links']) ? $_POST['event_links'] : [];
 
-    $form_slug = sanitize_title($form_slug_raw);
-    $label     = sanitize_text_field($label_raw);
+    $name_fr = sanitize_text_field($name_fr_raw);
+    $name_en = sanitize_text_field($name_en_raw);
+
+    // Aligné sur le comportement Pokémon demandé :
+    // - slug basé sur le nom EN (admin),
+    // - label = FR si dispo, sinon EN, sinon fallback champ label.
+    $form_slug = $name_en !== '' ? sanitize_title($name_en) : sanitize_title($form_slug_raw);
+    $label     = $name_fr !== '' ? $name_fr : ($name_en !== '' ? $name_en : sanitize_text_field($label_raw));
 
     $category  = sanitize_key($category_raw);
     if ($category === '') {
-        $category = 'normal';
+        $category = 'default';
     }
 
     // Normalisation du group_key : minuscules, [a-z0-9_-]
     $group_key = strtolower((string) $group_key_raw);
     $group_key = preg_replace('/[^a-z0-9_\-]/', '_', $group_key);
-
-    $parent_form_slug = sanitize_title($parent_slug_raw);
-    if ($parent_form_slug === $form_slug) {
-        // On évite un parent qui pointe sur lui-même
-        $parent_form_slug = '';
-    }
 
     // Champs obligatoires
     if ($form_slug === '' || $label === '') {
@@ -394,11 +382,11 @@ function poke_hub_pokemon_handle_forms_form() {
     
     // Ajouter les traductions si fournies
     $names = [];
-    if (!empty($name_fr_raw)) {
-        $names['fr'] = sanitize_text_field($name_fr_raw);
+    if ($name_fr !== '') {
+        $names['fr'] = $name_fr;
     }
-    if (!empty($name_en_raw)) {
-        $names['en'] = sanitize_text_field($name_en_raw);
+    if ($name_en !== '') {
+        $names['en'] = $name_en;
     }
     
     if (!empty($names)) {
@@ -438,12 +426,18 @@ function poke_hub_pokemon_handle_forms_form() {
     // - UPDATE si déjà présent
     if (!function_exists('poke_hub_pokemon_upsert_form_variant')) {
         // fallback : pas d’upsert => on fait un insert/update basique
-        $existing = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE form_slug = %s LIMIT 1",
-                $form_slug
-            )
-        );
+        $existing = null;
+        if ($action === 'update_form' && $id > 0) {
+            $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d LIMIT 1", $id));
+        }
+        if (!$existing) {
+            $existing = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table} WHERE form_slug = %s LIMIT 1",
+                    $form_slug
+                )
+            );
+        }
 
         if (!isset($extra_json)) {
             $extra_json = function_exists('poke_hub_pokemon_encode_extra_json')
@@ -452,16 +446,28 @@ function poke_hub_pokemon_handle_forms_form() {
         }
 
         if ($existing) {
+            $dup = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT id FROM {$table} WHERE form_slug = %s AND id <> %d LIMIT 1",
+                    $form_slug,
+                    (int) $existing->id
+                )
+            );
+            if ($dup) {
+                wp_safe_redirect(add_query_arg('ph_msg', 'slug_conflict', $redirect_base));
+                exit;
+            }
             $wpdb->update(
                 $table,
                 [
-                    'category' => $category,
-                    'group'    => $group_key,
-                    'label'    => $label,
-                    'extra'    => $extra_json,
+                    'form_slug' => $form_slug,
+                    'category'  => $category,
+                    'group'     => $group_key,
+                    'label'     => $label,
+                    'extra'     => $extra_json,
                 ],
                 ['id' => (int) $existing->id],
-                ['%s', '%s', '%s', '%s'],
+                ['%s', '%s', '%s', '%s', '%s'],
                 ['%d']
             );
             $variant_id = (int) $existing->id;
@@ -485,22 +491,17 @@ function poke_hub_pokemon_handle_forms_form() {
             $label,
             $category,
             $group_key,
-            $extra
+            $extra,
+            ($action === 'update_form' && $id > 0) ? $id : 0
         );
     }
 
-    if ($variant_id > 0) {
-        // On applique ensuite le parent_form_slug (l'upsert ne le touche jamais)
-        $wpdb->update(
-            $table,
-            [
-                'parent_form_slug' => $parent_form_slug,
-            ],
-            ['id' => $variant_id],
-            ['%s'],
-            ['%d']
-        );
+    if ($action === 'update_form' && $id > 0 && $variant_id <= 0) {
+        wp_safe_redirect(add_query_arg('ph_msg', 'slug_conflict', $redirect_base));
+        exit;
+    }
 
+    if ($variant_id > 0) {
         // Sauvegarder les associations événements (pokemon_form_variant_events)
         $events_table = pokehub_get_table('pokemon_form_variant_events');
         if ($events_table) {
@@ -617,10 +618,12 @@ function poke_hub_pokemon_admin_forms_screen() {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Form deleted.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'missing_fields') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Form slug and label are required.', 'poke-hub') . '</p></div>';
+        } elseif ($msg === 'slug_conflict') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Could not update: this slug is already used by another form variant.', 'poke-hub') . '</p></div>';
         }
     }
     ?>
-    <form method="post">
+    <form method="get">
         <input type="hidden" name="page" value="poke-hub-pokemon" />
         <input type="hidden" name="ph_section" value="forms" />
         <?php

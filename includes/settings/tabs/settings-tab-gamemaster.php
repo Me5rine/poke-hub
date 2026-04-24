@@ -145,14 +145,32 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
 
     check_admin_referer( 'poke_hub_gm_upload', 'poke_hub_gm_upload_nonce' );
 
-    if ( empty( $_FILES['gm_upload_file']['tmp_name'] ) ) {
+    $upload_file = $_FILES['gm_upload_file'] ?? null;
+    $upload_error = is_array( $upload_file ) ? (int) ( $upload_file['error'] ?? UPLOAD_ERR_NO_FILE ) : UPLOAD_ERR_NO_FILE;
+
+    $upload_error_messages = [
+        UPLOAD_ERR_INI_SIZE   => __( 'Upload failed: the JSON file is larger than the server limit (upload_max_filesize).', 'poke-hub' ),
+        UPLOAD_ERR_FORM_SIZE  => __( 'Upload failed: the JSON file is larger than the form limit.', 'poke-hub' ),
+        UPLOAD_ERR_PARTIAL    => __( 'Upload failed: the JSON file was only partially uploaded.', 'poke-hub' ),
+        UPLOAD_ERR_NO_FILE    => __( 'No file selected for upload.', 'poke-hub' ),
+        UPLOAD_ERR_NO_TMP_DIR => __( 'Upload failed: missing temporary folder on server.', 'poke-hub' ),
+        UPLOAD_ERR_CANT_WRITE => __( 'Upload failed: cannot write uploaded file to disk.', 'poke-hub' ),
+        UPLOAD_ERR_EXTENSION  => __( 'Upload failed: blocked by a PHP extension.', 'poke-hub' ),
+    ];
+
+    if ( $upload_error !== UPLOAD_ERR_OK ) {
+        $messages[] = [
+            'type' => 'error',
+            'text' => $upload_error_messages[ $upload_error ] ?? __( 'Upload failed for an unknown reason.', 'poke-hub' ),
+        ];
+    } elseif ( empty( $upload_file['tmp_name'] ) ) {
         $messages[] = [
             'type' => 'error',
             'text' => __( 'No file selected for upload.', 'poke-hub' ),
         ];
     } else {
-        $file_tmp  = $_FILES['gm_upload_file']['tmp_name'];
-        $file_name = $_FILES['gm_upload_file']['name'];
+        $file_tmp  = $upload_file['tmp_name'];
+        $file_name = (string) ( $upload_file['name'] ?? '' );
 
         $ext = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
 
@@ -183,6 +201,13 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
                     ];
                 } else {
                     $local_file = $gm_dir . 'latest.json';
+                    $previous_hash = '';
+                    if ( file_exists( $local_file ) && is_readable( $local_file ) ) {
+                        $prev_h = @hash_file( 'sha256', $local_file );
+                        if ( is_string( $prev_h ) ) {
+                            $previous_hash = $prev_h;
+                        }
+                    }
 
                     $written = file_put_contents( $local_file, $contents );
                     if ( false === $written ) {
@@ -203,11 +228,29 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
                             update_option( 'poke_hub_gm_last_mtime', $current_mtime );
                         }
 
+                        $new_hash = '';
+                        $new_h = @hash_file( 'sha256', $local_file );
+                        if ( is_string( $new_h ) ) {
+                            $new_hash = $new_h;
+                        }
+
+                        $same_hash = ( $previous_hash !== '' && $new_hash !== '' && $previous_hash === $new_hash );
+                        $replace_note = $same_hash
+                            ? __( 'Content is identical to previous local file.', 'poke-hub' )
+                            : __( 'Local file content was replaced.', 'poke-hub' );
+                        $mtime_note = $current_mtime > 0
+                            ? gmdate( 'Y-m-d H:i:s', $current_mtime ) . ' UTC'
+                            : '-';
+
                         $messages[] = [
                             'type' => 'success',
                             'text' => sprintf(
-                                __( 'Local Game Master file updated: %s', 'poke-hub' ),
-                                esc_html( $local_file )
+                                __( 'Local Game Master file updated: %1$s (%2$d bytes). SHA256: %3$s. Last modified: %4$s. %5$s', 'poke-hub' ),
+                                esc_html( $local_file ),
+                                (int) $written,
+                                $new_hash !== '' ? $new_hash : __( 'unavailable', 'poke-hub' ),
+                                $mtime_note,
+                                $replace_note
                             ),
                         ];
                     }
@@ -825,96 +868,71 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
             <tr>
                 <th scope="row"><?php esc_html_e( 'Summary', 'poke-hub' ); ?></th>
                 <td>
-                    <ul class="pokehub-gm-summary">
-                        <?php foreach ( $last_summary as $key => $value ) : ?>
+                    <?php
+                    $summary_tiles = [
+                        'pokemon_inserted_count'   => __( 'Pokémon ajoutés', 'poke-hub' ),
+                        'pokemon_updated_count'    => __( 'Pokémon mis à jour', 'poke-hub' ),
+                        'attacks_inserted_count'   => __( 'Attaques ajoutées', 'poke-hub' ),
+                        'attacks_updated_count'    => __( 'Attaques mises à jour', 'poke-hub' ),
+                        'pve_stats'                => __( 'Stats PvE MAJ', 'poke-hub' ),
+                        'pvp_stats'                => __( 'Stats PvP MAJ', 'poke-hub' ),
+                        'pokemon_type_links'       => __( 'Liens Pokémon/Types', 'poke-hub' ),
+                        'attack_type_links'        => __( 'Liens Attaques/Types', 'poke-hub' ),
+                        'pokemon_attack_links'     => __( 'Liens Pokémon/Attaques', 'poke-hub' ),
+                        'pokemon_type_weakness_links'   => __( 'Liens Faiblesses', 'poke-hub' ),
+                        'pokemon_type_resistance_links' => __( 'Liens Résistances', 'poke-hub' ),
+                    ];
 
+                    $detail_lists = [
+                        'pokemon_inserted_sample' => __( 'Pokémon ajoutés (exemples)', 'poke-hub' ),
+                        'pokemon_updated_sample'  => __( 'Pokémon mis à jour (exemples)', 'poke-hub' ),
+                        'attacks_inserted_sample' => __( 'Attaques ajoutées (exemples)', 'poke-hub' ),
+                        'attacks_updated_sample'  => __( 'Attaques mises à jour (exemples)', 'poke-hub' ),
+                    ];
+                    ?>
+
+                    <div class="pokehub-gm-summary-tiles" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        <?php foreach ( $summary_tiles as $key => $label ) : ?>
                             <?php
-                            if ( substr( $key, -8 ) === '_deleted' ) {
+                            if ( ! array_key_exists( $key, $last_summary ) ) {
                                 continue;
                             }
+                            $value = is_numeric( $last_summary[ $key ] ) ? (int) $last_summary[ $key ] : 0;
+                            ?>
+                            <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #dcdcde;border-radius:999px;background:#fff;">
+                                <strong><?php echo esc_html( (string) $value ); ?></strong>
+                                <span><?php echo esc_html( $label ); ?></span>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
 
-                            switch ( $key ) {
-                                case 'pokemon_inserted':
-                                    $label = __( 'Pokémon inserted', 'poke-hub' );
-                                    break;
-                                case 'pokemon_updated':
-                                    $label = __( 'Pokémon updated', 'poke-hub' );
-                                    break;
-                                case 'attacks_inserted':
-                                    $label = __( 'Attacks inserted', 'poke-hub' );
-                                    break;
-                                case 'attacks_updated':
-                                    $label = __( 'Attacks updated', 'poke-hub' );
-                                    break;
-                                case 'pve_stats':
-                                    $label = __( 'PvE stats updated', 'poke-hub' );
-                                    break;
-                                case 'pvp_stats':
-                                    $label = __( 'PvP stats updated', 'poke-hub' );
-                                    break;
-                                case 'pokemon_type_links':
-                                    $label = __( 'Pokémon ↔ Type links', 'poke-hub' );
-                                    break;
-                                case 'attack_type_links':
-                                    $label = __( 'Attack ↔ Type links', 'poke-hub' );
-                                    break;
-                                case 'pokemon_type_weakness_links':
-                                    $label = __( 'Type ↔ Weakness links', 'poke-hub' );
-                                    break;
-                                case 'pokemon_type_resistance_links':
-                                    $label = __( 'Type ↔ Resistance links', 'poke-hub' );
-                                    break;
-                                case 'pokemon_attack_links':
-                                    $label = __( 'Pokémon ↔ Attack links', 'poke-hub' );
-                                    break;
-                                default:
-                                    $label = $key;
-                                    break;
+                    <div style="margin-top:12px;">
+                        <?php foreach ( $detail_lists as $key => $label ) : ?>
+                            <?php
+                            $items = $last_summary[ $key ] ?? [];
+                            if ( ! is_array( $items ) || empty( $items ) ) {
+                                continue;
                             }
-
-                            $is_array = is_array( $value );
-                            $count    = $is_array ? count( $value ) : 0;
-
                             $detail_id = 'gm-summary-detail-' . preg_replace( '/[^a-z0-9_\-]/i', '_', $key );
                             ?>
-                            <li class="gm-summary-item">
-                                <strong><?php echo esc_html( $label ); ?></strong> :
-
-                                <?php if ( $is_array ) : ?>
-                                    <?php
-                                    $count_text = sprintf(
-                                        esc_html( _n( '%d item', '%d items', $count, 'poke-hub' ) ),
-                                        $count
-                                    );
-                                    echo esc_html( $count_text );
-                                    ?>
-
-                                    <?php if ( $count > 0 ) : ?>
-                                        <button type="button"
-                                                class="button button-small gm-toggle-btn"
-                                                data-target="<?php echo esc_attr( $detail_id ); ?>">
-                                            <?php esc_html_e( 'Show details', 'poke-hub' ); ?>
-                                        </button>
-
-                                        <div id="<?php echo esc_attr( $detail_id ); ?>"
-                                            class="gm-summary-detail"
-                                            style="display:none;">
-                                            <ul>
-                                                <?php foreach ( $value as $item ) : ?>
-                                                    <li><?php echo esc_html( (string) $item ); ?></li>
-                                                <?php endforeach; ?>
-                                            </ul>
-                                        </div>
-                                    <?php endif; ?>
-
-                                <?php else : ?>
-
-                                    <span><?php echo esc_html( (string) $value ); ?></span>
-
-                                <?php endif; ?>
-                            </li>
+                            <p style="margin:0 0 8px;">
+                                <button type="button"
+                                        class="button button-small gm-toggle-btn"
+                                        data-target="<?php echo esc_attr( $detail_id ); ?>">
+                                    <?php echo esc_html( $label ); ?> (<?php echo esc_html( (string) count( $items ) ); ?>)
+                                </button>
+                            </p>
+                            <div id="<?php echo esc_attr( $detail_id ); ?>"
+                                 class="gm-summary-detail"
+                                 style="display:none;margin:0 0 12px;padding:8px 12px;background:#fff;border:1px solid #dcdcde;border-radius:4px;">
+                                <ul style="margin:0 0 0 18px;">
+                                    <?php foreach ( $items as $item ) : ?>
+                                        <li><?php echo esc_html( (string) $item ); ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 </td>
             </tr>
 
@@ -930,9 +948,6 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                         var isVisible = content.style.display !== 'none';
 
                         content.style.display = isVisible ? 'none' : 'block';
-                        btn.textContent       = isVisible
-                            ? '<?php echo esc_js( __( 'Show details', 'poke-hub' ) ); ?>'
-                            : '<?php echo esc_js( __( 'Hide details', 'poke-hub' ) ); ?>';
                     });
                 });
             });

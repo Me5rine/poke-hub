@@ -119,6 +119,46 @@ function poke_hub_pokemon_is_baby_from_row(array $row): bool {
 }
 
 /**
+ * Groupe d’espèce « spéciale » (légendaire, fabuleux / mythical, ultra-chimère) pour filtres et règles.
+ * Priorité à `extra.species_special_group` (JSON en base). Chaîne vide = espèce standard.
+ * Filtre de repli : {@see 'poke_hub_pokemon_species_special_group_legacy'}.
+ *
+ * @param array<string, mixed> $row Au minimum `slug` ; `extra` peut être la chaîne JSON telle qu’en base.
+ * @return ''|'legendary'|'mythical'|'ultra_beast'
+ */
+function poke_hub_pokemon_species_special_group_from_row(array $row): string {
+    $allowed = ['legendary', 'mythical', 'ultra_beast'];
+    $extra   = $row['extra'] ?? null;
+    $raw     = null;
+
+    if (is_string($extra) && $extra !== '') {
+        $d = json_decode($extra, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+        if (is_array($d) && array_key_exists('species_special_group', $d)) {
+            $raw = $d['species_special_group'];
+        }
+    } elseif (is_array($extra) && array_key_exists('species_special_group', $extra)) {
+        $raw = $extra['species_special_group'];
+    }
+
+    if ($raw !== null && $raw !== '') {
+        $v = sanitize_key((string) $raw);
+        if (in_array($v, $allowed, true)) {
+            return $v;
+        }
+    }
+
+    $legacy = apply_filters('poke_hub_pokemon_species_special_group_legacy', null, $row);
+    if (is_string($legacy) && $legacy !== '') {
+        $lv = sanitize_key($legacy);
+        if (in_array($lv, $allowed, true)) {
+            return $lv;
+        }
+    }
+
+    return '';
+}
+
+/**
  * Get Scatterbug/Vivillon patterns from database.
  * Only returns patterns marked as regional (extra->regional->is_regional = true).
  * Patterns are stored as form variants for Scatterbug (dex_number 664) and Vivillon (dex_number 666).
@@ -836,6 +876,22 @@ function poke_hub_pokemon_get_assets_base_url() {
 }
 
 /**
+ * Base URL (bucket + chemin) pour un 2e dossier de sprites sur le même hébergeur (mêmes slug.png).
+ * Ex. primaire …/pokemon-go/pokemon/ + repli …/home/pokemon/ — pas de nommage par ID.
+ */
+function poke_hub_pokemon_get_assets_alternate_path_base_url(): string {
+    $bucket = trim((string) get_option('poke_hub_assets_bucket_base_url', ''));
+    $alt    = trim((string) get_option('poke_hub_assets_path_pokemon_alternate', ''));
+    if ($bucket === '' || $alt === '') {
+        return '';
+    }
+    $bucket = rtrim($bucket, '/');
+    $alt    = '/' . ltrim($alt, '/');
+
+    return $bucket . rtrim($alt, '/');
+}
+
+/**
  * URL de base de secours : même arborescence / mêmes noms de fichiers que la source principale.
  */
 function poke_hub_pokemon_get_assets_fallback_base_url() {
@@ -877,12 +933,17 @@ function poke_hub_pokemon_build_image_key_from_slug($slug, array $args = []) {
 }
 
 /**
- * Version simple : ne renvoie que l'URL principale (string).
+ * Version simple : URL d’affichage (primaire, ou fallback secondaire si la primaire est vide).
+ * Pour une repli 404 navigateur, utiliser {@see poke_hub_pokemon_get_image_sources()} (primary + fallback).
  */
 function poke_hub_pokemon_get_image_url($pokemon, array $args = []) {
-    $sources = poke_hub_pokemon_get_image_sources($pokemon, $args);
-
-    return $sources['primary'];
+    $sources  = poke_hub_pokemon_get_image_sources($pokemon, $args);
+    $primary  = trim((string) ($sources['primary'] ?? ''));
+    $fallback = trim((string) ($sources['fallback'] ?? ''));
+    if ($primary !== '') {
+        return $primary;
+    }
+    return $fallback;
 }
 
 /**
@@ -924,8 +985,9 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         }
     }
 
-    $base_url          = poke_hub_pokemon_get_assets_base_url();
-    $fallback_base_url = poke_hub_pokemon_get_assets_fallback_base_url();
+    $base_url              = poke_hub_pokemon_get_assets_base_url();
+    $fallback_base_url   = poke_hub_pokemon_get_assets_fallback_base_url();
+    $alternate_path_base = poke_hub_pokemon_get_assets_alternate_path_base_url();
 
     // Slug / dex : supporter tableau ou objet. Un slug stocké à 0 (int) ou "0" (chaîne) est invalide :
     // sanitize_title le garde en "0" → URL …/0.png (souvent vu sur formes Méga si données partielles / import).
@@ -986,6 +1048,8 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
             // Si aucun fallback n'est configuré, on garde la compatibilité avec primary.
             if ($fallback_base_url !== '') {
                 $fallback = $fallback_base_url . '/' . ltrim($path, '/');
+            } elseif ($alternate_path_base !== '' && $alternate_path_base !== $base_url) {
+                $fallback = $alternate_path_base . '/' . ltrim($path, '/');
             } else {
                 $fallback = $primary;
             }
@@ -1001,6 +1065,55 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
      * Filtre si tu veux personnaliser pour certains Pokémon / formes.
      */
     return apply_filters('poke_hub_pokemon_image_sources', $sources, $pokemon, $args);
+}
+
+/**
+ * Même règles que l’aperçu de sprite (admin) : URL affichée + champs d’API pour le repli 404.
+ *
+ * @param object|array<string, mixed> $pokemon
+ * @param array{shiny?: bool, gender?: string|null, variant?: string} $args
+ * @return array{ src: string, primary: string, fallback: string }  « fallback » = 2e URL possible (même clé) ; repli onerror seulement si !== src
+ */
+function poke_hub_pokemon_get_sprite_display_sources($pokemon, array $args = []): array {
+    if (function_exists('poke_hub_pokemon_get_image_sources')) {
+        $srcs     = poke_hub_pokemon_get_image_sources($pokemon, $args);
+        $primary  = trim((string) ($srcs['primary'] ?? ''));
+        $fallback = trim((string) ($srcs['fallback'] ?? ''));
+        $src = $primary !== '' ? $primary : $fallback;
+
+        return [
+            'src'      => $src,
+            'primary'  => $primary,
+            'fallback' => $fallback,
+        ];
+    }
+    $url = function_exists('poke_hub_pokemon_get_image_url')
+        ? trim((string) poke_hub_pokemon_get_image_url($pokemon, $args))
+        : '';
+
+    return [
+        'src'      => $url,
+        'primary'  => $url,
+        'fallback' => '',
+    ];
+}
+
+/**
+ * Fragment HTML commun : data-fallback + onerror (repli 404) si une 2e URL diffère de l’affichage.
+ * Réutilisable sur les vues <img> (admin, collections, blocs, etc.).
+ *
+ * @param string $display_src  URL en src= (déjà choisie : primaire ou repli seul).
+ * @param string $on_error_src URL de secours (ex. 2e chemin d’hébergeur).
+ * @return string  Commence par un espace, ou ''.
+ */
+function poke_hub_pokemon_get_sprite_image_fallback_attr_html($display_src, $on_error_src): string {
+    $display_src  = trim((string) $display_src);
+    $on_error_src = trim((string) $on_error_src);
+    if ($on_error_src === '' || $on_error_src === $display_src) {
+        return '';
+    }
+
+    return ' data-fallback="' . esc_attr($on_error_src) . '" onerror="this.onerror=null;this.src=\'' . esc_js($on_error_src) . '\';"';
 }
 
 /**
@@ -1399,7 +1512,7 @@ function pokehub_pokemon_select_category_rank(string $category): int {
     if (in_array($category, ['costume', 'costumed'], true)) {
         return 1;
     }
-    if ($category === 'mega' || $category === 'gigantamax') {
+    if (in_array($category, ['mega', 'primal', 'gigantamax'], true)) {
         return 2;
     }
     return 3;
@@ -2208,7 +2321,7 @@ function pokehub_get_mega_pokemon_for_select(): array {
         return [];
     }
     
-    // Récupérer uniquement les Pokémon avec formes Mega (category = 'mega' dans pokemon_form_variants)
+    // Récupérer uniquement les Pokémon avec formes Mega / Primal (même circuit in-game)
     $rows = $wpdb->get_results(
         "SELECT p.id, 
                 p.dex_number, 
@@ -2218,7 +2331,7 @@ function pokehub_get_mega_pokemon_for_select(): array {
                 COALESCE(fv.label, fv.form_slug, '') AS form
          FROM {$pokemon_table} p
          INNER JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
-         WHERE fv.category = 'mega'
+         WHERE fv.category IN ('mega', 'primal')
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );

@@ -217,7 +217,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                 $display = $fv->label !== '' ? $fv->label : $fv->form_slug;
                 $meta    = [];
 
-                if (!empty($fv->category) && $fv->category !== 'normal') {
+                if (!empty($fv->category) && !in_array((string) $fv->category, ['normal', 'default'], true)) {
                     $meta[] = $fv->category;
                 }
                 if (!empty($fv->group)) {
@@ -438,7 +438,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                     <?php
                     $display = $form_row->label !== '' ? $form_row->label : $form_row->form_slug;
                     $meta    = [];
-                    if (!empty($form_row->category) && $form_row->category !== 'normal') {
+                    if (!empty($form_row->category) && !in_array((string) $form_row->category, ['normal', 'default'], true)) {
                         $meta[] = $form_row->category;
                     }
                     if (!empty($form_row->group)) {
@@ -1633,9 +1633,31 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     // Pokémon d'événement ou costumé : si la forme a la catégorie "costume", c'est automatique ; sinon case à cocher
     $is_event_costumed = ($variant_category === 'costume') || !empty($_POST['is_event_costumed']);
+    $has_gmax_form     = !empty($_POST['has_gmax_form']);
 
-    // Bébé (extra.is_baby) — fiche éditable pour les règles « inclure bébés » (collections, etc.)
-    $is_baby = !empty($_POST['is_baby']);
+    // `extra.is_baby` + `extra.species_special_group` : un seul champ POST `species_kind` (repli: ancien is_baby)
+    $species_kind_allowed = ['standard', 'baby', 'legendary', 'mythical', 'ultra_beast'];
+    if (isset($_POST['species_kind'])) {
+        $species_kind = sanitize_key((string) wp_unslash($_POST['species_kind']));
+    } elseif (!empty($_POST['is_baby'])) {
+        $species_kind = 'baby';
+    } else {
+        $species_kind = 'standard';
+    }
+    if (!in_array($species_kind, $species_kind_allowed, true)) {
+        $species_kind = 'standard';
+    }
+    if ($species_kind === 'baby') {
+        $is_baby               = true;
+        $species_special_group = '';
+    } else {
+        $is_baby = false;
+        if ($species_kind === 'standard') {
+            $species_special_group = '';
+        } else {
+            $species_special_group = $species_kind;
+        }
+    }
 
     // Régional
     $regional_is_regional  = !empty($_POST['regional_is_regional']);
@@ -1676,6 +1698,10 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     $charged_attacks_raw = (isset($_POST['charged_moves']) && is_array($_POST['charged_moves']))
         ? wp_unslash($_POST['charged_moves'])
+        : [];
+
+    $gmax_attacks_raw = (isset($_POST['gmax_moves']) && is_array($_POST['gmax_moves']))
+        ? wp_unslash($_POST['gmax_moves'])
         : [];
 
     // ---------- Evolutions ----------
@@ -1854,7 +1880,13 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     // Pokémon d'événement ou costumé (même notion)
     $extra['is_event_costumed']  = (bool) $is_event_costumed;
+    $extra['has_gmax_form']      = (bool) $has_gmax_form;
     $extra['is_baby']            = (bool) $is_baby;
+    if ($species_special_group === '') {
+        unset($extra['species_special_group']);
+    } else {
+        $extra['species_special_group'] = $species_special_group;
+    }
 
     // ---------- Bloc par jeu : Pokémon GO ----------
 
@@ -1999,7 +2031,8 @@ function poke_hub_pokemon_handle_pokemon_form() {
             poke_hub_pokemon_sync_pokemon_attacks(
                 $pokemon_id,
                 (array) $fast_attacks_raw,
-                (array) $charged_attacks_raw
+                (array) $charged_attacks_raw,
+                (array) $gmax_attacks_raw
             );
         }
 
@@ -2073,7 +2106,8 @@ function poke_hub_pokemon_handle_pokemon_form() {
         poke_hub_pokemon_sync_pokemon_attacks(
             (int) $id,
             (array) $fast_attacks_raw,
-            (array) $charged_attacks_raw
+            (array) $charged_attacks_raw,
+            (array) $gmax_attacks_raw
         );
     }
 

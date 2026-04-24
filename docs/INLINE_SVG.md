@@ -21,7 +21,9 @@ Défini dans `poke-hub.php`, fonction `poke_hub_load_pokemon_public_helpers()` :
 3. **`includes/functions/pokehub-pokemon-type-icon.php`** — couche **types Pokémon** uniquement :  
    - `poke_hub_get_type_icon_url( string $slug )` : URL `.svg` du type (chemin `types` dans Sources).  
    - `pokehub_render_pokemon_type_icon_html( string $icon_url, array $args )` : délègue à `pokehub_render_inline_svg_from_url()` avec les classes UI types (`pokehub-type-icon`, etc.).  
-   - Enregistrement de la feuille **`pokehub-type-icons`** (`assets/css/poke-hub-type-icons.css`) sur `init`.
+   - **CSS** `assets/css/poke-hub-type-icons.css`, handle **`pokehub-type-icons`** :  
+     - **Front** : sur `init`, `poke_hub_register_bundled_front_style()` enregistre la feuille **seulement** si `poke_hub_load_default_plugin_front_css` vaut `true` (voir `pokehub-front-styles-bridge.php`) **et** si le fichier existe. Avec le thème Me5rine en production (`false`), c’est **`css/poke-hub/parts/02-type-icons.css`** qui fournit les mêmes règles côté thème — à maintenir en parité avec le fichier plugin.  
+     - **Admin** : chargement **systématique** sur les pages admin du plugin par `poke_hub_enqueue_admin_unified_styles()` dans `poke-hub.php` (enqueue avec URL explicite), pour que les listes / formulaires types restent corrects même lorsque le filtre front est à `false`. Détail : [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) (*Ce qui reste dans le plugin*).
 
 ## Filtres
 

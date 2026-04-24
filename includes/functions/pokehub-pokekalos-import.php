@@ -67,7 +67,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
         $sql_mega = "SELECT p.id, p.dex_number, p.name_fr, p.extra
                 FROM {$pokemon_table} p
                 INNER JOIN {$variants_table} fv ON p.form_variant_id = fv.id
-                WHERE p.is_default = 0 AND fv.category = 'mega'
+                WHERE p.is_default = 0 AND fv.category IN ('mega', 'primal')
                   AND p.name_fr IS NOT NULL AND TRIM(p.name_fr) != ''";
         if ($skip_existing) {
             $sql_mega .= $no_release_sql;

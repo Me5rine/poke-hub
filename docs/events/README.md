@@ -11,6 +11,7 @@ Ce fichier sert de **table des matières** ; le détail est réparti dans les pa
 | [README-ROUTING.md](./README-ROUTING.md) | Routing des URLs d’événements, réécritures, comportement front |
 | [EVENEMENTS-DISTANTS.md](./EVENEMENTS-DISTANTS.md) | Sources (`local_event`, `remote_event`, `special_event`), table `special_events`, sites distants |
 | [INTEGRATION-ELEMENTOR.md](./INTEGRATION-ELEMENTOR.md) | Utilisation avec Elementor |
+| [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md) (§ *Imports Fandom*) | Onglets **Temporary tools** : heure de raids, heure vedette, Lundi Max — **titres** (`title_en` / `title_fr`), noms issus de la table **`pokemon`**, wikitext Fandom |
 
 ## Événements spéciaux — Pokémon de l’événement
 

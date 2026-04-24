@@ -146,14 +146,14 @@ class Poke_Hub_Pokemon_Egg_Types_List_Table extends WP_List_Table {
 
         check_admin_referer('bulk-pokemon_egg_types');
 
-        if (empty($_POST['ids']) || !is_array($_POST['ids'])) {
+        if (empty($_REQUEST['ids']) || !is_array($_REQUEST['ids'])) {
             return;
         }
 
         global $wpdb;
         $table = pokehub_get_table('pokemon_egg_types');
 
-        $ids = array_map('intval', $_POST['ids']);
+        $ids = array_map('intval', $_REQUEST['ids']);
         $ids = array_filter($ids);
 
         if (!$ids) {
@@ -402,7 +402,7 @@ function poke_hub_pokemon_admin_egg_types_screen() {
         }
     }
     ?>
-    <form method="post">
+    <form method="get">
         <input type="hidden" name="page" value="poke-hub-pokemon" />
         <input type="hidden" name="ph_section" value="egg_types" />
         <?php

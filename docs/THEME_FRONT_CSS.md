@@ -7,7 +7,7 @@ Ce document est la **référence** pour le chargement du CSS public Poké HUB : 
 | Où ? | Contenu | Quand c’est utilisé |
 |------|---------|----------------------|
 | **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules (collections, blocs, profils, friend codes, variables `me5rine-lab-*`, etc.) : `poke-hub-front.css` → `@import` des `parts/*.css`, puis `poke-hub-late-overrides.css` en **dernière** couche. | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
-| **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; parfois un **filet** optionnel `poke-hub-collections-cascade-late.css` (voir tableau ci‑dessous). | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris). |
+| **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; **`poke-hub-type-icons.css`** (icônes types en SVG — voir tableau *Ce qui reste* ci‑dessous) ; parfois un **filet** optionnel `poke-hub-collections-cascade-late.css`. | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris), **sauf** les feuilles **admin** et l’enqueue **explicite** des icônes de types en admin (voir tableau). |
 
 **Filtre WordPress** : `poke_hub_load_default_plugin_front_css`
 
@@ -24,7 +24,7 @@ flowchart LR
   end
   subgraph plugin["Plugin poke-hub"]
     E[admin-unified, metaboxes, …]
-    F[global-colors + optionnel cascade-late]
+    F[global-colors + poke-hub-type-icons admin explicite + optionnel cascade-late]
   end
   G["Filtre poke_hub_load_default_plugin_front_css = false"] --> H["Pack front module = thème seulement"]
   G --> I["Déqueue des handles listés côté plugin"]
@@ -49,8 +49,9 @@ flowchart LR
 | Fichier / rôle | Rôle |
 |----------------|------|
 | `global-colors.css` | Variables notices / couleurs partagées (admin + besoins Gutenberg) ; **toujours** pertinent. |
+| `poke-hub-type-icons.css` | Icônes de **types** Pokémon (SVG inline, `currentColor`, classes `pokehub-type-icon--admin-list` / `--admin-preview`, cellule liste `.pokehub-type-icon-list-cell`). **Admin** : chargé **systématiquement** sur les écrans du plugin via `poke_hub_enqueue_admin_unified_styles()` dans `poke-hub.php` (chemin explicite), **sans dépendre** du filtre `poke_hub_load_default_plugin_front_css`. **Front** : enregistré sur `init` par `poke_hub_register_bundled_front_style()` dans `includes/functions/pokehub-pokemon-type-icon.php` **uniquement** si le filtre vaut `true` et le fichier est lisible. En production Me5rine (`false`), le thème reprend les mêmes règles dans `css/poke-hub/parts/02-type-icons.css` — **garder les deux fichiers alignés** si vous modifiez les styles. |
 | `admin-unified.css`, `pokehub-metaboxes-admin.css` | Administration uniquement. |
-| `poke-hub-collections-cascade-late.css` | **Optionnel** : filet de secours (cascade) pour Collections ; enfilé par le module quand le filtre `poke_hub_enqueue_collections_cascade_late` vaut `true` (défaut), **hors** logique `poke_hub_enqueue_bundled_front_style` — il n’est **pas** dans la liste `poke_hub_get_plugin_front_style_handles()` afin d’exister aussi lorsque le lot front « packagé » est désactivé. Désactiver : `add_filter( 'poke_hub_enqueue_collections_cascade_late', '__return_false' );` |
+| `poke-hub-collections-cascade-late.css` | **Optionnel** : filet de secours (cascade) pour Collections **hors** bloc recherche GO in-game (liste collections, section avancée `<details>`, filtre tuiles, layout nom de tuile, etc.) ; enfilé par le module quand le filtre `poke_hub_enqueue_collections_cascade_late` vaut `true` (défaut), **hors** logique `poke_hub_enqueue_bundled_front_style` — il n’est **pas** dans la liste `poke_hub_get_plugin_front_style_handles()` afin d’exister aussi lorsque le lot front « packagé » est désactivé. **Le bloc copy-paste GO** est stylé dans le thème : `parts/13-collections-front.css`. Désactiver la feuille : `add_filter( 'poke_hub_enqueue_collections_cascade_late', '__return_false' );` |
 | Fichiers `poke-hub-*-front.css` historiques | S’ils sont **absents** du dépôt, les modules n’enquent rien de ce côté ; le thème fournit l’équivalent. |
 
 Code : `includes/functions/pokehub-front-styles-bridge.php` (helpers, liste des handles, déqueue).
@@ -75,7 +76,7 @@ Commentaires détaillés : en-tête de `style.css` du thème enfant.
 
 ### Surcharges « collections thème »
 
-Dégradés / variables spécifiques : voir le part **`parts/14-collections-theme.css`**, importé par `poke-hub-front.css` (et non plus un fichier orphelin sous `assets/theme/` du plugin).
+Dégradés / variables spécifiques : voir le part **`parts/14-collections-theme.css`**, importé par `poke-hub-front.css` (et non plus un fichier orphelin sous `assets/theme/` du plugin). **`parts/13-collections-front.css`** : masquage des lignes de filtre (`label[data-collections-control].is-hidden`, etc.) pour les options de collection **selon la catégorie** — détail **docs/COLLECTIONS_MODULE.md** (*Options masquées par catégorie*) ; **bloc phrases de recherche GO** (layout, grille de groupes, toolbar des selects) — détail **modules/collections/COLLECTIONS_THEME_CSS.md** (*Bloc phrases de recherche*). Référence classes : **docs/POKEHUB_CSS_CLASSES.md** ; options et comportement du pool : **docs/COLLECTIONS_MODULE.md**.
 
 ## Fichiers de référence (dépôt thème, hors plugin)
 

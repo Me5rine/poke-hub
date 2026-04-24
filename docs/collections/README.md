@@ -1,6 +1,6 @@
 # Module Pokémon GO Collections – Poké HUB (index)
 
-Le module **collections** gère les **listes de collection** (shortcodes, pool d’objets, statuts possédé / échange / manquant), le routage public et l’API REST associée. Le **CSS front** est surtout dans le **thème** (Me5rine : `css/poke-hub/parts/13-…`, `14-…` ; doc **[THEME_FRONT_CSS.md](../THEME_FRONT_CSS.md)**). `modules/collections/COLLECTIONS_THEME_CSS.md` complète (variables, classes).
+Le module **collections** gère les **listes de collection** (shortcodes, pool d’objets, statuts possédé / échange / manquant), le routage public et l’API REST associée. Options de composition détaillées (genre Nidoran vs symboles vs doublon mâle/femelle collectionneur, **masquage des réglages inutiles selon la catégorie** : voir *Options masquées par catégorie (UI)* dans **[COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md)**), phrases GO copiables : **jeton = nom d’espèce**, **une entrée par dex** sur toutes les sections — incluant **Phrases GO : données serveur et langue** (`pogo_token_*`, `pogo_group_prefix_*`, noms variantes en base). Le **CSS front** est surtout dans le **thème** (Me5rine : `css/poke-hub/parts/13-…`, `14-…` ; doc **[THEME_FRONT_CSS.md](../THEME_FRONT_CSS.md)**), y compris la **mise en page du bloc recherche GO** (toolbar, grille de groupes) dans `13-collections-front.css`. `modules/collections/COLLECTIONS_THEME_CSS.md` complète (variables, classes).
 
 ## Pages de documentation
 

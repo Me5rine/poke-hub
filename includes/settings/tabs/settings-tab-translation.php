@@ -33,6 +33,9 @@ $start_after_id = 0;
 
 $selected_lang = isset($_GET['lang']) ? sanitize_text_field($_GET['lang']) : 'fr';
 $selected_type = isset($_GET['type']) ? sanitize_text_field($_GET['type']) : 'pokemon';
+$is_tools_context = defined('POKE_HUB_TRANSLATION_TAB_CONTEXT') && POKE_HUB_TRANSLATION_TAB_CONTEXT === 'tools';
+$page_slug = $is_tools_context ? 'poke-hub-tools' : 'poke-hub-settings';
+$tab_slug = 'translation';
 
 $allowed_langs = ['fr', 'de', 'it', 'es', 'ja', 'ko'];
 $allowed_types = ['pokemon', 'attacks', 'types'];
@@ -394,8 +397,8 @@ foreach ($messages as $msg) {
     <p><?php esc_html_e('Enter translations for missing items. Only items with entered translations will be saved.', 'poke-hub'); ?></p>
 
     <form method="get" action="" style="margin-top: 15px; margin-bottom: 20px; padding: 15px; background: #f0f0f1; border-radius: 4px;">
-        <input type="hidden" name="page" value="poke-hub-settings" />
-        <input type="hidden" name="tab" value="translation" />
+        <input type="hidden" name="page" value="<?php echo esc_attr($page_slug); ?>" />
+        <input type="hidden" name="tab" value="<?php echo esc_attr($tab_slug); ?>" />
 
         <label for="filter_lang" style="margin-right: 15px;">
             <strong><?php esc_html_e('Language:', 'poke-hub'); ?></strong>

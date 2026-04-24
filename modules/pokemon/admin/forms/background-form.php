@@ -20,6 +20,13 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         wp_die(__('You are not allowed to edit backgrounds.', 'poke-hub'));
     }
 
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['pokemon'], ['skip_allow_filter' => true, 'try_require_db_class' => true]);
+    }
+    if (function_exists('poke_hub_ensure_background_pokemon_link_unique_index')) {
+        poke_hub_ensure_background_pokemon_link_unique_index();
+    }
+
     global $wpdb;
 
     $is_edit = ($edit_row && isset($edit_row->id));
@@ -33,6 +40,9 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
     $current_pokemon_ids = [];
     $current_shiny_locked_ids = [];
     $current_shiny_active_ids = [];
+    $current_shadow_ids = [];
+    $current_dynamax_ids = [];
+    $current_gigantamax_ids = [];
 
     if ($is_edit) {
         $title = isset($edit_row->title) ? (string) $edit_row->title : '';
@@ -50,24 +60,46 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             $current_events = [['event_type' => (string) $edit_row->event_type, 'event_id' => (int) $edit_row->event_id]];
         }
 
-        // Pokémon liés
         $links_table = pokehub_get_table('pokemon_background_pokemon_links');
+        $link_base  = defined('POKE_HUB_BG_LINK_BASE') ? POKE_HUB_BG_LINK_BASE : 'base';
+        $link_sh    = defined('POKE_HUB_BG_LINK_SHADOW') ? POKE_HUB_BG_LINK_SHADOW : 'shadow';
+        $link_dx    = defined('POKE_HUB_BG_LINK_DYNAMAX') ? POKE_HUB_BG_LINK_DYNAMAX : 'dynamax';
+        $link_gx    = defined('POKE_HUB_BG_LINK_GIGANTAMAX') ? POKE_HUB_BG_LINK_GIGANTAMAX : 'gigantamax';
+
         if ($links_table) {
-            $pokemon_rows = $wpdb->get_results(
+            $link_rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT pokemon_id FROM {$links_table} WHERE background_id = %d ORDER BY pokemon_id ASC",
+                    "SELECT pokemon_id, is_shiny_locked, link_kind FROM {$links_table} WHERE background_id = %d",
                     (int) $edit_row->id
                 )
             );
-            $current_pokemon_ids = array_map(function ($row) {
-                return (int) $row->pokemon_id;
-            }, $pokemon_rows);
+            if (is_array($link_rows)) {
+                foreach ($link_rows as $ln) {
+                    $pid = (int) $ln->pokemon_id;
+                    if ($pid <= 0) {
+                        continue;
+                    }
+                    $k = isset($ln->link_kind) ? (string) $ln->link_kind : $link_base;
+                    if ($k === '' || $k === '0') {
+                        $k = $link_base;
+                    }
+                    if ($k === $link_base) {
+                        $current_pokemon_ids[] = $pid;
+                        if ((int) $ln->is_shiny_locked === 1) {
+                            $current_shiny_locked_ids[] = $pid;
+                        } else {
+                            $current_shiny_active_ids[] = $pid;
+                        }
+                    } elseif ($k === $link_sh) {
+                        $current_shadow_ids[] = $pid;
+                    } elseif ($k === $link_dx) {
+                        $current_dynamax_ids[] = $pid;
+                    } elseif ($k === $link_gx) {
+                        $current_gigantamax_ids[] = $pid;
+                    }
+                }
+            }
         }
-        if (function_exists('poke_hub_get_background_shiny_locked_pokemon_ids')) {
-            $current_shiny_locked_ids = poke_hub_get_background_shiny_locked_pokemon_ids((int) $edit_row->id);
-        }
-        // Pokémon shiny actif = liés au fond mais pas shiny lock (shiny disponible)
-        $current_shiny_active_ids = array_values(array_diff($current_pokemon_ids, $current_shiny_locked_ids));
     }
 
     // Tous les événements pour le picker (recherche par nom, tous types)
@@ -82,6 +114,38 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
              FROM {$pokemon_table}
              ORDER BY dex_number ASC, name_fr ASC, name_en ASC"
         );
+    }
+    $pokemon_shadow = function_exists('poke_hub_get_pokemon_list_for_background_link_kind')
+        ? poke_hub_get_pokemon_list_for_background_link_kind(defined('POKE_HUB_BG_LINK_SHADOW') ? POKE_HUB_BG_LINK_SHADOW : 'shadow') : [];
+    $pokemon_dynamax = function_exists('poke_hub_get_pokemon_list_for_background_link_kind')
+        ? poke_hub_get_pokemon_list_for_background_link_kind(defined('POKE_HUB_BG_LINK_DYNAMAX') ? POKE_HUB_BG_LINK_DYNAMAX : 'dynamax') : [];
+    $pokemon_gigantamax = function_exists('poke_hub_get_pokemon_list_for_background_link_kind')
+        ? poke_hub_get_pokemon_list_for_background_link_kind(defined('POKE_HUB_BG_LINK_GIGANTAMAX') ? POKE_HUB_BG_LINK_GIGANTAMAX : 'gigantamax') : [];
+
+    // Variantes : SQL filtré + liens déjà enregistrés + tout Pokémon déjà en « classique » (sinon pas d’option / pas de POST).
+    if ( $is_edit && function_exists( 'poke_hub_merge_pokemon_filter_rows_with_saved_ids' ) ) {
+        $ids_for_variants = array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        'intval',
+                        array_merge(
+                            $current_shiny_active_ids,
+                            $current_shiny_locked_ids,
+                            $current_dynamax_ids,
+                            $current_gigantamax_ids,
+                            $current_shadow_ids
+                        )
+                    ),
+                    static function ( int $x ): bool {
+                        return $x > 0;
+                    }
+                )
+            )
+        );
+        $pokemon_dynamax    = poke_hub_merge_pokemon_filter_rows_with_saved_ids( $pokemon_dynamax, $ids_for_variants );
+        $pokemon_gigantamax = poke_hub_merge_pokemon_filter_rows_with_saved_ids( $pokemon_gigantamax, $ids_for_variants );
+        $pokemon_shadow     = poke_hub_merge_pokemon_filter_rows_with_saved_ids( $pokemon_shadow, $ids_for_variants );
     }
 
     // Enqueue le script pour la médiathèque
@@ -121,7 +185,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             ?>
         </h1>
 
-        <form method="post">
+        <form method="post" id="pokehub-background-edit-form" class="pokehub-background-edit-form">
             <?php wp_nonce_field('poke_hub_pokemon_edit_background'); ?>
             <input type="hidden" name="page" value="poke-hub-pokemon" />
             <input type="hidden" name="ph_section" value="backgrounds" />
@@ -224,11 +288,13 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 <?php endif; ?>
             </div>
 
-            <!-- Section: Linked Pokémon (two distinct lists: shiny active / shiny lock) -->
+            <!-- Section: Linked Pokémon (classique : shiny) + obscur / dynamax / gigamax (collections) -->
             <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Linked Pokémon', 'poke-hub'); ?></h3>
-                <p class="description" style="margin-bottom:12px;"><?php esc_html_e('Two separate lists: Pokémon with shiny available for this background, and Pokémon that are shiny lock (background released before the shiny). A Pokémon can only appear in one of the two lists.', 'poke-hub'); ?></p>
-                <div class="admin-lab-form-row" style="display: flex; gap: 1em; flex-wrap: wrap;">
+                <p class="description" style="margin-bottom:12px;"><?php esc_html_e('The same Pokémon ID can be selected in classic (shiny) and in each variant. Pick classic lists first, or reload after a save: every Pokémon listed under classic (or already saved in a variant) is offered in the three variant fields so the form can post them. If a combined save still drops rows, reload once so the unique index (background, Pokémon, mode) is applied.', 'poke-hub'); ?></p>
+                <h4 style="margin-top:0;"><?php esc_html_e('Classic (standard forms)', 'poke-hub'); ?></h4>
+                <p class="description" style="margin-bottom:12px;"><?php esc_html_e('Two separate lists: Pokémon with shiny available for this background, and Pokémon that are shiny lock. A Pokémon can only appear in one of the two lists below.', 'poke-hub'); ?></p>
+                <div class="admin-lab-form-row" style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-start;">
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0; min-width: 280px;">
                         <div class="admin-lab-form-group">
                             <label for="pokemon_ids_shiny_active"><?php esc_html_e('Pokémon (shiny active)', 'poke-hub'); ?></label>
@@ -280,6 +346,86 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                         </div>
                     </div>
                 </div>
+                <h4 style="margin-top:1.25em;"><?php esc_html_e('Variant displays (Dynamax / Gigantamax / Shadow)', 'poke-hub'); ?></h4>
+                <p class="description" style="margin-bottom:10px;"><?php esc_html_e('Filtered Pokédex lists. First row: Dynamax and Gigantamax side by side. Second row: Shadow (obscur) on full width.', 'poke-hub'); ?></p>
+                <style>
+                .pokehub-bg-variant-grid { display:grid; grid-template-columns:1fr 1fr; gap:1em 1.5em; align-items:start; margin-top:0.5em; }
+                @media (max-width:782px) { .pokehub-bg-variant-grid { grid-template-columns:1fr; } }
+                </style>
+                <div class="pokehub-bg-variant-grid">
+                    <div class="admin-lab-form-group" style="min-width:0;">
+                        <h4 style="margin:0 0 0.25em 0;"><?php esc_html_e('Dynamax', 'poke-hub'); ?></h4>
+                        <p class="description" style="margin-bottom:8px;"><?php esc_html_e('Pokémon with a Dynamax form or a Dynamax release date in the database.', 'poke-hub'); ?></p>
+                        <label class="screen-reader-text" for="pokemon_ids_dynamax"><?php esc_html_e('Pokémon (Dynamax)', 'poke-hub'); ?></label>
+                        <select name="pokemon_ids_dynamax[]" id="pokemon_ids_dynamax" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                            <?php if (!empty($pokemon_dynamax)) : ?>
+                                <?php foreach ($pokemon_dynamax as $pokemon) : ?>
+                                    <?php
+                                    $p_id = (int) $pokemon->id;
+                                    $p_dex = (int) $pokemon->dex_number;
+                                    $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                    $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                    ?>
+                                    <option value="<?php echo $p_id; ?>"
+                                            data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                            data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                            data-label="<?php echo esc_attr($label); ?>"
+                                            <?php selected(in_array($p_id, $current_dynamax_ids, true)); ?>>
+                                        <?php echo $label; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="admin-lab-form-group" style="min-width:0;">
+                        <h4 style="margin:0 0 0.25em 0;"><?php esc_html_e('Gigantamax', 'poke-hub'); ?></h4>
+                        <p class="description" style="margin-bottom:8px;"><?php esc_html_e('Pokémon with a Gigantamax form or a Gigantamax release date in the database.', 'poke-hub'); ?></p>
+                        <label class="screen-reader-text" for="pokemon_ids_gigantamax"><?php esc_html_e('Pokémon (Gigantamax)', 'poke-hub'); ?></label>
+                        <select name="pokemon_ids_gigantamax[]" id="pokemon_ids_gigantamax" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                            <?php if (!empty($pokemon_gigantamax)) : ?>
+                                <?php foreach ($pokemon_gigantamax as $pokemon) : ?>
+                                    <?php
+                                    $p_id = (int) $pokemon->id;
+                                    $p_dex = (int) $pokemon->dex_number;
+                                    $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                    $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                    ?>
+                                    <option value="<?php echo $p_id; ?>"
+                                            data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                            data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                            data-label="<?php echo esc_attr($label); ?>"
+                                            <?php selected(in_array($p_id, $current_gigantamax_ids, true)); ?>>
+                                        <?php echo $label; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="admin-lab-form-group" style="grid-column:1 / -1;min-width:0;">
+                        <h4 style="margin:0 0 0.25em 0;"><?php esc_html_e('Shadow (Obscur)', 'poke-hub'); ?></h4>
+                        <p class="description" style="margin-bottom:8px;"><?php esc_html_e('Only species with a non-empty Shadow release in extra (JSON path release.shadow), same as the Shadow collection. Not the whole has_shadow flag.', 'poke-hub'); ?></p>
+                        <label class="screen-reader-text" for="pokemon_ids_shadow"><?php esc_html_e('Pokémon (Shadow)', 'poke-hub'); ?></label>
+                        <select name="pokemon_ids_shadow[]" id="pokemon_ids_shadow" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                            <?php if (!empty($pokemon_shadow)) : ?>
+                                <?php foreach ($pokemon_shadow as $pokemon) : ?>
+                                    <?php
+                                    $p_id = (int) $pokemon->id;
+                                    $p_dex = (int) $pokemon->dex_number;
+                                    $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                    $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                    ?>
+                                    <option value="<?php echo $p_id; ?>"
+                                            data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                            data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                            data-label="<?php echo esc_attr($label); ?>"
+                                            <?php selected(in_array($p_id, $current_shadow_ids, true)); ?>>
+                                        <?php echo $label; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <p class="submit">
@@ -309,20 +455,14 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             return null;
         };
 
-        // Initialiser Select2 sur les deux champs Pokémon
+        // Initialiser Select2 sur les champs Pokémon
         if ($.fn.select2) {
-            $('#pokemon_ids_shiny_active').select2({
-                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny active)...', 'poke-hub')); ?>',
-                allowClear: true,
-                width: '100%',
-                matcher: matcherFn
-            });
-            $('#shiny_locked_ids').select2({
-                placeholder: '<?php echo esc_js(__('Search Pokémon (shiny locked)...', 'poke-hub')); ?>',
-                allowClear: true,
-                width: '100%',
-                matcher: matcherFn
-            });
+            var s2 = { allowClear: true, width: '100%', matcher: matcherFn };
+            $('#pokemon_ids_shiny_active').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Pokémon (shiny active)...', 'poke-hub')); ?>' }, s2));
+            $('#shiny_locked_ids').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Pokémon (shiny locked)...', 'poke-hub')); ?>' }, s2));
+            $('#pokemon_ids_dynamax').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Dynamax Pokémon...', 'poke-hub')); ?>' }, s2));
+            $('#pokemon_ids_gigantamax').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Gigantamax Pokémon...', 'poke-hub')); ?>' }, s2));
+            $('#pokemon_ids_shadow').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Shadow Pokémon...', 'poke-hub')); ?>' }, s2));
         }
 
         // Les deux selects sont exclusifs : un Pokémon ne peut être que dans l'un ou l'autre
@@ -334,11 +474,62 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 $other.val(val).trigger('change');
             }
         }
+        function pokehubEnsureVariantOptionsFromChoice(data) {
+            if (!data || data.id == null || data.id === '') {
+                return;
+            }
+            var id = String(data.id);
+            var $targets = $('#pokemon_ids_dynamax, #pokemon_ids_gigantamax, #pokemon_ids_shadow');
+            $targets.each(function() {
+                var $sel = $(this);
+                if ($sel.find('option').filter(function() { return String($(this).val()) === id; }).length) {
+                    return;
+                }
+                var $src = data.element ? $(data.element) : $();
+                var text = (data.text != null && data.text !== '') ? String(data.text) : ( $src.length ? $src.text() : id );
+                var $opt = $('<option></option>').val(id).text(text);
+                if ($src.length) {
+                    $opt.attr('data-name-fr', $src.attr('data-name-fr') || '');
+                    $opt.attr('data-name-en', $src.attr('data-name-en') || '');
+                    $opt.attr('data-label', $src.attr('data-label') || text);
+                }
+                $sel.append($opt);
+                if ($sel.hasClass('select2-hidden-accessible')) {
+                    $sel.trigger('change');
+                }
+            });
+        }
+        function pokehubSyncClassicSelectionsToVariantOptions() {
+            $('#pokemon_ids_shiny_active, #shiny_locked_ids').find('option:selected').each(function() {
+                var $o = $(this);
+                pokehubEnsureVariantOptionsFromChoice({
+                    id: $o.val(),
+                    text: $o.text(),
+                    element: this
+                });
+            });
+        }
         $('#pokemon_ids_shiny_active').on('select2:select', function(e) {
             removeFromOtherSelect('pokemon_ids_shiny_active', e.params.data.id);
+            pokehubEnsureVariantOptionsFromChoice(e.params.data);
         });
         $('#shiny_locked_ids').on('select2:select', function(e) {
             removeFromOtherSelect('shiny_locked_ids', e.params.data.id);
+            pokehubEnsureVariantOptionsFromChoice(e.params.data);
+        });
+        pokehubSyncClassicSelectionsToVariantOptions();
+
+        // Select2 peut laisser le <select> natif hors sync : destroy avant envoi pour que le navigateur poste toutes les valeurs.
+        $('#pokehub-background-edit-form').on('submit', function() {
+            if (!$.fn.select2) {
+                return;
+            }
+            $(this).find('select.pokehub-pokemon-select').each(function() {
+                var $s = $(this);
+                if ($s.data('select2')) {
+                    $s.select2('destroy');
+                }
+            });
         });
 
         // Sync champ caché event_type depuis l'option sélectionnée (data-source)

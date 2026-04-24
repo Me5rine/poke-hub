@@ -40,6 +40,11 @@
             return;
         }
 
+        /* Phrases GO collections : listes simples, le JS écoute change sur le <select> natif (Select2 casse la synchro). */
+        if ($select.closest('.pokehub-collection-pogo-search').length) {
+            return;
+        }
+
         // Vérifier que c'est bien un élément select
         if (!$select.is('select')) {
             return;

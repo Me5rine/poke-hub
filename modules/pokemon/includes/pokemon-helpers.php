@@ -227,6 +227,7 @@ function poke_hub_pokemon_get_pokemon_attacks($pokemon_id) {
             'fast'    => [],
             'charged' => [],
             'special' => [],
+            'gmax'    => [],
         ];
     }
 
@@ -235,6 +236,7 @@ function poke_hub_pokemon_get_pokemon_attacks($pokemon_id) {
             'fast'    => [],
             'charged' => [],
             'special' => [],
+            'gmax'    => [],
         ];
     }
 
@@ -246,6 +248,7 @@ function poke_hub_pokemon_get_pokemon_attacks($pokemon_id) {
             'fast'    => [],
             'charged' => [],
             'special' => [],
+            'gmax'    => [],
         ];
     }
 
@@ -263,6 +266,7 @@ function poke_hub_pokemon_get_pokemon_attacks($pokemon_id) {
         'fast'    => [],
         'charged' => [],
         'special' => [],
+        'gmax'    => [],
     ];
 
     if (empty($rows)) {
@@ -294,7 +298,7 @@ function poke_hub_pokemon_get_pokemon_attacks($pokemon_id) {
  * @param array $fast_moves    Tableau brut venant de $_POST['fast_moves']
  * @param array $charged_moves Tableau brut venant de $_POST['charged_moves']
  */
-function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, array $charged_moves) {
+function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, array $charged_moves, array $gmax_moves = []) {
     $pokemon_id = (int) $pokemon_id;
     if ($pokemon_id <= 0) {
         return;
@@ -344,7 +348,8 @@ function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, a
 
     $rows_to_insert = array_merge(
         $normalize($fast_moves, 'fast'),
-        $normalize($charged_moves, 'charged')
+        $normalize($charged_moves, 'charged'),
+        $normalize($gmax_moves, 'gmax')
     );
 
     if (empty($rows_to_insert)) {
@@ -357,7 +362,7 @@ function poke_hub_pokemon_sync_pokemon_attacks($pokemon_id, array $fast_moves, a
         $wpdb->prepare(
             "DELETE FROM {$table_links}
              WHERE pokemon_id = %d
-               AND role IN ('fast', 'charged')",
+               AND role IN ('fast', 'charged', 'gmax')",
             $pokemon_id
         )
     );
@@ -532,15 +537,16 @@ function poke_hub_pokemon_get_all_variant_groups(): array {
 /**
  * Upsert d'une variante de forme globale dans pokemon_form_variants.
  *
- * @param string $form_slug  Slug de forme (ex: 'fall-2019')
- * @param string $label      Label humain (ex: 'Fall 2019')
- * @param string $category   Catégorie logique ('normal', 'costume', 'mega', etc.) - optionnel
- * @param string $group      Groupe logique (ex: 'halloween-2019') - optionnel
- * @param array  $extra_data Données additionnelles stockées dans extra
+ * @param string $form_slug   Slug de forme (ex: 'fall-2019')
+ * @param string $label       Label humain (ex: 'Fall 2019')
+ * @param string $category    Catégorie logique ('normal', 'costume', 'mega', etc.) - optionnel
+ * @param string $group       Groupe logique (ex: 'halloween-2019') - optionnel
+ * @param array  $extra_data  Données additionnelles stockées dans extra
+ * @param int    $variant_id  Si > 0 (édition admin), charge la ligne par id pour permettre de changer form_slug sans créer une nouvelle ligne.
  *
- * @return int ID de la variante ou 0
+ * @return int ID de la variante ou 0 (ex. slug déjà pris par une autre ligne)
  */
-function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category = '', $group = '', array $extra_data = []) {
+function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category = '', $group = '', array $extra_data = [], $variant_id = 0) {
     if (!function_exists('pokehub_get_table')) {
         return 0;
     }
@@ -557,13 +563,28 @@ function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category
         return 0;
     }
 
-    // Récupère éventuelle ligne existante
-    $row = $wpdb->get_row(
-        $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE form_slug = %s LIMIT 1",
-            $form_slug
-        )
-    );
+    $variant_id = (int) $variant_id;
+    $row        = null;
+    if ($variant_id > 0) {
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE id = %d LIMIT 1",
+                $variant_id
+            )
+        );
+    }
+    if (!$row && $variant_id > 0) {
+        return 0;
+    }
+    if (!$row) {
+        // Import / ajout : retrouver par slug (comportement historique).
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE form_slug = %s LIMIT 1",
+                $form_slug
+            )
+        );
+    }
 
     // Label par défaut
     if ($label === '' && $row) {
@@ -605,14 +626,25 @@ function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category
     $format = ['%s','%s','%s','%s','%s'];
 
     if ($row) {
+        $row_id = (int) $row->id;
+        $dup    = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$table} WHERE form_slug = %s AND id <> %d LIMIT 1",
+                $form_slug,
+                $row_id
+            )
+        );
+        if ($dup) {
+            return 0;
+        }
         $wpdb->update(
             $table,
             $data,
-            ['id' => (int) $row->id],
+            ['id' => $row_id],
             $format,
             ['%d']
         );
-        return (int) $row->id;
+        return $row_id;
     }
 
     $wpdb->insert($table, $data, $format);

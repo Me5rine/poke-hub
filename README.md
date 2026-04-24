@@ -206,8 +206,7 @@ Le module Pokémon est le cœur du plugin. Il gère toutes les données relative
 - **Formes Primo** : Primo-Résurgence (Groudon, Kyogre)
 - **Costumes** : Pokémon avec costumes spéciaux
 - **Formes régionales** : Variantes régionales
-- **Mappings de formes** : Correspondance entre IDs Game Master et formes
-- **Catégorisation** : Organisation par catégories (normal, mega, costume, etc.)
+- **Types de forme (variants)** : Registre global `pokemon_form_variants` ; typage (défaut, régional, fusion, costume, méga, etc.) ; préremplissage possible à l’import Game Master — voir `docs/COLLECTIONS_AND_FORMS_CATEGORIES.md`
 
 ##### 6. Météos
 
@@ -235,7 +234,7 @@ Le module Pokémon permet d'importer les données depuis un fichier Game Master 
 
 ##### Processus d'import
 
-1. **Upload du fichier** : Via l'interface **Poké HUB** > **Settings** > **Game Master**
+1. **Upload du fichier** : Via **Poké HUB** > **Temporary tools** > onglet **Game Master** (module Pokémon actif ; réglage *Show Temporary tools* dans **Settings** > **General** si besoin)
 2. **Sauvegarde locale** : Le fichier est sauvegardé dans `wp-content/uploads/poke-hub/gamemaster/latest.json`
 3. **Archivage S3** (optionnel) : Upload automatique sur S3 avec timestamp
 4. **Import des données** : Synchronisation complète dans la base de données
@@ -283,8 +282,7 @@ Accédez à **Poké HUB** > **Pokémon** pour gérer :
 - **Attaques** : Liste et édition des attaques
 - **Items** : Gestion des objets
 - **Météos** : Gestion des conditions météorologiques
-- **Formes** : Gestion des variantes de formes
-- **Mappings de formes** : Correspondance Game Master ↔ Formes
+- **Formes** : Gestion des variantes de formes (type de forme, slug, label)
 - **Backgrounds** : Gestion des fonds spéciaux
 
 #### Helpers et utilitaires
@@ -508,7 +506,7 @@ Le plugin permet d'importer les données du Game Master de Pokémon GO depuis un
 
 #### Processus d'import
 
-1. **Upload du fichier** : Uploadez un fichier JSON Game Master via l'interface
+1. **Upload du fichier** : Uploadez un fichier JSON Game Master via **Poké HUB** > **Temporary tools** > **Game Master**
 2. **Copie locale** : Le fichier est sauvegardé localement dans `wp-content/uploads/poke-hub/gamemaster/latest.json`
 3. **Archivage S3** (optionnel) : Si configuré, le fichier est également uploadé sur S3 avec un timestamp
 4. **Import des données** : Lancez l'import pour synchroniser les données dans la base
@@ -541,7 +539,7 @@ Le plugin peut automatiquement archiver les fichiers Game Master sur AWS S3.
 
 #### Configuration
 
-Dans **Settings** > **Game Master** :
+Sur l’écran **Poké HUB** > **Temporary tools** > **Game Master**, champs optionnels d’archivage S3 (bucket, préfixe, région) ; identifiants AWS via `wp-config.php` :
 - **Bucket** : Nom du bucket S3
 - **Préfixe** : Dossier dans le bucket (ex: `gamemaster`)
 - **Région** : Région AWS (ex: `eu-west-3`)

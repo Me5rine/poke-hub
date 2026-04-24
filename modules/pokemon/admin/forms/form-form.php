@@ -25,19 +25,16 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
     // Valeurs initiales
     $form_slug        = '';
     $label            = '';
-    $category         = 'normal';
+    $category         = 'default';
     $group_key        = '';
-    $parent_form_slug = '';
     $names            = ['fr' => '', 'en' => ''];
     $current_events   = [];
 
     if ($is_edit) {
         $form_slug        = isset($edit_row->form_slug) ? (string) $edit_row->form_slug : '';
         $label            = isset($edit_row->label) ? (string) $edit_row->label : '';
-        $category         = isset($edit_row->category) ? (string) $edit_row->category : 'normal';
+        $category         = isset($edit_row->category) ? (string) $edit_row->category : 'default';
         $group_key        = isset($edit_row->group_key) ? (string) $edit_row->group_key : (isset($edit_row->group) ? (string) $edit_row->group : '');
-        $parent_form_slug = isset($edit_row->parent_form_slug) ? (string) $edit_row->parent_form_slug : '';
-
         // Événements associés (plusieurs par forme / costume)
         if (function_exists('poke_hub_get_form_variant_events')) {
             $current_events = poke_hub_get_form_variant_events((int) $edit_row->id);
@@ -66,15 +63,6 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
 
     global $wpdb;
     $table = pokehub_get_table('pokemon_form_variants');
-
-    // Liste des autres formes possibles comme parent
-    $parent_candidates = [];
-    if ($table) {
-        $parent_candidates = $wpdb->get_results(
-            "SELECT form_slug, label, category FROM {$table} ORDER BY category ASC, label ASC",
-            ARRAY_A
-        );
-    }
 
     $back_url = add_query_arg(
         [
@@ -130,23 +118,24 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                 <div class="admin-lab-form-row">
                     <div class="admin-lab-form-col-50">
                         <div class="admin-lab-form-group">
-                            <label for="category"><?php esc_html_e('Category', 'poke-hub'); ?></label>
+                            <label for="category"><?php esc_html_e('Form type', 'poke-hub'); ?></label>
                             <select name="category" id="category">
                                 <?php
                                 $variant_categories = [
-                                    'normal'    => __('Normal', 'poke-hub'),
-                                    'costume'   => __('Costume / Event', 'poke-hub'),
-                                    'clone'     => __('Clone', 'poke-hub'),
-                                    'regional'  => __('Regional', 'poke-hub'),
-                                    'shadow'    => __('Shadow', 'poke-hub'),
-                                    'purified'  => __('Purified', 'poke-hub'),
-                                    'mega'      => __('Mega', 'poke-hub'),
-                                    'alola'     => __('Alola', 'poke-hub'),
-                                    'galar'     => __('Galar', 'poke-hub'),
-                                    'hisui'     => __('Hisui', 'poke-hub'),
-                                    'paldea'    => __('Paldea', 'poke-hub'),
+                                    'default'        => __('Default', 'poke-hub'),
+                                    'regional'       => __('Regional form', 'poke-hub'),
+                                    'fusion'         => __('Fusion (requires another Pokémon)', 'poke-hub'),
+                                    'switch_form'    => __('Switch form (inventory: candy, dust, item, moves…)', 'poke-hub'),
+                                    'switch_battle'  => __('Switch form in battle', 'poke-hub'),
+                                    'costume'        => __('Costume / event', 'poke-hub'),
+                                    'clone'          => __('Clone', 'poke-hub'),
+                                    'mega'           => __('Mega / Primal', 'poke-hub'),
+                                    'visual'         => __('Visual form (patterns, trim…)', 'poke-hub'),
+                                    'special'        => __('Special form (different stats, no inventory switch)', 'poke-hub'),
+                                    'shadow'         => __('Shadow', 'poke-hub'),
+                                    'purified'       => __('Purified', 'poke-hub'),
                                 ];
-                                $category_value = in_array($category, array_keys($variant_categories), true) ? $category : 'normal';
+                                $category_value = in_array($category, array_keys($variant_categories), true) ? $category : 'default';
                                 foreach ($variant_categories as $cat_key => $cat_label) :
                                     ?>
                                     <option value="<?php echo esc_attr($cat_key); ?>" <?php selected($category_value, $cat_key); ?>>
@@ -157,7 +146,7 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                                     <option value="<?php echo esc_attr($category); ?>" selected><?php echo esc_html(sprintf(__('Other: %s', 'poke-hub'), $category)); ?></option>
                                 <?php endif; ?>
                             </select>
-                            <p class="description"><?php esc_html_e('"Costume / Event" automatically marks Pokémon with this form as event/costumed.', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Auto-filled from Game Master when possible; editable manually.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col-50">
@@ -169,35 +158,6 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                     </div>
                 </div>
 
-                <!-- Parent Form -->
-                <div class="admin-lab-form-group">
-                    <label for="parent_form_slug"><?php esc_html_e('Parent Form', 'poke-hub'); ?></label>
-                    <select name="parent_form_slug" id="parent_form_slug">
-                        <option value=""><?php esc_html_e('— No parent —', 'poke-hub'); ?></option>
-                        <?php
-                        if (!empty($parent_candidates)) :
-                            foreach ($parent_candidates as $parent) :
-                                if ($is_edit && $parent['form_slug'] === $form_slug) {
-                                    continue;
-                                }
-
-                                $option_label = sprintf(
-                                    '%s (%s)',
-                                    $parent['label'] !== '' ? $parent['label'] : $parent['form_slug'],
-                                    $parent['category'] !== '' ? $parent['category'] : 'normal'
-                                );
-                                ?>
-                                <option value="<?php echo esc_attr($parent['form_slug']); ?>"
-                                    <?php selected($parent_form_slug, $parent['form_slug']); ?>>
-                                    <?php echo esc_html($option_label); ?>
-                                </option>
-                                <?php
-                            endforeach;
-                        endif;
-                        ?>
-                    </select>
-                    <p class="description"><?php esc_html_e('Optional parent form to build hierarchies.', 'poke-hub'); ?></p>
-                </div>
             </div>
 
             <!-- Section: Translations -->

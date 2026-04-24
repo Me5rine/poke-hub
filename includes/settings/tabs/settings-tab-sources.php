@@ -44,6 +44,7 @@ $assets_path_mega_energies = get_option('poke_hub_assets_path_mega_energies', '/
 $assets_path_objects = get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/');
 $assets_path_items = get_option('poke_hub_assets_path_items', '/pokemon-go/items/');
 $assets_path_pokemon = get_option('poke_hub_assets_path_pokemon', '/pokemon-go/pokemon/');
+$assets_path_pokemon_alternate = get_option('poke_hub_assets_path_pokemon_alternate', '');
 $assets_path_raids = get_option('poke_hub_assets_path_raids', '/pokemon-go/raids/');
 $assets_path_teams = get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/');
 $assets_path_types = get_option('poke_hub_assets_path_types', '/pokemon-go/types/');
@@ -129,6 +130,9 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     }
     if (isset($_POST['poke_hub_assets_path_pokemon'])) {
         update_option('poke_hub_assets_path_pokemon', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_pokemon'])));
+    }
+    if (isset($_POST['poke_hub_assets_path_pokemon_alternate'])) {
+        update_option('poke_hub_assets_path_pokemon_alternate', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_pokemon_alternate'])));
     }
     if (isset($_POST['poke_hub_assets_path_raids'])) {
         update_option('poke_hub_assets_path_raids', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_raids'])));
@@ -278,7 +282,7 @@ foreach ($messages as $msg) {
                     class="regular-text"
                     placeholder="https://backup.example.com/pokemon-go/pokemon/">
                 <p class="description">
-                    <?php _e('Backup source used when a Pokémon image is missing on the primary source (same filename/key expected). Leave empty to disable fallback.', 'poke-hub'); ?>
+                    <?php _e('Full URL to a backup folder (same host or CDN). Same file names as the primary (slug.png). If empty, you can set an alternate path on the same bucket below (same slugs, different subfolder, e.g. /home/pokemon/).', 'poke-hub'); ?>
                 </p>
             </td>
         </tr>
@@ -450,6 +454,20 @@ foreach ($messages as $msg) {
                                     placeholder="/pokemon-go/pokemon/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
                                     <?php _e('PNG: slug.png', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Pokémon (alternate path, same bucket)', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_pokemon_alternate"
+                                    value="<?php echo esc_attr($assets_path_pokemon_alternate); ?>"
+                                    class="regular-text"
+                                    placeholder="/home/pokemon/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('Optional. Same file names (slug.png) on the same bucket; used as second URL if the main Pokémon path 404s in the browser. Example when HOME artwork lives at …/home/pokemon/ivysaur.png while the primary path points to …/pokemon-go/pokemon/ivysaur.png. Leave empty to use only the primary path (or the full fallback URL above).', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

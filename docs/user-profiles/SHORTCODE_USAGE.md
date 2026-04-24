@@ -101,7 +101,11 @@ if ($current_tab === 'pokehub-profile') {
    - Saves data via `poke_hub_save_user_profile()` function
    - Shows success message after saving
 
-4. **Messages et notices** : Les shortcodes User Profiles affichent des blocs de message (succès, erreur, avertissement, information) avec les classes `me5rine-lab-form-message` et modificateurs :
+4. **Friend code public visibility** (logged-in edit form):
+   - A checkbox controls whether the trainer code appears on **public** listings (`[poke_hub_friend_codes]`, `[poke_hub_vivillon]`) and on **other users’** read-only profile view.
+   - Submissions include a hidden marker `friend_code_public_present` so partial/custom forms cannot accidentally overwrite visibility; see **`FRIEND_CODES_PUBLIC_AND_IP.md`** (French) for behaviour and theming notes.
+
+5. **Messages et notices** : Les shortcodes User Profiles affichent des blocs de message (succès, erreur, avertissement, information) avec les classes `me5rine-lab-form-message` et modificateurs :
    - **Succès (vert)** : profil sauvegardé, code ajouté
    - **Erreur (rouge)** : validation, échec sauvegarde
    - **Avertissement (orange)** : utilisateur non connecté, action à confirmer
@@ -124,7 +128,7 @@ You can customize the appearance by adding CSS in your theme targeting these cla
 
 ## 2. `[poke_hub_friend_codes]` - Friend Codes Listing
 
-Displays a public listing of friend codes with filtering options (country, team, reason).
+Displays a public listing of friend codes with filtering options (country, team, reason). Rows with **private** friend code visibility (`friend_code_public` off in profile/admin) are **excluded**; see **`FRIEND_CODES_PUBLIC_AND_IP.md`**.
 
 ### Basic Usage
 
@@ -166,7 +170,7 @@ See **`FRIEND_CODES_PUBLIC_AND_IP.md`** (same folder) for full detail (French).
 
 ## 3. `[poke_hub_vivillon]` - Vivillon Patterns Listing
 
-Displays friend codes filtered by Vivillon pattern with filtering options.
+Displays friend codes filtered by Vivillon pattern with filtering options. The same **public visibility** rules as `[poke_hub_friend_codes]` apply (`friend_code_public`); see **`FRIEND_CODES_PUBLIC_AND_IP.md`**.
 
 ### Basic Usage
 

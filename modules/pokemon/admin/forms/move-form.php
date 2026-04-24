@@ -276,6 +276,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                                 <option value=""><?php esc_html_e('-- Select --', 'poke-hub'); ?></option>
                                 <option value="fast" <?php selected($current_category, 'fast'); ?>><?php esc_html_e('Fast Move', 'poke-hub'); ?></option>
                                 <option value="charged" <?php selected($current_category, 'charged'); ?>><?php esc_html_e('Charged Move', 'poke-hub'); ?></option>
+                                <option value="gmax" <?php selected($current_category, 'gmax'); ?>><?php esc_html_e('GMAX Move', 'poke-hub'); ?></option>
                             </select>
                         </div>
                     </div>
