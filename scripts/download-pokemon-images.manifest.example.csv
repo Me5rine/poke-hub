@@ -1,0 +1,11 @@
+source,dex,slug,form,form_slug,costume_slug,mode,gender,is_shiny,is_gigamax,is_dynamax,is_mega,is_shadow,is_costume,extension,url
+go,25,pikachu,,,,normal,male,false,false,false,false,false,false,png,
+go,25,pikachu,,,,normal,female,false,false,false,false,false,false,png,
+go,25,pikachu,,,,normal,female,true,false,false,false,false,false,png,
+go,6,charizard,,,,gigantamax,male,false,true,false,false,false,false,png,
+go,6,charizard,,,,dynamax,male,false,false,true,false,false,false,png,
+go,6,charizard,,,,mega,male,false,false,false,true,false,false,png,
+go,150,mewtwo,,,,shadow,,false,false,false,false,true,false,png,
+go,25,pikachu,,rock-star,captain-hat,costume,,false,false,false,false,false,true,png,
+home,6,charizard,,,,normal,male,false,false,false,false,false,false,png,
+home,201,unown,a,a,,normal,,false,false,false,false,false,false,png,https://example.com/path/unown-a.png

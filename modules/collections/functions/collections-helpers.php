@@ -553,39 +553,44 @@ function poke_hub_collections_get_card_background_image_url(array $collection): 
 }
 
 /**
- * Filtre « sorti dans GO » pour le pool collections.
+ * Filtre « sorti dans GO » pour le pool collections, basé sur la fiche courante.
  *
- * En contexte {@see $release_context} `normal`, {@see poke_hub_pokemon_is_released_in_go()} ne regarde
- * que `extra.release.normal` : une fiche base (ex. Florizarre) avec seulement `release.mega` ou
- * `release.gigantamax` était exclue avant la logique Gigamax synthétique. Si l’utilisateur active
- * Méga / Dynamax / Gigamax dans les options, on accepte aussi la date correspondante.
+ * Important : on lit uniquement `extra.release` de la ligne en cours (pas de propagation
+ * via la chaîne d’évolution), afin de respecter les sorties échelonnées par événement.
  *
+ * @param array<string, mixed> $row  Ligne Pokémon (doit contenir `extra`)
  * @param array<string, mixed> $opts Options collection (include_mega, include_gigantamax, include_dynamax, …)
  */
-function poke_hub_collections_pokemon_passes_pool_release_filter(int $pokemon_id, string $release_context, array $opts): bool {
-    if (!function_exists('poke_hub_pokemon_is_released_in_go')) {
-        return true;
-    }
-    $pokemon_id = (int) $pokemon_id;
-    if ($pokemon_id <= 0) {
+function poke_hub_collections_row_passes_pool_release_filter(array $row, string $release_context, array $opts): bool {
+    $extra_raw = isset($row['extra']) ? (string) $row['extra'] : '';
+    if ($extra_raw === '') {
         return false;
     }
-    if ($release_context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
-        return pokehub_pokemon_can_be_shiny($pokemon_id);
+
+    $extra = json_decode($extra_raw, true);
+    if (!is_array($extra)) {
+        return false;
     }
+
+    $release_map = isset($extra['release']) && is_array($extra['release']) ? $extra['release'] : [];
+    $has_release = static function (array $map, string $key): bool {
+        return trim((string) ($map[$key] ?? '')) !== '';
+    };
+
     if ($release_context !== 'normal') {
-        return poke_hub_pokemon_is_released_in_go($pokemon_id, $release_context);
+        return $has_release($release_map, $release_context);
     }
-    if (poke_hub_pokemon_is_released_in_go($pokemon_id, 'normal')) {
+
+    if ($has_release($release_map, 'normal')) {
         return true;
     }
-    if (!empty($opts['include_mega']) && poke_hub_pokemon_is_released_in_go($pokemon_id, 'mega')) {
+    if (!empty($opts['include_mega']) && $has_release($release_map, 'mega')) {
         return true;
     }
-    if (!empty($opts['include_dynamax']) && poke_hub_pokemon_is_released_in_go($pokemon_id, 'dynamax')) {
+    if (!empty($opts['include_dynamax']) && $has_release($release_map, 'dynamax')) {
         return true;
     }
-    if (!empty($opts['include_gigantamax']) && poke_hub_pokemon_is_released_in_go($pokemon_id, 'gigantamax')) {
+    if (!empty($opts['include_gigantamax']) && $has_release($release_map, 'gigantamax')) {
         return true;
     }
 
@@ -1272,71 +1277,29 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         return [];
     }
 
-    // Ne garder que les Pokémon ayant une sortie GO pour ce contexte.
-    //
-    // Note shiny (règle GO récente) :
-    // une évolution peut être "shiny trouvable directement" si le Pokémon de base est shiny.
-    // On ne peut donc pas se limiter à extra->release->shiny sur chaque évolution.
-    if (function_exists('poke_hub_pokemon_is_released_in_go')) {
-        $filtered = [];
-        foreach ($results as $row) {
-            $pokemon_id = (int) ($row['id'] ?? 0);
-
-            // Cas spécial shiny : propager la logique via pokehub_pokemon_can_be_shiny().
-            if ($release_context === 'shiny' && function_exists('pokehub_pokemon_can_be_shiny')) {
-                if (pokehub_pokemon_can_be_shiny($pokemon_id)) {
-                    $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
-                    $row = poke_hub_collections_maybe_mark_dynamax_synthetic_base_row($row, $category, $opts);
-                    if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
-                        $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
-                    } else {
-                        $row['is_baby'] = false;
-                    }
-                    if (function_exists('poke_hub_pokemon_species_special_group_from_row')) {
-                        $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row($row);
-                    } else {
-                        $row['species_special_group'] = '';
-                    }
-                    unset($row['extra']);
-                    $filtered[] = $row;
-                }
-                continue;
-            }
-
-            if (poke_hub_collections_pokemon_passes_pool_release_filter($pokemon_id, $release_context, $opts)) {
-                $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
-                $row = poke_hub_collections_maybe_mark_dynamax_synthetic_base_row($row, $category, $opts);
-                if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
-                    $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
-                } else {
-                    $row['is_baby'] = false;
-                }
-                if (function_exists('poke_hub_pokemon_species_special_group_from_row')) {
-                    $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row($row);
-                } else {
-                    $row['species_special_group'] = '';
-                }
-                unset($row['extra']);
-                $filtered[] = $row;
-            }
+    // Ne garder que les Pokémon ayant une sortie GO pour ce contexte,
+    // en se basant sur la date de la fiche courante (pas de propagation évolution).
+    $filtered = [];
+    foreach ($results as $row) {
+        if (!poke_hub_collections_row_passes_pool_release_filter($row, $release_context, $opts)) {
+            continue;
         }
-        $results = $filtered;
-    } else {
-        foreach ($results as &$row) {
-            if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
-                $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
-            } else {
-                $row['is_baby'] = false;
-            }
-            if (function_exists('poke_hub_pokemon_species_special_group_from_row')) {
-                $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row($row);
-            } else {
-                $row['species_special_group'] = '';
-            }
-            unset($row['extra']);
+        $row = poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row($row, $category, $opts);
+        $row = poke_hub_collections_maybe_mark_dynamax_synthetic_base_row($row, $category, $opts);
+        if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
+            $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row);
+        } else {
+            $row['is_baby'] = false;
         }
-        unset($row);
+        if (function_exists('poke_hub_pokemon_species_special_group_from_row')) {
+            $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row($row);
+        } else {
+            $row['species_special_group'] = '';
+        }
+        unset($row['extra']);
+        $filtered[] = $row;
     }
+    $results = $filtered;
 
     if (!poke_hub_collections_category_is_specific($category)
         && !empty($opts['include_gigantamax'])

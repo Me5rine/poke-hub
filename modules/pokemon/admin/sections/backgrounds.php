@@ -144,7 +144,7 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
         }
 
         return sprintf(
-            '<img src="%1$s" alt="" style="width:64px;height:64px;object-fit:contain;border:1px solid #ddd;" />',
+            '<img src="%1$s" alt="" style="width:64px;height:64px;object-fit:cover;object-position:center top;border:1px solid #ddd;" />',
             esc_url($url)
         );
     }

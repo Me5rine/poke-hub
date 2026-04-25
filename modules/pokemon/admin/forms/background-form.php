@@ -262,7 +262,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                     <?php if ($image_url !== '') : ?>
                         <img src="<?php echo esc_url($image_url); ?>"
                              class="pokehub-background-image-preview"
-                             style="max-width:300px;height:auto;display:block;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />
+                             style="width:300px;height:180px;display:block;object-fit:cover;object-position:center top;border:1px solid #c3c4c7;padding:0;background:#fff;border-radius:4px;" />
                         <p class="description" style="margin-top:8px;">
                             <code><?php echo esc_html($image_url); ?></code>
                         </p>

@@ -120,7 +120,7 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         $col_view_url = $col_token !== '' ? $collections_base_url . '/' . $col_token : add_query_arg(['id' => $col['id'], 'view' => '1'], get_permalink());
                         $col_edit_url = $col_token !== '' ? $collections_base_url . '/' . $col_token . '?edit=1' : add_query_arg(['id' => $col['id'], 'view' => '1', 'edit' => '1'], get_permalink());
                         $card_bg_image = poke_hub_collections_get_card_background_image_url($col);
-                        $card_bg_style = $card_bg_image !== '' ? ' style="background-image: url(' . esc_url($card_bg_image) . '); background-size: cover; background-position: center;"' : '';
+                        $card_bg_style = $card_bg_image !== '' ? ' style="background-image: url(' . esc_url($card_bg_image) . '); background-size: cover; background-position: center top;"' : '';
                     ?>
                         <li class="me5rine-lab-card" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" data-category="<?php echo esc_attr($col['category']); ?>">
                             <a href="<?php echo esc_url($col_view_url); ?>" class="pokehub-collections-card-link">
@@ -441,7 +441,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         ?>
         <header class="me5rine-lab-dashboard-header pokehub-collection-view-header<?php echo $header_has_cover ? ' pokehub-collection-view-header--has-cover' : ' pokehub-collection-view-header--no-cover'; ?>">
             <?php if ($header_has_cover) : ?>
-                <div class="pokehub-collection-header-bg" style="background-image: url(<?php echo esc_url($header_cover_url); ?>);"></div>
+                <div class="pokehub-collection-header-bg" style="background-image: url(<?php echo esc_url($header_cover_url); ?>); background-size: cover; background-position: center top;"></div>
                 <div class="pokehub-collection-header-scrim" aria-hidden="true"></div>
             <?php endif; ?>
             <div class="pokehub-collection-header-inner<?php echo $can_edit ? '' : ' pokehub-collection-header-inner--two-cols'; ?>">
@@ -582,7 +582,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 ?>
                 <div class="pokehub-collection-tile" data-pokemon-id="<?php echo (int) $p['id']; ?>" data-status="<?php echo esc_attr($status); ?>" tabindex="0" role="button">
                     <div class="pokehub-collection-tile-figure">
-                        <?php if ($bg_url) : ?><div class="pokehub-collection-tile-bg" style="background-image: url(<?php echo esc_url($bg_url); ?>);" aria-hidden="true"></div><?php endif; ?>
+                        <?php if ($bg_url) : ?><div class="pokehub-collection-tile-bg" style="background-image: url(<?php echo esc_url($bg_url); ?>); background-size: cover; background-position: center top;" aria-hidden="true"></div><?php endif; ?>
                         <?php if ($img_src) : ?><img class="pokehub-collection-sprite" src="<?php echo esc_url($img_src); ?>" alt="" loading="lazy"<?php
                         if (function_exists('poke_hub_pokemon_get_sprite_image_fallback_attr_html')) {
                             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- échappé dans poke_hub_pokemon_get_sprite_image_fallback_attr_html

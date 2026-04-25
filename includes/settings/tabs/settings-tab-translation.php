@@ -31,8 +31,8 @@ $limit = null;
 $force = false;
 $start_after_id = 0;
 
-$selected_lang = isset($_GET['lang']) ? sanitize_text_field($_GET['lang']) : 'fr';
-$selected_type = isset($_GET['type']) ? sanitize_text_field($_GET['type']) : 'pokemon';
+$selected_lang = isset($_GET['lang']) ? sanitize_text_field(wp_unslash((string) $_GET['lang'])) : 'fr';
+$selected_type = isset($_GET['type']) ? sanitize_text_field(wp_unslash((string) $_GET['type'])) : 'pokemon';
 $is_tools_context = defined('POKE_HUB_TRANSLATION_TAB_CONTEXT') && POKE_HUB_TRANSLATION_TAB_CONTEXT === 'tools';
 $page_slug = $is_tools_context ? 'poke-hub-tools' : 'poke-hub-settings';
 $tab_slug = 'translation';
@@ -60,7 +60,9 @@ $lang_names = [
 if (!empty($_POST['poke_hub_save_translations'])) {
     check_admin_referer('poke_hub_translation_settings', 'poke_hub_translation_nonce');
 
-    $translations = isset($_POST['translations']) && is_array($_POST['translations']) ? $_POST['translations'] : [];
+    $translations = isset($_POST['translations']) && is_array($_POST['translations'])
+        ? wp_unslash($_POST['translations'])
+        : [];
     $saved_count = 0;
     $skipped_count = 0;
 
@@ -73,9 +75,11 @@ if (!empty($_POST['poke_hub_save_translations'])) {
             }
 
             $item_id = (int) $item_id;
-            $type = sanitize_text_field($data['type']);
-            $lang = sanitize_text_field($data['lang']);
-            $translation = isset($data['translation']) ? trim(sanitize_text_field($data['translation'])) : '';
+            $type = sanitize_text_field((string) ($data['type'] ?? ''));
+            $lang = sanitize_text_field((string) ($data['lang'] ?? ''));
+            $translation = isset($data['translation'])
+                ? trim(sanitize_text_field((string) $data['translation']))
+                : '';
 
             if ($translation === '') {
                 $skipped_count++;
