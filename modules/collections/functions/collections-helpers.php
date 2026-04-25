@@ -62,6 +62,72 @@ function poke_hub_collections_maybe_add_anonymous_ip_column() {
 }
 
 /**
+ * Migration : ajoute la colonne anonymous_owner_key si absente.
+ * Clé propriétaire anonyme (plus fiable que l’IP seule selon navigateurs/réseaux).
+ */
+function poke_hub_collections_maybe_add_anonymous_owner_key_column() {
+    if (get_option('poke_hub_collections_anonymous_owner_key_migrated')) {
+        return;
+    }
+    global $wpdb;
+    $collections_table = pokehub_get_table('collections');
+    if (!$collections_table) {
+        return;
+    }
+    $col = $wpdb->get_results($wpdb->prepare(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'anonymous_owner_key'",
+        DB_NAME,
+        $collections_table
+    ));
+    if (empty($col)) {
+        $wpdb->query("ALTER TABLE {$collections_table} ADD COLUMN anonymous_owner_key VARCHAR(64) NULL DEFAULT NULL AFTER anonymous_ip");
+        $wpdb->query("ALTER TABLE {$collections_table} ADD KEY anonymous_owner_key (anonymous_owner_key)");
+    }
+    update_option('poke_hub_collections_anonymous_owner_key_migrated', 1);
+}
+
+/**
+ * Génère une clé propriétaire anonyme.
+ */
+function poke_hub_collections_generate_anonymous_owner_key(): string {
+    try {
+        return bin2hex(random_bytes(16));
+    } catch (Throwable $e) {
+        return strtolower(wp_generate_password(32, false, false));
+    }
+}
+
+/**
+ * Normalise une clé propriétaire anonyme.
+ */
+function poke_hub_collections_normalize_anonymous_owner_key($owner_key): string {
+    $owner_key = is_string($owner_key) ? strtolower(trim($owner_key)) : '';
+    $owner_key = preg_replace('/[^a-z0-9]/', '', $owner_key);
+    return is_string($owner_key) ? $owner_key : '';
+}
+
+/**
+ * Nom du cookie de propriété anonyme pour un token de partage.
+ */
+function poke_hub_collections_owner_cookie_name(string $share_token): string {
+    return 'pokehub_col_owner_' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $share_token));
+}
+
+/**
+ * Lit la clé propriétaire anonyme depuis cookie (si disponible).
+ */
+function poke_hub_collections_get_owner_key_from_cookie(string $share_token): string {
+    if ($share_token === '') {
+        return '';
+    }
+    $cookie_name = poke_hub_collections_owner_cookie_name($share_token);
+    if (empty($_COOKIE[$cookie_name])) {
+        return '';
+    }
+    return poke_hub_collections_normalize_anonymous_owner_key(wp_unslash($_COOKIE[$cookie_name]));
+}
+
+/**
  * Génère un jeton aléatoire unique pour le partage (alphanumérique, 14 caractères).
  *
  * @return string
@@ -2188,13 +2254,14 @@ function poke_hub_collections_get_generation_progress(array $pool, array $items)
  * @param string|null $ip
  * @return array{ success: bool, message: string }
  */
-function poke_hub_collections_reset_items(int $collection_id, int $user_id = 0, ?string $ip = null): array {
+function poke_hub_collections_reset_items(int $collection_id, int $user_id = 0, ?string $ip = null, ?string $owner_key = null): array {
     if ($user_id > 0) {
         if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
             return ['success' => false, 'message' => __('You cannot modify this collection.', 'poke-hub')];
         }
     } else {
-        if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
+        $owner_key_norm = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+        if (!poke_hub_collections_can_edit_anonymous($collection_id, (string) $ip, $owner_key_norm)) {
             return ['success' => false, 'message' => __('You cannot modify this collection.', 'poke-hub')];
         }
     }
@@ -2755,6 +2822,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
     $options_json = wp_json_encode($options);
 
     $share_token = poke_hub_collections_generate_share_token();
+    $owner_key   = poke_hub_collections_generate_anonymous_owner_key();
     $slug        = 'anon-' . time() . '-' . substr($share_token, 0, 6);
 
     $r = $wpdb->insert(
@@ -2765,11 +2833,12 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
             'slug'         => $slug,
             'share_token'  => $share_token,
             'anonymous_ip' => $ip,
+            'anonymous_owner_key' => $owner_key,
             'category'     => $category,
             'options'      => $options_json,
             'is_public'    => 0,
         ],
-        ['%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
+        ['%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
     );
 
     if ($r === false) {
@@ -2782,6 +2851,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
         'message'        => __('Collection created.', 'poke-hub'),
         'collection_id'   => $collection_id,
         'share_token'    => $share_token,
+        'owner_key'      => $owner_key,
     ];
 }
 
@@ -2794,11 +2864,12 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
  * @param string|null $ip    IP client pour collections anonymes (ignoré si le propriétaire est un user connecté)
  * @return array{ success: bool, message: string, forbidden?: bool }
  */
-function poke_hub_collections_update(int $collection_id, int $user_id, array $data, ?string $ip = null): array {
+function poke_hub_collections_update(int $collection_id, int $user_id, array $data, ?string $ip = null, ?string $owner_key = null): array {
     global $wpdb;
 
     $ipNorm = $ip !== null && $ip !== '' ? preg_replace('/[^0-9a-f.:]/', '', (string) $ip) : '';
-    if (!poke_hub_collections_can_edit($collection_id, $user_id, $ipNorm)) {
+    $owner_key_norm = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+    if (!poke_hub_collections_can_edit($collection_id, $user_id, $ipNorm, $owner_key_norm)) {
         return [
             'success'   => false,
             'forbidden' => true,
@@ -3008,7 +3079,7 @@ function poke_hub_collections_get_public_by_slug(string $slug): ?array {
  * @param int    $user_id       >0 = WP user, 0 = tenter l’accès collection anonyme (IP requise)
  * @param string $ip            IP normalisée (même règle que {@see poke_hub_collections_get_client_ip()})
  */
-function poke_hub_collections_can_edit(int $collection_id, int $user_id, string $ip = ''): bool {
+function poke_hub_collections_can_edit(int $collection_id, int $user_id, string $ip = '', string $owner_key = ''): bool {
     $col = poke_hub_collections_get_one($collection_id);
     if (!$col) {
         return false;
@@ -3021,15 +3092,34 @@ function poke_hub_collections_can_edit(int $collection_id, int $user_id, string 
     }
     $ip = preg_replace('/[^0-9a-f.:]/', '', (string) $ip);
 
-    return $ip !== '' && poke_hub_collections_can_edit_anonymous($collection_id, $ip);
+    return poke_hub_collections_can_edit_anonymous($collection_id, $ip, $owner_key);
 }
 
 /**
  * Vérifie qu’une collection anonyme peut être modifiée depuis cette IP.
  */
-function poke_hub_collections_can_edit_anonymous(int $collection_id, string $ip): bool {
-    $col = poke_hub_collections_get_one($collection_id);
-    return $col && (int) $col['user_id'] === 0 && !empty($col['anonymous_ip']) && $col['anonymous_ip'] === $ip;
+function poke_hub_collections_can_edit_anonymous(int $collection_id, string $ip = '', string $owner_key = ''): bool {
+    global $wpdb;
+    $collections_table = pokehub_get_table('collections');
+    if (!$collections_table || $collection_id <= 0) {
+        return false;
+    }
+    $col = $wpdb->get_row($wpdb->prepare(
+        "SELECT user_id, anonymous_ip, anonymous_owner_key FROM {$collections_table} WHERE id = %d",
+        $collection_id
+    ), ARRAY_A);
+    if (!$col || (int) ($col['user_id'] ?? -1) !== 0) {
+        return false;
+    }
+    $owner_key = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+    $stored_key = poke_hub_collections_normalize_anonymous_owner_key($col['anonymous_owner_key'] ?? '');
+    if ($owner_key !== '' && $stored_key !== '' && hash_equals($stored_key, $owner_key)) {
+        return true;
+    }
+    if ($ip === '') {
+        return false;
+    }
+    return !empty($col['anonymous_ip']) && $col['anonymous_ip'] === $ip;
 }
 
 /**
@@ -3130,7 +3220,7 @@ function poke_hub_collections_claim(int $collection_id, int $user_id, string $ip
  * @param string|null $ip      requis si user_id = 0
  * @return array { success, message }
  */
-function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?string $ip = null): array {
+function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?string $ip = null, ?string $owner_key = null): array {
     global $wpdb;
 
     if ($user_id > 0) {
@@ -3138,7 +3228,8 @@ function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?stri
             return ['success' => false, 'message' => __('You cannot delete this collection.', 'poke-hub')];
         }
     } else {
-        if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
+        $owner_key_norm = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+        if (!poke_hub_collections_can_edit_anonymous($collection_id, (string) $ip, $owner_key_norm)) {
             return ['success' => false, 'message' => __('You cannot delete this collection.', 'poke-hub')];
         }
     }
@@ -3201,7 +3292,7 @@ function poke_hub_collections_get_items(int $collection_id): array {
  * @param string|null $ip  IP du client (requis si user_id = 0 pour collection anonyme)
  * @return bool
  */
-function poke_hub_collections_set_item(int $collection_id, int $pokemon_id, string $status, int $user_id = 0, ?string $ip = null): bool {
+function poke_hub_collections_set_item(int $collection_id, int $pokemon_id, string $status, int $user_id = 0, ?string $ip = null, ?string $owner_key = null): bool {
     global $wpdb;
 
     if ($user_id > 0) {
@@ -3209,7 +3300,8 @@ function poke_hub_collections_set_item(int $collection_id, int $pokemon_id, stri
             return false;
         }
     } else {
-        if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
+        $owner_key_norm = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+        if (!poke_hub_collections_can_edit_anonymous($collection_id, (string) $ip, $owner_key_norm)) {
             return false;
         }
     }
@@ -3242,19 +3334,20 @@ function poke_hub_collections_set_item(int $collection_id, int $pokemon_id, stri
  * @param string|null $ip requis si user_id = 0
  * @return bool
  */
-function poke_hub_collections_set_items(int $collection_id, array $items, int $user_id = 0, ?string $ip = null): bool {
+function poke_hub_collections_set_items(int $collection_id, array $items, int $user_id = 0, ?string $ip = null, ?string $owner_key = null): bool {
     if ($user_id > 0) {
         if (!poke_hub_collections_can_edit($collection_id, $user_id)) {
             return false;
         }
     } else {
-        if ($ip === null || !poke_hub_collections_can_edit_anonymous($collection_id, $ip)) {
+        $owner_key_norm = poke_hub_collections_normalize_anonymous_owner_key($owner_key);
+        if (!poke_hub_collections_can_edit_anonymous($collection_id, (string) $ip, $owner_key_norm)) {
             return false;
         }
     }
 
     foreach ($items as $pokemon_id => $status) {
-        poke_hub_collections_set_item($collection_id, (int) $pokemon_id, (string) $status, $user_id, $ip);
+        poke_hub_collections_set_item($collection_id, (int) $pokemon_id, (string) $status, $user_id, $ip, $owner_key);
     }
     return true;
 }

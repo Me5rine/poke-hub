@@ -2,6 +2,59 @@
     'use strict';
 
     var storageKey = 'poke_hub_collections';
+    var offlineItemsStorageKey = 'poke_hub_collections_offline_items';
+    var ownerKeyStoragePrefix = 'poke_hub_collections_owner_key_';
+
+    function getCollectionOwnerKey(shareToken) {
+        if (!shareToken) return '';
+        try {
+            return localStorage.getItem(ownerKeyStoragePrefix + shareToken) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function setCollectionOwnerKey(shareToken, ownerKey) {
+        if (!shareToken || !ownerKey) return;
+        try {
+            localStorage.setItem(ownerKeyStoragePrefix + shareToken, ownerKey);
+        } catch (e) {}
+        try {
+            document.cookie = 'pokehub_col_owner_' + shareToken + '=' + encodeURIComponent(ownerKey) + '; path=/; max-age=31536000; samesite=lax';
+        } catch (e2) {}
+    }
+
+    function getWrapOwnerKey(wrap) {
+        if (!wrap || !wrap.getAttribute) return '';
+        var token = wrap.getAttribute('data-share-token') || '';
+        return getCollectionOwnerKey(token);
+    }
+
+    function buildRestHeaders(base, wrap) {
+        var out = base || {};
+        if (typeof pokeHubCollections !== 'undefined' && pokeHubCollections && pokeHubCollections.nonce) {
+            out['X-WP-Nonce'] = pokeHubCollections.nonce;
+        }
+        var ownerKey = getWrapOwnerKey(wrap);
+        if (ownerKey) {
+            out['X-PokeHub-Owner-Key'] = ownerKey;
+        }
+        return out;
+    }
+
+    function readOfflineItemsMap() {
+        try {
+            return JSON.parse(localStorage.getItem(offlineItemsStorageKey) || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function writeOfflineItemsMap(map) {
+        try {
+            localStorage.setItem(offlineItemsStorageKey, JSON.stringify(map || {}));
+        } catch (e) {}
+    }
 
     /**
      * L’événement « error » des <img> ne remonte pas au document (pas de bulles) :
@@ -401,6 +454,9 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.success && data.share_token) {
+                        if (data.owner_key) {
+                            setCollectionOwnerKey(data.share_token, data.owner_key);
+                        }
                         closeCreateDrawer();
                         var base = window.location.origin + window.location.pathname.replace(/\/$/, '');
                         window.location.href = base + '/' + data.share_token;
@@ -468,17 +524,59 @@
                     localStorage.setItem(storageKey, JSON.stringify(collections));
                 }
             } else {
+                var offlineMap = readOfflineItemsMap();
+                if (!offlineMap[collectionId]) {
+                    offlineMap[collectionId] = {};
+                }
+                offlineMap[collectionId][pokemonId] = next;
+                writeOfflineItemsMap(offlineMap);
                 fetch(pokeHubCollections.restUrl + 'collections/' + collectionId + '/item', {
                     method: 'POST',
-                    headers: {
+                    headers: buildRestHeaders({
                         'Content-Type': 'application/json',
-                        'X-WP-Nonce': pokeHubCollections.nonce,
-                    },
+                    }, tileWrap || viewWrapTiles),
                     body: JSON.stringify({ pokemon_id: pokemonId, status: next }),
                     credentials: 'same-origin',
+                }).then(function (r) { return r.json(); }).then(function (data) {
+                    if (data && data.success) {
+                        var m = readOfflineItemsMap();
+                        if (m[collectionId]) {
+                            delete m[collectionId][pokemonId];
+                            if (Object.keys(m[collectionId]).length === 0) {
+                                delete m[collectionId];
+                            }
+                            writeOfflineItemsMap(m);
+                        }
+                    }
                 }).catch(function () {});
             }
         });
+        if (collectionId) {
+            var pending = readOfflineItemsMap();
+            var pendingForCol = pending[collectionId] || {};
+            var pendingIds = Object.keys(pendingForCol);
+            if (pendingIds.length > 0) {
+                for (var pi = 0; pi < pendingIds.length; pi++) {
+                    var pk = pendingIds[pi];
+                    items[pk] = pendingForCol[pk];
+                }
+                try {
+                    tileContainer.setAttribute('data-items', JSON.stringify(items));
+                } catch (e4) {}
+                tileContainer.querySelectorAll('.pokehub-collection-tile').forEach(function (tileEl) {
+                    var pid = String(parseInt(tileEl.getAttribute('data-pokemon-id'), 10));
+                    if (pendingForCol[pid]) {
+                        var st = pendingForCol[pid];
+                        tileEl.setAttribute('data-status', st);
+                        var dotEl = tileEl.querySelector('.pokehub-collection-tile-status');
+                        if (dotEl) {
+                            dotEl.className = 'pokehub-collection-tile-status pokehub-status-' + st;
+                        }
+                    }
+                });
+                applyStatusFilters();
+            }
+        }
     }
 
     // Local collection view: load from localStorage and fetch pool
@@ -794,10 +892,9 @@
             options.include_national_dex = document.getElementById('pokehub-edit-include-national') ? document.getElementById('pokehub-edit-include-national').checked : true;
             fetch(pokeHubCollections.restUrl + 'collections/' + collectionId, {
                 method: 'PATCH',
-                headers: {
+                headers: buildRestHeaders({
                     'Content-Type': 'application/json',
-                    'X-WP-Nonce': pokeHubCollections.nonce,
-                },
+                }, viewWrap),
                 body: JSON.stringify({
                     name: name || undefined,
                     is_public: isPublic,
@@ -827,10 +924,9 @@
             setupCollectionResetInline(resetBlock, function () {
                 fetch(pokeHubCollections.restUrl + 'collections/' + resetCollectionId + '/reset', {
                     method: 'POST',
-                    headers: {
+                    headers: buildRestHeaders({
                         'Content-Type': 'application/json',
-                        'X-WP-Nonce': pokeHubCollections.nonce,
-                    },
+                    }, viewWrap),
                     body: JSON.stringify({}),
                     credentials: 'same-origin',
                 })
@@ -861,7 +957,7 @@
             }
             fetch(pokeHubCollections.restUrl + 'collections/' + viewCollectionId, {
                 method: 'DELETE',
-                headers: { 'X-WP-Nonce': pokeHubCollections.nonce },
+                headers: buildRestHeaders({}, viewWrap),
                 credentials: 'same-origin',
             })
                 .then(function (r) { return r.json(); })
@@ -985,10 +1081,9 @@
                 var pokemonId = ids[done];
                 fetch(pokeHubCollections.restUrl + 'collections/' + collectionId + '/item', {
                     method: 'POST',
-                    headers: {
+                    headers: buildRestHeaders({
                         'Content-Type': 'application/json',
-                        'X-WP-Nonce': pokeHubCollections.nonce,
-                    },
+                    }, selectWrap),
                     body: JSON.stringify({ pokemon_id: pokemonId, status: status }),
                     credentials: 'same-origin',
                 })

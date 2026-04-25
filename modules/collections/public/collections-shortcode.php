@@ -299,7 +299,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                     <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
                         <div class="pokehub-collections-reset-inline" data-reset-context="local">
                             <div class="pokehub-collections-reset-step pokehub-collections-reset-step-initial">
-                                <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button me5rine-lab-form-button-secondary button" disabled><?php esc_html_e('Reset progress', 'poke-hub'); ?></button>
+                                <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button me5rine-lab-form-button-secondary button" disabled><span class="pokehub-btn-text"><?php esc_html_e('Reset progress', 'poke-hub'); ?></span></button>
                             </div>
                             <div class="pokehub-collections-reset-step pokehub-collections-reset-step-confirm" hidden>
                                 <p class="me5rine-lab-form-hint pokehub-collections-reset-hint"><?php esc_html_e('All entries will be shown as missing. You can change them again anytime.', 'poke-hub'); ?></p>
@@ -407,8 +407,12 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
     $items_resolved = function_exists('poke_hub_collections_resolved_items_map')
         ? poke_hub_collections_resolved_items_map($items, is_array($pool) ? $pool : [])
         : $items;
+    $owner_key_cookie = '';
+    if ((int) ($collection['user_id'] ?? 0) === 0 && !empty($collection['share_token']) && function_exists('poke_hub_collections_get_owner_key_from_cookie')) {
+        $owner_key_cookie = poke_hub_collections_get_owner_key_from_cookie((string) $collection['share_token']);
+    }
     $can_edit = ($user_id > 0 && (int) $collection['user_id'] === $user_id)
-        || ((int) $collection['user_id'] === 0 && !empty($collection['anonymous_ip']) && poke_hub_collections_get_client_ip() === $collection['anonymous_ip']);
+        || poke_hub_collections_can_edit_anonymous((int) $collection['id'], poke_hub_collections_get_client_ip(), $owner_key_cookie);
 
     $display_mode_assets = $opts['display_mode'] ?? 'tiles';
     if (in_array($display_mode_assets, ['select', 'tiles_select'], true)) {
@@ -464,10 +468,9 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
             <?php if ($can_edit) : ?>
             <div class="me5rine-lab-dashboard-header-actions pokehub-collection-view-actions">
-                <button type="button" class="pokehub-collections-btn-edit-settings me5rine-lab-form-button me5rine-lab-form-button-secondary button"><?php esc_html_e('Settings', 'poke-hub'); ?></button>
                 <div class="pokehub-collections-reset-inline" data-reset-context="server">
                     <div class="pokehub-collections-reset-step pokehub-collections-reset-step-initial">
-                        <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button me5rine-lab-form-button-secondary button"><?php esc_html_e('Reset progress', 'poke-hub'); ?></button>
+                        <button type="button" class="pokehub-collections-btn-reset-launch me5rine-lab-form-button me5rine-lab-form-button-secondary button"><span class="pokehub-btn-text"><?php esc_html_e('Reset progress', 'poke-hub'); ?></span></button>
                     </div>
                     <div class="pokehub-collections-reset-step pokehub-collections-reset-step-confirm" hidden>
                         <p class="me5rine-lab-form-hint pokehub-collections-reset-hint"><?php esc_html_e('All entries will be shown as missing. You can change them again anytime.', 'poke-hub'); ?></p>
@@ -477,7 +480,8 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         </div>
                     </div>
                 </div>
-                <button type="button" class="pokehub-collections-btn-share me5rine-lab-form-button button"><?php esc_html_e('Share', 'poke-hub'); ?></button>
+                <button type="button" class="pokehub-collections-btn-edit-settings me5rine-lab-form-button me5rine-lab-form-button-secondary button"><span class="pokehub-btn-text"><?php esc_html_e('Settings', 'poke-hub'); ?></span></button>
+                <button type="button" class="pokehub-collections-btn-share me5rine-lab-form-button button" title="<?php esc_attr_e('Share', 'poke-hub'); ?>"><span class="pokehub-btn-text"><?php esc_html_e('Share', 'poke-hub'); ?></span></button>
             </div>
             <?php endif; ?>
             </div>
@@ -503,15 +507,9 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         }
         ?>
 
-        <?php
-        $display_mode = $opts['display_mode'] ?? 'tiles';
-        if ($total > 0 && in_array($display_mode, ['tiles', 'tiles_select'], true)) :
-            ?>
-        <p class="pokehub-collection-legend me5rine-lab-form-hint" role="note" aria-hidden="true">
-            <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <?php esc_html_e('Owned', 'poke-hub'); ?></span>
-            <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-for-trade" aria-hidden="true"></span> <?php esc_html_e('For trade', 'poke-hub'); ?></span>
-            <span class="pokehub-collection-legend-item"><span class="pokehub-collection-legend-dot pokehub-legend-missing" aria-hidden="true"></span> <?php esc_html_e('Missing', 'poke-hub'); ?></span>
-            — <?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?>
+        <?php if ($total > 0) : ?>
+        <p class="me5rine-lab-form-hint" role="note" aria-hidden="true">
+            <?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?>
         </p>
         <?php endif; ?>
 

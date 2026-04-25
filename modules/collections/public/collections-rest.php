@@ -6,6 +6,25 @@ if (!defined('ABSPATH')) {
 }
 
 add_action('rest_api_init', function () {
+    $resolve_owner_key = static function (WP_REST_Request $request, array $collection = []): string {
+        $from_header = '';
+        if ($request->get_header('X-PokeHub-Owner-Key')) {
+            $from_header = (string) $request->get_header('X-PokeHub-Owner-Key');
+        } elseif ($request->get_header('X-Pokehub-Owner-Key')) {
+            $from_header = (string) $request->get_header('X-Pokehub-Owner-Key');
+        }
+        $owner_key = function_exists('poke_hub_collections_normalize_anonymous_owner_key')
+            ? poke_hub_collections_normalize_anonymous_owner_key($from_header)
+            : '';
+        if ($owner_key !== '') {
+            return $owner_key;
+        }
+        $share_token = isset($collection['share_token']) ? (string) $collection['share_token'] : '';
+        if ($share_token !== '' && function_exists('poke_hub_collections_get_owner_key_from_cookie')) {
+            return poke_hub_collections_get_owner_key_from_cookie($share_token);
+        }
+        return '';
+    };
     register_rest_route('poke-hub/v1', '/collections/pool', [
         'methods'             => 'GET',
         'permission_callback' => '__return_true',
@@ -13,7 +32,7 @@ add_action('rest_api_init', function () {
             'category' => ['required' => true, 'type' => 'string'],
             'options'  => ['type' => 'string'], // JSON
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $category = sanitize_key($request->get_param('category'));
             $options  = $request->get_param('options');
             $options  = is_string($options) ? json_decode($options, true) : [];
@@ -83,7 +102,7 @@ add_action('rest_api_init', function () {
         'permission_callback' => function () {
             return is_user_logged_in();
         },
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $user_id = get_current_user_id();
             $list    = poke_hub_collections_get_by_user($user_id);
             return new WP_REST_Response($list, 200);
@@ -99,7 +118,7 @@ add_action('rest_api_init', function () {
             'options'   => ['type' => 'object'],
             'is_public' => ['type' => 'boolean', 'default' => false],
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             if (is_user_logged_in()) {
                 $user_id = get_current_user_id();
                 $data    = [
@@ -117,6 +136,21 @@ add_action('rest_api_init', function () {
                 'options'  => $request->get_param('options') ?: [],
             ];
             $result = poke_hub_collections_create_anonymous($data, $ip);
+            if (!empty($result['success']) && !empty($result['share_token']) && !empty($result['owner_key'])) {
+                $cookie_name = function_exists('poke_hub_collections_owner_cookie_name')
+                    ? poke_hub_collections_owner_cookie_name((string) $result['share_token'])
+                    : '';
+                if ($cookie_name !== '') {
+                    setcookie($cookie_name, (string) $result['owner_key'], [
+                        'expires'  => time() + YEAR_IN_SECONDS,
+                        'path'     => COOKIEPATH ? COOKIEPATH : '/',
+                        'domain'   => COOKIE_DOMAIN ?: '',
+                        'secure'   => is_ssl(),
+                        'httponly' => false,
+                        'samesite' => 'Lax',
+                    ]);
+                }
+            }
             return new WP_REST_Response($result, $result['success'] ? 200 : 400);
         },
     ]);
@@ -125,7 +159,7 @@ add_action('rest_api_init', function () {
         'methods'             => 'GET',
         'permission_callback' => '__return_true',
         'args'                => ['id' => ['required' => true, 'type' => 'integer']],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $id  = (int) $request['id'];
             $col = poke_hub_collections_get_one($id);
             if (!$col) {
@@ -134,7 +168,8 @@ add_action('rest_api_init', function () {
             $user_id = get_current_user_id();
             if ((int) $col['user_id'] === 0) {
                 $ip = poke_hub_collections_get_client_ip();
-                if (empty($col['anonymous_ip']) || $col['anonymous_ip'] !== $ip) {
+                $owner_key = $resolve_owner_key($request, $col);
+                if (!poke_hub_collections_can_edit_anonymous($id, $ip, $owner_key)) {
                     return new WP_REST_Response(['error' => 'Forbidden'], 403);
                 }
             } elseif (empty($col['is_public']) && (int) $col['user_id'] !== $user_id) {
@@ -155,10 +190,12 @@ add_action('rest_api_init', function () {
             'options'   => ['type' => 'object'],
             'is_public' => ['type' => 'boolean'],
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $collection_id = (int) $request['id'];
             $user_id       = get_current_user_id();
             $ip            = function_exists('poke_hub_collections_get_client_ip') ? poke_hub_collections_get_client_ip() : '';
+            $col           = poke_hub_collections_get_one($collection_id);
+            $owner_key     = $resolve_owner_key($request, is_array($col) ? $col : []);
             $data          = [];
             if ($request->has_param('name')) {
                 $data['name'] = $request->get_param('name');
@@ -169,7 +206,7 @@ add_action('rest_api_init', function () {
             if ($request->has_param('is_public')) {
                 $data['is_public'] = $request->get_param('is_public');
             }
-            $result = poke_hub_collections_update($collection_id, $user_id, $data, $ip);
+            $result = poke_hub_collections_update($collection_id, $user_id, $data, $ip, $owner_key);
             if (!$result['success']) {
                 $status = !empty($result['forbidden']) ? 403 : 400;
 
@@ -184,13 +221,15 @@ add_action('rest_api_init', function () {
         'methods'             => 'DELETE',
         'permission_callback' => '__return_true',
         'args'                => ['id' => ['required' => true, 'type' => 'integer']],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $collection_id = (int) $request['id'];
             $user_id       = get_current_user_id();
             $ip            = poke_hub_collections_get_client_ip();
+            $col           = poke_hub_collections_get_one($collection_id);
+            $owner_key     = $resolve_owner_key($request, is_array($col) ? $col : []);
             $result        = $user_id > 0
                 ? poke_hub_collections_delete($collection_id, $user_id)
-                : poke_hub_collections_delete($collection_id, 0, $ip);
+                : poke_hub_collections_delete($collection_id, 0, $ip, $owner_key);
             if (!$result['success']) {
                 return new WP_REST_Response($result, 400);
             }
@@ -207,7 +246,7 @@ add_action('rest_api_init', function () {
             'id'     => ['required' => true, 'type' => 'integer'],
             'items'  => ['required' => true, 'type' => 'object'], // { pokemon_id: status }
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $collection_id = (int) $request['id'];
             $user_id       = get_current_user_id();
             $items         = $request->get_param('items');
@@ -227,16 +266,18 @@ add_action('rest_api_init', function () {
             'pokemon_id' => ['required' => true, 'type' => 'integer'],
             'status'     => ['required' => true, 'type' => 'string', 'enum' => ['owned', 'for_trade', 'missing']],
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $collection_id = (int) $request['id'];
             $pokemon_id    = (int) $request->get_param('pokemon_id');
             $status        = $request->get_param('status');
             $user_id       = get_current_user_id();
             $ip            = poke_hub_collections_get_client_ip();
+            $col           = poke_hub_collections_get_one($collection_id);
+            $owner_key     = $resolve_owner_key($request, is_array($col) ? $col : []);
             if ($user_id > 0) {
                 $ok = poke_hub_collections_set_item($collection_id, $pokemon_id, $status, $user_id);
             } else {
-                $ok = poke_hub_collections_set_item($collection_id, $pokemon_id, $status, 0, $ip);
+                $ok = poke_hub_collections_set_item($collection_id, $pokemon_id, $status, 0, $ip, $owner_key);
             }
             return new WP_REST_Response(['success' => $ok], $ok ? 200 : 400);
         },
@@ -248,14 +289,16 @@ add_action('rest_api_init', function () {
         'args'                => [
             'id' => ['required' => true, 'type' => 'integer'],
         ],
-        'callback'            => function (WP_REST_Request $request) {
+        'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
             $collection_id = (int) $request['id'];
             $user_id         = get_current_user_id();
             $ip              = poke_hub_collections_get_client_ip();
+            $col             = poke_hub_collections_get_one($collection_id);
+            $owner_key       = $resolve_owner_key($request, is_array($col) ? $col : []);
             if ($user_id > 0) {
                 $result = poke_hub_collections_reset_items($collection_id, $user_id);
             } else {
-                $result = poke_hub_collections_reset_items($collection_id, 0, $ip);
+                $result = poke_hub_collections_reset_items($collection_id, 0, $ip, $owner_key);
             }
             return new WP_REST_Response($result, $result['success'] ? 200 : 400);
         },

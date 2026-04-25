@@ -28,6 +28,7 @@ require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-rest.php';
 
 add_action('init', 'poke_hub_collections_maybe_add_share_token_column', 1);
 add_action('init', 'poke_hub_collections_maybe_add_anonymous_ip_column', 2);
+add_action('init', 'poke_hub_collections_maybe_add_anonymous_owner_key_column', 3);
 
 /**
  * Enqueue des assets front (appelé depuis le shortcode pour ne charger que sur les pages qui l'utilisent)
