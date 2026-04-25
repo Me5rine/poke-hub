@@ -3125,6 +3125,7 @@ function poke_hub_get_assets_bucket_base_url(): string {
  */
 function poke_hub_get_assets_path(string $asset_type): string {
     $paths = [
+        'backgrounds' => get_option('poke_hub_assets_path_backgrounds', '/pokemon-go/backgrounds/'),
         'icons' => get_option('poke_hub_assets_path_icons', '/pokemon-go/icons/'),
         'objects' => get_option('poke_hub_assets_path_objects', '/pokemon-go/objects/'),
         'items' => get_option('poke_hub_assets_path_items', '/pokemon-go/items/'),

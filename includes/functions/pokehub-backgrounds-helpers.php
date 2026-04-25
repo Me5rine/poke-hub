@@ -39,6 +39,28 @@ function poke_hub_get_background_type_label(string $type): string {
 }
 
 /**
+ * Construit l'URL de l'image background depuis les réglages "Sources".
+ */
+function poke_hub_get_background_image_url(string $slug): string {
+    $slug = sanitize_title($slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    if (function_exists('poke_hub_get_asset_url')) {
+        return poke_hub_get_asset_url('backgrounds', $slug, 'png');
+    }
+
+    $bucket = trim((string) get_option('poke_hub_assets_bucket_base_url', ''));
+    $path = trim((string) get_option('poke_hub_assets_path_backgrounds', '/pokemon-go/backgrounds/'));
+    if ($bucket === '' || $path === '') {
+        return '';
+    }
+
+    return rtrim($bucket, '/') . '/' . trim($path, '/') . '/' . $slug . '.png';
+}
+
+/**
  * Liste des Pokémon éligibles pour un type de lien « fond » (admin : multiselect filtré).
  *
  * @param string $link_kind POKE_HUB_BG_LINK_* (shadow, dynamax, gigantamax)

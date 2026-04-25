@@ -339,7 +339,13 @@ function poke_hub_collections_get_all_go_backgrounds_for_pokemon_ids( array $pok
     $lock_sql  = $only_shiny_active ? ' AND l.is_shiny_locked = 0' : '';
     $placehold = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
     $sql       = "SELECT DISTINCT b.id AS background_id, b.image_url,
-        COALESCE(NULLIF(TRIM(b.title), ''), NULLIF(TRIM(b.slug), ''), CONCAT('Fond #', b.id)) AS background_title
+        COALESCE(
+            NULLIF(TRIM(b.name_fr), ''),
+            NULLIF(TRIM(b.name_en), ''),
+            NULLIF(TRIM(b.title), ''),
+            NULLIF(TRIM(b.slug), ''),
+            CONCAT('Fond #', b.id)
+        ) AS background_title
         FROM {$links_table} l
         INNER JOIN {$backgrounds_table} b ON l.background_id = b.id
         WHERE l.pokemon_id IN ({$placehold})

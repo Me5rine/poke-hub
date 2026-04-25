@@ -33,6 +33,8 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
 
     // Valeurs par défaut / édition
     $title = '';
+    $name_fr = '';
+    $name_en = '';
     $slug = '';
     $background_type = defined('POKE_HUB_BACKGROUND_TYPE_SPECIAL') ? POKE_HUB_BACKGROUND_TYPE_SPECIAL : 'special';
     $image_url = '';
@@ -46,8 +48,9 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
 
     if ($is_edit) {
         $title = isset($edit_row->title) ? (string) $edit_row->title : '';
+        $name_fr = isset($edit_row->name_fr) ? (string) $edit_row->name_fr : '';
+        $name_en = isset($edit_row->name_en) ? (string) $edit_row->name_en : '';
         $slug = isset($edit_row->slug) ? (string) $edit_row->slug : '';
-        $image_url = isset($edit_row->image_url) ? (string) $edit_row->image_url : '';
         if (isset($edit_row->background_type) && (string) $edit_row->background_type !== '') {
             $background_type = (string) $edit_row->background_type;
         }
@@ -148,24 +151,22 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         $pokemon_shadow     = poke_hub_merge_pokemon_filter_rows_with_saved_ids( $pokemon_shadow, $ids_for_variants );
     }
 
-    // Enqueue le script pour la médiathèque
-    wp_enqueue_media();
-    wp_enqueue_script(
-        'pokehub-media-url',
-        POKE_HUB_URL . 'assets/js/pokehub-media-url.js',
-        ['jquery'],
-        POKE_HUB_VERSION,
-        true
-    );
-
-    wp_localize_script('pokehub-media-url', 'pokemonBackgroundsMedia', [
-        'selectTitle' => __('Select or Upload Background Image', 'poke-hub'),
-        'buttonText'  => __('Use this image', 'poke-hub'),
-        'tabUrl'      => __('Insert from URL', 'poke-hub'),
-        'inputLabel'  => __('Image URL:', 'poke-hub'),
-        'inputDesc'   => __('Enter a direct image URL.', 'poke-hub'),
-        'noImage'     => __('No image selected yet.', 'poke-hub'),
-    ]);
+    if ($name_fr === '' && $title !== '') {
+        $name_fr = $title;
+    }
+    $preview_slug = trim($slug);
+    if ($preview_slug === '') {
+        if ($name_en !== '') {
+            $preview_slug = sanitize_title($name_en);
+        } elseif ($name_fr !== '') {
+            $preview_slug = sanitize_title($name_fr);
+        } elseif ($title !== '') {
+            $preview_slug = sanitize_title($title);
+        }
+    }
+    $image_url = function_exists('poke_hub_get_background_image_url')
+        ? poke_hub_get_background_image_url($preview_slug)
+        : '';
 
     $back_url = add_query_arg(
         [
@@ -201,16 +202,16 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 <div class="admin-lab-form-row" style="display: flex; gap: 1em;">
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
                         <div class="admin-lab-form-group">
-                            <label for="title"><?php esc_html_e('Title', 'poke-hub'); ?> *</label>
-                            <input type="text" id="title" name="title" value="<?php echo esc_attr($title); ?>" required />
-                            <p class="description"><?php esc_html_e('Example: "Halloween Background", "Christmas Background"…', 'poke-hub'); ?></p>
+                            <label for="title"><?php esc_html_e('Internal title', 'poke-hub'); ?></label>
+                            <input type="text" id="title" name="title" value="<?php echo esc_attr($title); ?>" />
+                            <p class="description"><?php esc_html_e('Optional internal label in admin. If empty, translation names are used.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
                         <div class="admin-lab-form-group">
                             <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                             <input type="text" id="slug" name="slug" value="<?php echo esc_attr($slug); ?>" />
-                            <p class="description"><?php esc_html_e('Leave empty to auto-generate from title.', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('Leave empty to auto-generate from English name.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                     <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
@@ -230,36 +231,46 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                 </div>
             </div>
 
+            <!-- Section: Translations -->
+            <div class="admin-lab-form-section">
+                <h3><?php esc_html_e('Translations', 'poke-hub'); ?></h3>
+                <p class="description"><?php esc_html_e('Used in front-end labels. English name is used to auto-generate slug when empty.', 'poke-hub'); ?></p>
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
+                            <label for="name_fr"><?php esc_html_e('French Name', 'poke-hub'); ?></label>
+                            <input type="text" id="name_fr" name="name_fr" value="<?php echo esc_attr($name_fr); ?>" />
+                        </div>
+                    </div>
+                    <div class="admin-lab-form-col-50">
+                        <div class="admin-lab-form-group">
+                            <label for="name_en"><?php esc_html_e('English Name', 'poke-hub'); ?> *</label>
+                            <input type="text" id="name_en" name="name_en" value="<?php echo esc_attr($name_en); ?>" required />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Section: Background Image -->
             <div class="admin-lab-form-section">
                 <h3><?php esc_html_e('Background Image', 'poke-hub'); ?></h3>
-                
-                <div id="pokehub-background-image-field">
-                    <div class="admin-lab-form-group">
-                        <label for="image_url"><?php esc_html_e('Image URL', 'poke-hub'); ?></label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="url" id="image_url" name="image_url" value="<?php echo esc_attr($image_url); ?>" style="flex: 1;" />
-                            <button type="button" class="button pokehub-select-background-image">
-                                <?php esc_html_e('Choose from library', 'poke-hub'); ?>
-                            </button>
-                        </div>
-                        <p class="description"><?php esc_html_e('Full URL to the background image.', 'poke-hub'); ?></p>
-                        
-                        <div class="image-preview" style="margin-top:15px;">
-                            <?php if ($image_url) : ?>
-                                <img src="<?php echo esc_url($image_url); ?>" 
-                                     class="pokehub-background-image-preview" 
-                                     style="max-width:300px;height:auto;display:block;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />
-                                <button type="button" class="button pokehub-remove-background-image" style="margin-top:10px;">
-                                    <?php esc_html_e('Remove image', 'poke-hub'); ?>
-                                </button>
-                            <?php else : ?>
-                                <p class="description" style="margin:0;color:#999;">
-                                    <?php esc_html_e('No image selected yet.', 'poke-hub'); ?>
-                                </p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                <div class="admin-lab-form-group">
+                    <label><?php esc_html_e('Image preview', 'poke-hub'); ?></label>
+                    <p class="description">
+                        <?php esc_html_e('The image URL is generated automatically from settings (Sources > Backgrounds path) and the background slug: {bucket}{path}{slug}.png.', 'poke-hub'); ?>
+                    </p>
+                    <?php if ($image_url !== '') : ?>
+                        <img src="<?php echo esc_url($image_url); ?>"
+                             class="pokehub-background-image-preview"
+                             style="max-width:300px;height:auto;display:block;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />
+                        <p class="description" style="margin-top:8px;">
+                            <code><?php echo esc_html($image_url); ?></code>
+                        </p>
+                    <?php else : ?>
+                        <p class="description" style="margin-top:8px;color:#646970;">
+                            <?php esc_html_e('Set an English name or slug to preview. Also verify Sources settings for bucket URL and backgrounds path.', 'poke-hub'); ?>
+                        </p>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -571,98 +582,6 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         if ($.fn.select2) {
             $('#pokehub-background-events-list .pokehub-event-picker-select').select2({ placeholder: '<?php echo esc_js(__('Search event...', 'poke-hub')); ?>', allowClear: true, width: '100%' });
         }
-        // Gestion de la médiathèque pour l'image
-        $(document).on('click', '.pokehub-select-background-image', function(e) {
-            e.preventDefault();
-
-            const $field = $('#pokehub-background-image-field');
-            const $urlInput = $('#image_url');
-            let $preview = $field.find('.pokehub-background-image-preview');
-            const $remove = $field.find('.pokehub-remove-background-image');
-
-            const frame = new wp.media.view.MediaFrame.PokeHubTypes({
-                title: (window.pokemonBackgroundsMedia && pokemonBackgroundsMedia.selectTitle) || 'Select or Upload Image',
-                button: {
-                    text: (window.pokemonBackgroundsMedia && pokemonBackgroundsMedia.buttonText) || 'Use this image'
-                },
-                multiple: false
-            });
-
-            frame.on('open', function() {
-                const state = frame.state('pokehub-types-url');
-                if (state) {
-                    state.props.set({
-                        url: $urlInput.val() || ''
-                    });
-                }
-            });
-
-            frame.on('select', function() {
-                const attachment = frame.state().get('selection').first();
-                if (!attachment) return;
-
-                const data = attachment.toJSON();
-                if (!data.url) return;
-
-                $urlInput.val(data.url);
-
-                if (!$preview.length) {
-                    $field.find('.image-preview').html(
-                        '<img src="' + data.url + '" class="pokehub-background-image-preview" style="max-width:300px;height:auto;display:block;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />' +
-                        '<button type="button" class="button pokehub-remove-background-image" style="margin-top:10px;"><?php echo esc_js(__('Remove image', 'poke-hub')); ?></button>'
-                    );
-                    $preview = $field.find('.pokehub-background-image-preview');
-                } else {
-                    $preview.attr('src', data.url).show();
-                }
-
-                $remove.show();
-            });
-
-            frame.on('insert', function(state) {
-                if (!state || state.id !== 'pokehub-types-url') return;
-
-                const url = state.props.get('url');
-                if (!url) return;
-
-                $urlInput.val(url);
-
-                if (!$preview.length) {
-                    $field.find('.image-preview').html(
-                        '<img src="' + url + '" class="pokehub-background-image-preview" style="max-width:300px;height:auto;display:block;border:1px solid #c3c4c7;padding:8px;background:#fff;border-radius:4px;" />' +
-                        '<button type="button" class="button pokehub-remove-background-image" style="margin-top:10px;"><?php echo esc_js(__('Remove image', 'poke-hub')); ?></button>'
-                    );
-                    $preview = $field.find('.pokehub-background-image-preview');
-                } else {
-                    $preview.attr('src', url).show();
-                }
-
-                $remove.show();
-            });
-
-            frame.open();
-        });
-
-        $(document).on('click', '.pokehub-remove-background-image', function(e) {
-            e.preventDefault();
-
-            const $field = $('#pokehub-background-image-field');
-            const $urlInput = $('#image_url');
-            const $preview = $field.find('.pokehub-background-image-preview');
-
-            $urlInput.val('');
-
-            if ($preview.length) {
-                $preview.attr('src', '').hide();
-            }
-
-            $field.find('.image-preview').html(
-                '<p class="description" style="margin:0;color:#999;"><?php echo esc_js(__('No image selected yet.', 'poke-hub')); ?></p>'
-            );
-
-            $(this).hide();
-        });
-
     });
     </script>
     <?php

@@ -25,7 +25,7 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
     public function get_columns() {
         return [
             'cb'             => '<input type="checkbox" />',
-            'title'          => __('Title', 'poke-hub'),
+            'title'          => __('Name', 'poke-hub'),
             'slug'           => __('Slug', 'poke-hub'),
             'background_type' => __('Type', 'poke-hub'),
             'image'          => __('Image', 'poke-hub'),
@@ -36,7 +36,7 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
 
     public function get_sortable_columns() {
         return [
-            'title'           => ['title', true],
+            'title'           => ['name_en', true],
             'slug'            => ['slug', true],
             'background_type' => ['background_type', true],
         ];
@@ -73,7 +73,17 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
             'poke_hub_delete_background_' . (int) $item->id
         );
 
-        $title = esc_html($item->title);
+        $title = trim((string) ($item->name_fr ?? ''));
+        if ($title === '') {
+            $title = trim((string) ($item->name_en ?? ''));
+        }
+        if ($title === '') {
+            $title = trim((string) ($item->title ?? ''));
+        }
+        if ($title === '') {
+            $title = trim((string) ($item->slug ?? ''));
+        }
+        $title = esc_html($title);
 
         // URL de la page publique du fond
         $view_url = '';
@@ -122,14 +132,12 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
     }
 
     public function column_image($item) {
-        $extra = [];
-        if (!empty($item->extra)) {
-            $decoded = json_decode($item->extra, true);
-            if (is_array($decoded)) {
-                $extra = $decoded;
-            }
+        $url = function_exists('poke_hub_get_background_image_url')
+            ? poke_hub_get_background_image_url((string) ($item->slug ?? ''))
+            : '';
+        if ($url === '' && !empty($item->image_url)) {
+            $url = (string) $item->image_url;
         }
-        $url = $item->image_url ?? ($extra['image_url'] ?? '');
 
         if (!$url) {
             return '&mdash;';
@@ -339,9 +347,9 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
             $order = 'ASC';
         }
 
-        $allowed_orderby = ['title', 'slug', 'background_type'];
+        $allowed_orderby = ['title', 'name_en', 'name_fr', 'slug', 'background_type'];
         if (!in_array($orderby, $allowed_orderby, true)) {
-            $orderby = 'title';
+            $orderby = 'name_en';
         }
 
         $search = isset($_REQUEST['s']) ? wp_unslash(trim($_REQUEST['s'])) : '';
@@ -350,8 +358,10 @@ class Poke_Hub_Pokemon_Backgrounds_List_Table extends WP_List_Table {
         $params = [];
 
         if ($search !== '') {
-            $where   .= ' AND (title LIKE %s OR slug LIKE %s)';
+            $where   .= ' AND (title LIKE %s OR name_fr LIKE %s OR name_en LIKE %s OR slug LIKE %s)';
             $like     = '%' . $wpdb->esc_like($search) . '%';
+            $params[] = $like;
+            $params[] = $like;
             $params[] = $like;
             $params[] = $like;
         }
@@ -422,7 +432,6 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     if (function_exists('pokehub_install_tables_for_modules')) {
         pokehub_install_tables_for_modules(['pokemon'], ['skip_allow_filter' => true, 'try_require_db_class' => true]);
     }
-
     global $wpdb;
     $table = pokehub_get_table('pokemon_backgrounds');
     $links_table = pokehub_get_table('pokemon_background_pokemon_links');
@@ -438,12 +447,13 @@ function poke_hub_pokemon_handle_backgrounds_form() {
 
     $id        = isset($_POST['id']) ? (int) $_POST['id'] : 0;
     $title     = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+    $name_fr   = isset($_POST['name_fr']) ? sanitize_text_field(wp_unslash($_POST['name_fr'])) : '';
+    $name_en   = isset($_POST['name_en']) ? sanitize_text_field(wp_unslash($_POST['name_en'])) : '';
     $slug      = isset($_POST['slug']) ? sanitize_title(wp_unslash($_POST['slug'])) : '';
     $background_type = isset($_POST['background_type']) ? sanitize_key(wp_unslash($_POST['background_type'])) : 'special';
     if (!in_array($background_type, ['location', 'special'], true)) {
         $background_type = 'special';
     }
-    $image_url = isset($_POST['image_url']) ? esc_url_raw(wp_unslash($_POST['image_url'])) : '';
     $event_links = isset($_POST['event_links']) && is_array($_POST['event_links'])
         ? $_POST['event_links']
         : [];
@@ -477,17 +487,24 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     $pokemon_ids_gigantamax   = $read_post_id_list( 'pokemon_ids_gigantamax' );
 
     // Validation
-    if ($title === '') {
-        wp_safe_redirect(add_query_arg('ph_msg', 'missing_title', $redirect_base));
+    if ($name_en === '') {
+        wp_safe_redirect(add_query_arg('ph_msg', 'missing_name_en', $redirect_base));
         exit;
     }
 
-    // Slug auto depuis le titre
+    // Slug auto depuis le nom anglais
     if ($slug === '') {
-        $slug = sanitize_title($title);
+        $slug = sanitize_title($name_en);
     }
 
     $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_background' ? 0 : $id, 'slug', 'id', 'background');
+    $image_url = function_exists('poke_hub_get_background_image_url')
+        ? poke_hub_get_background_image_url($slug)
+        : '';
+
+    if ($title === '') {
+        $title = $name_fr !== '' ? $name_fr : $name_en;
+    }
 
     $extra = [
         'image_url' => $image_url,
@@ -496,11 +513,13 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     $data = [
         'slug'            => $slug,
         'title'          => $title,
+        'name_en'        => $name_en,
+        'name_fr'        => $name_fr,
         'background_type' => $background_type,
         'image_url'      => $image_url,
         'extra'          => wp_json_encode($extra),
     ];
-    $format = ['%s', '%s', '%s', '%s', '%s'];
+    $format = ['%s', '%s', '%s', '%s', '%s', '%s', '%s'];
 
     if ($action === 'add_background') {
         $wpdb->insert($table, $data, $format);
@@ -662,8 +681,8 @@ function poke_hub_pokemon_admin_backgrounds_screen() {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Background saved.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'deleted') {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Background deleted.', 'poke-hub') . '</p></div>';
-        } elseif ($msg === 'missing_title') {
-            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Title is required.', 'poke-hub') . '</p></div>';
+        } elseif ($msg === 'missing_name_en') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('English name is required.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_id') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Invalid background ID.', 'poke-hub') . '</p></div>';
         }

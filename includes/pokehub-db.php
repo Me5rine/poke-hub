@@ -495,6 +495,8 @@ class Pokehub_DB {
         $sql_backgrounds = "CREATE TABLE {$backgrounds_table} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             slug VARCHAR(191) NOT NULL,
+            name_en VARCHAR(191) NOT NULL DEFAULT '',
+            name_fr VARCHAR(191) NOT NULL DEFAULT '',
             title VARCHAR(255) NOT NULL DEFAULT '',
             background_type VARCHAR(50) NOT NULL DEFAULT 'special',
             image_url TEXT NULL,
@@ -505,6 +507,8 @@ class Pokehub_DB {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug),
+            KEY name_en (name_en(191)),
+            KEY name_fr (name_fr(191)),
             KEY background_type (background_type),
             KEY event_id (event_id),
             KEY event_type (event_type)
