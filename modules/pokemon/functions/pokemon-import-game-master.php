@@ -128,7 +128,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             }
         }
 
-        if ( $variant_id <= 0 && function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+        // Toujours upsert : une variante déjà en base avait category=… figée car l’import ne s’exécutait que si id=0.
+        if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
             $guess_settings = $settings;
             $fproto_u = $form_proto !== '' ? strtoupper( (string) $form_proto ) : '';
             if ( $fproto_u !== '' && ! empty( $form_costume_index[ (string) $pokemon_id_proto ][ $fproto_u ] ) ) {
@@ -140,7 +141,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             $auto_form_type = function_exists( 'poke_hub_pokemon_guess_form_type_from_gm' )
                 ? poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_proto, $form_slug, $guess_settings )
                 : 'default';
-            $variant_id = poke_hub_pokemon_upsert_form_variant(
+            $variant_id = (int) poke_hub_pokemon_upsert_form_variant(
                 $form_slug,
                 $variant_label,
                 $auto_form_type, // category = type de forme
@@ -150,7 +151,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     'form_proto'       => $form_proto,
                     'template_id'      => $template_id,
                     'form_type'        => $auto_form_type,
-                ]
+                ],
+                $variant_id
             );
         }
 
@@ -948,8 +950,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     $mega_variant_id = (int) $existing_mega_variant['id'];
                 }
             }
-            if ( $mega_variant_id <= 0 && function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
-                $mega_variant_id = poke_hub_pokemon_upsert_form_variant(
+            if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
+                $mega_variant_id = (int) poke_hub_pokemon_upsert_form_variant(
                     $temp_form_slug,
                     $temp_form_label,
                     $mega_variant_category,
@@ -958,7 +960,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                         'pokemon_id_proto' => $pokemon_id_proto,
                         'temp_evo_id'      => $temp_evo_id,
                         'template_id'      => $template_id,
-                    ]
+                    ],
+                    $mega_variant_id
                 );
             }
 
@@ -1860,6 +1863,98 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     // (formSettings ne liste pas toujours NORMAL, d'où collisions de slug sans ce complément).
     $pokemon_forms_agg = [];
     $form_costume_index = [];
+    $is_family_excluded_form = static function (
+        string $pokemon_id_proto,
+        string $form_value,
+        string $template_id = '',
+        array $settings = [],
+        bool $is_costume_flag = false
+    ): bool {
+        $form_value_u = strtoupper( trim( $form_value ) );
+        $pokemon_id_u = strtoupper( trim( $pokemon_id_proto ) );
+        if ( $form_value_u === '' ) {
+            return false;
+        }
+        if ( $is_costume_flag ) {
+            return true;
+        }
+        // Exclusions métier pour la création des placeholders "*-family".
+        if ( strpos( $form_value_u, 'COPY' ) !== false || ( $template_id !== '' && stripos( $template_id, '_COPY' ) !== false ) ) {
+            return true;
+        }
+        // Certains costumes event ne sont pas toujours marqués isCostume côté formSettings (ex: PSYDUCK_SWIM_2025).
+        if ( preg_match( '/_(FASHION|HAT|CAP|BOW|HOLIDAY|PARTY|SWIM|COSTUME)(_|$)/', $form_value_u ) ) {
+            return true;
+        }
+        if ( preg_match( '/_(19|20)\d{2}($|_)/', $form_value_u ) ) {
+            return true;
+        }
+        if ( strpos( $form_value_u, 'SHADOW' ) !== false || strpos( $form_value_u, 'PURIFIED' ) !== false || preg_match( '/_[SP]$/', $form_value_u ) ) {
+            return true;
+        }
+        if ( strpos( $form_value_u, 'GIGANTAMAX' ) !== false || strpos( $form_value_u, 'G_MAX' ) !== false || strpos( $form_value_u, 'DYNAMAX' ) !== false ) {
+            return true;
+        }
+        foreach ( [ 'ALOLA', 'GALAR', 'HISUI', 'PALDEA' ] as $region_token ) {
+            if ( strpos( $form_value_u, $region_token ) !== false ) {
+                return true;
+            }
+        }
+        if ( strpos( $form_value_u, 'MEGA' ) !== false && strpos( $form_value_u, 'MEGAHORN' ) === false ) {
+            return true;
+        }
+        if ( strpos( $form_value_u, 'PRIMAL' ) !== false && ( strpos( $form_value_u, 'KYOGRE' ) !== false || strpos( $form_value_u, 'GROUDON' ) !== false ) ) {
+            return true;
+        }
+        if ( function_exists( 'poke_hub_pokemon_guess_form_type_from_gm' ) ) {
+            $guess_settings = $settings;
+            if ( $is_costume_flag ) {
+                $guess_settings['__isCostume'] = true;
+            }
+            if ( $template_id !== '' && stripos( $template_id, '_COPY' ) !== false ) {
+                $guess_settings['__isClone'] = true;
+            }
+            $form_kind = poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_u, $form_value_u, '', $guess_settings );
+            if ( in_array( $form_kind, [ 'costume', 'clone', 'regional', 'mega' ], true ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    // Index costume en premier : l’agrégat pokemon_forms_agg (pokemonSettings) doit ignorer
+    // les formes isCostume, sinon une espèce avec NORMAL + costumes seulement (ex. Bulbizarre)
+    // est traitée comme Dialga/Palkia et crée un slug *-family fantôme.
+    foreach ( $decoded as $entry ) {
+        if ( ! is_array( $entry ) ) {
+            continue;
+        }
+        $data = $entry['data'] ?? [];
+        $template_id = (string) ( $entry['templateId'] ?? '' );
+        if ( empty( $data['formSettings'] ) || ! is_array( $data['formSettings'] ) ) {
+            continue;
+        }
+        $form_settings = $data['formSettings'];
+        $pokemon_proto = (string) ( $form_settings['pokemon'] ?? '' );
+        $forms_list    = $form_settings['forms'] ?? [];
+        if ( $pokemon_proto === '' || ! is_array( $forms_list ) ) {
+            continue;
+        }
+        foreach ( $forms_list as $form_row ) {
+            if ( ! is_array( $form_row ) || empty( $form_row['isCostume'] ) ) {
+                continue;
+            }
+            $form_for_costume = strtoupper( (string) ( $form_row['form'] ?? '' ) );
+            if ( $form_for_costume === '' ) {
+                continue;
+            }
+            if ( ! isset( $form_costume_index[ $pokemon_proto ] ) ) {
+                $form_costume_index[ $pokemon_proto ] = [];
+            }
+            $form_costume_index[ $pokemon_proto ][ $form_for_costume ] = true;
+        }
+    }
 
     // Prélecture du mapping GMAX (SOURDOUGH_MOVE_MAPPING_SETTINGS)
     foreach ( $decoded as $entry ) {
@@ -1881,8 +1976,11 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 }
                 if ( preg_match( '/_NORMAL$/', $form_raw ) || $form_raw === 'NORMAL' || $form_raw === 'FORM_NORMAL' ) {
                     $pokemon_forms_agg[ $poke_proto ]['explicit_normal'] = true;
-                } else {
-                    $pokemon_forms_agg[ $poke_proto ]['non_normal'] = true;
+                } elseif ( empty( $form_costume_index[ $poke_proto ][ $form_raw ] ) ) {
+                    $is_costume_flag = ! empty( $form_costume_index[ $poke_proto ][ $form_raw ] );
+                    if ( ! $is_family_excluded_form( $poke_proto, $form_raw, $template_id, $ps, $is_costume_flag ) ) {
+                        $pokemon_forms_agg[ $poke_proto ]['non_normal'] = true;
+                    }
                 }
             }
         }
@@ -1892,8 +1990,7 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             $pokemon_proto = (string) ( $form_settings['pokemon'] ?? '' );
             $forms_list    = $form_settings['forms'] ?? [];
             if ( $pokemon_proto !== '' && is_array( $forms_list ) ) {
-                $has_normal_form = false;
-                $has_other_form_change = false;
+                $non_costume_copy_forms = [];
                 foreach ( $forms_list as $form_row ) {
                     if ( ! is_array( $form_row ) ) {
                         continue;
@@ -1911,40 +2008,15 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                     if ( $form_value === '' ) {
                         continue;
                     }
-                    if ( preg_match( '/_NORMAL$/', $form_value ) || $form_value === 'NORMAL' || $form_value === 'FORM_NORMAL' ) {
-                        $has_normal_form = true;
-                    } else {
-                        // On ne conserve NORMAL que s'il existe au moins une vraie forme de changement.
-                        // Cela exclut les formes cosmétiques/régionales qui ne doivent pas créer "xxx-normal".
-                        $form_kind = function_exists( 'poke_hub_pokemon_guess_form_type_from_gm' )
-                            ? poke_hub_pokemon_guess_form_type_from_gm(
-                                $pokemon_proto,
-                                $form_value,
-                                '',
-                                [
-                                    '__isCostume' => ! empty( $form_row['isCostume'] ),
-                                ]
-                            )
-                            : '';
-                        $has_meaningful_normal_pair = in_array(
-                            $form_kind,
-                            [ 'switch_form', 'switch_battle', 'special', 'fusion' ],
-                            true
-                        );
-                        if ( ! $has_meaningful_normal_pair ) {
-                            // Fallback explicite: certaines espèces (ex: Palkia/Dialga) ont NORMAL + ORIGIN
-                            // sans signal complet côté settings, mais ORIGIN reste une vraie forme métier.
-                            if ( preg_match( '/_(ORIGIN|INCARNATE|THERIAN|RESOLUTE|BLADE|SHIELD|HERO|CROWNED|DUSK_MANE|DAWN_WINGS|BLACK|WHITE)$/', $form_value ) ) {
-                                $has_meaningful_normal_pair = true;
-                            }
-                        }
-                        if ( $has_meaningful_normal_pair ) {
-                            $has_other_form_change = true;
-                        }
+                    $is_costume_flag = ! empty( $form_row['isCostume'] );
+                    if ( $is_costume_flag || $is_family_excluded_form( $pokemon_proto, $form_value, $template_id, [ '__isCostume' => $is_costume_flag ], $is_costume_flag ) ) {
+                        continue;
                     }
+                    $non_costume_copy_forms[ $form_value ] = true;
                 }
-                // NORMAL n'est une vraie forme que si l'espèce a aussi une forme "métier" (switch/fusion/special).
-                if ( $has_normal_form && $has_other_form_change ) {
+                // Règle métier: créer une famille quand une espèce a plusieurs formes,
+                // hors costumes et hors COPY.
+                if ( count( $non_costume_copy_forms ) > 1 ) {
                     $species_with_explicit_normal_form[ $pokemon_proto ] = true;
                 }
             }

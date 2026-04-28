@@ -1423,20 +1423,29 @@ function poke_hub_pokemon_get_display_info($pokemon, array $args = []) {
 
 /**
  * Rang de tri pour les catégories de formes dans les listes.
- * Ordre voulu: base/normal -> costume -> mega -> autres.
+ * Ordre voulu: base/normal -> formes -> costume (incl. Copy / clone GO) -> mega -> gigantamax -> dynamax -> autres.
  */
 function pokehub_pokemon_select_category_rank(string $category): int {
     $category = sanitize_key($category);
-    if ($category === '' || in_array($category, ['normal', 'base', 'default'], true)) {
+    if ($category === '' || in_array($category, ['normal', 'base', 'default', 'standard'], true)) {
         return 0;
     }
-    if (in_array($category, ['costume', 'costumed'], true)) {
+    if (in_array($category, ['regional', 'form', 'forms', 'special', 'fusion'], true)) {
         return 1;
     }
-    if (in_array($category, ['mega', 'primal', 'gigantamax'], true)) {
+    if (in_array($category, ['costume', 'costumed', 'clone'], true)) {
         return 2;
     }
-    return 3;
+    if (in_array($category, ['mega', 'megax', 'primal'], true)) {
+        return 3;
+    }
+    if ($category === 'gigantamax') {
+        return 4;
+    }
+    if ($category === 'dynamax') {
+        return 5;
+    }
+    return 6;
 }
 
 /**

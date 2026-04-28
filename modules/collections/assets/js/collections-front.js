@@ -1940,6 +1940,236 @@
         }
         pogoDebugLog('initPogoSearch done; blocs .pokehub-collection-pogo-search =', document.querySelectorAll('.pokehub-collection-pogo-search').length);
     }
+    function initCollectionGenerationJump() {
+        var wraps = document.querySelectorAll('.pokehub-collection-view-wrap');
+        wraps.forEach(function (wrap) {
+            var links = wrap.querySelectorAll('.pokehub-collection-generation-jump-link[data-generation-anchor]');
+            if (!links || links.length === 0) {
+                return;
+            }
+            links.forEach(function (link) {
+                link.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    var anchor = link.getAttribute('data-generation-anchor') || '';
+                    if (!anchor) return;
+                    var target = wrap.querySelector('#' + anchor);
+                    if (!target) return;
+                    var rootStyle = window.getComputedStyle(document.documentElement);
+                    var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
+                    var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
+                    var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
+                    var compactNav = stickyTools ? stickyTools.querySelector('.pokehub-collection-compact-nav') : null;
+                    var stickyToolsH = stickyTools ? stickyTools.getBoundingClientRect().height : 0;
+                    var compactNavH = (compactNav && !compactNav.hidden) ? compactNav.getBoundingClientRect().height : 0;
+                    var extraCompact = compactNavH > 0 ? 8 : 0;
+                    var offset = elOffset + adminOffset + stickyToolsH + extraCompact + 6;
+                    var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+                    links.forEach(function (l) { l.classList.remove('is-active'); });
+                    link.classList.add('is-active');
+                    window.scrollTo({ top: top, behavior: 'smooth' });
+                });
+            });
+            var sections = [];
+            links.forEach(function (link) {
+                var id = link.getAttribute('data-generation-anchor');
+                if (!id) return;
+                var node = wrap.querySelector('#' + id);
+                if (node) {
+                    sections.push({ id: id, node: node, link: link });
+                }
+            });
+            function updateActiveFromScroll() {
+                if (!sections.length) return;
+                var rootStyle = window.getComputedStyle(document.documentElement);
+                var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
+                var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
+                var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
+                var stickyToolsH = stickyTools ? stickyTools.getBoundingClientRect().height : 0;
+                var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+                var pivot = y + elOffset + adminOffset + stickyToolsH + 8;
+                var current = sections[0];
+                for (var i = 0; i < sections.length; i++) {
+                    var topAbs = sections[i].node.getBoundingClientRect().top + y;
+                    if (topAbs <= pivot) {
+                        current = sections[i];
+                    } else {
+                        break;
+                    }
+                }
+                links.forEach(function (l) { l.classList.remove('is-active'); });
+                if (current && current.link) {
+                    current.link.classList.add('is-active');
+                }
+            }
+            var raf = 0;
+            function onScroll() {
+                if (raf) return;
+                raf = window.requestAnimationFrame(function () {
+                    raf = 0;
+                    updateActiveFromScroll();
+                });
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll);
+            updateActiveFromScroll();
+        });
+    }
+    function initCollectionCompactStickyMode() {
+        var wraps = document.querySelectorAll('.pokehub-collection-view-wrap');
+        wraps.forEach(function (wrap) {
+            var stickyWrap = wrap.querySelector('.pokehub-collection-header-sticky-wrap');
+            var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
+            if (!stickyWrap || !stickyTools) {
+                return;
+            }
+            var compactNav = stickyTools.querySelector('.pokehub-collection-compact-nav');
+            var sections = wrap.querySelectorAll('[data-compact-section]');
+            var buttons = compactNav ? compactNav.querySelectorAll('.pokehub-collection-compact-nav-btn[data-compact-target]') : [];
+            var currentTarget = 'none';
+            var compactOn = false;
+            var compactTriggerOn = 0;
+            var compactTriggerOff = 0;
+            var sectionsTop = {};
+            var headerTopAbs = 0;
+            var headerHeight = 0;
+            var naturalHeaderHeight = 0;
+            var maskedState = { filters: false, pogo: false, selectors: false };
+
+            function computeAnchors() {
+                var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+                var headerRect = stickyWrap.getBoundingClientRect();
+                headerTopAbs = headerRect.top + y;
+                if (stickyWrap.offsetHeight > 0) {
+                    naturalHeaderHeight = stickyWrap.offsetHeight;
+                }
+                headerHeight = naturalHeaderHeight > 0 ? naturalHeaderHeight : (headerRect.height || 0);
+                sections.forEach(function (sec) {
+                    var key = sec.getAttribute('data-compact-section');
+                    if (!key) {
+                        return;
+                    }
+                    sectionsTop[key] = sec.getBoundingClientRect().top + y;
+                });
+                // Déclenchement compact seulement quand le header d'origine est entièrement masqué.
+                var headerBottom = headerTopAbs + headerHeight;
+                compactTriggerOn = headerBottom + 2;
+                compactTriggerOff = Math.max(0, compactTriggerOn - 56);
+            }
+            function applyCompactTarget(target) {
+                var t = target || 'none';
+                sections.forEach(function (sec) {
+                    var k = sec.getAttribute('data-compact-section') || '';
+                    var show = (t === 'all' || t === k);
+                    sec.classList.toggle('is-compact-hidden', !show);
+                });
+                if (buttons.length) {
+                    buttons.forEach(function (btn) {
+                        var active = (btn.getAttribute('data-compact-target') || '') === t;
+                        btn.classList.toggle('is-active', active);
+                    });
+                }
+                currentTarget = t;
+            }
+            function updateMaskedTiles(maskLine) {
+                var keys = ['filters', 'pogo', 'selectors'];
+                var changed = false;
+                keys.forEach(function (k) {
+                    var top = sectionsTop[k];
+                    if (typeof top !== 'number') {
+                        maskedState[k] = false;
+                        return;
+                    }
+                    if (!maskedState[k] && maskLine >= (top + 4)) {
+                        maskedState[k] = true;
+                        changed = true;
+                    } else if (maskedState[k] && maskLine <= (top - 28)) {
+                        maskedState[k] = false;
+                        changed = true;
+                    }
+                });
+                return changed;
+            }
+            function updateCompactButtonsVisibility() {
+                var anyMasked = maskedState.filters || maskedState.pogo || maskedState.selectors;
+                buttons.forEach(function (btn) {
+                    var target = btn.getAttribute('data-compact-target') || '';
+                    var show = false;
+                    if (target === 'header') {
+                        show = compactOn;
+                    } else if (target === 'filters' || target === 'pogo' || target === 'selectors') {
+                        show = !!maskedState[target];
+                    }
+                    btn.hidden = !show;
+                });
+                if (currentTarget !== 'none' && currentTarget !== 'header') {
+                    var stillVisible = maskedState[currentTarget] === true;
+                    if (!stillVisible) {
+                        applyCompactTarget('none');
+                    }
+                }
+                if (currentTarget === 'header' && !compactOn) {
+                    applyCompactTarget('none');
+                }
+            }
+            function updateCompactMode() {
+                var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+                var rootStyle = window.getComputedStyle(document.documentElement);
+                var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
+                var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
+                var firstMaskLine = y + elOffset + adminOffset;
+                if (!compactOn && firstMaskLine >= compactTriggerOn) {
+                    compactOn = true;
+                } else if (compactOn && firstMaskLine <= compactTriggerOff) {
+                    compactOn = false;
+                }
+                wrap.classList.toggle('pokehub-collection--compact', compactOn);
+                if (compactNav) {
+                    compactNav.hidden = !compactOn;
+                }
+                if (compactOn) {
+                    updateMaskedTiles(firstMaskLine);
+                    updateCompactButtonsVisibility();
+                } else {
+                    maskedState.filters = false;
+                    maskedState.pogo = false;
+                    maskedState.selectors = false;
+                    buttons.forEach(function (btn) { btn.hidden = true; });
+                    applyCompactTarget('all');
+                }
+            }
+            if (buttons.length) {
+                buttons.forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var target = btn.getAttribute('data-compact-target') || 'none';
+                        if (currentTarget === target) {
+                            applyCompactTarget('none');
+                        } else {
+                            applyCompactTarget(target);
+                        }
+                    });
+                });
+            }
+            var raf = 0;
+            function onScrollOrResize() {
+                if (raf) return;
+                raf = window.requestAnimationFrame(function () {
+                    raf = 0;
+                    updateCompactMode();
+                });
+            }
+            window.addEventListener('scroll', onScrollOrResize, { passive: true });
+            window.addEventListener('resize', function () {
+                computeAnchors();
+                onScrollOrResize();
+            });
+            computeAnchors();
+            window.setTimeout(function () {
+                computeAnchors();
+                onScrollOrResize();
+            }, 250);
+            updateCompactMode();
+        });
+    }
     window.pokeHubPogoSearchRefresh = function (wrap) {
         pogoDebugLog('pokeHubPogoSearchRefresh called', !!wrap);
         if (wrap) {
@@ -1958,6 +2188,8 @@
     function initCollectionsAndPogo() {
         bindCollectionSpriteFallbacks(document);
         initPogoSearch();
+        initCollectionGenerationJump();
+        initCollectionCompactStickyMode();
     }
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(initCollectionsAndPogo, 0);

@@ -1052,7 +1052,15 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     switch ($category) {
         case 'costume':
         case 'costume_shiny':
-            $where[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) = 'costume' OR (p.extra IS NOT NULL AND (p.extra LIKE '%\"is_event_costumed\":true%' OR p.extra LIKE '%\"is_event_costumed\": true%')))";
+            // GO : les « Copy » sont des déguisements / variantes événementielles comme les costumes.
+            $where[] = "(
+                LOWER(TRIM(COALESCE(fv.category, ''))) IN ('costume', 'clone')
+                OR (
+                    p.extra IS NOT NULL AND p.extra != ''
+                    AND INSTR(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.template_id')), '')), '_copy') > 0
+                )
+                OR (p.extra IS NOT NULL AND (p.extra LIKE '%\"is_event_costumed\":true%' OR p.extra LIKE '%\"is_event_costumed\": true%'))
+            )";
             break;
         case 'shadow':
             $where[] = "(
@@ -1235,12 +1243,17 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
   )";
         }
         if ( !empty($opts['include_costumes']) ) {
+            // Clone / Copy : même case que les costumes (décocher « inclure costumes » les masque aussi).
             $one_per_disjuncts[] = "(
-    LOWER(TRIM(COALESCE(fv.category, ''))) = 'costume'
+    LOWER(TRIM(COALESCE(fv.category, ''))) IN ('costume', 'clone')
+    OR (
+        p.extra IS NOT NULL AND p.extra != ''
+        AND INSTR(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.template_id')), '')), '_copy') > 0
+    )
     OR (p.extra IS NOT NULL AND (p.extra LIKE '%\"is_event_costumed\":true%' OR p.extra LIKE '%\"is_event_costumed\": true%'))
   )";
         }
-        $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('clone', 'fusion', 'special'))";
+        $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('fusion', 'special'))";
 
         $where[] = '(' . implode( ' OR ', $one_per_disjuncts ) . ')';
     }
@@ -1254,12 +1267,13 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         if (!empty($opts['include_costumes'])) {
             // rien
         } elseif (empty($opts['include_costumes'])) {
-            // Exclure uniquement costumés (variante + flag extra) — pas toutes les formes non « normal ».
-            // Mêmes motifs LIKE que le filtre de catégorie « costume » (lignes case costume / costume_shiny).
+            // Exclure costumés + Copy clone (variante + flag extra + template_id type *_COPY_*).
+            // Mêmes règles que la catégorie « costume » / option include_costumes.
             $where[] = "(
-                LOWER(TRIM(COALESCE(fv.category, ''))) != 'costume'
+                LOWER(TRIM(COALESCE(fv.category, ''))) NOT IN ('costume', 'clone')
                 AND (p.extra IS NULL OR p.extra = '' OR (
-                    p.extra NOT LIKE '%\"is_event_costumed\":true%'
+                    INSTR(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.template_id')), '')), '_copy') = 0
+                    AND p.extra NOT LIKE '%\"is_event_costumed\":true%'
                     AND p.extra NOT LIKE '%\"is_event_costumed\": true%'
                 ))
             )";
@@ -2141,6 +2155,26 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
     usort(
         $rows,
         static function (array $a, array $b): int {
+            $resolveCategory = static function (array $row): string {
+                $cat  = sanitize_key((string) ($row['form_category'] ?? ''));
+                $slug = strtolower(trim((string) ($row['form_slug'] ?? '')));
+                if ($cat !== '') {
+                    return $cat;
+                }
+                if (!empty($row['synthetic_gigantamax']) || strpos($slug, 'gigantamax') !== false || strpos($slug, 'gigamax') !== false) {
+                    return 'gigantamax';
+                }
+                if (!empty($row['synthetic_dynamax']) || strpos($slug, 'dynamax') !== false) {
+                    return 'dynamax';
+                }
+                if (strpos($slug, 'mega') !== false || strpos($slug, 'primal') !== false) {
+                    return 'mega';
+                }
+                if (strpos($slug, 'costume') !== false || strpos($slug, 'clone') !== false || !empty($row['is_event_costumed'])) {
+                    return 'costume';
+                }
+                return '';
+            };
             $genA = isset($a['generation_number']) ? (int) $a['generation_number'] : 0;
             $genB = isset($b['generation_number']) ? (int) $b['generation_number'] : 0;
             $effGenA = $genA > 0 ? $genA : 999;
@@ -2155,22 +2189,39 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
                 return $dexA <=> $dexB;
             }
 
+            $rankA = function_exists('pokehub_pokemon_select_category_rank')
+                ? pokehub_pokemon_select_category_rank($resolveCategory($a))
+                : 3;
+            $rankB = function_exists('pokehub_pokemon_select_category_rank')
+                ? pokehub_pokemon_select_category_rank($resolveCategory($b))
+                : 3;
+            if ($rankA !== $rankB) {
+                return $rankA <=> $rankB;
+            }
+
+            $sourceIdA = !empty($a['synthetic_go_background_from_pool_row_id'])
+                ? (int) $a['synthetic_go_background_from_pool_row_id']
+                : (int) ($a['id'] ?? 0);
+            $sourceIdB = !empty($b['synthetic_go_background_from_pool_row_id'])
+                ? (int) $b['synthetic_go_background_from_pool_row_id']
+                : (int) ($b['id'] ?? 0);
+            if ($sourceIdA !== $sourceIdB) {
+                return $sourceIdA <=> $sourceIdB;
+            }
+
+            $isBgA = !empty($a['synthetic_go_background']) ? 1 : 0;
+            $isBgB = !empty($b['synthetic_go_background']) ? 1 : 0;
+            if ($isBgA !== $isBgB) {
+                // Même forme/source : la ligne "sans fond" d'abord, puis la/les déclinaisons avec fond.
+                return $isBgA <=> $isBgB;
+            }
+
             $nameA = trim((string) (($a['name_fr'] ?? '') !== '' ? $a['name_fr'] : ($a['name_en'] ?? '')));
             $nameB = trim((string) (($b['name_fr'] ?? '') !== '' ? $b['name_fr'] : ($b['name_en'] ?? '')));
             $nameAN = function_exists('mb_strtolower') ? mb_strtolower($nameA, 'UTF-8') : strtolower($nameA);
             $nameBN = function_exists('mb_strtolower') ? mb_strtolower($nameB, 'UTF-8') : strtolower($nameB);
             if ($nameAN !== $nameBN) {
                 return $nameAN <=> $nameBN;
-            }
-
-            $rankA = function_exists('pokehub_pokemon_select_category_rank')
-                ? pokehub_pokemon_select_category_rank((string) ($a['form_category'] ?? ''))
-                : 3;
-            $rankB = function_exists('pokehub_pokemon_select_category_rank')
-                ? pokehub_pokemon_select_category_rank((string) ($b['form_category'] ?? ''))
-                : 3;
-            if ($rankA !== $rankB) {
-                return $rankA <=> $rankB;
             }
 
             $formA = trim((string) ($a['form_label'] ?? ''));

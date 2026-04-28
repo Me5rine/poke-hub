@@ -178,6 +178,29 @@ function Resolve-SourceUrl {
     $url = $url.Replace("{mode_prefix}", $modePrefix)
     $url = $url.Replace("{mode_suffix}", $modeSuffix)
 
+    $pogoStemCell = Normalize-Text $Row.pogo_stem
+    if ($pogoStemCell -eq "") {
+        $pogoStemCell = "pokemon_icon_{0:d3}_00" -f $dex
+    }
+    $pogoGenderInfix = ""
+
+    $pogoShinyInfix = if ($isShiny) { "_shiny" } else { "" }
+    $pogoFile = "$pogoStemCell$pogoGenderInfix$pogoShinyInfix"
+
+    $pogoAaBaseCell = Normalize-Text $Row.pogo_aa_base
+    if ($pogoAaBaseCell -eq "") {
+        $pogoAaBaseCell = "pm$dex"
+    }
+    $pogoAaShiny = if ($isShiny) { ".s" } else { "" }
+    $pogoAaFile = "${pogoAaBaseCell}${pogoAaShiny}.icon.png"
+
+    $url = $url.Replace("{pogo_stem}", $pogoStemCell)
+    $url = $url.Replace("{pogo_gender_infix}", $pogoGenderInfix)
+    $url = $url.Replace("{pogo_shiny_infix}", $pogoShinyInfix)
+    $url = $url.Replace("{pogo_file}", $pogoFile)
+    $url = $url.Replace("{pogo_aa_base}", $pogoAaBaseCell)
+    $url = $url.Replace("{pogo_aa_file}", $pogoAaFile)
+
     return $url
 }
 

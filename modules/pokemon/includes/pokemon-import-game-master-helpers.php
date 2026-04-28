@@ -614,6 +614,8 @@ function poke_hub_pokemon_gm_guess_type_from_form_change_settings( $form_proto, 
  * @param string $form_slug
  * @param array  $settings Champs optionnels: __isClone (bool, ex. templateId contient _COPY),
  *                         __isCostume (bool, ex. formSettings.forms[].isCostume).
+ *                         Le GM marque parfois isCostume sur des formes purement visuelles (Zarbi, saisons Vivaldaim) :
+ *                         on résout donc ces espèces avant d’honorer __isCostume.
  * @return string
  */
 function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_proto, $form_slug, array $settings = [] ) {
@@ -632,6 +634,18 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
     if ( ! empty( $settings['__isClone'] ) ) {
         return 'clone';
     }
+
+    // Avant __isCostume : le GM peut avoir isCostume=true sur Zarbi / Vivaldaim / Haydaim alors que ce ne sont pas des déguisements.
+    $visual_species = [ 'UNOWN', 'VIVILLON', 'SPINDA', 'FURFROU' ];
+    if ( in_array( $pokemon_id_proto, $visual_species, true ) ) {
+        return 'visual';
+    }
+    // Saisons du Pokédex uniquement (pas les déguisements type Bulbizarre d’automne : ceux-ci restent « costume » via $costume_tokens plus bas).
+    if ( in_array( $pokemon_id_proto, [ 'DEERLING', 'SAWSBUCK' ], true )
+        && preg_match( '/_(SPRING|SUMMER|AUTUMN|WINTER|FALL)(_|$)/', $form_proto ) ) {
+        return 'visual';
+    }
+
     if ( ! empty( $settings['__isCostume'] ) ) {
         return 'costume';
     }
@@ -671,10 +685,6 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
         return 'switch_battle';
     }
 
-    $visual_species = [ 'UNOWN', 'VIVILLON', 'SPINDA', 'FURFROU' ];
-    if ( in_array( $pokemon_id_proto, $visual_species, true ) ) {
-        return 'visual';
-    }
     $visual_tokens = [ 'PATTERN', 'FLOWER', 'RIBBON', 'HEART', 'TRIM', 'LETTER' ];
     foreach ( $visual_tokens as $token ) {
         if ( strpos( $form_proto, $token ) !== false ) {
