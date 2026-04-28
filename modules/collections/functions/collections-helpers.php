@@ -2846,6 +2846,12 @@ function poke_hub_collections_resolved_items_map(array $items, array $pool): arr
 function poke_hub_collections_pool_row_to_pokemon_for_image_target(array $p, bool $is_shiny): array {
     $row = (array) $p;
     $arg = [ 'shiny' => $is_shiny ];
+    if (!empty($p['synthetic_gigantamax'])
+        || (function_exists('poke_hub_collections_gigantamax_row_is_real_form')
+            && poke_hub_collections_gigantamax_row_is_real_form($p))) {
+        // Sur Gigamax, ne pas appliquer le genre par défaut (évite les URLs ...-male.png).
+        $arg['skip_gender_resolution'] = true;
+    }
     if (!empty($p['synthetic_go_background']) && !empty($p['synthetic_go_background_link_pokemon_id'])) {
         $row['id'] = (int) $p['synthetic_go_background_link_pokemon_id'];
     } elseif (!empty($p['synthetic_sex_collector']) && !empty($p['synthetic_sex_base_id'])) {

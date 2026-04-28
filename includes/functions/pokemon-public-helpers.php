@@ -883,6 +883,7 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         'shiny'   => false,
         'gender'  => null,
         'variant' => 'sprite', // si un jour tu veux des sous-dossiers
+        'skip_gender_resolution' => false,
     ]);
 
     // Genre pour le fichier sprite : une seule mécanique — poke_hub_pokemon_determine_gender().
@@ -899,7 +900,7 @@ function poke_hub_pokemon_get_image_sources($pokemon, array $args = []) {
         $gender_arg = null;
     }
 
-    if ($pokemon_id_for_gender > 0 && function_exists('poke_hub_pokemon_determine_gender')) {
+    if (empty($args['skip_gender_resolution']) && $pokemon_id_for_gender > 0 && function_exists('poke_hub_pokemon_determine_gender')) {
         $resolved = poke_hub_pokemon_determine_gender($pokemon_id_for_gender, $gender_arg);
         if ($resolved !== null) {
             $args['gender'] = $resolved;
