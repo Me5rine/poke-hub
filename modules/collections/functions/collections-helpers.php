@@ -2702,6 +2702,12 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
             $out[] = $row;
             continue;
         }
+        // Pas de dimorphisme sur les formes Gigamax (réelles ou synthétiques).
+        if (function_exists('poke_hub_collections_gigantamax_row_is_real_form')
+            && poke_hub_collections_gigantamax_row_is_real_form($row)) {
+            $out[] = $row;
+            continue;
+        }
         if (!empty($row['synthetic_go_background'])) {
             $out[] = $row;
             continue;
