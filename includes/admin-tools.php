@@ -194,6 +194,10 @@ function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, stri
     if ($mode !== '' && !in_array($mode, ['normal', 'costume'], true)) {
         $raw_parts[] = $mode;
     }
+    $is_gigamax_row = poke_hub_tools_normalize_bool($row['is_gigamax'] ?? false);
+    if ($is_gigamax_row || $mode === 'gigantamax' || strpos($slug, 'gigantamax-') === 0) {
+        $raw_parts[] = 'gigantamax';
+    }
 
     // Ajoute aussi les suffixes présents dans le slug (ex: unown-z, deerling-summer, vivillon-tundra).
     $slug_tail = '';
@@ -335,7 +339,13 @@ function poke_hub_tools_resolve_row_url(array $row, string $template): string {
         $aa_candidates = poke_hub_tools_build_pogo_aa_base_candidates($dex, $row, $slug);
         $pogo_aa_base_cell = $aa_candidates[0] ?? poke_hub_tools_compute_pogo_addressable_base($dex, [], $slug);
     }
-    $pogo_aa_file = $pogo_aa_base_cell . ($is_shiny ? '.s' : '') . '.icon.png';
+    $pogo_aa_gender_infix = '';
+    if ($gender === 'male') {
+        $pogo_aa_gender_infix = (string) apply_filters('poke_hub_pogo_aa_male_infix', '', $row);
+    } elseif ($gender === 'female') {
+        $pogo_aa_gender_infix = (string) apply_filters('poke_hub_pogo_aa_female_infix', '.g2', $row);
+    }
+    $pogo_aa_file = $pogo_aa_base_cell . $pogo_aa_gender_infix . ($is_shiny ? '.s' : '') . '.icon.png';
 
     $replacements = [
         '{dex}' => (string) $dex,
@@ -357,6 +367,7 @@ function poke_hub_tools_resolve_row_url(array $row, string $template): string {
         '{pogo_shiny_infix}' => $pogo_shiny_infix,
         '{pogo_file}' => $pogo_file,
         '{pogo_aa_base}' => $pogo_aa_base_cell,
+        '{pogo_aa_gender_infix}' => $pogo_aa_gender_infix,
         '{pogo_aa_file}' => $pogo_aa_file,
     ];
 
@@ -636,8 +647,18 @@ function poke_hub_tools_copy_images_from_local_manifest(array $args): array {
         $aa_bases = array_values(array_unique(array_filter($aa_bases, static fn($v) => $v !== '')));
 
         $aa_files = [];
+        $pogo_aa_gender_infix = '';
+        if ($gender === 'male') {
+            $pogo_aa_gender_infix = (string) apply_filters('poke_hub_pogo_aa_male_infix', '', $row);
+        } elseif ($gender === 'female') {
+            $pogo_aa_gender_infix = (string) apply_filters('poke_hub_pogo_aa_female_infix', '.g2', $row);
+        }
         foreach ($aa_bases as $aa_base) {
-            $aa_files[] = $aa_base . ($is_shiny ? '.s' : '') . '.icon.png';
+            $aa_files[] = $aa_base . $pogo_aa_gender_infix . ($is_shiny ? '.s' : '') . '.icon.png';
+            if ($pogo_aa_gender_infix !== '') {
+                // Fallback possible si la variante genre n'existe pas pour cette forme.
+                $aa_files[] = $aa_base . ($is_shiny ? '.s' : '') . '.icon.png';
+            }
         }
 
         $explicit_local = poke_hub_tools_normalize_text($row['local_file'] ?? '');
@@ -1407,7 +1428,7 @@ function poke_hub_admin_tools_page() {
                                     <th scope="row"><label for="poke_hub_images_home_template"><?php esc_html_e('HOME URL template', 'poke-hub'); ?></label></th>
                                     <td>
                                         <input type="text" name="poke_hub_images_home_template" id="poke_hub_images_home_template" class="large-text code" value="<?php echo esc_attr($images_defaults['home_template']); ?>" placeholder="https://example.com/home/{stem}.png" />
-                                        <p class="description"><?php esc_html_e('Placeholders: …, {pogo_stem}, {pogo_gender_infix}, {pogo_shiny_infix}, {pogo_file} (256×256 pokemon_icon_*), and {pogo_aa_base}, {pogo_aa_file} (Addressable Assets: pm25 / pm25.s.icon.png). Recommended GO raw URL: https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/Addressable%20Assets/{pogo_aa_file}', 'poke-hub'); ?></p>
+                                        <p class="description"><?php esc_html_e('Placeholders: …, {pogo_stem}, {pogo_gender_infix}, {pogo_shiny_infix}, {pogo_file} (256×256 pokemon_icon_*), and {pogo_aa_base}, {pogo_aa_gender_infix}, {pogo_aa_file} (Addressable Assets: pm25 / pm25.g2.icon.png / pm25.g2.s.icon.png). Recommended GO raw URL: https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/Addressable%20Assets/{pogo_aa_file}', 'poke-hub'); ?></p>
                                     </td>
                                 </tr>
                                 <tr>
