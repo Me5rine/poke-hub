@@ -1681,6 +1681,10 @@ function poke_hub_collections_maybe_mark_gigantamax_synthetic_base_row(array $ro
     if (poke_hub_collections_gigantamax_row_is_real_form($row)) {
         return $row;
     }
+    // Ne jamais fabriquer un Gigamax synthétique à partir d'une ligne Dynamax.
+    if (function_exists('poke_hub_collections_dynamax_row_is_real_form') && poke_hub_collections_dynamax_row_is_real_form($row)) {
+        return $row;
+    }
     if (!poke_hub_collections_row_has_gigantamax_release_in_extra($row)) {
         return $row;
     }
@@ -1730,6 +1734,10 @@ function poke_hub_collections_maybe_mark_dynamax_synthetic_base_row( array $row,
         return $row;
     }
     if ( poke_hub_collections_dynamax_row_is_real_form( $row ) ) {
+        return $row;
+    }
+    // Ne jamais fabriquer un Dynamax synthétique à partir d'une ligne Gigantamax.
+    if (function_exists('poke_hub_collections_gigantamax_row_is_real_form') && poke_hub_collections_gigantamax_row_is_real_form($row)) {
         return $row;
     }
     if ( ! poke_hub_collections_row_has_dynamax_release_in_extra( $row ) ) {
@@ -1791,6 +1799,10 @@ function poke_hub_collections_apply_marked_synthetic_gigantamax(array $rows): ar
         }
         $dex = isset($row['dex_number']) ? (int) $row['dex_number'] : 0;
         $out[] = $row;
+        // Filet de sécurité : pas de synthèse croisée depuis une forme Dynamax.
+        if (function_exists('poke_hub_collections_dynamax_row_is_real_form') && poke_hub_collections_dynamax_row_is_real_form($row)) {
+            continue;
+        }
         if ($dex > 0 && !empty($real_dex[$dex])) {
             continue;
         }
@@ -1961,6 +1973,10 @@ function poke_hub_collections_apply_marked_synthetic_dynamax( array $rows ): arr
         }
         $dex = isset( $row['dex_number'] ) ? (int) $row['dex_number'] : 0;
         $out[] = $row;
+        // Filet de sécurité : pas de synthèse croisée depuis une forme Gigantamax.
+        if (function_exists('poke_hub_collections_gigantamax_row_is_real_form') && poke_hub_collections_gigantamax_row_is_real_form($row)) {
+            continue;
+        }
         if ( $dex > 0 && ! empty( $real_dex[ $dex ] ) ) {
             continue;
         }
