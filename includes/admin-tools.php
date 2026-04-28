@@ -500,12 +500,23 @@ function poke_hub_tools_copy_images_from_local_manifest(array $args): array {
     if ($source_dir_input === '') {
         return ['log' => [__('Local assets folder is required.', 'poke-hub')]];
     }
-    $source_dir = wp_normalize_path($source_dir_input);
-    if (!is_dir($source_dir)) {
-        return ['log' => [sprintf(__('Local assets folder not found: %s', 'poke-hub'), $source_dir_input)]];
-    }
-
     $uploads = wp_upload_dir();
+    $source_dir = $source_dir_input;
+    if (preg_match('#^https?://#i', $source_dir_input)) {
+        $baseurl = rtrim((string) ($uploads['baseurl'] ?? ''), '/');
+        $basedir = wp_normalize_path((string) ($uploads['basedir'] ?? ''));
+        if ($baseurl !== '' && $basedir !== '' && stripos($source_dir_input, $baseurl . '/') === 0) {
+            $rel = ltrim((string) substr($source_dir_input, strlen($baseurl)), '/');
+            $source_dir = $basedir . '/' . str_replace('\\', '/', $rel);
+        }
+    }
+    $source_dir = wp_normalize_path($source_dir);
+    if (!is_dir($source_dir)) {
+        return ['log' => [
+            sprintf(__('Local assets folder not found: %s', 'poke-hub'), $source_dir_input),
+            sprintf(__('Tip: use a server path (example: %s)', 'poke-hub'), trailingslashit((string) ($uploads['basedir'] ?? '')) . 'poke-hub'),
+        ]];
+    }
     $base_dir = trailingslashit($uploads['basedir']) . 'poke-hub/gamemaster';
     $go_dir = trailingslashit($base_dir) . 'pokemon-go/pokemon';
     $home_dir = trailingslashit($base_dir) . 'home/pokemon';

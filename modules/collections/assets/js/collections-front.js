@@ -2023,128 +2023,169 @@
                 return;
             }
             var compactNav = stickyTools.querySelector('.pokehub-collection-compact-nav');
-            var sections = wrap.querySelectorAll('[data-compact-section]');
+            var sections = {
+                header: stickyWrap,
+                filters: wrap.querySelector('[data-compact-section="filters"]'),
+                pogo: wrap.querySelector('[data-compact-section="pogo"]'),
+                selectors: wrap.querySelector('[data-compact-section="selectors"]'),
+            };
             var buttons = compactNav ? compactNav.querySelectorAll('.pokehub-collection-compact-nav-btn[data-compact-target]') : [];
-            var currentTarget = 'none';
+            var orderedKeys = ['header', 'filters', 'pogo', 'selectors'];
+            var currentTarget = '';
             var compactOn = false;
-            var compactTriggerOn = 0;
-            var compactTriggerOff = 0;
-            var sectionsTop = {};
-            var headerTopAbs = 0;
-            var headerHeight = 0;
-            var naturalHeaderHeight = 0;
-            var maskedState = { filters: false, pogo: false, selectors: false };
+            var anchors = {};
+            var visibleTiles = { header: false, filters: false, pogo: false, selectors: false };
+
+            function getDocumentTop(node) {
+                var top = 0;
+                var el = node;
+                while (el) {
+                    top += el.offsetTop || 0;
+                    el = el.offsetParent;
+                }
+                return top;
+            }
 
             function computeAnchors() {
-                var y = window.pageYOffset || document.documentElement.scrollTop || 0;
-                var headerRect = stickyWrap.getBoundingClientRect();
-                headerTopAbs = headerRect.top + y;
-                if (stickyWrap.offsetHeight > 0) {
-                    naturalHeaderHeight = stickyWrap.offsetHeight;
-                }
-                headerHeight = naturalHeaderHeight > 0 ? naturalHeaderHeight : (headerRect.height || 0);
-                sections.forEach(function (sec) {
-                    var key = sec.getAttribute('data-compact-section');
-                    if (!key) {
-                        return;
-                    }
-                    sectionsTop[key] = sec.getBoundingClientRect().top + y;
+                orderedKeys.forEach(function (k) {
+                    var node = sections[k];
+                    anchors[k] = node ? getDocumentTop(node) : Number.POSITIVE_INFINITY;
                 });
-                // Déclenchement compact seulement quand le header d'origine est entièrement masqué.
-                var headerBottom = headerTopAbs + headerHeight;
-                compactTriggerOn = headerBottom + 2;
-                compactTriggerOff = Math.max(0, compactTriggerOn - 56);
             }
-            function applyCompactTarget(target) {
-                var t = target || 'none';
-                sections.forEach(function (sec) {
-                    var k = sec.getAttribute('data-compact-section') || '';
-                    var show = (t === 'all' || t === k);
-                    sec.classList.toggle('is-compact-hidden', !show);
-                });
-                if (buttons.length) {
-                    buttons.forEach(function (btn) {
-                        var active = (btn.getAttribute('data-compact-target') || '') === t;
-                        btn.classList.toggle('is-active', active);
-                    });
-                }
-                currentTarget = t;
-            }
-            function updateMaskedTiles(maskLine) {
-                var keys = ['filters', 'pogo', 'selectors'];
-                var changed = false;
-                keys.forEach(function (k) {
-                    var top = sectionsTop[k];
-                    if (typeof top !== 'number') {
-                        maskedState[k] = false;
-                        return;
-                    }
-                    if (!maskedState[k] && maskLine >= (top + 4)) {
-                        maskedState[k] = true;
-                        changed = true;
-                    } else if (maskedState[k] && maskLine <= (top - 28)) {
-                        maskedState[k] = false;
-                        changed = true;
-                    }
-                });
-                return changed;
-            }
-            function updateCompactButtonsVisibility() {
-                var anyMasked = maskedState.filters || maskedState.pogo || maskedState.selectors;
-                buttons.forEach(function (btn) {
-                    var target = btn.getAttribute('data-compact-target') || '';
-                    var show = false;
-                    if (target === 'header') {
-                        show = compactOn;
-                    } else if (target === 'filters' || target === 'pogo' || target === 'selectors') {
-                        show = !!maskedState[target];
-                    }
-                    btn.hidden = !show;
-                });
-                if (currentTarget !== 'none' && currentTarget !== 'header') {
-                    var stillVisible = maskedState[currentTarget] === true;
-                    if (!stillVisible) {
-                        applyCompactTarget('none');
-                    }
-                }
-                if (currentTarget === 'header' && !compactOn) {
-                    applyCompactTarget('none');
-                }
-            }
-            function updateCompactMode() {
+
+            function stickyOffsetPx() {
                 var y = window.pageYOffset || document.documentElement.scrollTop || 0;
                 var rootStyle = window.getComputedStyle(document.documentElement);
                 var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
                 var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
-                var firstMaskLine = y + elOffset + adminOffset;
-                if (!compactOn && firstMaskLine >= compactTriggerOn) {
+                return {
+                    y: y,
+                    offset: elOffset + adminOffset,
+                };
+            }
+
+            function currentMaskLine() {
+                var s = stickyOffsetPx();
+                return s.y + s.offset;
+            }
+
+            function applyCompactTarget(target) {
+                var t = target || '';
+                orderedKeys.forEach(function (k) {
+                    var node = sections[k];
+                    if (!node) return;
+                    var show = (t !== '' && t === k);
+                    node.classList.toggle('is-compact-hidden', !show);
+                });
+                buttons.forEach(function (btn) {
+                    var active = (btn.getAttribute('data-compact-target') || '') === t;
+                    btn.classList.toggle('is-active', active);
+                });
+                currentTarget = t;
+            }
+
+            function updateTilesFromMaskLine(maskLine) {
+                orderedKeys.forEach(function (k) {
+                    if (!sections[k]) {
+                        visibleTiles[k] = false;
+                        return;
+                    }
+                    if (!visibleTiles[k] && maskLine >= (anchors[k] + 6)) {
+                        visibleTiles[k] = true;
+                    } else if (visibleTiles[k] && maskLine <= (anchors[k] - 28)) {
+                        visibleTiles[k] = false;
+                    }
+                });
+                buttons.forEach(function (btn) {
+                    var key = btn.getAttribute('data-compact-target') || '';
+                    btn.hidden = !visibleTiles[key];
+                });
+                if (currentTarget && !visibleTiles[currentTarget]) {
+                    currentTarget = '';
+                }
+            }
+
+            function firstVisibleTileKey() {
+                for (var i = 0; i < orderedKeys.length; i++) {
+                    var k = orderedKeys[i];
+                    if (visibleTiles[k]) {
+                        return k;
+                    }
+                }
+                return '';
+            }
+
+            function showAllNormalSections() {
+                orderedKeys.forEach(function (k) {
+                    var node = sections[k];
+                    if (node) node.classList.remove('is-compact-hidden');
+                    visibleTiles[k] = false;
+                });
+                buttons.forEach(function (btn) {
+                    btn.hidden = true;
+                    btn.classList.remove('is-active');
+                });
+                currentTarget = '';
+            }
+
+            function scrollSectionUnderSticky(key) {
+                var node = sections[key];
+                if (!node) return;
+                var s = stickyOffsetPx();
+                var stickyH = stickyTools.getBoundingClientRect().height || 0;
+                var targetTop = anchors[key] - (s.offset + stickyH + 8);
+                window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+            }
+
+            function updateCompactMode() {
+                var maskLine = currentMaskLine();
+                var firstAnchor = anchors.header;
+                if (!compactOn && maskLine >= (firstAnchor + 6)) {
                     compactOn = true;
-                } else if (compactOn && firstMaskLine <= compactTriggerOff) {
+                } else if (compactOn && maskLine <= (firstAnchor - 72)) {
                     compactOn = false;
                 }
+
                 wrap.classList.toggle('pokehub-collection--compact', compactOn);
                 if (compactNav) {
                     compactNav.hidden = !compactOn;
                 }
-                if (compactOn) {
-                    updateMaskedTiles(firstMaskLine);
-                    updateCompactButtonsVisibility();
+
+                if (!compactOn) {
+                    showAllNormalSections();
                 } else {
-                    maskedState.filters = false;
-                    maskedState.pogo = false;
-                    maskedState.selectors = false;
-                    buttons.forEach(function (btn) { btn.hidden = true; });
-                    applyCompactTarget('all');
+                    updateTilesFromMaskLine(maskLine);
+                    if (!currentTarget) {
+                        var k = firstVisibleTileKey();
+                        if (k) {
+                            applyCompactTarget(k);
+                        } else {
+                            applyCompactTarget('');
+                        }
+                    } else if (visibleTiles[currentTarget]) {
+                        applyCompactTarget(currentTarget);
+                    } else {
+                        var fallback = firstVisibleTileKey();
+                        if (fallback) {
+                            applyCompactTarget(fallback);
+                        } else {
+                            applyCompactTarget('');
+                        }
+                    }
                 }
+
+                wrap.style.setProperty('--pokehub-sticky-tools-current-height', Math.ceil(stickyTools.getBoundingClientRect().height) + 'px');
             }
+
             if (buttons.length) {
                 buttons.forEach(function (btn) {
                     btn.addEventListener('click', function () {
-                        var target = btn.getAttribute('data-compact-target') || 'none';
+                        var target = btn.getAttribute('data-compact-target') || '';
                         if (currentTarget === target) {
-                            applyCompactTarget('none');
+                            applyCompactTarget('');
                         } else {
                             applyCompactTarget(target);
+                            scrollSectionUnderSticky(target);
                         }
                     });
                 });
@@ -2154,17 +2195,14 @@
                 if (raf) return;
                 raf = window.requestAnimationFrame(function () {
                     raf = 0;
+                    computeAnchors();
                     updateCompactMode();
                 });
             }
             window.addEventListener('scroll', onScrollOrResize, { passive: true });
-            window.addEventListener('resize', function () {
-                computeAnchors();
-                onScrollOrResize();
-            });
+            window.addEventListener('resize', onScrollOrResize);
             computeAnchors();
             window.setTimeout(function () {
-                computeAnchors();
                 onScrollOrResize();
             }, 250);
             updateCompactMode();

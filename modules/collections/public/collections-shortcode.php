@@ -459,7 +459,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             (int) $total
         );
         ?>
-        <div class="pokehub-collection-header-sticky-wrap" data-compact-section="header" data-compact-label="<?php esc_attr_e('Header', 'poke-hub'); ?>">
+        <div class="pokehub-collection-header-sticky-wrap" data-compact-section="header">
         <header class="me5rine-lab-dashboard-header pokehub-collection-view-header<?php echo $header_has_cover ? ' pokehub-collection-view-header--has-cover' : ' pokehub-collection-view-header--no-cover'; ?>">
             <?php if ($header_has_cover) : ?>
                 <div class="pokehub-collection-header-bg" style="background-image: url(<?php echo esc_url($header_cover_url); ?>); background-size: cover; background-position: center top;"></div>

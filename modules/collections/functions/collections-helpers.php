@@ -1138,8 +1138,23 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             break;
     }
 
-    // switch_battle : jamais en liste (on garde la fiche de base, pas la forme en combat).
-    $where[] = "(fv.id IS NULL OR LOWER(TRIM(COALESCE(fv.category, ''))) != 'switch_battle')";
+    // switch_battle : jamais en liste (on garde la fiche de base, pas la forme en combat),
+    // sauf formes Black/White de Kyurem/Necrozma parfois importées en switch_battle.
+    $where[] = "(
+        fv.id IS NULL
+        OR LOWER(TRIM(COALESCE(fv.category, ''))) != 'switch_battle'
+        OR (
+            LOWER(TRIM(COALESCE(fv.form_slug, ''))) REGEXP '(^|[-_])(black|white)($|[-_])'
+            AND (
+                LOWER(TRIM(COALESCE(p.slug, ''))) LIKE 'kyurem%'
+                OR LOWER(TRIM(COALESCE(p.slug, ''))) LIKE 'necrozma%'
+            )
+        )
+        OR (
+            LOWER(TRIM(COALESCE(p.slug, ''))) LIKE 'genesect-%'
+            AND LOWER(TRIM(COALESCE(p.slug, ''))) NOT LIKE '%-family'
+        )
+    )";
 
     $tok_reg   = poke_hub_collections_regional_form_variant_slug_tokens();
     $in_ph_reg = implode(',', array_fill(0, count($tok_reg), '%s'));
@@ -1179,7 +1194,22 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             '-family$'
         );
         $where[] = $wpdb->prepare(
-            "(p.slug IS NULL OR p.slug = '' OR LOWER(TRIM(p.slug)) NOT REGEXP %s)",
+            "NOT (
+                p.slug IS NOT NULL
+                AND TRIM(p.slug) != ''
+                AND LOWER(TRIM(p.slug)) REGEXP %s
+                AND EXISTS (
+                    SELECT 1 FROM {$pokemon_table} p2
+                    WHERE p2.dex_number = p.dex_number
+                      AND p2.id <> p.id
+                      AND p2.slug IS NOT NULL
+                      AND TRIM(p2.slug) != ''
+                      AND LOWER(TRIM(p2.slug)) NOT REGEXP %s
+                      AND LOWER(TRIM(p2.slug)) NOT REGEXP %s
+                )
+            )",
+            '-normal$',
+            '-family$',
             '-normal$'
         );
         $visual_dex = poke_hub_collections_dex_for_visual_variants_base_slug_only();
@@ -1198,6 +1228,24 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 )
             )";
         }
+        // En mode "toutes les formes", masquer la ligne base/famille (slug sans tiret)
+        // lorsqu'il existe déjà des formes explicites de type switch_form/fusion/special.
+        // Ex: Giratina (Altered/Origin) ne doit pas afficher une entrée "famille" en plus.
+        $where[] = "NOT (
+            p.slug IS NOT NULL AND TRIM( p.slug ) != ''
+            AND p.slug NOT LIKE '%-%'
+            AND EXISTS (
+                SELECT 1
+                FROM {$pokemon_table} p2
+                LEFT JOIN {$form_variants_table} fv2 ON p2.form_variant_id = fv2.id
+                WHERE p2.dex_number = p.dex_number
+                  AND p2.id <> p.id
+                  AND p2.slug IS NOT NULL
+                  AND TRIM( p2.slug ) != ''
+                  AND LOWER( p2.slug ) LIKE CONCAT( LOWER( TRIM( p.slug ) ), '-%' )
+                  AND LOWER( TRIM( COALESCE( fv2.category, '' ) ) ) IN ('switch_form', 'fusion', 'special')
+            )
+        )";
     } else {
         $pt = $pokemon_table;
         $one_per_slug = $wpdb->prepare(
@@ -1212,6 +1260,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     )
     AND p.is_default = 1
     AND (p.slug IS NULL OR p.slug = '' OR LOWER(TRIM(p.slug)) NOT REGEXP %s)
+    AND (p.slug IS NULL OR p.slug = '' OR p.slug NOT LIKE '%%-%%')
   )
 )",
             '-family$',
@@ -1253,9 +1302,37 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     OR (p.extra IS NOT NULL AND (p.extra LIKE '%\"is_event_costumed\":true%' OR p.extra LIKE '%\"is_event_costumed\": true%'))
   )";
         }
-        $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('fusion', 'special'))";
-
+        // En "1 par espèce", certaines formes restent des entrées distinctes (ex: Giratina, Kyurem).
+        $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('fusion', 'special', 'switch_form'))";
+        // Genesect drives: inclure les variantes de slug explicites même si la catégorie varie selon import.
+        $one_per_disjuncts[] = "(
+            LOWER(TRIM(COALESCE(p.slug, ''))) LIKE 'genesect-%'
+            AND LOWER(TRIM(COALESCE(p.slug, ''))) NOT LIKE '%-family'
+        )";
         $where[] = '(' . implode( ' OR ', $one_per_disjuncts ) . ')';
+        // Mais on retire la ligne base/famille si des formes explicites existent déjà pour ce dex.
+        $where[] = "NOT (
+            p.slug IS NOT NULL AND TRIM( p.slug ) != ''
+            AND p.slug NOT LIKE '%-%'
+            AND EXISTS (
+                SELECT 1
+                FROM {$pokemon_table} p2
+                LEFT JOIN {$form_variants_table} fv2 ON p2.form_variant_id = fv2.id
+                WHERE p2.dex_number = p.dex_number
+                  AND p2.id <> p.id
+                  AND p2.slug IS NOT NULL
+                  AND TRIM( p2.slug ) != ''
+                  AND LOWER( p2.slug ) LIKE CONCAT( LOWER( TRIM( p.slug ) ), '-%' )
+                  AND (
+                      LOWER( TRIM( COALESCE( fv2.category, '' ) ) ) IN ('fusion', 'special', 'switch_form')
+                      OR (
+                          LOWER( TRIM( COALESCE( fv2.category, '' ) ) ) = 'switch_battle'
+                          AND LOWER( TRIM( COALESCE( p2.slug, '' ) ) ) LIKE 'genesect-%'
+                          AND LOWER( TRIM( COALESCE( p2.slug, '' ) ) ) NOT LIKE '%-family'
+                      )
+                  )
+            )
+        )";
     }
 
     // Options « en plus » (Méga, Gigantamax, Dynamax, costumes, formes régionales) : uniquement pour les catégories non spécifiques
