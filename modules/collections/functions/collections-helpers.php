@@ -1155,6 +1155,23 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             AND LOWER(TRIM(COALESCE(p.slug, ''))) NOT LIKE '%-family'
         )
     )";
+    // Garde-fou données : une même entrée ne doit jamais être à la fois Dynamax et Gigantamax.
+    $where[] = "NOT (
+        (
+            LOWER(TRIM(COALESCE(p.slug, ''))) LIKE '%dynamax%'
+            AND (
+                LOWER(TRIM(COALESCE(p.slug, ''))) LIKE '%gigantamax%'
+                OR LOWER(TRIM(COALESCE(p.slug, ''))) LIKE '%gigamax%'
+            )
+        )
+        OR (
+            LOWER(TRIM(COALESCE(fv.form_slug, ''))) LIKE '%dynamax%'
+            AND (
+                LOWER(TRIM(COALESCE(fv.form_slug, ''))) LIKE '%gigantamax%'
+                OR LOWER(TRIM(COALESCE(fv.form_slug, ''))) LIKE '%gigamax%'
+            )
+        )
+    )";
 
     $tok_reg   = poke_hub_collections_regional_form_variant_slug_tokens();
     $in_ph_reg = implode(',', array_fill(0, count($tok_reg), '%s'));
@@ -1782,6 +1799,11 @@ function poke_hub_collections_apply_marked_synthetic_gigantamax(array $rows): ar
     foreach ($rows as $row) {
         $mark = !empty($row['__pokehub_c_gigantamax_src']);
         unset($row['__pokehub_c_gigantamax_src']);
+        // Une ligne Dynamax synthétique ne doit jamais servir de base à une synthèse G-Max.
+        if (!empty($row['synthetic_dynamax'])) {
+            $out[] = $row;
+            continue;
+        }
         if (poke_hub_collections_gigantamax_row_is_real_form($row)) {
             $out[] = $row;
             continue;
@@ -1918,6 +1940,7 @@ function poke_hub_collections_dynamax_build_synthetic_from_base_row( array $base
     }
     $out = $base;
     unset( $out['extra'] );
+    unset( $out['__pokehub_c_gigantamax_src'], $out['__pokehub_c_dynamax_src'] );
     $out['id']                        = poke_hub_collections_dynamax_synthetic_pokemon_id( $base_id );
     $out['form_variant_id']         = 0;
     $out['slug']                    = $dx_slug;
@@ -1956,6 +1979,11 @@ function poke_hub_collections_apply_marked_synthetic_dynamax( array $rows ): arr
     foreach ( $rows as $row ) {
         $mark = ! empty( $row['__pokehub_c_dynamax_src'] );
         unset( $row['__pokehub_c_dynamax_src'] );
+        // Une ligne Gigamax synthétique ne doit jamais servir de base à une synthèse Dynamax.
+        if ( ! empty( $row['synthetic_gigantamax'] ) ) {
+            $out[] = $row;
+            continue;
+        }
         if ( poke_hub_collections_dynamax_row_is_real_form( $row ) ) {
             $out[] = $row;
             continue;
@@ -2066,6 +2094,7 @@ function poke_hub_collections_gigantamax_build_synthetic_from_base_row(array $ba
     }
     $out = $base;
     unset($out['extra']);
+    unset($out['__pokehub_c_gigantamax_src'], $out['__pokehub_c_dynamax_src']);
     $out['id']                 = poke_hub_collections_gigantamax_synthetic_pokemon_id($base_id);
     $out['form_variant_id']   = 0;
     $out['slug']              = $gmax_slug;
