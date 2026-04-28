@@ -785,12 +785,10 @@ function poke_hub_tools_create_gamemaster_zip(): array {
 
     $uploads = wp_upload_dir();
     $zip_dir = trailingslashit($uploads['basedir']) . 'poke-hub/exports';
-    $zip_url_base = trailingslashit($uploads['baseurl']) . 'poke-hub/exports';
     wp_mkdir_p($zip_dir);
 
     $zip_name = 'poke-hub-gamemaster-' . gmdate('Ymd-His') . '.zip';
     $zip_path = trailingslashit($zip_dir) . $zip_name;
-    $zip_url = trailingslashit($zip_url_base) . $zip_name;
 
     $zip = new ZipArchive();
     $open = $zip->open($zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
@@ -836,15 +834,57 @@ function poke_hub_tools_create_gamemaster_zip(): array {
 
     $zip->close();
 
+    $download_url = add_query_arg([
+        'action' => 'poke_hub_tools_download_export_zip',
+        'file' => rawurlencode($zip_name),
+        '_wpnonce' => wp_create_nonce('poke_hub_tools_download_export_zip:' . $zip_name),
+    ], admin_url('admin-post.php'));
+
     return [
         'log' => [
             sprintf(__('ZIP created with %d files.', 'poke-hub'), $count),
             sprintf(__('ZIP path: %s', 'poke-hub'), $zip_path),
         ],
-        'download_url' => esc_url_raw($zip_url),
+        'download_url' => esc_url_raw($download_url),
         'download_label' => $zip_name,
     ];
 }
+
+/**
+ * Téléchargement sécurisé d'un ZIP exports via admin-post (évite les blocages nginx sur /uploads).
+ */
+function poke_hub_tools_handle_download_export_zip(): void {
+    if (!current_user_can('manage_options')) {
+        wp_die(esc_html__('You are not allowed to download this file.', 'poke-hub'), '', 403);
+    }
+
+    $file_param = isset($_GET['file']) ? wp_unslash((string) $_GET['file']) : '';
+    $file_name = rawurldecode($file_param);
+    $file_name = wp_basename($file_name);
+    if ($file_name === '' || substr($file_name, -4) !== '.zip') {
+        wp_die(esc_html__('Invalid ZIP file.', 'poke-hub'), '', 400);
+    }
+    if (!wp_verify_nonce(isset($_GET['_wpnonce']) ? (string) $_GET['_wpnonce'] : '', 'poke_hub_tools_download_export_zip:' . $file_name)) {
+        wp_die(esc_html__('Invalid download nonce.', 'poke-hub'), '', 403);
+    }
+
+    $uploads = wp_upload_dir();
+    $exports_dir = trailingslashit((string) ($uploads['basedir'] ?? '')) . 'poke-hub/exports';
+    $file_path = trailingslashit($exports_dir) . $file_name;
+    if (!is_file($file_path)) {
+        wp_die(esc_html__('ZIP file not found.', 'poke-hub'), '', 404);
+    }
+
+    nocache_headers();
+    header('Content-Description: File Transfer');
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '', $file_name) . '"');
+    header('Content-Length: ' . (string) filesize($file_path));
+    header('X-Content-Type-Options: nosniff');
+    readfile($file_path);
+    exit;
+}
+add_action('admin_post_poke_hub_tools_download_export_zip', 'poke_hub_tools_handle_download_export_zip');
 
 /**
  * Écrit les lignes manifest pour un slug donné (variantes genre / shiny selon options).

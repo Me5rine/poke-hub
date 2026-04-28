@@ -53,7 +53,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     if ( $pokemon_id_proto === '' ) {
         return $stats;
     }
-    $has_gmax_form = ! empty( $gmax_species[ (string) $pokemon_id_proto ] );
+    $species_has_gmax_form = ! empty( $gmax_species[ (string) $pokemon_id_proto ] );
     $has_explicit_normal_family = ! empty( $species_with_explicit_normal_form[ (string) $pokemon_id_proto ] );
 
     // Dex & génération
@@ -184,6 +184,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     } else {
         $is_default = ( $form_slug === '' ) ? 1 : 0;
     }
+    // has_gmax_form ne doit vivre que sur la fiche par défaut de l'espèce.
+    $has_gmax_form = ( $species_has_gmax_form && (int) $is_default === 1 );
 
     // Slug vu dans ce Game Master (stat)
     $seen_pokemon_slugs[$slug] = true;
@@ -1039,7 +1041,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'variant_category'   => $mega_variant_category,
                 'variant_group'      => $mega_variant_group,
                 'form_label_suffix'  => $temp_form_label,
-                'has_gmax_form'      => $has_gmax_form,
+                'has_gmax_form'      => false,
 
                 'gender'             => [
                     'male'   => $gender_male,
