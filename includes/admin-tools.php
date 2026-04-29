@@ -1026,6 +1026,64 @@ function poke_hub_tools_manifest_fput_lines_for_pokemon($fh, int &$count, int $p
 }
 
 /**
+ * Version "relax" des candidats Gigamax synthétiques pour Images Sync:
+ * accepte release.gigantamax OU un flag has_gigantamax_form dans extra,
+ * sans filtrer sur "released in GO".
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_tools_fetch_synthetic_gigantamax_base_rows_relaxed(): array {
+    if (!function_exists('pokehub_get_table')) {
+        return [];
+    }
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return [];
+    }
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+    $form_variants_table = $use_remote ? pokehub_get_table('remote_pokemon_form_variants') : pokehub_get_table('pokemon_form_variants');
+    if (!$pokemon_table || !$form_variants_table) {
+        return [];
+    }
+
+    $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
+            COALESCE(fv.label, fv.form_slug, '') AS form,
+            COALESCE(fv.label, fv.form_slug, '') AS form_label,
+            COALESCE(fv.category, 'normal') AS form_category
+        FROM {$pokemon_table} p
+        LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+        WHERE p.extra IS NOT NULL AND p.extra != ''
+        AND (
+            TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gigantamax_form')), ''))) IN ('1','true','yes','oui')
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gigantamax')), ''))) IN ('1','true','yes','oui')
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.gigantamax_form')), ''))) IN ('1','true','yes','oui')
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gmax_form')), ''))) IN ('1','true','yes','oui')
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gmax')), ''))) IN ('1','true','yes','oui')
+            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.games.pokemon_go.has_gmax_form')), ''))) IN ('1','true','yes','oui')
+        )
+        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR fv.form_slug LIKE %s )";
+    $rows = $wpdb->get_results($wpdb->prepare($sql, '%gigantamax%'), ARRAY_A);
+    if (!is_array($rows) || $rows === []) {
+        return [];
+    }
+
+    $out = [];
+    foreach ($rows as $r) {
+        if (function_exists('poke_hub_pokemon_gigantamax_row_is_real_form') && poke_hub_pokemon_gigantamax_row_is_real_form($r)) {
+            continue;
+        }
+        $pid = (int) ($r['id'] ?? 0);
+        if ($pid <= 0) {
+            continue;
+        }
+        $out[] = $r;
+    }
+    return $out;
+}
+
+/**
  * Génère un manifest CSV à partir des fiches Pokémon en base (slug déjà complet par forme, import GM).
  *
  * @param array{
@@ -1153,8 +1211,22 @@ function poke_hub_tools_build_manifest_csv_from_db(array $args): array {
     }
 
     $synth_added = 0;
-    if (!empty($args['include_synthetic_gigantamax']) && function_exists('poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows') && function_exists('poke_hub_pokemon_gigantamax_build_synthetic_data_from_base')) {
-        foreach (poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows() as $base) {
+    if (!empty($args['include_synthetic_gigantamax']) && function_exists('poke_hub_pokemon_gigantamax_build_synthetic_data_from_base')) {
+        $base_rows = [];
+        if (function_exists('poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows')) {
+            $base_rows = poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows();
+        }
+        foreach (poke_hub_tools_fetch_synthetic_gigantamax_base_rows_relaxed() as $rb) {
+            $base_rows[] = $rb;
+        }
+        $by_id = [];
+        foreach ($base_rows as $b) {
+            $bid = (int) ($b['id'] ?? 0);
+            if ($bid > 0) {
+                $by_id[$bid] = $b;
+            }
+        }
+        foreach ($by_id as $base) {
             $data = poke_hub_pokemon_gigantamax_build_synthetic_data_from_base($base);
             $g_slug = (string) ($data['slug'] ?? '');
             $g_dex = (int) ($data['dex_number'] ?? 0);
