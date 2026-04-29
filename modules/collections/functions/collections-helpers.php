@@ -2718,7 +2718,7 @@ function poke_hub_collections_pokemon_id_is_synthetic_sex(int $pokemon_id): bool
  * - « mâle et femelle (GO) » : les deux genres sont disponibles dans le profil ; ou
  * - « dimorphisme » : has_gender_dimorphism est coché en fiche Pokédex et mâle + femelle sont disponibles.
  *
- * Ne touche pas aux fiches variante fv.category = gender (hors pool), ni aux Gigamax synthétiques.
+ * Ne touche pas aux fiches variante fv.category = gender (hors pool).
  */
 function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts): array {
     if ($rows === [] || (empty($opts['include_both_sexes_collector']) && empty($opts['include_gender']))) {
@@ -2733,21 +2733,6 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
             $out[] = $row;
             continue;
         }
-        if (poke_hub_collections_gigantamax_is_synthetic_pokemon_id((int) ($row['id'] ?? 0))) {
-            $out[] = $row;
-            continue;
-        }
-        if ( function_exists( 'poke_hub_collections_dynamax_is_synthetic_pokemon_id' )
-            && poke_hub_collections_dynamax_is_synthetic_pokemon_id( (int) ( $row['id'] ?? 0 ) ) ) {
-            $out[] = $row;
-            continue;
-        }
-        // Pas de dimorphisme sur les formes Gigamax (réelles ou synthétiques).
-        if (function_exists('poke_hub_collections_gigantamax_row_is_real_form')
-            && poke_hub_collections_gigantamax_row_is_real_form($row)) {
-            $out[] = $row;
-            continue;
-        }
         if (!empty($row['synthetic_go_background'])) {
             $out[] = $row;
             continue;
@@ -2756,20 +2741,19 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
             $out[] = $row;
             continue;
         }
-        if (!empty($row['synthetic_gigantamax'])) {
-            $out[] = $row;
-            continue;
-        }
-        if ( ! empty( $row['synthetic_dynamax'] ) ) {
-            $out[] = $row;
-            continue;
-        }
         $base_id = (int) ($row['id'] ?? 0);
         if ($base_id <= 0) {
             $out[] = $row;
             continue;
         }
-        $profile = poke_hub_pokemon_get_gender_profile($base_id);
+        // Profil genre : espèce de base (Dynamax/Gigamax synth. ont un id hors plage SQL).
+        $gender_profile_id = $base_id;
+        if (!empty($row['synthetic_dynamax']) && !empty($row['dynamax_base_pokemon_id'])) {
+            $gender_profile_id = (int) $row['dynamax_base_pokemon_id'];
+        } elseif (!empty($row['synthetic_gigantamax']) && !empty($row['gigantamax_base_pokemon_id'])) {
+            $gender_profile_id = (int) $row['gigantamax_base_pokemon_id'];
+        }
+        $profile = poke_hub_pokemon_get_gender_profile($gender_profile_id);
         $genders = is_array($profile['available_genders'] ?? null) ? $profile['available_genders'] : [];
         if (!in_array('male', $genders, true) || !in_array('female', $genders, true)) {
             $out[] = $row;
@@ -2782,8 +2766,14 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
             $out[] = $row;
             continue;
         }
-        $m = poke_hub_collections_sex_synthetic_row_from_base($row, 'male', $base_id);
-        $f = poke_hub_collections_sex_synthetic_row_from_base($row, 'female', $base_id);
+        // Gigamax : pas de sprites ♂/♀ distincts — toujours l’image de la forme G-Max.
+        // Dynamax : même dimorphisme que l’espèce de base (profil ci-dessus).
+        $is_gigamax_row = !empty($row['synthetic_gigantamax'])
+            || (function_exists('poke_hub_collections_gigantamax_row_is_real_form')
+                && poke_hub_collections_gigantamax_row_is_real_form($row));
+        $use_gender_asset = !$is_gigamax_row && !empty($profile['has_gender_dimorphism']);
+        $m = poke_hub_collections_sex_synthetic_row_from_base($row, 'male', $base_id, $use_gender_asset);
+        $f = poke_hub_collections_sex_synthetic_row_from_base($row, 'female', $base_id, $use_gender_asset);
         if ($m !== null) {
             $out[] = $m;
         }
@@ -2798,7 +2788,7 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
 /**
  * @return array<string, mixed>|null
  */
-function poke_hub_collections_sex_synthetic_row_from_base(array $row, string $sex, int $base_id): ?array {
+function poke_hub_collections_sex_synthetic_row_from_base(array $row, string $sex, int $base_id, bool $use_gender_asset = true): ?array {
     $base_id = (int) $base_id;
     if ($base_id <= 0) {
         return null;
@@ -2812,6 +2802,7 @@ function poke_hub_collections_sex_synthetic_row_from_base(array $row, string $se
     $t['synthetic_sex'] = (strtolower($sex) === 'female') ? 'female' : 'male';
     $t['synthetic_sex_base_id'] = $base_id;
     $t['synthetic_sex_collector'] = true;
+    $t['synthetic_sex_use_gender_asset'] = $use_gender_asset;
     $t['form_category']   = (string) ($t['form_category'] ?? 'normal');
     $t['gender_display']  = (strtolower($sex) === 'female') ? '♀' : '♂';
     if (function_exists('pokehub_pokemon_is_baby_from_row')) {
@@ -2895,8 +2886,16 @@ function poke_hub_collections_pool_row_to_pokemon_for_image_target(array $p, boo
     if (!empty($p['synthetic_go_background']) && !empty($p['synthetic_go_background_link_pokemon_id'])) {
         $row['id'] = (int) $p['synthetic_go_background_link_pokemon_id'];
     } elseif (!empty($p['synthetic_sex_collector']) && !empty($p['synthetic_sex_base_id'])) {
-        $row['id']     = (int) $p['synthetic_sex_base_id'];
-        $arg['gender'] = (strtolower((string) ($p['synthetic_sex'] ?? '')) === 'female') ? 'female' : 'male';
+        $use_sex_asset = !array_key_exists('synthetic_sex_use_gender_asset', $p) || !empty($p['synthetic_sex_use_gender_asset']);
+        // Dynamax + dimorphisme : determine_gender() doit utiliser l’id espèce comme en base ; le slug reste dynamax-*.
+        if ($use_sex_asset && !empty($p['synthetic_dynamax']) && !empty($p['dynamax_base_pokemon_id'])) {
+            $row['id'] = (int) $p['dynamax_base_pokemon_id'];
+        } else {
+            $row['id'] = (int) $p['synthetic_sex_base_id'];
+        }
+        if ($use_sex_asset) {
+            $arg['gender'] = (strtolower((string) ($p['synthetic_sex'] ?? '')) === 'female') ? 'female' : 'male';
+        }
     } elseif (function_exists('poke_hub_collections_gigantamax_is_synthetic_pokemon_id')
         && !empty($p['id'])
         && poke_hub_collections_gigantamax_is_synthetic_pokemon_id((int) $p['id'])

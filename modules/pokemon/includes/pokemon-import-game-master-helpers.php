@@ -521,13 +521,10 @@ function poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto, 
         return 'normal';
     }
 
-    // "normal"/"standard" = forme de base dans les autres cas (évite les doublons inutiles)
+    // "normal"/"standard" seuls = forme de base (évite les doublons inutiles).
+    // Ne pas traiter "galarian_standard", "alolan_whatever", etc. comme la forme vide :
+    // seul le suffixe exact "standard" / "normal" (déjà couvert) doit fusionner avec la base.
     if ( in_array( $suffix, [ 'normal', 'standard', 'form_normal', 'form_standard' ], true ) ) {
-        return '';
-    }
-
-    // Cas tordu où la forme reste "..._normal" (ex: nidoran_normal si pas matché)
-    if ( preg_match( '/(^|_)normal$/', $suffix ) || preg_match( '/(^|_)standard$/', $suffix ) ) {
         return '';
     }
 

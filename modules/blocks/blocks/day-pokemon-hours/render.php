@@ -254,28 +254,15 @@ if (!function_exists('pokehub_day_pokemon_hours_render_spotlight_tile')) {
             return;
         }
 
-        $card_count = count($cards);
-        $single = $card_count === 1;
-        $visible_slots = max(2, min(4, $card_count));
-        $primary = array_slice($cards, 0, $visible_slots);
-        $extra_count = max(0, $card_count - count($primary));
+        $single = count($cards) === 1;
         $first_id = (int) ($cards[0]['id'] ?? 0);
         $type_color = ($first_id > 0 && function_exists('pokehub_get_pokemon_type_color'))
             ? (string) pokehub_get_pokemon_type_color($first_id)
             : '';
-        $display = '';
-        if ($single) {
-            $display = (string) ($cards[0]['display'] ?? '');
-        } else {
-            $labels = array_values(array_unique(array_filter(array_map(static function ($c) {
-                return isset($c['display']) ? (string) $c['display'] : '';
-            }, $cards))));
-            if (count($labels) <= 3) {
-                $display = implode(' + ', $labels);
-            } else {
-                $display = implode(' + ', array_slice($labels, 0, 2)) . ' +' . (count($labels) - 2);
-            }
-        }
+        $labels = array_values(array_unique(array_filter(array_map(static function ($c) {
+            return isset($c['display']) ? (string) $c['display'] : '';
+        }, $cards))));
+        $display = $labels !== [] ? implode(' + ', $labels) : ((string) ($cards[0]['display'] ?? ''));
         $pokemon_ids_attr = implode(',', array_map(static function ($c) {
             return (string) ((int) ($c['id'] ?? 0));
         }, $cards));
@@ -285,19 +272,39 @@ if (!function_exists('pokehub_day_pokemon_hours_render_spotlight_tile')) {
             $show_shiny_badge = $show_shiny_badge || !empty($c['show_shiny']);
             $show_regional_badge = $show_regional_badge || !empty($c['show_regional']);
         }
+
+        // Image unique de la tuile : slug cumulé (ex: pikachu-mimikyu).
+        $combined_slug_tokens = [];
+        foreach ($pokemons as $pokemon) {
+            if (!is_array($pokemon)) {
+                continue;
+            }
+            $slug = sanitize_title((string) ($pokemon['slug'] ?? ''));
+            if ($slug === '' || $slug === '0') {
+                continue;
+            }
+            $combined_slug_tokens[] = $slug;
+        }
+        $combined_slug_tokens = array_values(array_unique($combined_slug_tokens));
+        $combined_slug = implode('-', $combined_slug_tokens);
+
+        $combined_image_url = '';
+        if ($combined_slug !== '' && function_exists('poke_hub_pokemon_get_image_url')) {
+            $combined_image_url = (string) poke_hub_pokemon_get_image_url(
+                ['slug' => $combined_slug],
+                [
+                    'shiny' => false,
+                    'gender' => null,
+                    'skip_gender_resolution' => true,
+                ]
+            );
+        }
+        if ($combined_image_url === '') {
+            $combined_image_url = (string) ($cards[0]['image_url'] ?? '');
+        }
         ?>
         <div class="pokehub-day-pokemon-hours-spotlight-tile">
-            <div class="pokehub-wild-pokemon-card pokehub-day-pokemon-hours-spotlight-card<?php
-                if (!$single) {
-                    echo ' pokehub-day-pokemon-hours-spotlight-card--multi';
-                    if ($card_count >= 3) {
-                        echo ' pokehub-day-pokemon-hours-spotlight-card--triple';
-                    }
-                    if ($card_count >= 4) {
-                        echo ' pokehub-day-pokemon-hours-spotlight-card--quadruple';
-                    }
-                }
-            ?>"<?php echo $type_color !== '' ? ' style="--pokemon-type-color: ' . esc_attr($type_color) . '"' : ''; ?>>
+            <div class="pokehub-wild-pokemon-card pokehub-day-pokemon-hours-spotlight-card"<?php echo $type_color !== '' ? ' style="--pokemon-type-color: ' . esc_attr($type_color) . '"' : ''; ?>>
                 <?php if ($single && $show_shiny_badge) : ?>
                     <span class="pokehub-wild-pokemon-shiny-icon" title="<?php esc_attr_e('Shiny available', 'poke-hub'); ?>">✨</span>
                 <?php endif; ?>
@@ -305,54 +312,27 @@ if (!function_exists('pokehub_day_pokemon_hours_render_spotlight_tile')) {
                     <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
                 <?php endif; ?>
                 <div class="pokehub-wild-pokemon-card-inner">
-                    <?php if ($single) : ?>
-                        <?php if ((string) ($cards[0]['image_url'] ?? '') !== '') : ?>
-                            <div class="pokehub-wild-pokemon-image-wrapper">
-                                <img
-                                    src="<?php echo esc_url((string) $cards[0]['image_url']); ?>"
-                                    alt="<?php echo esc_attr((string) $cards[0]['name']); ?>"
-                                    class="pokehub-wild-pokemon-image"
-                                    loading="lazy"
-                                    decoding="async"
-                                    onerror="this.style.display='none';"
-                                />
-                            </div>
-                        <?php endif; ?>
+                    <?php if ($combined_image_url !== '') : ?>
+                        <div class="pokehub-wild-pokemon-image-wrapper">
+                            <img
+                                src="<?php echo esc_url($combined_image_url); ?>"
+                                alt="<?php echo esc_attr($display); ?>"
+                                class="pokehub-wild-pokemon-image"
+                                loading="lazy"
+                                decoding="async"
+                                onerror="this.style.display='none';"
+                            />
+                        </div>
                     <?php else : ?>
                         <div class="pokehub-day-pokemon-hours-spotlight-images" role="img" aria-label="<?php echo esc_attr($display); ?>">
-                            <?php foreach ($primary as $img_idx => $card) : ?>
-                                <div class="pokehub-day-pokemon-hours-spotlight-image-slot">
-                                    <div class="pokehub-wild-pokemon-image-wrapper">
-                                        <?php if (!empty($card['show_shiny'])) : ?>
-                                            <span class="pokehub-wild-pokemon-shiny-icon" title="<?php esc_attr_e('Shiny available', 'poke-hub'); ?>">✨</span>
-                                        <?php endif; ?>
-                                        <?php if (!empty($card['show_regional'])) : ?>
-                                            <span class="pokehub-wild-pokemon-regional-icon" title="<?php esc_attr_e('Regional Pokémon', 'poke-hub'); ?>">🌍</span>
-                                        <?php endif; ?>
-                                        <?php if ((string) ($card['image_url'] ?? '') !== '') : ?>
-                                            <img
-                                                src="<?php echo esc_url((string) $card['image_url']); ?>"
-                                                alt="<?php echo esc_attr((string) ($card['name'] ?? $card['display'] ?? '')); ?>"
-                                                class="pokehub-wild-pokemon-image"
-                                                loading="lazy"
-                                                decoding="async"
-                                                onerror="this.style.display='none';"
-                                            />
-                                        <?php else : ?>
-                                            <span class="pokehub-day-pokemon-hours-spotlight-fallback">#<?php echo esc_html((string) ((int) ($card['id'] ?? ($img_idx + 1)))); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ($extra_count > 0 && $img_idx === count($primary) - 1) : ?>
-                                            <span class="pokehub-day-pokemon-hours-spotlight-more">+<?php echo esc_html((string) $extra_count); ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <span class="pokehub-wild-pokemon-name"><?php echo esc_html((string) ($card['display'] ?? '')); ?></span>
+                            <div class="pokehub-day-pokemon-hours-spotlight-image-slot">
+                                <div class="pokehub-wild-pokemon-image-wrapper">
+                                    <span class="pokehub-day-pokemon-hours-spotlight-fallback">#<?php echo esc_html((string) ((int) ($cards[0]['id'] ?? 0))); ?></span>
                                 </div>
-                            <?php endforeach; ?>
+                            </div>
                         </div>
                     <?php endif; ?>
-                    <?php if ($single) : ?>
-                        <div class="pokehub-wild-pokemon-name"><?php echo esc_html($display); ?></div>
-                    <?php endif; ?>
+                    <div class="pokehub-wild-pokemon-name"><?php echo esc_html($display); ?></div>
                 </div>
             </div>
             <div class="pokehub-day-pokemon-hours-spotlight-meta"<?php echo $pokemon_ids_attr !== '' ? ' data-pokemon-ids="' . esc_attr($pokemon_ids_attr) . '"' : ''; ?>>
@@ -417,20 +397,7 @@ ob_start();
                             continue;
                         }
                         $day_display = date_i18n('D j M', strtotime($date_str));
-                        $tile_classes = 'pokehub-day-pokemon-hours-featured-track-item';
-                        if (count($pokemons) > 1) {
-                            $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--multi';
-                        }
-                        if (count($pokemons) >= 2) {
-                            $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--double';
-                        }
-                        if (count($pokemons) >= 3) {
-                            $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--triple';
-                        }
-                        if (count($pokemons) >= 4) {
-                            $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--quadruple';
-                        }
-                        echo '<div class="' . esc_attr($tile_classes) . '" role="listitem">';
+                        echo '<div class="pokehub-day-pokemon-hours-featured-track-item" role="listitem">';
                         pokehub_day_pokemon_hours_render_spotlight_tile($pokemons, $day_display, $featured_tile_time !== '', $featured_tile_time);
                         echo '</div>';
                     }
@@ -466,20 +433,7 @@ ob_start();
                                 continue;
                             }
                             $day_display = date_i18n('D j M', strtotime($date_str));
-                            $tile_classes = 'pokehub-day-pokemon-hours-featured-track-item';
-                            if (count($pokemons) > 1) {
-                                $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--multi';
-                            }
-                            if (count($pokemons) >= 2) {
-                                $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--double';
-                            }
-                            if (count($pokemons) >= 3) {
-                                $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--triple';
-                            }
-                            if (count($pokemons) >= 4) {
-                                $tile_classes .= ' pokehub-day-pokemon-hours-featured-track-item--quadruple';
-                            }
-                            echo '<div class="' . esc_attr($tile_classes) . '" role="listitem">';
+                            echo '<div class="pokehub-day-pokemon-hours-featured-track-item" role="listitem">';
                             pokehub_day_pokemon_hours_render_spotlight_tile($pokemons, $day_display, $slot_time_display !== '', $slot_time_display);
                             echo '</div>';
                         }
