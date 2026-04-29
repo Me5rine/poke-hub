@@ -520,6 +520,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     if ( $row && function_exists( 'poke_hub_pokemon_gm_deep_merge_extra' ) ) {
         $extra = poke_hub_pokemon_gm_deep_merge_extra( $gm_existing_extra, $extra );
     }
+    // Invariant métier: has_gmax_form uniquement sur la fiche par défaut.
+    // On force après merge pour éviter toute conservation d'une ancienne valeur true.
+    $extra['has_gmax_form'] = (bool) $has_gmax_form;
 
     if ( $row && ! $gm_existing_extra_valid ) {
         // JSON existant invalide: on n'écrase jamais le champ extra.

@@ -198,12 +198,24 @@ function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, stri
     if ($is_gigamax_row || $mode === 'gigantamax' || strpos($slug, 'gigantamax-') === 0) {
         $raw_parts[] = 'gigantamax';
     }
+    $is_mega_row = poke_hub_tools_normalize_bool($row['is_mega'] ?? false);
+    $slug_lc = strtolower($slug);
+    if ($is_mega_row || $mode === 'mega' || strpos($slug_lc, 'mega') !== false) {
+        $raw_parts[] = 'mega';
+        if (preg_match('/(?:^|-)(x)(?:-|$)/i', $slug_lc)) {
+            $raw_parts[] = 'mega_x';
+        }
+        if (preg_match('/(?:^|-)(y)(?:-|$)/i', $slug_lc)) {
+            $raw_parts[] = 'mega_y';
+        }
+    }
 
     // Ajoute aussi les suffixes présents dans le slug (ex: unown-z, deerling-summer, vivillon-tundra).
     $slug_tail = '';
     if (strpos($slug, '-') !== false) {
         $slug_tail = (string) substr($slug, strpos($slug, '-') + 1);
     }
+    $is_base_slug = ($slug_tail === '');
     if ($slug_tail !== '') {
         $raw_parts[] = $slug_tail;
         foreach (explode('-', $slug_tail) as $part) {
@@ -246,6 +258,24 @@ function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, stri
             $bases[] = 'pm' . (string) $dex . '.fMEGAX';
         } elseif ($tk === 'MEGA_Y') {
             $bases[] = 'pm' . (string) $dex . '.fMEGAY';
+        }
+    }
+
+    if (in_array('MEGA', $tokens, true)) {
+        $bases[] = 'pm' . (string) $dex . '.fMEGA';
+    }
+    if (in_array('MEGA_X', $tokens, true)) {
+        $bases[] = 'pm' . (string) $dex . '.fMEGA_X';
+    }
+    if (in_array('MEGA_Y', $tokens, true)) {
+        $bases[] = 'pm' . (string) $dex . '.fMEGA_Y';
+    }
+
+    // Cas fréquent: pour certains dex partagés (ex. Kyurem), la forme de base est stockée en fNORMAL.
+    if ($is_base_slug) {
+        $bases[] = 'pm' . (string) $dex . '.fNORMAL';
+        if ($species_proto !== '') {
+            $bases[] = 'pm' . (string) $dex . '.f' . $species_proto . '_NORMAL';
         }
     }
 
@@ -940,6 +970,9 @@ function poke_hub_tools_manifest_fput_lines_for_pokemon($fh, int &$count, int $p
     $is_giga_csv = $mark_synthetic_gigantamax ? 'true' : 'false';
     $pogo_stem = poke_hub_tools_compute_pogo_icon_stem($dex, $extra_for_pogo, $slug);
     $pogo_aa_base = poke_hub_tools_compute_pogo_addressable_base($dex, $extra_for_pogo, $slug);
+    if ($mark_synthetic_gigantamax && strpos($pogo_aa_base, '.f') === false) {
+        $pogo_aa_base .= '.fGIGANTAMAX';
+    }
 
     foreach ($variants as $v) {
         foreach ($sources as $src) {
@@ -950,7 +983,7 @@ function poke_hub_tools_manifest_fput_lines_for_pokemon($fh, int &$count, int $p
                 '',
                 '',
                 '',
-                '',
+                $mark_synthetic_gigantamax ? 'gigantamax' : '',
                 (string) ($v['gender'] ?? ''),
                 !empty($v['is_shiny']) ? 'true' : 'false',
                 $is_giga_csv,

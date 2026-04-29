@@ -1245,24 +1245,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 )
             )";
         }
-        // En mode "toutes les formes", masquer la ligne base/famille (slug sans tiret)
-        // lorsqu'il existe déjà des formes explicites de type switch_form/fusion/special.
-        // Ex: Giratina (Altered/Origin) ne doit pas afficher une entrée "famille" en plus.
-        $where[] = "NOT (
-            p.slug IS NOT NULL AND TRIM( p.slug ) != ''
-            AND p.slug NOT LIKE '%-%'
-            AND EXISTS (
-                SELECT 1
-                FROM {$pokemon_table} p2
-                LEFT JOIN {$form_variants_table} fv2 ON p2.form_variant_id = fv2.id
-                WHERE p2.dex_number = p.dex_number
-                  AND p2.id <> p.id
-                  AND p2.slug IS NOT NULL
-                  AND TRIM( p2.slug ) != ''
-                  AND LOWER( p2.slug ) LIKE CONCAT( LOWER( TRIM( p.slug ) ), '-%' )
-                  AND LOWER( TRIM( COALESCE( fv2.category, '' ) ) ) IN ('switch_form', 'fusion', 'special')
-            )
-        )";
+        // Mode "toutes les formes" : on exclut uniquement *-family.
+        // La forme normale (slug sans suffixe) doit rester visible (ex: kyurem, necrozma).
     } else {
         $pt = $pokemon_table;
         $one_per_slug = $wpdb->prepare(
@@ -1863,11 +1847,19 @@ function poke_hub_collections_gigantamax_row_is_real_form(array $row): bool {
         return true;
     }
     $slug = strtolower((string) ($row['slug'] ?? ''));
-    if ($slug !== '' && strpos($slug, 'gigantamax') !== false) {
+    if ($slug !== '' && (
+        strpos($slug, 'gigantamax') !== false
+        || strpos($slug, 'gigamax') !== false
+        || strpos($slug, 'gmax') !== false
+    )) {
         return true;
     }
     $label = strtolower((string) ($row['form_label'] ?? ''));
-    return $label !== '' && strpos($label, 'gigantamax') !== false;
+    return $label !== '' && (
+        strpos($label, 'gigantamax') !== false
+        || strpos($label, 'gigamax') !== false
+        || strpos($label, 'gmax') !== false
+    );
 }
 
 /**
@@ -2297,6 +2289,41 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
                 }
                 return '';
             };
+            $isUnownLikeRow = static function (array $row): bool {
+                $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                $name = strtolower(trim((string) (($row['name_fr'] ?? '') !== '' ? $row['name_fr'] : ($row['name_en'] ?? ''))));
+                return strpos($slug, 'unown') === 0
+                    || strpos($slug, 'zarbi') === 0
+                    || $name === 'unown'
+                    || $name === 'zarbi';
+            };
+            $unownSortKey = static function (array $row): array {
+                $label = trim((string) ($row['form_label'] ?? ''));
+                $slug  = strtolower(trim((string) ($row['slug'] ?? '')));
+                if ($label === '') {
+                    if (preg_match('/-(.+)$/', $slug, $m)) {
+                        $label = trim((string) ($m[1] ?? ''));
+                    }
+                }
+                $u = strtoupper($label);
+                // Slugs GM courants : unown-exclamation-point / unown-question-mark.
+                if (strpos($slug, 'exclamation-point') !== false) {
+                    return [1, 27, '!'];
+                }
+                if (strpos($slug, 'question-mark') !== false) {
+                    return [1, 28, '?'];
+                }
+                if ($u === '!') {
+                    return [1, 27, '!'];
+                }
+                if ($u === '?') {
+                    return [1, 28, '?'];
+                }
+                if (preg_match('/^[A-Z]$/', $u)) {
+                    return [0, ord($u) - ord('A') + 1, $u];
+                }
+                return [2, 999, $u];
+            };
             $genA = isset($a['generation_number']) ? (int) $a['generation_number'] : 0;
             $genB = isset($b['generation_number']) ? (int) $b['generation_number'] : 0;
             $effGenA = $genA > 0 ? $genA : 999;
@@ -2310,6 +2337,20 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
             if ($dexA !== $dexB) {
                 return $dexA <=> $dexB;
             }
+            // Zarbi/Unown: tri explicite A..Z puis ! puis ? (avant le tri catégorie/source/id).
+            if ($isUnownLikeRow($a) && $isUnownLikeRow($b)) {
+                $kA = $unownSortKey($a);
+                $kB = $unownSortKey($b);
+                if ($kA[0] !== $kB[0]) {
+                    return $kA[0] <=> $kB[0];
+                }
+                if ($kA[1] !== $kB[1]) {
+                    return $kA[1] <=> $kB[1];
+                }
+                if ($kA[2] !== $kB[2]) {
+                    return $kA[2] <=> $kB[2];
+                }
+            }
 
             $rankA = function_exists('pokehub_pokemon_select_category_rank')
                 ? pokehub_pokemon_select_category_rank($resolveCategory($a))
@@ -2320,7 +2361,6 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
             if ($rankA !== $rankB) {
                 return $rankA <=> $rankB;
             }
-
             $sourceIdA = !empty($a['synthetic_go_background_from_pool_row_id'])
                 ? (int) $a['synthetic_go_background_from_pool_row_id']
                 : (int) ($a['id'] ?? 0);
