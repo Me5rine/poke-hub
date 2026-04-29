@@ -1026,9 +1026,10 @@ function poke_hub_tools_manifest_fput_lines_for_pokemon($fh, int &$count, int $p
 }
 
 /**
- * Version "relax" des candidats Gigamax synthétiques pour Images Sync:
- * accepte release.gigantamax OU un flag has_gigantamax_form dans extra,
- * sans filtrer sur "released in GO".
+ * Candidats Gigamax synthétiques pour Images Sync:
+ * se base sur les flags has_gmax_form/has_gigantamax_form (et alias),
+ * sans dépendre d'une date release.gigantamax.
+ * Important: ce comportement "sans date" est volontairement limité à l'outil Images Sync.
  *
  * @return array<int, array<string, mixed>>
  */
@@ -1055,15 +1056,14 @@ function poke_hub_tools_fetch_synthetic_gigantamax_base_rows_relaxed(): array {
         LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
         WHERE p.extra IS NOT NULL AND p.extra != ''
         AND (
-            TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
-            OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gigantamax_form')), ''))) IN ('1','true','yes','oui')
+            LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gigantamax_form')), ''))) IN ('1','true','yes','oui')
             OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gigantamax')), ''))) IN ('1','true','yes','oui')
             OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.gigantamax_form')), ''))) IN ('1','true','yes','oui')
             OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gmax_form')), ''))) IN ('1','true','yes','oui')
             OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.has_gmax')), ''))) IN ('1','true','yes','oui')
             OR LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.games.pokemon_go.has_gmax_form')), ''))) IN ('1','true','yes','oui')
         )
-        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR fv.form_slug LIKE %s )";
+        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR COALESCE(fv.form_slug, '') LIKE %s )";
     $rows = $wpdb->get_results($wpdb->prepare($sql, '%gigantamax%'), ARRAY_A);
     if (!is_array($rows) || $rows === []) {
         return [];
@@ -1572,11 +1572,11 @@ function poke_hub_admin_tools_page() {
                                             <label><input type="checkbox" name="poke_hub_images_include_home" value="1" <?php checked($images_defaults['include_home']); ?> /> <?php esc_html_e('Include HOME rows (source=home)', 'poke-hub'); ?></label><br />
                                             <label><input type="checkbox" name="poke_hub_images_include_shiny" value="1" <?php checked($images_defaults['include_shiny_variants']); ?> /> <?php esc_html_e('Duplicate rows for shiny sprites (always when checked, even if not yet released shiny in-game)', 'poke-hub'); ?></label><br />
                                             <label><input type="checkbox" name="poke_hub_images_include_gender" value="1" <?php checked($images_defaults['include_gender_variants']); ?> /> <?php esc_html_e('Duplicate rows for male/female when dimorphism is enabled in data', 'poke-hub'); ?></label><br />
-                                            <label><input type="checkbox" name="poke_hub_images_include_synthetic_gmax" value="1" <?php checked($images_defaults['include_synthetic_gigantamax']); ?> /> <?php esc_html_e('Add synthetic Gigantamax rows (release date in data, no separate G-Max form row)', 'poke-hub'); ?></label><br />
+                                            <label><input type="checkbox" name="poke_hub_images_include_synthetic_gmax" value="1" <?php checked($images_defaults['include_synthetic_gigantamax']); ?> /> <?php esc_html_e('Add synthetic Gigantamax rows (has_gmax_form/has_gigantamax_form in data, no separate G-Max form row)', 'poke-hub'); ?></label><br />
                                             <label for="poke_hub_images_manifest_limit"><?php esc_html_e('Row limit (0 = all)', 'poke-hub'); ?></label>
                                             <input type="number" name="poke_hub_images_manifest_limit" id="poke_hub_images_manifest_limit" class="small-text" value="<?php echo esc_attr((string) (int) $images_defaults['manifest_limit']); ?>" min="0" step="1" />
                                         </fieldset>
-                                        <p class="description"><?php esc_html_e('“Generate manifest” lists every Pokémon row (each form = one slug: normal, Mega, costumes, etc.), adds a shiny row for each whenever the shiny checkbox is on (even before official shiny release in-game), adds male/female rows when dimorphism data allows, adds synthetic Gigamax when enabled, and duplicates each line for GO and/or HOME. You still need URL templates pointing to your allowed image host.', 'poke-hub'); ?></p>
+                                        <p class="description"><?php esc_html_e('“Generate manifest” lists every Pokémon row (each form = one slug: normal, Mega, costumes, etc.), adds a shiny row for each whenever the shiny checkbox is on (even before official shiny release in-game), adds male/female rows when dimorphism data allows, adds synthetic Gigamax when enabled using has_gmax_form/has_gigantamax_form flags (no release date required in this tool), and duplicates each line for GO and/or HOME. You still need URL templates pointing to your allowed image host.', 'poke-hub'); ?></p>
                                     </td>
                                 </tr>
                                 <tr>

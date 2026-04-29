@@ -1663,7 +1663,7 @@ function poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows(): arra
         LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
         WHERE p.extra IS NOT NULL AND p.extra != ''
         AND TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
-        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR fv.form_slug LIKE %s )
+        AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR COALESCE(fv.form_slug, '') LIKE %s )
         ";
     $like = '%gigantamax%';
     $sql  = $wpdb->prepare($sql, $like);
