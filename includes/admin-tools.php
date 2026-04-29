@@ -155,6 +155,18 @@ function poke_hub_tools_compute_pogo_addressable_base(int $dex, array $extra, st
         if ($species !== '' && strpos($form_proto, $species . '_') === 0) {
             $form_proto = (string) substr($form_proto, strlen($species) + 1);
         }
+        // Mapping proto interne -> naming Addressable Assets (PokeMiners).
+        if ($form_proto === 'TEMP_EVOLUTION_MEGA') {
+            $form_proto = 'MEGA';
+        } elseif ($form_proto === 'TEMP_EVOLUTION_MEGA_X') {
+            $form_proto = 'MEGA_X';
+        } elseif ($form_proto === 'TEMP_EVOLUTION_MEGA_Y') {
+            $form_proto = 'MEGA_Y';
+        } elseif ($form_proto === 'TEMP_EVOLUTION_GIGANTAMAX') {
+            $form_proto = 'GIGANTAMAX';
+        } elseif ($form_proto === 'TEMP_EVOLUTION_PRIMAL') {
+            $form_proto = 'PRIMAL';
+        }
         if ($form_proto !== '' && !in_array($form_proto, ['NORMAL', '00', 'FAMILY'], true)) {
             $default = 'pm' . (string) $mid . '.f' . $form_proto;
         }
