@@ -179,7 +179,11 @@ function poke_hub_tools_compute_pogo_addressable_base(int $dex, array $extra, st
 function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, string $slug): array {
     $dex = max(0, $dex);
     $base_default = poke_hub_tools_compute_pogo_addressable_base($dex, [], $slug);
-    $bases = [$base_default, 'pm' . (string) $dex];
+    $pm_plain = 'pm' . (string) $dex;
+    $bases = [];
+    if ($base_default !== '' && $base_default !== $pm_plain) {
+        $bases[] = $base_default;
+    }
 
     $species = poke_hub_tools_normalize_slug_token(strtok($slug, '-') ?: $slug);
     $species_proto = strtoupper(str_replace('-', '_', $species));
@@ -271,6 +275,8 @@ function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, stri
         $bases[] = 'pm' . (string) $dex . '.fMEGA_Y';
     }
 
+    $has_variant_hint = ($tokens !== []) || ($mode !== '' && $mode !== 'normal') || !$is_base_slug || $is_gigamax_row || $is_mega_row;
+
     // Cas fréquent: pour certains dex partagés (ex. Kyurem), la forme de base est stockée en fNORMAL.
     if ($is_base_slug) {
         $bases[] = 'pm' . (string) $dex . '.fNORMAL';
@@ -301,6 +307,11 @@ function poke_hub_tools_build_pogo_aa_base_candidates(int $dex, array $row, stri
         foreach ($tokens as $tk) {
             $bases[] = 'pm' . (string) $dex . '.f' . $tk;
         }
+    }
+
+    // Le fallback forme de base pm{dex} ne doit jamais primer pour une forme spéciale (méga, gmax, costumes…).
+    if (!$has_variant_hint) {
+        $bases[] = $pm_plain;
     }
 
     return array_values(array_unique(array_filter($bases, static fn($v) => $v !== '')));
