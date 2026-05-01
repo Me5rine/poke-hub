@@ -14,10 +14,11 @@ Les dates d'événement s'affichent automatiquement avec des indicateurs visuels
 
 ### 2. Bonus visuels en cartes
 
-Les bonus s'affichent automatiquement sous forme de cartes modernes avec :
+Les bonus s'affichent automatiquement sous forme de cartes avec :
 - Icônes des bonus (fichier **`{slug}.svg`** sur le bucket en priorité, SVG inline ; repli raster — voir [INLINE_SVG.md](./INLINE_SVG.md) et [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md))
-- Badges de ratio (ex: "1/2", "1/4") détectés automatiquement
-- Design sombre et moderne
+- Badges de ratio (ex. `1/2`, `1/4`) détectés automatiquement dans le titre ou la description (affichés sur l’icône)
+
+**Bloc Gutenberg (`layout` cartes)** : sous l’icône s’affiche la **description** (texte événement en priorité, sinon description catalogue) — pas le nom du **type** de bonus comme libellé principal (le nom reste utilisable pour l’`alt` de l’image). Détail et classes : [BONUS_SOURCE_AND_BLOCKS.md](./BONUS_SOURCE_AND_BLOCKS.md).
 
 ## 🚀 Utilisation
 
@@ -100,6 +101,8 @@ Affiche les quêtes et récompenses du contenu courant (article ou événement).
 
 **Exemple :** `<!--wp:pokehub/bonus {"autoDetect":true,"layout":"cards"} /-->`
 
+**Rendu `layout="cards"`** : une carte par entrée (`pokehub_render_bonuses_visual()`) ; texte sous l’icône = description (voir section « Bonus » en tête du document).
+
 #### Bloc "GO Pass" (`pokehub/go-pass`)
 
 Affiche le Pass GO lié au contenu courant (carte résumé ou grille complète).
@@ -150,9 +153,9 @@ Affiche les Pokémon par jour avec horaires (données de la metabox **Day Pokém
 
 **Mode `featured_hours` (front)** — piste horizontale de tuiles type carte Pokémon sauvage + bandeau date/heure sous la carte :
 
-- **Une seule piste** : tous les créneaux (jours différents ou horaires différents) s’enchaînent dans la même grille, avec **espacement homogène** (gauche / droite / entre tuiles) via `gap` + `padding` sur `.pokehub-day-pokemon-hours-featured-track` (`assets/css/poke-hub-blocks-front.css`).
-- **Plusieurs Pokémon sur un même créneau** : une tuile **plus large** (span 2, 3 ou 4 colonnes selon le nombre d’images affichées), **hauteur de carte alignée** sur la tuile solo (variable `--pokehub-featured-tile-size`). À l’intérieur : **répétition du duo image + nom** par Pokémon (même logique visuelle que la tuile solo), icônes **shiny / régional par Pokémon** sur chaque image si besoin ; au-delà des emplacements visibles, badge **`+N`** sur le dernier slot.
-- **Taille d’image** : fixée de façon identique pour solo et multi dans ce contexte (surcharge `.pokehub-day-pokemon-hours-spotlight-tile .pokehub-wild-pokemon-image-wrapper`).
+- **Une seule piste** : tous les créneaux (jours différents ou horaires différents) s’enchaînent dans la même grille, avec **espacement homogène** (gauche / droite / entre tuiles) via `gap` + `padding` sur `.pokehub-day-pokemon-hours-featured-track` (feuille blocs dans le dépôt **plugin** ou équivalent **thème** — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
+- **Plusieurs Pokémon sur un même créneau** : **une image unique** dont le fichier sur le bucket suit le **slug cumulé** des Pokémon (slug Poké HUB reliés par des tirets, ex. `pikachu-mimiqui`), via `poke_hub_pokemon_get_image_url()` comme pour un Pokémon « virtuel » (pas de vignettes côte à côte). À placer sous le même chemin vignettes Pokémon que les sprites habituels.
+- **Noms sous la carte** : liste des libellés d’affichage dans l’ordre, séparateurs **`A & B`** puis **`A, B & C`** (chaînes **traduisibles** ; traduction française possible en « A, B **et** C » dans le fichier de langues).
 
 **Données « featured » / Spotlight :**
 
@@ -197,28 +200,33 @@ Affiche les études ponctuelles, spéciales ou magistrales (étapes, chemins, qu
 
 #### Bloc « Avatar shop highlights » (`pokehub/shop-avatar-highlights`)
 
-Affiche une **couverture** (média WordPress), un **paragraphe d’accroche** (liste des noms d’articles boutique avatar + nom d’événement résolu), puis une **grille de tuiles** (même gabarit carré que Wild Pokémon : `.pokehub-wild-pokemon-card`, etc.).
+Affiche une **couverture** (média WordPress), un **paragraphe d’accroche** (liste des noms d’articles boutique avatar + nom d’événement résolu), puis une **grille de tuiles** (réutilisation des classes Wild Pokémon avec variantes liste shop).
 
+- **Wrapper** : même convention que les autres blocs contenu — classes **`pokehub-shop-avatar-highlights-block-wrapper`** + **`pokehub-shop-highlights`** (pour le cadre commun `[class*="block-wrapper"]` et le titre Poké Hub aligné avec le contenu ; feuille thème Me5rine Lab : **`css/poke-hub/parts/04-blocks-front.css`** — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
 - **Dépendances :** module **shop-items** actif (tables catalogue + contenu) ; le bloc n’est enregistré que si le schéma requis existe (`pokehub_blocks_shop_avatar_schema_ready()` dans `modules/blocks/functions/blocks-helpers.php`).
 - **Données :** `content_shop_avatar` + `content_shop_avatar_entries` + `shop_avatar_items` (lecture via `pokehub_content_get_shop_avatar()`, `poke_hub_shop_avatar_get_items_by_ids()`).
 - **Éditeur :** metabox **Avatar shop (block)** (`modules/blocks/admin/blocks-shop-avatar-metabox.php`) — sélection d’items (Select2 + AJAX), **création rapide** inline (champs EN / FR optionnel + bouton, pas de `window.prompt`), image de couverture, lien optionnel vers **Poké HUB → Shop** pour les administrateurs. AJAX : `modules/blocks/admin/blocks-shop-avatar-metabox-ajax.php`. JS : `modules/blocks/admin/js/pokehub-shop-avatar-metabox-admin.js`.
-- **Texte d’accroche (front) :** chaînes en **anglais** dans `__()` ; le **nom d’événement** est résolu par `pokehub_shop_highlights_resolve_event_label()` (`pokehub_event`, liaison Pass GO → `special_events`, sinon titre du post, repli `this event`) — voir [TRANSLATION.md](TRANSLATION.md).
-- **Sous-titre au-dessus des tuiles :** `Avatar items in this event` (traduisible).
+- **Texte d’accroche (front) :** chaînes en **anglais** dans `__()` ; le **nom d’événement** est résolu par `pokehub_shop_highlights_resolve_event_label()` (`pokehub_event`, liaison Pass GO → `special_events`, sinon titre du post, repli `this event`) — voir [TRANSLATION.md](TRANSLATION.md). Le paragraphe porte **`pokehub-block-subtitle`** en plus de **`pokehub-shop-highlights-lead__text`**.
+- **Titre au-dessus de la grille d’articles :** chaîne « Avatar items in this event » avec **`pokehub-block-subtitle`** + **`pokehub-shop-highlights-panel__tiles-title`**.
 
 **Attributs :** `autoDetect` (boolean, défaut `true`) — aligné sur les autres blocs « contenu post ».
 
-**Styles :** `assets/css/poke-hub-blocks-front.css` (`.pokehub-shop-highlights-*`, panneau, ligne d’accroche, zone tuiles).
+**Tuiles liste :** hauteur **non** forcée comme les carrés Wild Pokémon génériques (`aspect-ratio` levé pour les cartes `-item-card`) pour que les **noms longs** lisent sur plusieurs lignes sans être coupés en bas du carré — règles **thème** : `parts/04-blocks-front.css` (sélecteurs `.pokehub-shop-highlights-items` … `avatar-item-card`).
+
+**Styles :** fichier **plugin** historique `assets/css/poke-hub-blocks-front.css` si le pack plugin est chargé ; **Me5rine Lab** : `css/poke-hub/parts/04-blocks-front.css` ([THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
 
 #### Bloc « In-game sticker highlights » (`pokehub/shop-sticker-highlights`)
 
-Même principe que le bloc avatar, pour les **stickers en jeu** : couverture, paragraphe (noms + disponibilité boutique / PokéStops / Gifts + événement), tuiles carrées.
+Même principe que le bloc avatar, pour les **stickers en jeu** : couverture, paragraphe (noms + disponibilité boutique / PokéStops / Gifts + événement), grille de vignettes avec **réglages titre / sous-titres / noms longs identiques**.
 
+- **Wrapper :** **`pokehub-shop-sticker-highlights-block-wrapper`** + **`pokehub-shop-highlights`** (voir avatar ci-dessus).
 - **Dépendances :** module **shop-items** ; schéma `pokehub_blocks_shop_sticker_schema_ready()`.
 - **Données :** `content_shop_sticker` + `content_shop_sticker_entries` + `shop_sticker_items`.
 - **Éditeur :** metabox **In-game stickers (block)** (`blocks-shop-sticker-metabox.php` + AJAX + `pokehub-shop-sticker-metabox-admin.js`).
-- **Sous-titre des tuiles :** `Stickers in this event`.
+- **Intro + titre de grille :** même classes **`pokehub-block-subtitle`** que le bloc avatar (« Stickers in this event » au-dessus des tuiles).
+- **Tuiles :** classes **`pokehub-shop-sticker-item-card`** (voir règles thème contre le texte coupé).
 
-**Styles :** même feuille `poke-hub-blocks-front.css`.
+**Styles :** équivalent bloc avatar — **`parts/04-blocks-front.css`** (thème) ou `poke-hub-blocks-front.css` (plugin selon charge).
 
 ## 🎨 Styles CSS
 
@@ -231,7 +239,7 @@ Les styles sont chargés par le module **Blocks** (`modules/blocks/blocks.php`).
 - **New Pokémon - Evolution Lines** : `assets/css/poke-hub-new-pokemon-evolutions-front.css`
 - **Collection Challenges** : `assets/css/poke-hub-collection-challenges-front.css`
 - **Special Research** : `assets/css/poke-hub-special-research-front.css`
-- **Avatar shop / Sticker highlights** : règles dans `assets/css/poke-hub-blocks-front.css` (blocs `pokehub/shop-avatar-highlights`, `pokehub/shop-sticker-highlights` — panneau, accroche, tuiles ; réutilisation des classes Wild Pokémon pour les cartes).
+- **Avatar shop / Sticker highlights** : même logique ; sur **Me5rine Lab** la source de vérité visuelle est `css/poke-hub/parts/04-blocks-front.css` (**wrapper `-block-wrapper`**, **`pokehub-block-subtitle`**, tuiles liste sans carré forcé pour noms longs). Si le plugin enfile encore `poke-hub-blocks-front.css`, vérifier l’absence de doublons avec [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md).
 - **Icônes types / bonbons** : handle `pokehub-type-icons` → `assets/css/poke-hub-type-icons.css` (front si filtre plugin ; admin toujours via `poke-hub.php`) ; équivalent thème : `parts/02-type-icons.css` — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) ; bonbons : `poke-hub-candy-display.css` (selon contexte)
 
 ### Titres principaux (`.pokehub-block-title`)

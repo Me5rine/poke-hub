@@ -87,6 +87,65 @@ function poke_hub_pokemon_gm_type_proto_to_slug( $proto ) {
 }
 
 /**
+ * pokemonSettings.pokemonClass → slug extra.species_special_group (aligné sur l’admin / les filtres collections).
+ *
+ * @param string $proto ex. POKEMON_CLASS_LEGENDARY, POKEMON_CLASS_MYTHIC, POKEMON_CLASS_ULTRA_BEAST
+ * @return ''|'legendary'|'mythical'|'ultra_beast'
+ */
+function poke_hub_pokemon_gm_species_special_group_from_pokemon_class( $proto ) {
+    $key = strtoupper( trim( (string) $proto ) );
+    if ( $key === '' ) {
+        return '';
+    }
+    static $map = null;
+    if ( $map === null ) {
+        $map = [
+            'POKEMON_CLASS_LEGENDARY'   => 'legendary',
+            'POKEMON_CLASS_MYTHIC'      => 'mythical',
+            'POKEMON_CLASS_MYTHICAL'    => 'mythical',
+            'POKEMON_CLASS_ULTRA_BEAST' => 'ultra_beast',
+        ];
+    }
+
+    /** @var string $out */
+    $out = (string) apply_filters( 'poke_hub_pokemon_gm_species_special_group_from_pokemon_class', $map[ $key ] ?? '', $key );
+    $out = sanitize_key( $out );
+    $allowed = [ 'legendary', 'mythical', 'ultra_beast' ];
+
+    return in_array( $out, $allowed, true ) ? $out : '';
+}
+
+/**
+ * Écrit dans extra lorsque le GM fournit pokemonClass ; retire la clé si la classe est « standard »
+ * pour ne pas garder un ancien mythical/legendary erroné.
+ *
+ * Si pokemonClass est absent ou vide dans $settings : ne rien modifier (réimport partiel / squelette).
+ *
+ * @param array<string,mixed> $extra
+ * @param array<string,mixed> $settings
+ */
+function poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra( array &$extra, array $settings ): void {
+    if ( ! array_key_exists( 'pokemonClass', $settings ) ) {
+        return;
+    }
+    $raw = trim( (string) $settings['pokemonClass'] );
+    if ( $raw === '' ) {
+        return;
+    }
+
+    $tier = function_exists( 'poke_hub_pokemon_gm_species_special_group_from_pokemon_class' )
+        ? poke_hub_pokemon_gm_species_special_group_from_pokemon_class( $raw )
+        : '';
+
+    if ( $tier !== '' ) {
+        $extra['species_special_group'] = $tier;
+        return;
+    }
+
+    unset( $extra['species_special_group'] );
+}
+
+/**
  * Convertit un identifiant proto en slug lisible.
  * - "VENUSAUR" → "venusaur"
  * - "FURY_CUTTER_FAST" → "fury-cutter-fast"
@@ -130,6 +189,20 @@ function poke_hub_pokemon_gm_template_to_dex( $template_id ) {
         return 0;
     }
     return (int) $m[1];
+}
+
+/**
+ * Numéro de Pokédex depuis un template SPAWN (ex. `SPAWN_V0902_POKEMON_BASCULEGION`).
+ *
+ * @param string $template_id
+ * @return int
+ */
+function poke_hub_gm_spawn_template_to_dex( $template_id ) {
+    $tid = (string) $template_id;
+    if ( preg_match( '/^SPAWN_V(\d{4})_/i', $tid, $m ) ) {
+        return (int) $m[1];
+    }
+    return 0;
 }
 
 /**
@@ -529,6 +602,19 @@ function poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto, 
     }
 
     $suffix = str_replace( '_', '-', $suffix );
+
+    // Slug « une lettre » (ex.: MEWTWO_A et UNOWN_A → `a`) : une seule ligne dans pokemon_form_variants
+    // pour plusieurs espèces → la catégorie était écrasée au dernier import (ex.: visual pour Zarbi après Mewtwo).
+    if ( $pokemon_id_proto !== '' && $suffix !== '' && preg_match( '/^[a-z]$/', $suffix ) === 1 ) {
+        $base_slug = function_exists( 'poke_hub_pokemon_gm_id_to_slug' )
+            ? poke_hub_pokemon_gm_id_to_slug( $pokemon_id_proto )
+            : sanitize_title( strtolower( str_replace( '_', '-', $pokemon_id_proto ) ) );
+        $base_slug = trim( (string) $base_slug, " .\t\n\r\0\x0B" );
+        if ( $base_slug !== '' && $base_slug !== '0' ) {
+            $suffix = $base_slug . '-' . $suffix;
+        }
+    }
+
     return $suffix;
 }
 
@@ -628,12 +714,28 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
         return 'default';
     }
 
+    // Mewtwo armure : proto `MEWTWO_A`, `A` seul ; slug import `mewtwo-a` (ou `mewtwo-armor*`), ou ancienne ligne globale `a`.
+    if ( $pokemon_id_proto === 'MEWTWO' ) {
+        $is_mewtwo_armor_slug = preg_match( '/^mewtwo-(a|armor|armored|armoured)(-.+)?$/', $form_slug ) === 1;
+        if ( preg_match( '/(^|_)MEWTWO_A($|_)/', $form_proto ) === 1
+            || $form_proto === 'A'
+            || $form_slug === 'a'
+            || $is_mewtwo_armor_slug ) {
+            return 'costume';
+        }
+    }
+
     if ( ! empty( $settings['__isClone'] ) ) {
         return 'clone';
     }
 
     // Avant __isCostume : le GM peut avoir isCostume=true sur Zarbi / Vivaldaim / Haydaim alors que ce ne sont pas des déguisements.
-    $visual_species = [ 'UNOWN', 'VIVILLON', 'SPINDA', 'FURFROU' ];
+    $visual_species = apply_filters(
+        'poke_hub_pokemon_gm_visual_variant_species_protos',
+        [ 'CASTFORM', 'FURFROU', 'SPINDA', 'UNOWN', 'VIVILLON' ]
+    );
+    /** @var list<string> $visual_species */
+    $visual_species = array_map( 'strtoupper', array_values( array_filter( array_map( 'strval', (array) $visual_species ) ) ) );
     if ( in_array( $pokemon_id_proto, $visual_species, true ) ) {
         return 'visual';
     }
@@ -668,6 +770,13 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
         if ( in_array( $pokemon_id_proto, [ 'KYUREM', 'NECROZMA' ], true ) ) {
             return 'fusion';
         }
+    }
+
+    // Avant ibfc : le GM rattache ces formes aux deux entrées défaut / alternate (combat) ; sinon elles devenaient
+    // switch_battle alors qu’elles sont des doubles formes à stats comme Déoxys, pas Mimiqui / Aegislash.
+    if ( in_array( $pokemon_id_proto, [ 'TORNADUS', 'THUNDURUS', 'LANDORUS', 'ENAMORUS' ], true )
+        && ( strpos( $form_proto, 'INCARNATE' ) !== false || strpos( $form_proto, 'THERIAN' ) !== false ) ) {
+        return 'special';
     }
 
     if ( poke_hub_pokemon_gm_ibfc_matches_form( $form_proto, $settings ) ) {
@@ -706,7 +815,7 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
     if ( strpos( $form_proto, 'COSTUME' ) !== false ) {
         return 'costume';
     }
-    $costume_tokens = [ 'FALL', 'SPRING', 'SUMMER', 'WINTER', 'FASHION', 'HAT', 'CAP', 'BOW', 'HOLIDAY', 'PARTY' ];
+    $costume_tokens = [ 'FALL', 'SPRING', 'SUMMER', 'WINTER', 'FASHION', 'HAT', 'CAP', 'BOW', 'HOLIDAY', 'PARTY', 'SWIM' ];
     foreach ( $costume_tokens as $token ) {
         if ( strpos( $form_proto, $token ) !== false ) {
             return 'costume';
@@ -717,7 +826,7 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
         return 'special';
     }
     if ( $pokemon_id_proto === 'KELDEO' && strpos( $form_proto, 'RESOLUTE' ) !== false ) {
-        return 'special';
+        return 'switch_form';
     }
     if ( $pokemon_id_proto === 'URSHIFU' && ( strpos( $form_proto, 'SINGLE_STRIKE' ) !== false || strpos( $form_proto, 'RAPID_STRIKE' ) !== false ) ) {
         return 'special';
@@ -730,10 +839,6 @@ function poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_prot
     }
     if ( strpos( $form_proto, 'GIRATINA' ) !== false
         && ( strpos( $form_proto, 'ALTERED' ) !== false || strpos( $form_proto, 'ORIGIN' ) !== false ) ) {
-        return 'special';
-    }
-    if ( in_array( $pokemon_id_proto, [ 'TORNADUS', 'THUNDURUS', 'LANDORUS' ], true )
-        && ( strpos( $form_proto, 'INCARNATE' ) !== false || strpos( $form_proto, 'THERIAN' ) !== false ) ) {
         return 'special';
     }
     if ( ( strpos( $form_proto, 'KYOGRE' ) !== false || strpos( $form_proto, 'GROUDON' ) !== false ) && strpos( $form_proto, 'PRIMAL' ) !== false ) {
@@ -1218,6 +1323,46 @@ function poke_hub_gm_build_gender_index( array $gm_entries ): array {
 }
 
 /**
+ * Indices dex National depuis entrées genderSettings préfixées SPAWN_V####_
+ * quand aucun bloc pokemonSettings n’existe (ex: Basculegion pré-release).
+ *
+ * @param array<int, mixed> $gm_entries Liste brute GM
+ * @return array<string, int> UPPERCASE pokemonId_PROTO => dex
+ */
+function poke_hub_gm_collect_spawn_gender_dex_hints( array $gm_entries ): array {
+    $hints = [];
+
+    foreach ( $gm_entries as $entry ) {
+        if ( ! is_array( $entry ) ) {
+            continue;
+        }
+        $tid = trim( (string) ( $entry['templateId'] ?? '' ) );
+        if ( $tid === '' || preg_match( '/^SPAWN_V\d{4}_/i', $tid ) !== 1 ) {
+            continue;
+        }
+
+        $gs = $entry['data']['genderSettings'] ?? null;
+        if ( ! is_array( $gs ) || empty( $gs['pokemon'] ) ) {
+            continue;
+        }
+
+        $dex = function_exists( 'poke_hub_gm_spawn_template_to_dex' ) ? poke_hub_gm_spawn_template_to_dex( $tid ) : 0;
+        if ( $dex <= 0 ) {
+            continue;
+        }
+
+        $proto_u = strtoupper( trim( (string) $gs['pokemon'] ) );
+        if ( $proto_u === '' ) {
+            continue;
+        }
+        // Dernier modèle vu gagne si doublons.
+        $hints[ $proto_u ] = $dex;
+    }
+
+    return $hints;
+}
+
+/**
  * Extrait les flags principaux d'un bloc pokemonSettings :
  * - isTradable / isTransferable
  * - shadow (stardust, candy, moves)
@@ -1311,6 +1456,74 @@ function poke_hub_pokemon_extract_flags_from_settings( array $pokemon_settings )
         'attack_probability'        => $attack_probability,
         'dodge_probability'         => $dodge_probability,
     ];
+}
+
+/**
+ * Choisit une ligne index « jouable » pour les liens d’évolution (évite les placeholders *-family*).
+ *
+ * @param array $species_bucket Sous-arbre `pokemon_index[pokemonProto]` du même Pokémon.
+ * @param array|null $resolved Entrée index résolue (souvent clé '' ou correspondance exacte de forme).
+ * @param string $proto pokemonId brut Game Master (`DIALGA`, etc.) pour favoriser la ligne au slug canon.
+ * @return array|null Ligne à utiliser pour `pokemon_evolutions`, ou null si seul un *-family* existe.
+ */
+function poke_hub_pokemon_gm_resolve_index_row_for_evolution_links( array $species_bucket, ?array $resolved, string $proto = '' ): ?array {
+    if ( ! is_array( $resolved ) || empty( $resolved['pokemon_id'] ) ) {
+        return null;
+    }
+    $slug = (string) ( $resolved['slug'] ?? '' );
+    $needs_fallback = ! empty( $resolved['is_family_placeholder'] )
+        || poke_hub_pokemon_import_gm_slug_is_family_placeholder( $slug );
+
+    if ( ! $needs_fallback ) {
+        return $resolved;
+    }
+
+    $canonical = '';
+    if ( $proto !== '' && function_exists( 'poke_hub_pokemon_gm_id_to_slug' ) ) {
+        $canonical = (string) poke_hub_pokemon_gm_id_to_slug( $proto );
+    }
+
+    $candidates = [];
+    foreach ( $species_bucket as $row ) {
+        if ( ! is_array( $row ) || empty( $row['pokemon_id'] ) ) {
+            continue;
+        }
+        if ( ! empty( $row['is_family_placeholder'] ) ) {
+            continue;
+        }
+        $s = (string) ( $row['slug'] ?? '' );
+        if ( $s !== '' && poke_hub_pokemon_import_gm_slug_is_family_placeholder( $s ) ) {
+            continue;
+        }
+        $ssl = strtolower( $s );
+        $score = 1;
+        if ( $canonical !== '' && $s === $canonical ) {
+            $score = 100;
+        } elseif ( strpos( $ssl, 'mega-' ) === 0 || strpos( $ssl, 'primal-' ) === 0 ) {
+            $score = -10;
+        }
+        $candidates[] = [ 'score' => $score, 'row' => $row ];
+    }
+    if ( $candidates === [] ) {
+        return null;
+    }
+    usort(
+        $candidates,
+        static function ( array $a, array $b ): int {
+            return $b['score'] <=> $a['score'];
+        }
+    );
+
+    return isset( $candidates[0]['row'] ) && is_array( $candidates[0]['row'] ) ? $candidates[0]['row'] : null;
+}
+
+/**
+ * Suffixe slug réservé aux placeholders de lignée créés lors de l'import GM (*-family*).
+ */
+function poke_hub_pokemon_import_gm_slug_is_family_placeholder( string $slug ): bool {
+    $s = strtolower( trim( $slug ) );
+
+    return $s !== '' && substr( $s, -7 ) === '-family';
 }
 
 /**

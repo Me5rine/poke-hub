@@ -4,6 +4,10 @@
 
 Le système de gestion des images Pokémon est déjà en place dans le plugin. Ce document explique le fonctionnement actuel et la structure mise en œuvre.
 
+### Admin : Images sync (manifest CSV)
+
+La page **Poké HUB → Temporary tools** propose l’onglet **`images-sync`** pour générer un **CSV** décrivant les chemins d’icônes attendus (copie depuis un dossier local, téléchargement, etc.). Cet outil dérive la liste depuis **les lignes Pokémon en base** (formes, shiny, Gigamax synthétique via **flags** si activé), **sans** appliquer les filtres basés sur **les dates de sortie** utilisés par le module **Collections** pour le Gigamax « jouable » dans les listes. Voir **[ADMIN_TEMPORARY_TOOLS.md](./ADMIN_TEMPORARY_TOOLS.md)** § *Images sync* ; distinction collections : [COLLECTIONS_MODULE.md](./COLLECTIONS_MODULE.md) § *Gigamax synthétique (collections vs outil Images)*.
+
 ## Fichiers principaux
 
 ### `includes/functions/pokemon-public-helpers.php`
@@ -53,6 +57,7 @@ Ce fichier contient toutes les fonctions de gestion des images Pokémon (disponi
      - `$args` : Tableau d'options :
        - `shiny` (bool) : Si vrai, cherche l'image shiny
        - `gender` (string|null) : "male" ou "female"
+       - `skip_gender_resolution` (bool) : Si vrai, n’ajoute pas le suffixe `-male`/`-female` issu du **genre par défaut** résolu sur la ligne (cas **Gigamax** et autres intégrations où l’asset est **une seule clé plate** sans dimorphisme de fichier ; le module Collections peut aussi passer ce flag via `poke_hub_collections_pool_row_to_pokemon_for_image_target()` selon **`synthetic_sex_use_gender_asset`**). Voir aussi [COLLECTIONS_MODULE.md](./COLLECTIONS_MODULE.md) § *Pool SQL* et *Images des tuiles (collections)*.
        - `variant` (string) : Type de variant (par défaut "sprite", pour futurs sous-dossiers)
    - Retourne un tableau :
      ```php

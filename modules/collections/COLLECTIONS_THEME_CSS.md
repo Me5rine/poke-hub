@@ -2,7 +2,7 @@
 
 Référence technique complémentaire à **[docs/README.md](../../docs/README.md)**, à **[docs/THEME_FRONT_CSS.md](../../docs/THEME_FRONT_CSS.md)** (ordre thème / plugin) et à la **[charte doc](../../docs/REDACTION.md)**.
 
-**Emplacement du CSS (production Me5rine Lab)** : les styles spécifiques modules sont dans le thème enfant, sous **`css/poke-hub/parts/13-collections-front.css`**, importés par **`css/poke-hub/poke-hub-front.css`**. Les surcharges de variables (dégradés) sont dans **`parts/14-collections-theme.css`**. Un correctif de cascade final peut exister dans **`css/poke-hub/poke-hub-late-overrides.css`**. Aucun fichier CSS dans le dossier du module : tout passe par l’enchainement documenté dans THEME_FRONT_CSS.
+**Emplacement du CSS (production Me5rine Lab)** : les styles spécifiques modules sont dans le thème enfant — **`css/poke-hub/parts/13-collections-front.css`** (chargé comme les autres `parts/` avec son propre `?ver=filemtime`). La liste officielle inclut encore **`poke-hub-front.css`** (`@import` des `parts/`) comme index / éditeur. Les surcharges de variables (dégradés) sont dans **`parts/14-collections-theme.css`**. Un correctif de cascade final peut exister dans **`css/poke-hub/poke-hub-late-overrides.css`**. Aucun fichier CSS dans le dossier du module : tout passe par l’enchaînement documenté dans THEME_FRONT_CSS.
 
 **Bloc phrases de recherche Pokémon GO (in-game)** : toute la présentation (grille à deux colonnes de groupes, titres de groupe, champs copiables, `<summary>` du `<details>`, barre d’outils des deux selects) est définie dans **`parts/13-collections-front.css`**, section commentée *Recherche in-game Pokémon GO*. Utiliser les **variables globales front** `css/variables.css` (`--me5rine-lab-*`, `--me5rine-lab-font`) — pas de `--admin-lab-*` sur ce bloc (réservé à l’admin / notices). Le plugin **`assets/css/poke-hub-collections-cascade-late.css`** conserve un renvoi en commentaire seulement : les règles POGO n’y sont plus dupliquées.
 
@@ -37,6 +37,17 @@ Seules les variables suivantes sont propres au module (dégradé des cartes de l
 | `--pokehub-collections-card-gradient-end` | Fin du dégradé (fallback : `--me5rine-lab-secondary`) |
 | `--pokehub-collections-card-overlay` | Overlay sombre sur la carte (rgba(0,0,0,0.7)) |
 | `--pokehub-collections-modal-backdrop` | Fond du modal (rgba(0,0,0,0.5)) |
+
+Les variables suivantes concernent **l’alignement sous le header du site** (typiquement Elementor) et sous la barre d’administration WordPress, pour que les bandeaux **`position: sticky`** de la vue collection ne recouvrent pas le masthead et restent calés :
+
+| Variable | Rôle |
+|----------|------|
+| `--pokehub-elementor-header-offset` | Hauteur réservée pour le header global du site (**valeurs de référence** dans Me5rine : environ **129px** bureau, **123px** `max-width: 1024px`, **95px** `max-width: 767px` — à ajuster dans le thème si le header réel diffère). |
+| `--pokehub-adminbar-offset` | **0px** par défaut ; **32px** / **46px** (`max-width: 782px`) sur `body.admin-bar`. |
+| `--pokehub-sticky-tools-current-height` | Définie en **JavaScript** sur `.pokehub-collection-view-wrap` (hauteur en pixels du conteneur `.pokehub-collection-sticky-tools`). Sert au `top` **`sticky`** de **Jump to generation** en mode `.pokehub-collection--compact`. |
+| `--pokehub-collection-header-sticky-height` | Référence visuelle résiduelle dans le fichier thème pour la zone titre (à ne pas confondre avec `--pokehub-sticky-tools-current-height`, qui est mise à jour au fil du responsive). |
+
+**Mode compact (.pokehub-collection--compact)** — styles dans **`parts/13-collections-front.css`** : hors mode compact, `.pokehub-collection-sticky-tools` reste dans le flux (pas de collage sticky forcé hors ce que donne aussi le bloc header enveloppé) ; avec la classe **`pokehub-collection--compact`** appliquée depuis `collections-front.js`, le bloc d’outils devient **`position: sticky`**, **`top: calc(...)`**, et la grille **`.pokehub-collection-compact-nav`** s’affiche. Les blocs désactivés en mode mono‑panneau utilisent **`[data-compact-section].is-compact-hidden { display: none; }`** (les sections portent ces attributs côté `collections-shortcode.php`). `.pokehub-collection-generation-jump` n’est **`sticky`** sous les outils que **lorsque** le wrap porte **`pokehub-collection--compact`** (sinon bloc dans le flux, avec marges dédiées).
 
 **Personnalisation dans le thème** : éditer `parts/14-collections-theme.css` (déjà importé par `poke-hub-front.css`) ou surcharger en CSS dans une couche chargée **après** `poke-hub-late-overrides` si besoin.
 
@@ -110,7 +121,7 @@ Aucune couleur dédiée : tout repose sur les variables notice. Pour harmoniser,
 
 ## Filtre d’affichage par statut (vue collection)
 
-En vue collection (**compte connecté** ou **collection locale**), un bloc **Afficher dans la grille** permet de masquer ou réafficher des tuiles selon le statut, **sans modifier** les données (REST / base / `localStorage`). Chaîne source de l’interface (anglais, domaine `poke-hub`) : *Show in grid*.
+En vue collection (**compte connecté** ou **collection locale**), le bloc **Include in grid** permet de masquer ou réafficher des tuiles selon le statut, **sans modifier** les données (REST / base / `localStorage`). Chaîne source anglaise actuelle dans le code : **`Include in grid`** ; les traductions peuvent refléter l’usage métier (« Afficher… », « Inclure… », etc.) selon vos fichiers .po/.mo .
 
 Trois cases correspondent aux statuts techniques suivants (voir aussi **docs/COLLECTIONS_MODULE.md**, section *Statuts d’une entrée*) :
 
@@ -126,6 +137,10 @@ Classes dédiées :
 - `.pokehub-collection-status-filters-checkboxes` — groupe des cases.
 - `.pokehub-collection-status-filter-label` — libellé d’une case.
 - `.pokehub-collection-filter-status` — case à cocher pilotée par JS (`data-filter-status`).
+- `.pokehub-collection-status-filters-note` — aide *Click a tile to cycle status* sous la ligne de cases.
+- `.pokehub-collection-generation-jump` / `.pokehub-collection-generation-jump-links` — ancres rapides par génération (sibling du bloc `.pokehub-collection-sticky-tools`).
+- `.pokehub-collection-compact-nav` / `.pokehub-collection-compact-nav-btn` — raccourcis visibles en **`.pokehub-collection--compact`**.
+
 - `.pokehub-collection-filter-empty-hint` — message si aucun statut n’est coché.
 
 Le script applique l’attribut HTML `hidden` aux tuiles dont le statut est décoché. Si la collection est regroupée par génération (`.pokehub-collection-generation-block`), les sections sans aucune tuile visible sont masquées.

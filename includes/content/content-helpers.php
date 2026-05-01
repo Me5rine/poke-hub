@@ -115,6 +115,7 @@ function pokehub_content_sync_dates_for_source($source_type, $source_id, $start_
         'content_go_pass',
         'content_shop_avatar',
         'content_shop_sticker',
+        'content_community_day',
     ];
 
     foreach ($tables_with_dates as $key) {
@@ -1318,6 +1319,384 @@ function pokehub_content_save_new_pokemon($source_type, $source_id, array $pokem
         ], ['%d', '%d', '%s', '%d']);
     }
 }
+
+// --- Community Day (bloc Gutenberg → table de contenu) ---
+
+/**
+ * Parcourt des blocs Gutenberg déjà parsés pour collecter les attributs du bloc pokehub/community-day.
+ *
+ * @param array<int, array<string,mixed>> $blocks
+ * @return array<int, array<string,mixed>>
+ */
+function pokehub_content_collect_community_day_block_attrs_recursive(array $blocks): array {
+    $out = [];
+    foreach ($blocks as $block) {
+        if (!empty($block['blockName']) && $block['blockName'] === 'pokehub/community-day') {
+            $attrs = isset($block['attrs']) && is_array($block['attrs']) ? $block['attrs'] : [];
+            $out[]  = $attrs;
+        }
+        if (!empty($block['innerBlocks']) && is_array($block['innerBlocks'])) {
+            foreach (pokehub_content_collect_community_day_block_attrs_recursive($block['innerBlocks']) as $inner) {
+                $out[] = $inner;
+            }
+        }
+    }
+    return $out;
+}
+
+/**
+ * Extrait depuis le HTML d'un post les données des blocs Community Day.
+ *
+ * @return array<int, array{pokemon_id: int, special_attack_id: int, evolution_start: string, evolution_end: string}>
+ */
+function pokehub_content_parse_community_day_blocks_from_html(string $html): array {
+    if ($html === '' || !function_exists('parse_blocks')) {
+        return [];
+    }
+    $parsed = parse_blocks($html);
+    if (!is_array($parsed)) {
+        return [];
+    }
+    $raw_attrs = pokehub_content_collect_community_day_block_attrs_recursive($parsed);
+    $rows      = [];
+    foreach ($raw_attrs as $attrs) {
+        $entries = [];
+        if (!empty($attrs['entries']) && is_array($attrs['entries'])) {
+            foreach ((array) $attrs['entries'] as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $entry_attack_ids = [];
+                if (!empty($entry['specialAttackIds']) && is_array($entry['specialAttackIds'])) {
+                    foreach ((array) $entry['specialAttackIds'] as $attack_id) {
+                        $aid = (int) $attack_id;
+                        if ($aid > 0) {
+                            $entry_attack_ids[] = $aid;
+                        }
+                    }
+                }
+                $entries[] = [
+                    'pokemon_id' => isset($entry['pokemonId']) ? (int) $entry['pokemonId'] : 0,
+                    'special_attack_ids' => array_values(array_unique($entry_attack_ids)),
+                ];
+            }
+        }
+        $rows[] = [
+            'pokemon_id'       => isset($attrs['pokemonId']) ? (int) $attrs['pokemonId'] : 0,
+            'special_attack_id'=> isset($attrs['specialAttackId']) ? (int) $attrs['specialAttackId'] : 0,
+            'evolution_start'  => isset($attrs['evolutionStart']) ? trim((string) $attrs['evolutionStart']) : '',
+            'evolution_end'    => isset($attrs['evolutionEnd']) ? trim((string) $attrs['evolutionEnd']) : '',
+            'entries'          => $entries,
+        ];
+    }
+    return $rows;
+}
+
+/**
+ * @return object|null Ligne wpdb
+ */
+function pokehub_content_get_community_day_row(string $source_type, int $source_id) {
+    global $wpdb;
+    $table = pokehub_get_table('content_community_day');
+    if (!$table || $source_id <= 0) {
+        return null;
+    }
+    return $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$table} WHERE source_type = %s AND source_id = %d LIMIT 1",
+        $source_type,
+        $source_id
+    ));
+}
+
+/**
+ * Lit les données Community Day synchronisées pour une source (reutilisable hors rendu bloc).
+ *
+ * @return array{
+ *   pokemon_id: int,
+ *   special_attack_id: int,
+ *   evolution_start: string,
+ *   evolution_end: string,
+ *   blocks: array<int, array<string,mixed>>,
+ *   start_ts: int,
+ *   end_ts: int
+ * }
+ */
+function pokehub_content_get_community_day(string $source_type, int $source_id): array {
+    $empty = [
+        'pokemon_id'        => 0,
+        'special_attack_id' => 0,
+        'evolution_start'   => '',
+        'evolution_end'     => '',
+        'blocks'            => [],
+        'start_ts'          => 0,
+        'end_ts'            => 0,
+    ];
+    $row = pokehub_content_get_community_day_row($source_type, $source_id);
+    if (!$row) {
+        return $empty;
+    }
+    $blocks = [];
+    if (!empty($row->blocks_json)) {
+        $dec = json_decode((string) $row->blocks_json, true);
+        if (is_array($dec)) {
+            $blocks = $dec;
+        }
+    }
+    return [
+        'pokemon_id'        => (int) ($row->pokemon_id ?? 0),
+        'special_attack_id' => (int) ($row->special_attack_id ?? 0),
+        'evolution_start'   => (string) ($row->evolution_start ?? ''),
+        'evolution_end'     => (string) ($row->evolution_end ?? ''),
+        'blocks'            => $blocks,
+        'start_ts'          => (int) ($row->start_ts ?? 0),
+        'end_ts'            => (int) ($row->end_ts ?? 0),
+    ];
+}
+
+/**
+ * Supprime l’entrée Community Day pour une source.
+ */
+function pokehub_content_delete_community_day(string $source_type, int $source_id): void {
+    global $wpdb;
+    $table = pokehub_get_table('content_community_day');
+    if (!$table || $source_id <= 0) {
+        return;
+    }
+    $wpdb->delete($table, [
+        'source_type' => (string) $source_type,
+        'source_id'   => (int) $source_id,
+    ], ['%s', '%d']);
+}
+
+/**
+ * Sauvegarde les données dérivées des blocs Community Day (liste de blocs).
+ *
+ * @param array<int, array{pokemon_id?: int, special_attack_id?: int, evolution_start?: string, evolution_end?: string}|array<string,mixed>> $block_rows
+ */
+function pokehub_content_save_community_day(string $source_type, int $source_id, array $block_rows): void {
+    global $wpdb;
+    $table = pokehub_get_table('content_community_day');
+    if (!$table || $source_id <= 0) {
+        return;
+    }
+
+    $normalized = [];
+    foreach ($block_rows as $r) {
+        if (!is_array($r)) {
+            continue;
+        }
+        $pid = isset($r['pokemon_id']) ? (int) $r['pokemon_id'] : (isset($r['pokemonId']) ? (int) $r['pokemonId'] : 0);
+        $aid = isset($r['special_attack_id']) ? (int) $r['special_attack_id'] : (isset($r['specialAttackId']) ? (int) $r['specialAttackId'] : 0);
+        $es  = isset($r['evolution_start']) ? trim((string) $r['evolution_start']) : (isset($r['evolutionStart']) ? trim((string) $r['evolutionStart']) : '');
+        $ee  = isset($r['evolution_end']) ? trim((string) $r['evolution_end']) : (isset($r['evolutionEnd']) ? trim((string) $r['evolutionEnd']) : '');
+        $entry_rows = [];
+        if (!empty($r['entries']) && is_array($r['entries'])) {
+            foreach ((array) $r['entries'] as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $entry_pid = isset($entry['pokemon_id']) ? (int) $entry['pokemon_id'] : (isset($entry['pokemonId']) ? (int) $entry['pokemonId'] : 0);
+                $entry_aids = [];
+                $raw_aids = isset($entry['special_attack_ids']) ? $entry['special_attack_ids'] : (isset($entry['specialAttackIds']) ? $entry['specialAttackIds'] : []);
+                if (is_array($raw_aids)) {
+                    foreach ($raw_aids as $raw_aid) {
+                        $aid_n = (int) $raw_aid;
+                        if ($aid_n > 0) {
+                            $entry_aids[] = $aid_n;
+                        }
+                    }
+                }
+                $entry_rows[] = [
+                    'pokemon_id' => $entry_pid,
+                    'special_attack_ids' => array_values(array_unique($entry_aids)),
+                ];
+            }
+        }
+        if (empty($entry_rows) && $pid > 0) {
+            $entry_rows[] = [
+                'pokemon_id' => $pid,
+                'special_attack_ids' => $aid > 0 ? [$aid] : [],
+            ];
+        }
+        $normalized[] = [
+            'pokemon_id'        => $pid,
+            'special_attack_id' => $aid,
+            'evolution_start'   => $es,
+            'evolution_end'     => $ee,
+            'entries'           => $entry_rows,
+        ];
+    }
+
+    $has_any_pokemon = false;
+    foreach ($normalized as $n) {
+        if ($n['pokemon_id'] > 0) {
+            $has_any_pokemon = true;
+            break;
+        }
+        if (!empty($n['entries']) && is_array($n['entries'])) {
+            foreach ($n['entries'] as $entry_row) {
+                if (!empty($entry_row['pokemon_id'])) {
+                    $has_any_pokemon = true;
+                    break 2;
+                }
+            }
+        }
+    }
+    if (!$has_any_pokemon) {
+        pokehub_content_delete_community_day($source_type, $source_id);
+        return;
+    }
+
+    $primary = $normalized[0];
+    foreach ($normalized as $n) {
+        if ($n['pokemon_id'] > 0) {
+            $primary = $n;
+            break;
+        }
+        if (!empty($n['entries']) && is_array($n['entries'])) {
+            foreach ($n['entries'] as $entry_row) {
+                if (!empty($entry_row['pokemon_id'])) {
+                    $primary = array_merge($n, [
+                        'pokemon_id' => (int) $entry_row['pokemon_id'],
+                        'special_attack_id' => !empty($entry_row['special_attack_ids'][0]) ? (int) $entry_row['special_attack_ids'][0] : 0,
+                    ]);
+                    break 2;
+                }
+            }
+        }
+    }
+
+    $dates = function_exists('pokehub_content_get_dates_for_source')
+        ? pokehub_content_get_dates_for_source($source_type, $source_id)
+        : ['start_ts' => 0, 'end_ts' => 0];
+    $existing = pokehub_content_get_community_day_row($source_type, $source_id);
+    $json     = wp_json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $data = [
+        'start_ts'          => (int) ($dates['start_ts'] ?? 0),
+        'end_ts'            => (int) ($dates['end_ts'] ?? 0),
+        'pokemon_id'        => (int) $primary['pokemon_id'],
+        'special_attack_id' => (int) $primary['special_attack_id'],
+        'evolution_start'   => (string) $primary['evolution_start'],
+        'evolution_end'     => (string) $primary['evolution_end'],
+        'blocks_json'       => is_string($json) ? $json : null,
+        'updated_at'        => current_time('mysql'),
+    ];
+
+    if ($existing) {
+        $wpdb->update($table, $data, ['id' => (int) $existing->id], ['%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s'], ['%d']);
+    } else {
+        $wpdb->insert(
+            $table,
+            array_merge(
+                [
+                    'source_type' => (string) $source_type,
+                    'source_id'   => (int) $source_id,
+                    'sort_order'  => 0,
+                    'created_at'  => current_time('mysql'),
+                ],
+                $data
+            ),
+            ['%s', '%d', '%d', '%s', '%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s']
+        );
+    }
+}
+
+/**
+ * Traitement différé (shutdown) pour content_community_day : libère vite la pile save_post lorsque des extensions
+ * lourdes (ex. offload S3) s’exécutent sur la même requête ; le contenu lisible est alors dans la DB.
+ */
+function pokehub_content_community_day_deferred_shutdown(): void {
+    if (empty($GLOBALS['pokehub_community_day_defer_ids']) || !is_array($GLOBALS['pokehub_community_day_defer_ids'])) {
+        return;
+    }
+    $ids = array_keys(array_filter($GLOBALS['pokehub_community_day_defer_ids']));
+    $GLOBALS['pokehub_community_day_defer_ids'] = [];
+
+    if (!function_exists('pokehub_content_parse_community_day_blocks_from_html')) {
+        return;
+    }
+
+    foreach ($ids as $post_id) {
+        $post_id = (int) $post_id;
+        if ($post_id <= 0) {
+            continue;
+        }
+        if (!empty($GLOBALS['pokehub_skip_content_sync'])) {
+            continue;
+        }
+        if (function_exists('get_post_meta')) {
+            $parent_id = get_post_meta($post_id, '_pokehub_featured_hours_parent_post_id', true);
+            if (!empty($parent_id)) {
+                continue;
+            }
+        }
+
+        $fresh = get_post($post_id);
+        if (!$fresh instanceof \WP_Post) {
+            continue;
+        }
+
+        $types = apply_filters('pokehub_content_community_day_post_types', ['post', 'pokehub_event']);
+        if (!in_array($fresh->post_type, $types, true)) {
+            continue;
+        }
+
+        $rows = pokehub_content_parse_community_day_blocks_from_html((string) $fresh->post_content);
+        $source_type = 'post';
+
+        if (empty($rows)) {
+            if (function_exists('pokehub_content_delete_community_day')) {
+                pokehub_content_delete_community_day($source_type, $post_id);
+            }
+            continue;
+        }
+
+        pokehub_content_save_community_day($source_type, $post_id, $rows);
+    }
+}
+
+add_action('shutdown', 'pokehub_content_community_day_deferred_shutdown', 20);
+
+/**
+ * À l’enregistrement du post : enqueue la synchro Community Day pour shutdown (voir ci‑dessus).
+ */
+add_action(
+    'save_post',
+    static function ($post_id, $post) {
+        if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) {
+            return;
+        }
+        if (!$post instanceof \WP_Post) {
+            return;
+        }
+        if (!empty($GLOBALS['pokehub_skip_content_sync'])) {
+            return;
+        }
+        if (function_exists('get_post_meta')) {
+            $parent_id = get_post_meta($post_id, '_pokehub_featured_hours_parent_post_id', true);
+            if (!empty($parent_id)) {
+                return;
+            }
+        }
+
+        $types = apply_filters('pokehub_content_community_day_post_types', ['post', 'pokehub_event']);
+        if (!in_array($post->post_type, $types, true)) {
+            return;
+        }
+
+        if (!function_exists('pokehub_content_parse_community_day_blocks_from_html')) {
+            return;
+        }
+
+        if (!isset($GLOBALS['pokehub_community_day_defer_ids']) || !is_array($GLOBALS['pokehub_community_day_defer_ids'])) {
+            $GLOBALS['pokehub_community_day_defer_ids'] = [];
+        }
+        $GLOBALS['pokehub_community_day_defer_ids'][(int) $post_id] = true;
+    },
+    25,
+    2
+);
 
 // --- Habitats ---
 

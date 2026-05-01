@@ -521,6 +521,16 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     ?>
 <div class="wrap">
     <?php poke_hub_admin_back_to_list_bar($back_url); ?>
+    <?php
+    // Retours rapides après action GET (clone, etc.) sans remonter sur la liste
+    $ph_msg_quick = isset($_GET['ph_msg']) ? sanitize_key(wp_unslash($_GET['ph_msg'])) : '';
+    if ($is_edit && $ph_msg_quick === 'cloned') {
+        printf(
+            '<div class="notice notice-success is-dismissible"><p>%s</p></div>',
+            esc_html__('Duplicate created. Adjust the slug and name, then save.', 'poke-hub')
+        );
+    }
+    ?>
     <h1>
         <?php
         echo $is_edit
@@ -528,6 +538,25 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             : esc_html__('Add Pokémon', 'poke-hub');
         ?>
     </h1>
+    <?php if ($is_edit && !empty($edit_row->id)) : ?>
+        <p style="margin: 12px 0;">
+            <?php
+            $clone_nav_url = wp_nonce_url(
+                add_query_arg(
+                    [
+                        'page'       => 'poke-hub-pokemon',
+                        'ph_section' => 'pokemon',
+                        'action'     => 'clone',
+                        'id'         => (int) $edit_row->id,
+                    ],
+                    admin_url('admin.php')
+                ),
+                'poke_hub_clone_pokemon_' . (int) $edit_row->id
+            );
+            ?>
+            <a class="button" href="<?php echo esc_url($clone_nav_url); ?>"><?php esc_html_e('Clone this Pokémon', 'poke-hub'); ?></a>
+        </p>
+    <?php endif; ?>
 
     <form method="post">
         <?php wp_nonce_field('poke_hub_pokemon_edit_pokemon'); ?>

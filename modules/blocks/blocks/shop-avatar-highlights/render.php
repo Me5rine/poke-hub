@@ -86,7 +86,7 @@ if ($has_items && function_exists('pokehub_shop_highlights_resolve_event_label')
 $show_lead = $has_hero || $intro_html !== '';
 
 $wrapper_attributes = get_block_wrapper_attributes([
-    'class' => 'pokehub-shop-avatar-highlights-block pokehub-shop-highlights',
+    'class' => 'pokehub-shop-avatar-highlights-block-wrapper pokehub-shop-avatar-highlights-block pokehub-shop-highlights',
 ]);
 
 ob_start();
@@ -118,14 +118,14 @@ ob_start();
                         </figure>
                     <?php endif; ?>
                     <?php if ($intro_html !== '') : ?>
-                        <p class="pokehub-shop-highlights-lead__text"><?php echo $intro_html; ?></p>
+                        <p class="pokehub-shop-highlights-lead__text pokehub-block-subtitle"><?php echo $intro_html; ?></p>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
 
             <?php if ($has_items) : ?>
                 <div class="pokehub-shop-highlights-panel__tiles">
-                    <h3 class="pokehub-shop-highlights-panel__tiles-title"><?php esc_html_e('Avatar items in this event', 'poke-hub'); ?></h3>
+                    <h3 class="pokehub-shop-highlights-panel__tiles-title pokehub-block-subtitle"><?php esc_html_e('Avatar items in this event', 'poke-hub'); ?></h3>
                     <div class="pokehub-wild-pokemon-grid pokehub-shop-highlights-items pokehub-shop-avatar-items-grid">
                         <?php foreach ($ordered_items as $row) : ?>
                             <?php

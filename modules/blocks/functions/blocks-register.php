@@ -54,6 +54,9 @@ function pokehub_blocks_register_all() {
         'shop-sticker-highlights' => [
             'requires' => [],
         ],
+        'community-day' => [
+            'requires' => [],
+        ],
     ];
     
     foreach ($blocks as $block_name => $config) {

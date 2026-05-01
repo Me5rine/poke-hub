@@ -111,7 +111,63 @@ add_action('init', function() {
     
     // Enregistrer les blocs
     pokehub_blocks_register_all();
-    
+
+    // Select2 + aide Community Day : enregistrés sur init pour pouvoir rattacher une dépendance au script editor du bloc.
+    if (!wp_style_is('pokehub-select2-editor', 'registered')) {
+        wp_register_style(
+            'pokehub-select2-editor',
+            'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css',
+            [],
+            '4.1.0'
+        );
+        wp_add_inline_style(
+            'pokehub-select2-editor',
+            '.components-panel__body .pokehub-community-day-select-wrap select.pokehub-community-day-select{max-width:100%;}'
+        );
+    }
+    if (!wp_script_is('pokehub-select2-editor', 'registered')) {
+        wp_register_script(
+            'pokehub-select2-editor',
+            'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
+            ['jquery'],
+            '4.1.0',
+            true
+        );
+    }
+    if (!wp_script_is('pokehub-community-day-editor-select2', 'registered')) {
+        wp_register_script(
+            'pokehub-community-day-editor-select2',
+            POKE_HUB_BLOCKS_URL . 'blocks/community-day/editor-select2.js',
+            ['jquery', 'pokehub-select2-editor'],
+            POKE_HUB_VERSION,
+            true
+        );
+        wp_localize_script(
+            'pokehub-community-day-editor-select2',
+            'pokehubCommunityDayEditorCfg',
+            [
+                'nonce'          => wp_create_nonce('wp_rest'),
+                'restPokemon'    => rest_url('poke-hub/v1/pokemon-for-select'),
+                'searching'      => __('Recherche…', 'poke-hub'),
+                'inputTooShort'  => __('Saisis au moins une lettre pour chercher.', 'poke-hub'),
+            ]
+        );
+    }
+    $cd_block_editor = WP_Block_Type_Registry::get_instance()->get_registered('pokehub/community-day');
+    if ($cd_block_editor && !empty($cd_block_editor->editor_script) && wp_script_is('pokehub-community-day-editor-select2', 'registered')) {
+        $wp_scripts_registry = wp_scripts();
+        foreach ((array) $cd_block_editor->editor_script as $cd_editor_handle) {
+            $cd_editor_handle = (string) $cd_editor_handle;
+            if ($cd_editor_handle === '') {
+                continue;
+            }
+            if (isset($wp_scripts_registry->registered[$cd_editor_handle])) {
+                $dep = $wp_scripts_registry->registered[$cd_editor_handle];
+                $dep->deps = array_values(array_unique(array_merge(array_filter((array) $dep->deps), ['pokehub-community-day-editor-select2'])));
+            }
+        }
+    }
+
     /**
      * Enqueue des assets front-end pour les blocs
      */
@@ -192,6 +248,11 @@ add_action('init', function() {
             'pokehub-candy-display',
         ]);
 
+        // Toujours charger Select2 + helper Community Day en éditeur pour éviter les états
+        // où le script du bloc est présent sans ses dépendances (sélection native non voulue).
+        wp_enqueue_style('pokehub-select2-editor');
+        wp_enqueue_script('pokehub-community-day-editor-select2');
+
         poke_hub_register_bundled_front_style('pokehub-special-event-single', 'poke-hub-special-events-single.css', []);
         poke_hub_enqueue_bundled_front_style('pokehub-go-pass-block-front', 'poke-hub-go-pass-block-front.css', [
             'pokehub-blocks-front-style',
@@ -259,8 +320,39 @@ add_action('init', function() {
                 } elseif (is_bool($raw_dimorphic_only)) {
                     $dimorphic_only = $raw_dimorphic_only;
                 }
-                $pokemon_list = pokehub_get_pokemon_for_select_filtered($ids, $search, $dimorphic_only);
+                // Sans recherche ni ids : liste complète (local ou remote selon réglages), comme les métaboxes PHP.
+                if ($search === '' && empty($ids) && function_exists('pokehub_get_pokemon_for_select')) {
+                    $pokemon_list = pokehub_get_pokemon_for_select();
+                } else {
+                    $pokemon_list = pokehub_get_pokemon_for_select_filtered($ids, $search, $dimorphic_only);
+                }
                 return rest_ensure_response($pokemon_list);
+            },
+            'permission_callback' => function() {
+                return current_user_can('edit_posts');
+            },
+        ]);
+
+        register_rest_route('poke-hub/v1', '/pokemon-special-attacks', [
+            'methods' => 'GET',
+            'callback' => function($request) {
+                if (!function_exists('pokehub_get_pokemon_special_attacks')) {
+                    return rest_ensure_response([]);
+                }
+                $pokemon_id = (int) $request->get_param('pokemon_id');
+                if ($pokemon_id <= 0) {
+                    return rest_ensure_response([]);
+                }
+                $include_family = false;
+                $raw_include_family = $request->get_param('include_family');
+                if (is_string($raw_include_family)) {
+                    $include_family = in_array(strtolower(trim($raw_include_family)), ['1', 'true', 'yes', 'on'], true);
+                } elseif (is_numeric($raw_include_family)) {
+                    $include_family = ((int) $raw_include_family) === 1;
+                } elseif (is_bool($raw_include_family)) {
+                    $include_family = $raw_include_family;
+                }
+                return rest_ensure_response(pokehub_get_pokemon_special_attacks($pokemon_id, $include_family));
             },
             'permission_callback' => function() {
                 return current_user_can('edit_posts');

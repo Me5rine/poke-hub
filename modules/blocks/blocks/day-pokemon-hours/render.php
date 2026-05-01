@@ -259,10 +259,30 @@ if (!function_exists('pokehub_day_pokemon_hours_render_spotlight_tile')) {
         $type_color = ($first_id > 0 && function_exists('pokehub_get_pokemon_type_color'))
             ? (string) pokehub_get_pokemon_type_color($first_id)
             : '';
-        $labels = array_values(array_unique(array_filter(array_map(static function ($c) {
-            return isset($c['display']) ? (string) $c['display'] : '';
-        }, $cards))));
-        $display = $labels !== [] ? implode(' + ', $labels) : ((string) ($cards[0]['display'] ?? ''));
+        $labels = [];
+        foreach ($cards as $c) {
+            $part = isset($c['display']) ? trim((string) $c['display']) : '';
+            if ($part !== '') {
+                $labels[] = $part;
+            }
+        }
+        if ($labels === []) {
+            $labels = [(string) ($cards[0]['display'] ?? '#' . ((int) ($cards[0]['id'] ?? 0)))];
+        }
+
+        // « A » / « A & B » / « A, B & C » — pas d’unique sur les labels (évite de n’afficher qu’un nom si collisions).
+        $display = '';
+        if (count($labels) === 1) {
+            $display = $labels[0];
+        } elseif (count($labels) === 2) {
+            /* translators: Liste de deux noms Pokémon : %1$s premier, %2$s second */
+            $display = sprintf(__('%1$s & %2$s', 'poke-hub'), $labels[0], $labels[1]);
+        } elseif (count($labels) >= 3) {
+            $last = array_pop($labels);
+            $prefix = implode(', ', $labels);
+            /* translators: Liste de plusieurs noms : %1$s noms séparés par des virgules, %2$s dernier nom (avec « et » ou « & » avant le dernier selon la langue). */
+            $display = sprintf(__('%1$s & %2$s', 'poke-hub'), $prefix, $last);
+        }
         $pokemon_ids_attr = implode(',', array_map(static function ($c) {
             return (string) ((int) ($c['id'] ?? 0));
         }, $cards));

@@ -19,10 +19,14 @@ function poke_hub_games_get_all_pokemon(): array {
     }
 
     // Récupérer uniquement les formes par défaut pour éviter les doublons
+    $fam_sql = function_exists('pokehub_pokemon_sql_exclude_family_placeholder_slug_expr')
+        ? pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('slug')
+        : "( LENGTH(TRIM(COALESCE(slug, ''))) < 7 OR RIGHT(LOWER(TRIM(COALESCE(slug, ''))), 7) <> '-family' )";
     $rows = $wpdb->get_results(
         "SELECT id, dex_number, name_fr, name_en, slug
          FROM {$pokemon_table}
          WHERE is_default = 1
+           AND {$fam_sql}
          ORDER BY dex_number ASC",
         ARRAY_A
     );

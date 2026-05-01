@@ -42,6 +42,10 @@ Les catégories **spécifiques** (Gigantamax, Dynamax, Costume, Shadow, Purified
 
 Pour les catégories **non spécifiques** mais dont le **sens de la liste** exclut certaines options (ex. pas de bébés dans une liste L/M/UC), une **deuxième couche** masque des contrôles ciblés : voir *Options masquées par catégorie (UI)*.
 
+### Gigamax synthétique (collections vs outil Images)
+
+Pour le **pool collections** (affichage joueur, id synthétiques `2100000000+`), la logique Gigamax synthétique vit dans `includes/functions/pokemon-public-helpers.php` : elle tient compte notamment de **`extra.release.gigantamax`** (date renseignée) et du filtre **sorti en GO** pour le mode concerné (`poke_hub_pokemon_is_released_in_go`, etc.). Ce n’est **pas** le comportement de l’onglet admin **Temporary tools → Images sync** (`tab=images-sync`), qui liste des icônes à préparer **sans** dépendre des dates — uniquement selon les **données** et **flags** en base pour le manifest CSV. Détail : [ADMIN_TEMPORARY_TOOLS.md](./ADMIN_TEMPORARY_TOOLS.md) § *Images sync*.
+
 ### Options de composition
 
 Une collection a des **options** (JSON) ; selon la catégorie, seules les options pertinentes sont affichées :
@@ -51,7 +55,7 @@ Une collection a des **options** (JSON) ; selon la catégorie, seules les option
   - **Genre (deux notions distinctes)** :
     - **`include_gender`** : garder les **lignes séparées** quand le jeu a **deux fiches distinctes** liées à l’attribut de forme *gender* en base (ex. Nidoran, formes mâle/femelle de Mistigrix) — filtre SQL sur `form_category = gender`.
     - **`show_gender_symbols`** : afficher **♂ / ♀** à droite du nom **uniquement** sur ces lignes de variante *gender* (sans effet sur les autres).
-    - **`include_both_sexes_collector`** : pour chaque fiche du pool dont le **profil de genre** (`poke_hub_pokemon_get_gender_profile`, champs `available_genders` dans `extra`) déclare **à la fois** `male` et `female`, le pool est **doublé** en deux entrées (même nom d’espèce, symboles ♂/♀) avec des **`pokemon_id` synthétiques** (plage réservée à partir de `2200000000`, voir `poke_hub_collections_sex_synthetic_pokemon_id()` dans `collections-helpers.php`) afin de suivre mâle et femelle **séparément** dans `pokehub_collection_items`. Les espèces **sans genre** ou **un seul sexe** ne sont pas dupliquées. Les lignes déjà de type variante *gender* ne sont pas re-découpées par cette option.
+    - **`include_both_sexes_collector`** (et, avec la case **dimorphisme**, **`include_gender`**) : pour chaque fiche du pool dont le **profil de genre** (`poke_hub_pokemon_get_gender_profile`, via `extra` en base) déclare **à la fois** `male` et `female` comme disponibles dans l’UI, le pool peut être **doublé** en deux entrées (symboles ♂/♀) avec des **`pokemon_id` synthétiques** (plage réservée à partir de `2200000000`, `poke_hub_collections_sex_synthetic_pokemon_id()`). **Images** : un drapeau **`synthetic_sex_use_gender_asset`** sur chaque ligne synthétique indique si le sprite doit utiliser les fichiers **`-male` / `-female`** (vrai **uniquement** quand `has_gender_dimorphism` est vrai sur la fiche de référence) ; sinon les deux tuiles réutilisent **le même fichier** (ex. espèce non dimorphique : deux entrées, une image). **Gigamax** : **jamais** de suffixe genre sur l’URL — toujours le sprite de la forme G-Max (`synthetic_sex_use_gender_asset` à false ; le helper d’images évite aussi le « genre par défaut » sur les formes Gigamax). **Dynamax** : le dimorphisme suit **l’espèce de base** ; le profil genre et la résolution des URLs pour les lignes synthétiques utilisent **`dynamax_base_pokemon_id`** lorsque la ligne est un Dynamax synthétique (`synthetic_dynamax`). Les lignes **Dynamax / Gigamax** du pool sont concernées par le dédoublement comme les autres fiches (voir *Pool : formes*, *Images*). Les espèces **sans les deux sexes** en `available_genders` ne sont pas dupliquées. Les lignes déjà de type variante `fv.category = gender` ne sont pas re-découpées par cette option.
   - Inclure les Pokémon costumés, les Méga, les Gigantamax, les Dynamax.
   - Inclure les attaques spéciales (ex. Dracaufeu avec attaque événement).
 - **Listes « spécifiques »** (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds…) : pas d’options Méga/Giga/Dynamax/costumes — la collection = uniquement ce type.
@@ -114,15 +118,59 @@ Chaque Pokémon du pool a un **statut** stocké côté données (`pokehub_collec
 | `for_trade` | À l’échange (équivalent du libellé anglais source *For trade*, domaine d’extension `poke-hub`) |
 | `missing` | Manquant |
 
-Le bloc **Afficher dans la grille** ne change pas ces valeurs : il **filtre uniquement l’affichage** des tuiles (chaîne source anglaise *Show in grid*, même domaine). En français, l’interface désigne ces états comme **possédé**, **à l’échange**, **manquant** ; le code et l’API gardent `owned`, `for_trade`, `missing`.
+Le bloc **Include in grid** (*chaîne source anglaise* dans les fichiers de traduction du domaine `poke-hub`; ancienne formulation documentée « Show in grid ») ne change pas ces valeurs : il **filtre uniquement l’affichage** des tuiles. En français, l’interface peut traduire ce libellé ; les trois statuts sont **possédé**, **à l’échange**, **manquant** côté texte métier ; le code et l’API gardent `owned`, `for_trade`, `missing`.
+
+## Ordre des lignes dans la grille et variantes
+
+Quand plusieurs entrées du pool concernent une même famille (national dex ou même espèce sous plusieurs formes), l’ordre d’affichage est défini dans **`poke_hub_collections_sort_pool_display()`** (`modules/collections/functions/collections-helpers.php`), en lien avec **`pokehub_pokemon_select_category_rank()`** (`includes/functions/pokemon-public-helpers.php`) pour résoudre une **catégorie de forme** à partir de `form_category`, du slug, ou de drapeaux synthétiques (Gigamax, Dynamax, costume, fond GO, etc.).
+
+Ordre de tri (résumé) : **génération** ascendante ; **n° de Pokédex** ; **cas spéciaux Zarbi / Unown** (même espèce `#201`) : ordre forcé **A → Z**, puis **`!`**, puis **`?`** (y compris slugs GM du type `unown-exclamation-point`, `unown-question-mark`, ou équivalents `zarbi-*`) ; **rang de catégorie de variante** ; pour les lignes avec **fonds GO** synthétiques, regroupement cohérent avec la ligne source ; puis nom / libellé de forme / id pour un ordre stable.
+
+## Pool SQL : lignes « family », tous les Pokémon vs une entrée par espèce
+
+Le pool est construit dans **`poke_hub_collections_get_pool()`**. Comportements utiles pour la maintenance et le support :
+
+- **`one_per_species` désactivé (« toutes les formes »)**  
+  - Les slugs se terminant par **`-family`** sont **exclusivement réservés** au mode « une entrée par espèce » (regroupement). En **« toutes les formes », une ligne `*-family` ne doit pas apparaître** ; les entrées utilisables sont la **forme normale** (`slug` sans cette terminaison) et les variantes (méga, costume, fusion, etc.).  
+  - D’autres filtres (ex. lignes `-normal` redondantes) ne s’appliquent que lorsqu’une **autre forme réelle** existe pour le même n° Pokédex (évite une base générique alors que des suffixes `-…` sont présents).
+
+- **`one_per_species` activé**  
+  - Logique de **famille par espèce** (slugs `-family`, `is_default`, formes incluses selon options : régional, méga, costume, Dynamax synthétique, etc.). Les variantes **`fusion` / `special`** (ex. plusieurs formes « mécaniquement » distinctes) restent des entrées séparées quand les options les autorisent ; la ligne famille seule peut être masquée si ces formes explicites existent déjà (évite triple affichage type Giratina).
+
+- **Formes catalogue** (`pokemon_form_variants.category`) : certaines lignes (**`switch_form`**, exceptions **`switch_battle`** pour cas documentés comme Kyurem blanc / Genesect drives avec slugs compatibles, etc.) sont nécessaires au pool alors que d’autres combinaisons sont exclues (ex. **`switch_battle`** pour les changements purement combat hors exceptions).
+
+- **Synthèses Dynamax / Gigamax** (collections **non** catégories `dynamax` / `gigantamax` dédiées) : si la fiche a une sortie prévue mais pas de ligne variante en table, une tuile peut être dérivée (ids synthétiques `1000000000+` / `2100000000+`). **Il ne doit pas exister** de ligne combinée impossible type « Dynamax **et** Gigantamax » pour la même ligne de pool ; la génération évite aussi qu’une synthèse se réapplique en chaîne depuis une ligne déjà Dynamax ou déjà Gigamax.
+
+- **Cohérence données** : garde SQL optionnel contre un slug improbable **`dynamax` + `gigantamax`** sur une même ligne (données importées corrompues).
+
+Référence code : **`modules/collections/functions/collections-helpers.php`** (filtres `WHERE`, `poke_hub_collections_maybe_mark_*_synthetic_base_row`, `poke_hub_collections_apply_*_synthetic_*`, `poke_hub_collections_sort_pool_display`).
+
+### Images des tuiles (collections)
+
+Pour lier sprites et pool, **`poke_hub_collections_pool_row_to_pokemon_for_image_target()`** prépare l’objet passé à **`poke_hub_pokemon_get_image_sources()`** :
+
+- lignes **Gigamax** (réelles ou synthétiques) : pas de jeu sur le **genre par défaut** résolu automatiquement (évite les URLs `*-male` non souhaitées sur le sprite G-Max seul fichier) ;
+- lignes **synthétiques collectionneur mâle/femelle** : voir **`synthetic_sex_use_gender_asset`** et la section **Options de composition** ci-dessus ; argument optionnel **`skip_gender_resolution`** côté helper d’images : voir **`docs/POKEMON_IMAGES.md`** (**`poke_hub_pokemon_get_image_sources`**).
+
+### POGO recherche
+
+Le dédoublement mâle/femelle n’inverse pas les règles des phrases copiables (toujours **une entrée par n° dex** entre groupes comme documenté § *Phrases GO*).
 
 ## Expérience utilisateur
 
 1. **Création** : drawer (panneau latéral) avec nom, type (catégorie), options selon le type (voir *Catégories spécifiques*), mode d’affichage (tuiles ou liste + sélecteur). Si non connecté : message de stockage local.
-2. **Édition** : grille de tuiles (clic = cycle **manquant → possédé → à l’échange → manquant**) **ou** liste + Select2 pour ajouter les Pokémon manquants (mode configurable). **Légende** : possédé (vert), à l’échange (orange), manquant (gris). Bloc **Afficher dans la grille** : une case cochée par statut **affiché** ; tout décocher vide la grille et affiche un rappel ; avec **regroupement par génération**, les blocs sans aucune tuile visible sont masqués (voir *Statuts d’une entrée*). Les Pokémon **sans génération résolue** en base (taxonomie `generations`) sont regroupés **en dernier** dans la liste / les sections, pas avant la génération 1 (`poke_hub_collections_sort_pool_display`, `poke_hub_collections_group_pool_by_generation`).
+2. **Édition** : grille de tuiles (clic = cycle **manquant → possédé → à l’échange → manquant**) **ou** liste + Select2 pour ajouter les Pokémon manquants (mode configurable). **Légende** : possédé (vert), à l’échange (orange), manquant (gris). Bloc **Include in grid** : une case cochée par statut **affiché** ; la courte phrase « Click a tile to cycle status. » est rendue dans le **même** bloc sous la légende ; tout décocher vide la grille et affiche un rappel ; avec **regroupement par génération**, les blocs sans aucune tuile visible sont masqués (voir *Statuts d’une entrée*). Les Pokémon **sans génération résolue** en base (taxonomie `generations`) sont regroupés **en dernier** dans la liste / les sections, pas avant la génération 1 (`poke_hub_collections_sort_pool_display`, `poke_hub_collections_group_pool_by_generation`).
 3. **Partage** : lien (slug ou id), export image (canvas ou serveur).
 4. **Mise à jour** : le joueur revient sur la collection et met à jour les statuts ou les paramètres (drawer paramètres pour les options).
 5. **Phrases de recherche Pokémon GO** : bloc `<details>` rendu par `poke_hub_collections_output_pogo_search_block()` (`collections-shortcode.php`). Le libellé du `<summary>` est une chaîne traduisible (domaine `poke-hub` ; source actuelle du type *Pokémon GO: your hunt strings, ready to paste*). Génération côté client dans `collections-front.js`. Le pool et les statuts sont lus sur `.pokehub-collection-tiles` (`data-pool`, `data-items` ; côté serveur les items sont **résolus** avec `poke_hub_collections_resolved_items_map()` pour hériter du statut de la fiche de base sur les lignes à id synthétique mâle/femelle). Barre d’outils : deux `<select>` (statut de liste, mode noms FR / EN / n° Pokédex) sur **une même ligne** (gauche / droite), avec les classes `pokehub-collection-pogo-search-toolbar` et `pokehub-collection-pogo-search-toolbar-field--status` / `--token`. Les groupes affichés (titres courts côté i18n `pogoGroup*` dans `collections.php`) incluent notamment Classic, formes régionales, méga, dynamax, gigamax, mâle/femelle, costume, fonds simples, **fonds + dynamax**, **fonds + gigantamax**, selon le pool. Chaque groupe non vide : titre `h4.pokehub-pogo-search-group-title`, grille **deux colonnes** de groupes (`.pokehub-pogo-search-groups`), champ + bouton copier. **Une seule entrée par n° de dex** sur l’ensemble des groupes (même espèce dans plusieurs sections → un seul jeton copiable, aligné sur le jeu). **Styles** : uniquement dans le thème, `css/poke-hub/parts/13-collections-front.css` (section *Recherche in-game Pokémon GO*), variables `--me5rine-lab-*` ; le fichier plugin `poke-hub-collections-cascade-late.css` ne contient plus de règles dédiées à ce bloc (filet de cascade pour le reste des collections).
+6. **Vue détail : structure DOM, offsets et mode compact** (scroll long) :
+   - **Flux HTML** lorsque la collection affiche au moins un Pokémon (`$total > 0` dans `collections-shortcode.php`) : après `.pokehub-collection-header-sticky-wrap` *(attribut `data-compact-section="header"`)* suit `.pokehub-collection-sticky-tools` (barre de navigation réduite cachée par défaut, filtres **`data-compact-section="filters"`**, bloc GO **`data-compact-section="pogo"`**) ; **en dehors** de cet outillage vient ensuite `.pokehub-collection-generation-jump` s’il y a plusieurs générations ; encore plus bas éventuellement `.pokehub-collection-multiselect-wrap` avec **`data-compact-section="selectors"`** si le mode d’affichage inclut les sélecteurs.
+   - **Feuilles de style** : présentations détaillées (largeurs multi‑select responsive, grille des boutons compact, bloc « Jump to generation », etc.) sont dans **`css/poke-hub/parts/13-collections-front.css`** (thème) ; variables d’offsets dans `:root` / `body.admin-bar`, voir **`modules/collections/COLLECTIONS_THEME_CSS.md`** (*Variables offsets et vue collection sticky*).
+   - **Activation du mode compact** : `initCollectionCompactStickyMode()` dans `collections-front.js` ajoute la classe **`pokehub-collection--compact`** sur `.pokehub-collection-view-wrap` lorsque la *ligne de masque du viewport* `(scroll Y) + (--pokehub-elementor-header-offset + --pokehub-adminbar-offset)` passe **au-delà du haut documentaire du header** (~`offsetTop` du wrap header, avec **seuil bas +6 px**) ; désactivation lorsque cette ligne redescend **72 px au-dessous** du même seuil (hystérèse contre les oscillations au bord du header du site).
+   - **Tuiles de la barre compacte** `.pokehub-collection-compact-nav` (libellés source *Header*, *Filters*, *GO strings*, *Add/mark*) : chaque bouton **`data-compact-target`** parmi `header` \| `filters` \| `pogo` \| `selectors` devient **`hidden`** jusqu’à ce que la ligne de masque passe suffisamment l’ancre de la section suivante (**entrée si** **`maskLine ≥ ancre(section) + 6 px`**, **sortie si** **`maskLine ≤ ancre(section) − 28 px`**). Une fois compact actif et des tuiles visibles, **`applyCompactTarget`** n’affiche qu’une seule section (`[data-compact-section].is-compact-hidden { display:none }` dans le thème pour les autres).
+   - **Recliquer une tuile active** : définit une cible vide dans le JS (comportement actuel décrit ligne par ligne dans `applyCompactTarget`) ; lorsque **`compactOn`** repasse à false (remontée du scroll hors plage ci‑dessus), tous les segments redeviennent visibles (**`showAllNormalSections`**).
+   - **`--pokehub-sticky-tools-current-height`** est écrite en JS depuis la **hauteur réelle du bandeau** `.pokehub-collection-sticky-tools`, pour plaquer la nav **Jump to generation** sous ce bandeau en mode compact (**`sticky` uniquement alors que le wrap a la classe `pokehub-collection--compact`**).
+   - **Clic « Jump to generation »** : `initCollectionGenerationJump()` calcule `scrollTop` après soustraction de `Elementor + admin bar + hauteur des outils sticky` et d’une petite marge ; le lien **actif** par génération est mis à jour au scroll (**`requestAnimationFrame`**) avec un pivot reposant sur ces mêmes offsets.
 
 ### Phrases GO : données serveur et langue
 
@@ -150,7 +198,7 @@ Côté JS (`pogoGroupPrefix`), le préfixe d’un groupe régional utilise d’a
 - `modules/collections/public/collections-shortcode.php` — shortcodes `[poke_hub_collections]` et `[poke_hub_collection_view]`.
 - `modules/collections/public/collections-rest.php` — API REST (pool, CRUD, items).
 - Styles front : **dans le thème** Me5rine, `css/poke-hub/parts/13-collections-front.css` et `14-collections-theme.css` (importés par `poke-hub-front.css` ; priorité d’ordre : voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)). En mode plugin pur (`poke_hub_load_default_plugin_front_css` = true), le fichier `assets/css/poke-hub-collections-front.css` s’enfile s’il est présent. `modules/collections/assets/js/collections-front.js` — front.
-- `modules/collections/COLLECTIONS_THEME_CSS.md` — référence classes / variables (légende, filtre **Afficher dans la grille**, cartes liste). Chaînes traduisibles : **docs/TRANSLATION.md**. Conventions doc : **docs/REDACTION.md**.
+- `modules/collections/COLLECTIONS_THEME_CSS.md` — référence classes / variables (légende, bloc **Include in grid**, carte liste, vue collection sticky et mode compact). Chaînes traduisibles : **docs/TRANSLATION.md**. Conventions doc : **docs/REDACTION.md**.
 
 ## Mise en place d’une page
 

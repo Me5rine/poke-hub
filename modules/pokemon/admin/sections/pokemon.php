@@ -146,7 +146,26 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             esc_url($edit_url),
             esc_html__('Edit', 'poke-hub')
         );
-        
+
+        $clone_url = wp_nonce_url(
+            add_query_arg(
+                [
+                    'page'       => 'poke-hub-pokemon',
+                    'ph_section' => 'pokemon',
+                    'action'     => 'clone',
+                    'id'         => (int) $item->id,
+                ],
+                admin_url('admin.php')
+            ),
+            'poke_hub_clone_pokemon_' . (int) $item->id
+        );
+
+        $actions['clone'] = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url($clone_url),
+            esc_html__('Clone', 'poke-hub')
+        );
+
         $actions['delete'] = sprintf(
             '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
             esc_url($delete_url),
@@ -345,14 +364,11 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
         $ids = array_filter($ids);
 
         if ($ids) {
-            $in = implode(',', array_fill(0, count($ids), '%d'));
+            poke_hub_pokemon_delete_linked_rows_for_pokemon_ids($ids);
 
-            $wpdb->query(
-                $wpdb->prepare(
-                    "DELETE FROM {$table} WHERE id IN ($in)",
-                    $ids
-                )
-            );
+            $in_placeholder = implode(',', array_fill(0, count($ids), '%d'));
+            $del_sql          = "DELETE FROM {$table} WHERE id IN ({$in_placeholder})";
+            $wpdb->query(call_user_func_array([$wpdb, 'prepare'], array_merge([$del_sql], $ids)));
         }
     }
 
@@ -962,6 +978,59 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
 }
 
 /**
+ * Supprime les lignes de liaison où interviennent des Pokémon donnés :
+ * attaques, types, biomes et évolutions (base ou cible).
+ *
+ * À utiliser avant de supprimer les fiches pokemon correspondantes pour éviter l’historique désynchronisé.
+ *
+ * @param int[] $ids IDs lignes pokemon.
+ */
+function poke_hub_pokemon_delete_linked_rows_for_pokemon_ids(array $ids): void {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($v): bool {
+        return $v > 0;
+    })));
+    if ($ids === [] || !function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return;
+    }
+
+    $in_placeholder = implode(',', array_fill(0, count($ids), '%d'));
+    $prep_in        = static function (string $fragment) use ($wpdb, $ids, $in_placeholder): void {
+        $sql = "{$fragment}{$in_placeholder})";
+        $args = array_merge([$sql], $ids);
+        $wpdb->query(call_user_func_array([$wpdb, 'prepare'], $args));
+    };
+
+    $table_pokemon_attack_links = pokehub_get_table('pokemon_attack_links');
+    if ($table_pokemon_attack_links) {
+        $prep_in("DELETE FROM {$table_pokemon_attack_links} WHERE pokemon_id IN (");
+    }
+
+    $table_pokemon_type_links = pokehub_get_table('pokemon_type_links');
+    if ($table_pokemon_type_links) {
+        $prep_in("DELETE FROM {$table_pokemon_type_links} WHERE pokemon_id IN (");
+    }
+
+    $table_pokemon_biome_links = pokehub_get_table('pokemon_biome_pokemon_links');
+    if ($table_pokemon_biome_links) {
+        $prep_in("DELETE FROM {$table_pokemon_biome_links} WHERE pokemon_id IN (");
+    }
+
+    $table_evolutions = pokehub_get_table('pokemon_evolutions');
+    if ($table_evolutions) {
+        $sql = 'DELETE FROM ' . $table_evolutions .
+            ' WHERE base_pokemon_id IN (' . $in_placeholder .
+            ') OR target_pokemon_id IN (' . $in_placeholder . ')';
+        $args = array_merge([$sql], $ids, $ids);
+        $wpdb->query(call_user_func_array([$wpdb, 'prepare'], $args));
+    }
+}
+
+/**
  * Gestion delete (action simple)
  */
 function poke_hub_pokemon_handle_pokemon_delete() {
@@ -999,52 +1068,11 @@ function poke_hub_pokemon_handle_pokemon_delete() {
     global $wpdb;
     $table_pokemon = pokehub_get_table('pokemon');
 
-    // Suppression du Pokémon
+    /** @see poke_hub_pokemon_delete_linked_rows_for_pokemon_ids() */
+    poke_hub_pokemon_delete_linked_rows_for_pokemon_ids([$id]);
+
+    // Suppression de la fiche Pokémon
     $wpdb->delete($table_pokemon, ['id' => $id], ['%d']);
-
-    // Nettoyage des liens Pokémon ↔ attaques
-    $table_pokemon_attack_links = pokehub_get_table('pokemon_attack_links');
-    if ($table_pokemon_attack_links) {
-        $wpdb->delete(
-            $table_pokemon_attack_links,
-            ['pokemon_id' => $id],
-            ['%d']
-        );
-    }
-
-    // Nettoyage des liens Pokémon ↔ types
-    $table_pokemon_type_links = pokehub_get_table('pokemon_type_links');
-    if ($table_pokemon_type_links) {
-        $wpdb->delete(
-            $table_pokemon_type_links,
-            ['pokemon_id' => $id],
-            ['%d']
-        );
-    }
-
-    $table_pokemon_biome_links = pokehub_get_table('pokemon_biome_pokemon_links');
-    if ($table_pokemon_biome_links) {
-        $wpdb->delete(
-            $table_pokemon_biome_links,
-            ['pokemon_id' => $id],
-            ['%d']
-        );
-    }
-
-    // On pourrait aussi nettoyer les lignes d'évolutions où ce Pokémon apparaît (base / target)
-    $table_evolutions = pokehub_get_table('pokemon_evolutions');
-    if ($table_evolutions) {
-        $wpdb->delete(
-            $table_evolutions,
-            ['base_pokemon_id' => $id],
-            ['%d']
-        );
-        $wpdb->delete(
-            $table_evolutions,
-            ['target_pokemon_id' => $id],
-            ['%d']
-        );
-    }
 
     $redirect = add_query_arg(
         [
@@ -1059,6 +1087,401 @@ function poke_hub_pokemon_handle_pokemon_delete() {
     exit;
 }
 add_action('admin_init', 'poke_hub_pokemon_handle_pokemon_delete');
+
+/**
+ * Tronque une chaîne de nom comme les colonnes name_en / extra (≤ 191 graphemes environ).
+ *
+ * @param string $text
+ */
+function poke_hub_pokemon_clone_truncate_name_field(string $text, int $max_chars = 191): string {
+    if ($text === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if ((int) mb_strlen($text, 'UTF-8') <= $max_chars) {
+            return $text;
+        }
+        return (string) mb_substr($text, 0, $max_chars, 'UTF-8');
+    }
+
+    return strlen($text) <= $max_chars ? $text : substr($text, 0, $max_chars);
+}
+
+/**
+ * Génère un slug unique `{base}-clone` ou `{base}-clone-N` dans la limite de longueur.
+ */
+function poke_hub_pokemon_unique_clone_slug(string $original_slug): string {
+    global $wpdb;
+
+    if (!function_exists('pokehub_get_table')) {
+        return sanitize_title(trim($original_slug)) !== ''
+            ? sanitize_title(trim($original_slug)) . '-clone'
+            : 'pokemon-clone';
+    }
+
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        return 'pokemon-clone';
+    }
+
+    $base = sanitize_title(trim($original_slug));
+    if ($base === '') {
+        $base = 'pokemon';
+    }
+
+    $suffix    = 'clone';
+    $max_len   = 191;
+    $try_build = static function (string $b, string $sfx, ?int $n = null) use ($max_len): string {
+        $mid = '-' . $sfx . ($n !== null ? '-' . $n : '');
+        $budget = max(1, $max_len - strlen($mid)); // approximation octets ASCII pour le corps slug
+        $core   = substr($b, 0, $budget);
+        if ($core === '') {
+            $core = substr($sfx, 0, $max_len);
+        }
+        $slug = sanitize_title($core . $mid);
+        if ($slug === '') {
+            $slug = $sfx . ($n ?? '');
+        }
+
+        return poke_hub_pokemon_clone_truncate_name_field($slug, $max_len);
+    };
+
+    $candidate = $try_build($base, $suffix);
+    $n         = 2;
+    while ((int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE slug = %s", $candidate)) > 0) {
+        $candidate = $try_build($base, $suffix, $n);
+        $n++;
+    }
+
+    return $candidate;
+}
+
+/**
+ * Ajoute un suffixe aux entrées chaîne de extra['names'] (récursif minimal).
+ *
+ * @param mixed $node
+ * @return mixed
+ */
+function poke_hub_pokemon_clone_suffix_extra_names_recursive($node, string $suffix) {
+    if (!is_array($node)) {
+        return $node;
+    }
+    $out = [];
+    foreach ($node as $k => $v) {
+        if (is_string($v) && $v !== '') {
+            $out[$k] = poke_hub_pokemon_clone_truncate_name_field($v . $suffix);
+        } elseif (is_array($v)) {
+            $out[$k] = poke_hub_pokemon_clone_suffix_extra_names_recursive($v, $suffix);
+        } else {
+            $out[$k] = $v;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Ajuste extra JSON après duplication : noms i18n, repères GM enlevés, dates de sortie effacées.
+ */
+function poke_hub_pokemon_clone_adjust_extra_after_copy(string $raw_extra, string $name_suffix): string {
+    $valid = true;
+    $extra = [];
+    if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+        $extra = poke_hub_pokemon_decode_extra_json($raw_extra, $valid);
+    } else {
+        $decoded = json_decode($raw_extra, true);
+        $extra = is_array($decoded) ? $decoded : [];
+    }
+
+    if (isset($extra['names']) && is_array($extra['names'])) {
+        $extra['names'] = poke_hub_pokemon_clone_suffix_extra_names_recursive($extra['names'], $name_suffix);
+    }
+
+    // Repères Game Master pouvant tromper après édition : la copie doit être vue comme entrée locale.
+    unset($extra['template_id'], $extra['pokemon_id_proto']);
+
+    // Dates de sortie (normal/shiny/etc.) propres au déploiement : ne pas reporter la fiche source.
+    unset($extra['release']);
+
+    $encoded = null;
+    if (function_exists('poke_hub_pokemon_encode_extra_json')) {
+        $encoded = poke_hub_pokemon_encode_extra_json($extra, $raw_extra);
+    } else {
+        $encoded = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    return is_string($encoded) ? $encoded : (string) $raw_extra;
+}
+
+/**
+ * Copie les liaisons pertinentes depuis un Pokémon source vers une nouvelle ligne.
+ */
+function poke_hub_pokemon_clone_link_rows(int $source_id, int $new_id): bool {
+    if ($source_id <= 0 || $new_id <= 0 || $source_id === $new_id) {
+        return false;
+    }
+
+    global $wpdb;
+    $source_id = (int) $source_id;
+    $new_id    = (int) $new_id;
+
+    // Types : (pokemon_id, type_id, slot)
+    $tt = pokehub_get_table('pokemon_type_links');
+    if ($tt) {
+        $wpdb->query($wpdb->prepare(
+            "
+            INSERT INTO {$tt} (pokemon_id, type_id, slot)
+            SELECT %d, type_id, slot FROM {$tt} WHERE pokemon_id = %d
+            ",
+            $new_id,
+            $source_id
+        ));
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    // Attaques
+    $at = pokehub_get_table('pokemon_attack_links');
+    if ($at) {
+        $wpdb->query($wpdb->prepare(
+            "
+            INSERT INTO {$at} (pokemon_id, attack_id, role, is_legacy, is_event, is_elite_tm, extra)
+            SELECT %d, attack_id, role, is_legacy, is_event, is_elite_tm, extra
+            FROM {$at} WHERE pokemon_id = %d
+            ",
+            $new_id,
+            $source_id
+        ));
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    // Biomes (biome_id, pokemon_id, id auto)
+    $bio = pokehub_get_table('pokemon_biome_pokemon_links');
+    if ($bio) {
+        $wpdb->query($wpdb->prepare(
+            "
+            INSERT INTO {$bio} (biome_id, pokemon_id)
+            SELECT biome_id, %d FROM {$bio} WHERE pokemon_id = %d
+            ",
+            $new_id,
+            $source_id
+        ));
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    // Évolutions dont ce Pokémon était la BASE (même familles vers les mêmes cibles ; à ajuster en admin si besoin)
+    $evo = pokehub_get_table('pokemon_evolutions');
+    if ($evo) {
+        $wpdb->query(
+            "
+            INSERT INTO `{$evo}` (
+                base_pokemon_id, target_pokemon_id,
+                base_form_variant_id, target_form_variant_id,
+                candy_cost, candy_cost_purified,
+                is_trade_evolution, no_candy_cost_via_trade, is_random_evolution,
+                method, item_requirement_slug, item_requirement_cost, item_id,
+                lure_item_slug, lure_item_id,
+                weather_requirement_slug, gender_requirement, time_of_day,
+                priority, quest_template_id, extra
+            )
+            SELECT
+                {$new_id}, target_pokemon_id,
+                base_form_variant_id, target_form_variant_id,
+                candy_cost, candy_cost_purified,
+                is_trade_evolution, no_candy_cost_via_trade, is_random_evolution,
+                method, item_requirement_slug, item_requirement_cost, item_id,
+                lure_item_slug, lure_item_id,
+                weather_requirement_slug, gender_requirement, time_of_day,
+                priority, quest_template_id, extra
+            FROM `{$evo}`
+            WHERE base_pokemon_id = {$source_id}
+            "
+        );
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    // Liens événements (costume etc.)
+    $ppe = pokehub_get_table('pokemon_pokemon_events');
+    if ($ppe) {
+        $wpdb->query($wpdb->prepare(
+            "
+            INSERT INTO {$ppe} (pokemon_id, event_type, event_id)
+            SELECT %d, event_type, event_id FROM {$ppe} WHERE pokemon_id = %d
+            ",
+            $new_id,
+            $source_id
+        ));
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    // Backgrounds assortis au Pokémon
+    $bgl = pokehub_get_table('pokemon_background_pokemon_links');
+    if ($bgl) {
+        $wpdb->query($wpdb->prepare(
+            "
+            INSERT INTO {$bgl} (background_id, pokemon_id, is_shiny_locked, link_kind)
+            SELECT background_id, %d, is_shiny_locked, link_kind
+            FROM {$bgl}
+            WHERE pokemon_id = %d
+            ",
+            $new_id,
+            $source_id
+        ));
+        if ($wpdb->last_error) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Duplique un Pokémon (nouveau slug / is_default = 0).
+ *
+ * @return int|false ID créé ou false en erreur partielle après nettoyage.
+ */
+function poke_hub_pokemon_duplicate_pokemon(int $source_id) {
+    global $wpdb;
+
+    if (!function_exists('pokehub_get_table')) {
+        return false;
+    }
+
+    $table = pokehub_get_table('pokemon');
+    if (!$table || $source_id <= 0) {
+        return false;
+    }
+
+    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $source_id));
+    if (!$row || empty($row->id)) {
+        return false;
+    }
+
+    $name_suffix = __(' (copy)', 'poke-hub');
+    $new_slug    = poke_hub_pokemon_unique_clone_slug((string) ($row->slug ?? ''));
+
+    $name_fr = poke_hub_pokemon_clone_truncate_name_field(
+        ((string) ($row->name_fr ?? '')) !== '' ? ($row->name_fr . $name_suffix) : ''
+    );
+    $name_en = poke_hub_pokemon_clone_truncate_name_field(
+        ((string) ($row->name_en ?? '')) !== '' ? ($row->name_en . $name_suffix) : ''
+    );
+
+    $extra_adj = poke_hub_pokemon_clone_adjust_extra_after_copy((string) ($row->extra ?? ''), $name_suffix);
+
+    $cols = [
+        'dex_number'                     => isset($row->dex_number) ? (int) $row->dex_number : 0,
+        'name_en'                        => $name_en,
+        'name_fr'                        => $name_fr,
+        'slug'                           => $new_slug,
+        'form_variant_id'                => isset($row->form_variant_id) ? (int) $row->form_variant_id : 0,
+        'is_default'                     => 0,
+        'generation_id'                  => isset($row->generation_id) ? (int) $row->generation_id : 0,
+        'base_atk'                       => isset($row->base_atk) ? (int) $row->base_atk : 0,
+        'base_def'                       => isset($row->base_def) ? (int) $row->base_def : 0,
+        'base_sta'                       => isset($row->base_sta) ? (int) $row->base_sta : 0,
+        'is_tradable'                    => !empty($row->is_tradable) ? 1 : 0,
+        'is_transferable'                => !empty($row->is_transferable) ? 1 : 0,
+        'has_shadow'                     => !empty($row->has_shadow) ? 1 : 0,
+        'has_purified'                   => !empty($row->has_purified) ? 1 : 0,
+        'shadow_purification_stardust'   => isset($row->shadow_purification_stardust) ? (int) $row->shadow_purification_stardust : 0,
+        'shadow_purification_candy'      => isset($row->shadow_purification_candy) ? (int) $row->shadow_purification_candy : 0,
+        'buddy_walked_mega_energy_award'  => isset($row->buddy_walked_mega_energy_award) ? (int) $row->buddy_walked_mega_energy_award : 0,
+        'dodge_probability'              => isset($row->dodge_probability) ? (float) $row->dodge_probability : 0.0,
+        'attack_probability'             => isset($row->attack_probability) ? (float) $row->attack_probability : 0.0,
+        'extra'                          => $extra_adj,
+    ];
+
+    $formats = [];
+    if (function_exists('poke_hub_pokemon_gm_wpdb_format_for_pokemon_row')) {
+        $formats = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row($cols);
+    }
+
+    $ok = $wpdb->insert($table, $cols, $formats ?: null);
+    if (!$ok || (int) $wpdb->insert_id <= 0) {
+        return false;
+    }
+
+    $new_id = (int) $wpdb->insert_id;
+
+    $links_ok = poke_hub_pokemon_clone_link_rows($source_id, $new_id);
+    if (!$links_ok) {
+        poke_hub_pokemon_delete_linked_rows_for_pokemon_ids([$new_id]);
+        $wpdb->delete($table, ['id' => $new_id], ['%d']);
+
+        return false;
+    }
+
+    return $new_id;
+}
+
+/**
+ * Action admin : duplication d’un Pokémon → ouverture de la copie pour édition.
+ */
+function poke_hub_pokemon_handle_pokemon_clone(): void {
+    if (!is_admin()) {
+        return;
+    }
+
+    if (empty($_GET['page']) || $_GET['page'] !== 'poke-hub-pokemon') {
+        return;
+    }
+
+    if (empty($_GET['ph_section']) || $_GET['ph_section'] !== 'pokemon') {
+        return;
+    }
+
+    if (empty($_GET['action']) || $_GET['action'] !== 'clone') {
+        return;
+    }
+
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    $source_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+    if ($source_id <= 0) {
+        return;
+    }
+
+    check_admin_referer('poke_hub_clone_pokemon_' . $source_id);
+
+    $new_id = poke_hub_pokemon_duplicate_pokemon($source_id);
+
+    if ($new_id === false) {
+        wp_safe_redirect(add_query_arg(
+            [
+                'page'       => 'poke-hub-pokemon',
+                'ph_section' => 'pokemon',
+                'ph_msg'     => 'clone_failed',
+            ],
+            admin_url('admin.php')
+        ));
+        exit;
+    }
+
+    wp_safe_redirect(add_query_arg(
+        [
+            'page'       => 'poke-hub-pokemon',
+            'ph_section' => 'pokemon',
+            'action'     => 'edit',
+            'id'         => $new_id,
+            'ph_msg'     => 'cloned',
+        ],
+        admin_url('admin.php')
+    ));
+    exit;
+}
+add_action('admin_init', 'poke_hub_pokemon_handle_pokemon_clone');
 
 /**
  * Prépare les évolutions envoyées par le formulaire (POST) pour un Pokémon.
@@ -1160,6 +1583,7 @@ function poke_hub_pokemon_prepare_evolutions_from_request(array $raw): array {
  *                                   Si absent, on tentera pokehub_get_table().
  *     @type callable|null $resolver Requis en mode 'import' :
  *                                   function(string $target_id_proto, string $target_form_proto): array{int,int}
+ *     @type string        $base_id_proto Proto Game Master du parent (ex. BASE forme utilisée lors du sync PASS 3).
  * }
  */
 function poke_hub_pokemon_sync_pokemon_evolutions(
@@ -1354,11 +1778,24 @@ function poke_hub_pokemon_sync_pokemon_evolutions(
                 $lure_item_slug = sanitize_title(strtolower($lure_requirement_proto));
             }
 
-            // --- Extra JSON ---
-            $extra = $row['extra'] ?? null;
-            if (is_array($extra) && !empty($extra)) {
-                $extra_json = wp_json_encode($extra);
+            // --- Extra JSON : données GM pour valider les arêtes (cible vs lignée réelle) ---
+            $extra = [];
+            if (isset($row['extra']) && is_array($row['extra'])) {
+                $extra = $row['extra'];
             }
+            $base_id_proto_opt = (string) ($options['base_id_proto'] ?? '');
+            if ($base_id_proto_opt !== '') {
+                $extra['base_id_proto'] = strtoupper($base_id_proto_opt);
+            }
+            if ($target_id_proto !== '') {
+                $extra['target_id_proto'] = strtoupper($target_id_proto);
+            }
+            if ($target_form_proto !== '') {
+                $extra['target_form_proto'] = (string) $target_form_proto;
+            }
+            $extra['evolution_source'] = 'game_master';
+
+            $extra_json = wp_json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } else {
             // Mode form : on ne gère PAS la création d'items
             $item_slug      = (string) ($row['item_requirement_slug'] ?? '');
@@ -2169,6 +2606,10 @@ function poke_hub_pokemon_admin_pokemon_screen() {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon saved.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'deleted') {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon deleted.', 'poke-hub') . '</p></div>';
+        } elseif ($msg === 'cloned') {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon cloned. Adjust the slug and name, then save.', 'poke-hub') . '</p></div>';
+        } elseif ($msg === 'clone_failed') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Unable to duplicate this Pokémon.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_id') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Invalid Pokémon ID.', 'poke-hub') . '</p></div>';
         }

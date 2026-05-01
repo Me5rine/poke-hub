@@ -42,13 +42,16 @@ $auto_detect = $attributes['autoDetect'] ?? true;
 $pokemon_ids = $attributes['pokemonIds'] ?? [];
 
 $meta_pokemon_genders = [];
+// Comme « Pokémon sauvages » : si la metabox est vide, ignorer pokemonIds périmés du bloc HTML.
 if ($auto_detect && function_exists('pokehub_content_get_new_pokemon')) {
     $data = pokehub_content_get_new_pokemon('post', (int) $post_id);
     if (!empty($data['ids'])) {
-        $pokemon_ids = array_map('intval', $data['ids']);
-    }
-    if (!empty($data['genders']) && is_array($data['genders'])) {
-        $meta_pokemon_genders = $data['genders'];
+        $pokemon_ids = array_map('intval', (array) $data['ids']);
+        if (!empty($data['genders']) && is_array($data['genders'])) {
+            $meta_pokemon_genders = $data['genders'];
+        }
+    } else {
+        $pokemon_ids = [];
     }
 }
 
@@ -98,6 +101,125 @@ if ($use_remote_pokemon) {
 
 if (!$pokemon_table || !$evolutions_table) {
     return '';
+}
+
+if (!function_exists('pokehub_np_evo_normalize_proto')) {
+    /**
+     * Normalise une clé pokemonId Game Master pour comparaisons.
+     */
+    function pokehub_np_evo_normalize_proto(string $proto): string {
+        return strtoupper(trim($proto));
+    }
+}
+
+if (!function_exists('pokehub_np_evo_cached_pokemon_id_proto')) {
+    /**
+     * pokemon_id_proto (champ dans extra de la fiche pokemon), avec cache requête.
+     */
+    function pokehub_np_evo_cached_pokemon_id_proto(int $pid): string {
+        static $cache = [];
+
+        $pid = (int) $pid;
+        if ($pid <= 0) {
+            return '';
+        }
+        if (array_key_exists($pid, $cache)) {
+            return $cache[$pid];
+        }
+
+        if (!function_exists('pokehub_get_table') || !function_exists('pokehub_pokemon_uses_remote_dataset')) {
+            $cache[$pid] = '';
+
+            return '';
+        }
+
+        global $wpdb;
+        if (!isset($wpdb) || !is_object($wpdb)) {
+            $cache[$pid] = '';
+
+            return '';
+        }
+
+        $pokemon_table = pokehub_get_table(
+            pokehub_pokemon_uses_remote_dataset() ? 'remote_pokemon' : 'pokemon'
+        );
+        if ($pokemon_table === '' || $pokemon_table === null) {
+            $cache[$pid] = '';
+
+            return '';
+        }
+
+        $sql  = "SELECT extra FROM {$pokemon_table} WHERE id = %d LIMIT 1";
+        $raw  = $wpdb->get_var($wpdb->prepare($sql, $pid));
+        $raw  = $raw !== null ? (string) $raw : '';
+
+        $decode_ok = true;
+        if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+            $decoded = poke_hub_pokemon_decode_extra_json($raw, $decode_ok);
+        } else {
+            $tmp     = json_decode($raw, true);
+            $decoded = is_array($tmp) ? $tmp : [];
+        }
+
+        $proto = '';
+        if (is_array($decoded) && isset($decoded['pokemon_id_proto'])) {
+            $proto = pokehub_np_evo_normalize_proto((string) $decoded['pokemon_id_proto']);
+        }
+        $cache[$pid] = $proto;
+
+        return $proto;
+    }
+}
+
+if (!function_exists('pokehub_np_evo_game_master_row_keeps_relation')) {
+    /**
+     * Filtre les arêtes issues de l’import GM quand les IDs Pokémon ne correspondent plus aux protos enregistrés.
+     *
+     * @param array<string,mixed> $e Ligne d’évolution (champ extra + base/target ids).
+     */
+    function pokehub_np_evo_game_master_row_keeps_relation(array $e): bool {
+        $base_pid = (int) ($e['base_pokemon_id'] ?? 0);
+        $tgt_pid  = (int) ($e['target_pokemon_id'] ?? 0);
+        if ($base_pid <= 0 || $tgt_pid <= 0) {
+            return true;
+        }
+
+        $decode_ok = true;
+        $raw_extra = isset($e['extra']) ? (string) $e['extra'] : '';
+        $ex        = [];
+
+        if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+            $ex = poke_hub_pokemon_decode_extra_json($raw_extra, $decode_ok);
+            if (!$decode_ok) {
+                return true;
+            }
+        } else {
+            $tmp = json_decode($raw_extra, true);
+            $ex  = is_array($tmp) ? $tmp : [];
+        }
+
+        if (($ex['evolution_source'] ?? '') !== 'game_master') {
+            return true;
+        }
+
+        $row_base = pokehub_np_evo_normalize_proto((string) ($ex['base_id_proto'] ?? ''));
+        $row_tgt  = pokehub_np_evo_normalize_proto((string) ($ex['target_id_proto'] ?? ''));
+        if ($row_base === '' && $row_tgt === '') {
+            return true;
+        }
+
+        $db_base = pokehub_np_evo_cached_pokemon_id_proto($base_pid);
+        $db_tgt  = pokehub_np_evo_cached_pokemon_id_proto($tgt_pid);
+
+        if ($row_tgt !== '' && $db_tgt !== '' && $row_tgt !== $db_tgt) {
+            return false;
+        }
+        if ($row_base !== '' && $db_base !== '' && $row_base !== $db_base) {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 /**
@@ -168,6 +290,7 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
              LEFT JOIN {$weathers_table} w ON w.slug = e.weather_requirement_slug
              WHERE e.base_pokemon_id = %d
                AND e.base_form_variant_id = %d
+               AND (t.id IS NULL OR " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('t.slug') . ")
              ORDER BY e.priority ASC, e.id ASC",
             (int) $pokemon_id,
             (int) $form_variant_id
@@ -199,6 +322,7 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
                  LEFT JOIN {$weathers_table} w ON w.slug = e.weather_requirement_slug
                  WHERE e.base_pokemon_id = %d
                    AND e.base_form_variant_id = 0
+                   AND (t.id IS NULL OR " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('t.slug') . ")
                  ORDER BY e.priority ASC, e.id ASC",
                 (int) $pokemon_id
             ),
@@ -230,6 +354,7 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
                  LEFT JOIN {$items_table} li ON li.id = e.lure_item_id
                  LEFT JOIN {$weathers_table} w ON w.slug = e.weather_requirement_slug
                  WHERE e.base_pokemon_id = %d
+                   AND (t.id IS NULL OR " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('t.slug') . ")
                  ORDER BY e.priority ASC, e.id ASC",
                 (int) $pokemon_id
             ),
@@ -237,14 +362,24 @@ function pokehub_get_pokemon_evolutions_out($pokemon_id, $form_variant_id = 0) {
         );
     }
 
-    return $evolutions ?: [];
+    $evolutions = is_array($evolutions) ? $evolutions : [];
+    if ($evolutions !== []
+        && apply_filters('pokehub_filter_evolutions_by_game_master_proto', true)
+        && function_exists('pokehub_np_evo_game_master_row_keeps_relation')) {
+        $evolutions = array_values(array_filter($evolutions, 'pokehub_np_evo_game_master_row_keeps_relation'));
+    }
+
+    return $evolutions;
 }
 }
 
 /**
- * Récupère toutes les évolutions précédentes d'un Pokémon (depuis les formes de base)
- * 
- * @param int $pokemon_id ID du Pokémon
+ * Récupère les pré-évolutions (autres lignes pokemon → cette ligne pokemon).
+ *
+ * Aligné sur l’admin : uniquement les arêtes dont target_form_variant_id correspond à la
+ * forme de la fiche cible (évite les liens parasites avec variant 0 ou autre incohérence).
+ *
+ * @param int $pokemon_id ID de la ligne pokemon cible de l’arête (comme pokehub/pokemon-form).
  * @return array Liste des Pokémon de base avec leurs conditions d'évolution
  */
 if (!function_exists('pokehub_get_pokemon_evolutions_in')) {
@@ -300,18 +435,29 @@ function pokehub_get_pokemon_evolutions_in($pokemon_id) {
                     w.name_en AS weather_name_en
              FROM {$evolutions_table} e
              INNER JOIN {$pokemon_table} b ON b.id = e.base_pokemon_id
+             INNER JOIN {$pokemon_table} tar ON tar.id = e.target_pokemon_id
+                AND COALESCE(tar.form_variant_id, 0) = COALESCE(e.target_form_variant_id, 0)
              LEFT JOIN {$form_variants_table} bv ON bv.id = e.base_form_variant_id
              LEFT JOIN {$items_table} i ON i.id = e.item_id
              LEFT JOIN {$items_table} li ON li.id = e.lure_item_id
              LEFT JOIN {$weathers_table} w ON w.slug = e.weather_requirement_slug
              WHERE e.target_pokemon_id = %d
+               AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('b.slug') . "
+               AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('tar.slug') . "
              ORDER BY e.priority ASC, e.id ASC",
             (int) $pokemon_id
         ),
         ARRAY_A
     );
     
-    return $evolutions ?: [];
+    $evolutions = is_array($evolutions) ? $evolutions : [];
+    if ($evolutions !== []
+        && apply_filters('pokehub_filter_evolutions_by_game_master_proto', true)
+        && function_exists('pokehub_np_evo_game_master_row_keeps_relation')) {
+        $evolutions = array_values(array_filter($evolutions, 'pokehub_np_evo_game_master_row_keeps_relation'));
+    }
+
+    return $evolutions;
 }
 }
 
@@ -578,6 +724,43 @@ function pokehub_build_evolution_line($pokemon_id) {
 }
 
 /**
+ * Restreint l’arbre d’évolution affiché à la lignée du Pokémon choisi dans la metabox.
+ * À partir de la racine résolvie, conserve uniquement le chemin jusqu’à $selected_id
+ * puis tout le sous-arbre en aval (pour les embranchements légitimes, ex. évolutions d’Évoli).
+ * Supprime les branches « cousines » (autres lignées depuis la même racine).
+ *
+ * @param array|null $node         Nœud retourné par pokehub_build_evolution_line()
+ * @param int        $selected_id  ID ligne pokemon du Pokémon sélectionné
+ * @return array|null
+ */
+if (!function_exists('pokehub_trim_evolution_tree_to_selected')) {
+function pokehub_trim_evolution_tree_to_selected($node, $selected_id) {
+    $selected_id = (int) $selected_id;
+    if ($selected_id <= 0 || !$node || !isset($node['pokemon']) || !is_array($node['pokemon'])) {
+        return null;
+    }
+    if ((int) ($node['pokemon']['id'] ?? 0) === $selected_id) {
+        return $node;
+    }
+    $children = isset($node['evolutions']) && is_array($node['evolutions']) ? $node['evolutions'] : [];
+    foreach ($children as $child) {
+        if (!$child || !is_array($child)) {
+            continue;
+        }
+        $trimmed = pokehub_trim_evolution_tree_to_selected($child, $selected_id);
+        if ($trimmed !== null && is_array($trimmed)) {
+            $copy                = $node;
+            $copy['evolutions'] = [$trimmed];
+
+            return $copy;
+        }
+    }
+
+    return null;
+}
+}
+
+/**
  * Conditions d’évolution : pastille bonbon + texte (sans doubler le coût en bonbons si déjà affiché).
  */
 if (!function_exists('pokehub_render_evolution_conditions_block')) {
@@ -682,10 +865,21 @@ function pokehub_format_evolution_conditions($evolution, array $args = []) {
 }
 }
 
-// Traiter chaque Pokémon
+// Traiter chaque Pokémon (dédoublonner les IDs tout en gardant l’ordre)
+$pokemon_ids = array_values(array_unique(array_filter(array_map('intval', (array) $pokemon_ids), static function ($id) {
+    return $id > 0;
+})));
+
 $evolution_lines = [];
 foreach ($pokemon_ids as $pokemon_id) {
     $line = pokehub_build_evolution_line($pokemon_id);
+    if ($line && function_exists('pokehub_trim_evolution_tree_to_selected')) {
+        $line = pokehub_trim_evolution_tree_to_selected($line, (int) $pokemon_id);
+    }
+    if (!$line && function_exists('pokehub_build_evolution_tree')) {
+        $visited   = [];
+        $line      = pokehub_build_evolution_tree((int) $pokemon_id, 0, $visited);
+    }
     if ($line) {
         $evolution_lines[] = $line;
     }

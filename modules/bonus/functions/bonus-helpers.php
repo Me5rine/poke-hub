@@ -298,16 +298,13 @@ function pokehub_render_bonuses_visual($bonuses, $layout = 'cards') {
                             </div>
                         <?php endif; ?>
 
-                        <?php if ($bonus_title !== '') : ?>
-                            <div class="pokehub-bonus-name"><?php echo esc_html($bonus_title); ?></div>
+                        <?php if ($bonus_description !== '') : ?>
+                            <div class="pokehub-bonus-description pokehub-bonus-description--in-card">
+                                <?php echo wp_kses_post($bonus_description); ?>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>
-                <?php if ($bonus_description !== '') : ?>
-                    <div class="pokehub-bonus-description pokehub-bonus-description--below">
-                        <?php echo wp_kses_post($bonus_description); ?>
-                    </div>
-                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>

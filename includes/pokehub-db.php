@@ -1194,6 +1194,7 @@ class Pokehub_DB {
             'content_habitats', 'content_habitat_entries', 'content_special_research', 'content_special_research_steps',
             'content_collection_challenges', 'content_collection_challenge_items', 'content_bonus', 'content_bonus_entries',
             'content_wild_pokemon', 'content_wild_pokemon_entries', 'content_new_pokemon', 'content_new_pokemon_entries',
+            'content_community_day',
             'content_raids', 'content_raid_bosses', 'content_go_pass',
             'shop_avatar_categories', 'shop_avatar_items', 'shop_avatar_item_events',
             'content_shop_avatar', 'content_shop_avatar_entries',
@@ -1266,6 +1267,7 @@ class Pokehub_DB {
         $wild_entries_tbl  = pokehub_get_table('content_wild_pokemon_entries');
         $new_pokemon_tbl   = pokehub_get_table('content_new_pokemon');
         $new_pokemon_entries_tbl = pokehub_get_table('content_new_pokemon_entries');
+        $community_day_tbl = pokehub_get_table('content_community_day');
         $day_pokemon_hours_tbl = pokehub_get_table('content_day_pokemon_hours');
         $day_pokemon_hour_entries_tbl = pokehub_get_table('content_day_pokemon_hour_entries');
         $raids_tbl         = pokehub_get_table('content_raids');
@@ -1503,6 +1505,26 @@ class Pokehub_DB {
             KEY pokemon_id (pokemon_id)
         ) {$charset_collate};";
 
+        $sql_community_day = "CREATE TABLE {$community_day_tbl} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'post',
+            source_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            start_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            end_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            pokemon_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            special_attack_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            evolution_start VARCHAR(40) NOT NULL DEFAULT '',
+            evolution_end VARCHAR(40) NOT NULL DEFAULT '',
+            blocks_json LONGTEXT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY source (source_type, source_id),
+            KEY dates (start_ts, end_ts),
+            KEY pokemon_id (pokemon_id)
+        ) {$charset_collate};";
+
         $sql_day_pokemon_hours = "CREATE TABLE {$day_pokemon_hours_tbl} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             source_type VARCHAR(20) NOT NULL DEFAULT 'post',
@@ -1719,6 +1741,7 @@ class Pokehub_DB {
         dbDelta($sql_wild_entries);
         dbDelta($sql_new_pokemon);
         dbDelta($sql_new_pokemon_entries);
+        dbDelta($sql_community_day);
         dbDelta($sql_day_pokemon_hours);
         dbDelta($sql_day_pokemon_hour_entries);
 

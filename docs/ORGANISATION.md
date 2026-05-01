@@ -9,7 +9,7 @@ Ce guide explique comment organiser le code dans le plugin Poké HUB pour mainte
 ```
 poke-hub/
 ├── includes/              # Code partagé entre modules
-│   ├── admin-tools.php   # Page admin « Temporary tools » (Pokekalos, Game Master, Translation si module Pokémon ; onglets events/Fandom si actifs) — voir docs/ADMIN_TEMPORARY_TOOLS.md
+│   ├── admin-tools.php   # Page admin « Temporary tools » (Pokekalos, Game Master, Translation, Images sync si module Pokémon ; onglets events/Fandom si actifs) — voir docs/ADMIN_TEMPORARY_TOOLS.md
 │   ├── admin-ui.php      # UI admin partagée (ex. barre « retour à la liste », styles `pokehub-admin-back-bar`) — voir docs/ADMIN_FORM_UX.md
 │   ├── functions/        # Helpers globaux (toujours chargés avec le plugin, hors modules) : ex. pokehub-helpers.php (purge Nginx / cache page), pokehub-inline-svg.php, pokehub-pokemon-type-icon.php, pokemon-public-helpers.php — voir docs/INLINE_SVG.md, docs/CACHE_AND_NGINX_PURGE.md
 │   ├── settings/         # Gestion des paramètres (modules : source unique dans settings-modules.php)

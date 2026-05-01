@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "pokehub/community-day",
+	"title": "Community Day",
+	"category": "pokehub",
+	"icon": "star-filled",
+	"description": "Affiche automatiquement les infos Community Day: lignée shiny, attaque spéciale, méga boost et IV PvP.",
+	"keywords": ["pokemon", "community day", "shiny", "pvp", "mega"],
+	"textdomain": "poke-hub",
+	"supports": {
+		"html": false,
+		"align": false
+	},
+	"attributes": {
+		"entries": {
+			"type": "array",
+			"default": []
+		},
+		"pokemonId": {
+			"type": "number",
+			"default": 0
+		},
+		"specialAttackId": {
+			"type": "number",
+			"default": 0
+		},
+		"evolutionStart": {
+			"type": "string",
+			"default": ""
+		},
+		"evolutionEnd": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}

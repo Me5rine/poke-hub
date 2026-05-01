@@ -2,7 +2,7 @@
 
 Le module **pokemon** est le plus large : taxonomies (types, régions, générations, …), fiches espèces / formes, import **Game Master**, images, **biomes**, outils admin et helpers partagés par le reste du plugin.
 
-L’**import Game Master** et l’onglet **Translation** (données multilingues Pokémon) sont sous **Poké HUB → Temporary tools** — voir [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md).
+L’**import Game Master**, l’onglet **Translation** (données multilingues Pokémon) et **Images sync** (manifest CSV d’icônes, **sans** filtre sur les dates de sortie — voir lien § *Images sync*) sont sous **Poké HUB → Temporary tools** — [ADMIN_TEMPORARY_TOOLS.md](../ADMIN_TEMPORARY_TOOLS.md).
 
 Ce **README** regroupe les liens vers les guides déjà rédigés dans `docs/pokemon/`.
 
@@ -10,6 +10,7 @@ Ce **README** regroupe les liens vers les guides déjà rédigés dans `docs/pok
 
 | Document | Contenu principal |
 |----------|-------------------|
+| [GAME_MASTER_IMPORT.md](./GAME_MASTER_IMPORT.md) | Import GM : passes, slug / formes (`*-family`, normalisation), Gigamax, variants (mise à jour `category`), liens Collections |
 | [BIOMES.md](./BIOMES.md) | Biomes GO : tables, admin, fiche Pokémon, helpers |
 | [DATA_SAFETY.md](./DATA_SAFETY.md) | Import GM, non-écrasement des données, règles de fusion, heuristique **génération ↔ dex** (ex. G9 : 906–1026) |
 | [README-REGIONAL-AUTO-CONFIG.md](./README-REGIONAL-AUTO-CONFIG.md) | Configuration auto des Pokémon régionaux |

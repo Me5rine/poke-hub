@@ -61,7 +61,7 @@ Toutes les classes listées ici commencent par ce préfixe pour limiter les conf
 
 ### Module Bonus
 
-Fichier CSS : `assets/css/poke-hub-bonus-front.css`.
+Fichier CSS référencé par le plugin : `assets/css/poke-hub-bonus-front.css`. **Production Me5rine Lab :** équivalent **`css/poke-hub/parts/06-bonus-front.css`** (thème — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
 
 #### Variables (thème — pas d’option admin)
 
@@ -83,7 +83,7 @@ Les SVG **inline** sont teintés via `currentColor` sur les formes (`path`, `cir
 - `.pokehub-bonus-icon--svg` — Conteneur flex du SVG inline.
 - `.pokehub-bonus-image` — Balise `<img>` en repli raster.
 - `.pokehub-bonus-badge` — Badge ratio (ex. `1/2`) en bas à droite de l’icône.
-- `.pokehub-bonus-description` — Texte sous l’icône (cartes).
+- `.pokehub-bonus-description` — Conteneur de la description sous l’icône (suffixes : **`pokehub-bonus-description--in-card`** sous la vignette dans le bloc cartes ; **`pokehub-bonus-description--below`** conservé pour rétrocompat / HTML ancien).
 
 #### Shortcode `[pokehub-bonus]`
 - `.pokehub-bonuses-shortcode` — Colonne d’articles.
@@ -175,16 +175,22 @@ Fichier principal des styles : `assets/css/poke-hub-blocks-front.css`.
 
 ### Shop highlights (avatar + stickers en jeu)
 
-Fichier : `assets/css/poke-hub-blocks-front.css`.
+Fichier **plugin historique :** `assets/css/poke-hub-blocks-front.css`. **Me5rine Lab (référence visuelle)** : **`css/poke-hub/parts/04-blocks-front.css`**.
 
-- `.pokehub-shop-highlights` — modificateur sur le wrapper du bloc (`pokehub-shop-avatar-highlights-block` ou `pokehub-shop-sticker-highlights-block`).
-- `.pokehub-shop-highlights-panel` — carte (fond, bordure, ombre) englobant l’accroche et les tuiles.
+**Wrappers bloc** (pour le cadre commun et le titre comme les autres blocs — chaîne **`block-wrapper`**) :
+
+- **`pokehub-shop-avatar-highlights-block-wrapper`** + **`pokehub-shop-highlights`** + **`pokehub-shop-avatar-highlights-block`**
+- **`pokehub-shop-sticker-highlights-block-wrapper`** + **`pokehub-shop-highlights`** + **`pokehub-shop-sticker-highlights-block`**
+
+- `.pokehub-shop-highlights-panel` — carte (fond, bordure, ombre) englobant l’accroche et les tuiles (sous le `h2` du bloc).
 - `.pokehub-shop-highlights-lead` — ligne du haut (flex) : image + paragraphe.
 - `.pokehub-shop-highlights-lead__figure` — zone image (contain, largeur max).
-- `.pokehub-shop-highlights-lead__text` — paragraphe d’accroche.
+- `.pokehub-shop-highlights-lead__text` — paragraphe d’accroche ; combiné avec **`pokehub-block-subtitle`** pour la couleur / hiérarchie typographique.
 - `.pokehub-shop-highlights-panel__tiles` — zone liste sous le séparateur.
-- `.pokehub-shop-highlights-panel__tiles-title` — sous-titre au-dessus de la grille.
-- `.pokehub-shop-highlights-items` — modificateur sur `.pokehub-wild-pokemon-grid` (tuiles carrées héritées des classes Wild Pokémon).
+- `.pokehub-shop-highlights-panel__tiles-title` — titre au-dessus de la grille (`h3`), combiné avec **`pokehub-block-subtitle`**.
+- `.pokehub-block-subtitle` — classe transversale de sous-titre (intro + titre de grille) pour ces deux blocs.
+- `.pokehub-shop-highlights-items` — modificateur sur `.pokehub-wild-pokemon-grid`.
+- **`pokehub-shop-avatar-item-card`** / **`pokehub-shop-sticker-item-card`** — variantes de `.pokehub-wild-pokemon-card` : grille liste **sans** carré forcé (`aspect-ratio: auto`), inner en **overflow visible** pour noms **longs sur plusieurs lignes** (voir `parts/04-blocks-front.css`).
 
 ## Variables CSS
 
@@ -403,7 +409,7 @@ Pour garder une cohérence visuelle, utiliser **toujours** les classes `me5rine-
 - `.pokehub-collections-card-link`, `.pokehub-collections-card-bg` — lien et fond (pas d’équivalent thème) ; `.pokehub-collections-card-btn`, `.pokehub-collections-card-btn-settings`, `.pokehub-collections-card-btn-delete` (boutons icône + JS)
 - `.pokehub-collection-view-wrap` (+ `me5rine-lab-dashboard`), `.pokehub-collection-tiles`, `.pokehub-collection-tile`, `.pokehub-collection-tile-status`, `.pokehub-status-{owned|missing|for_trade}`
 - `.pokehub-collection-legend`, `.pokehub-collection-legend-item`, `.pokehub-collection-legend-dot`, `.pokehub-legend-owned`, `.pokehub-legend-for-trade`, `.pokehub-legend-missing` — légende : **possédé** = vert (contour + bulle = `--admin-lab-color-var-green`, fond = notice success), **à l'échange** = orange (notice warning), **manquant** = gris. Variables : `--admin-lab-color-notice-sucess-*`, `--admin-lab-color-var-green`, `--admin-lab-color-notice-warning`, `--me5rine-lab-border` (global-colors en dépendance)
-- `.pokehub-collection-status-filters`, `.pokehub-collection-status-filters-inner`, `.pokehub-collection-status-filters-heading`, `.pokehub-collection-status-filters-checkboxes`, `.pokehub-collection-status-filter-label`, `.pokehub-collection-filter-status`, `.pokehub-collection-filter-empty-hint` — filtre **Afficher dans la grille** : affichage par statut (`owned` / `for_trade` / `missing` sur `data-status` et `data-filter-status`)
+- `.pokehub-collection-status-filters`, `.pokehub-collection-status-filters-inner`, `.pokehub-collection-status-filters-heading`, `.pokehub-collection-status-filters-checkboxes`, `.pokehub-collection-status-filter-label`, `.pokehub-collection-filter-status`, `.pokehub-collection-status-filters-note`, `.pokehub-collection-filter-empty-hint`, `.pokehub-collection-compact-nav`, `.pokehub-collection-generation-jump`, `[data-compact-section]` — filtre **Include in grid** (traduction métier selon vos fichiers de langues) ; affichage par statut (`owned` / `for_trade` / `missing` sur `data-status` et `data-filter-status`) ; **mode compact** sur `.pokehub-collection-view-wrap.pokehub-collection--compact` (voir **docs/COLLECTIONS_MODULE.md**)
 - `.pokehub-collection-pogo-search`, `.pokehub-collection-pogo-search-summary`, `.pokehub-collection-pogo-search-body`, `.pokehub-collection-pogo-search-toolbar`, `.pokehub-collection-pogo-search-toolbar-field`, `.pokehub-collection-pogo-search-toolbar-field--status`, `.pokehub-collection-pogo-search-toolbar-field--token`, `.pokehub-collection-pogo-search-hint-refresh`, `.pokehub-pogo-search-status`, `.pokehub-pogo-search-token-mode`, `.pokehub-pogo-search-groups`, `.pokehub-pogo-search-group`, `.pokehub-pogo-search-group-title`, `.pokehub-pogo-search-lines`, `.pokehub-pogo-search-line`, `.pokehub-pogo-search-input`, `.pokehub-pogo-search-copy` — bloc **phrases de recherche GO** (génération JS, `collections-front.js`). **CSS** : thème `css/poke-hub/parts/13-collections-front.css` (pas le filet plugin `poke-hub-collections-cascade-late.css` pour ce bloc).
 - `.pokehub-collections-options-additive`, `.pokehub-collections-options-specific-hint` — bloc options « en plus » vs message pour catégories spécifiques (masquage avec `.is-hidden`)
 - Attribut **`data-collections-control`** sur les `<label>` du filtre de contenu (création) et sur certaines `<option>` du select « Inclure seulement » : le JS ajoute **`.is-hidden`** sur le label ou **`hidden`** sur l’option selon la catégorie ; le thème masque ces lignes (voir **COLLECTIONS_MODULE.md**, *Options masquées par catégorie* ; CSS `13-collections-front.css`)

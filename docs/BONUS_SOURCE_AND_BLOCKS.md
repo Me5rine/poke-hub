@@ -58,11 +58,19 @@ Sur un **site distant**, le menu Bonus et l’édition du catalogue sont masqué
 
 Les champs retournés par `pokehub_get_bonus_data()` incluent notamment `title` (libellé d’affichage : français si renseigné, sinon anglais), `title_en`, `title_fr`, `slug`, `image_html`, `image_url` (URL `.svg` préférée si configurée, sinon première URL raster).
 
+## Rendu du bloc (`pokehub_render_bonuses_visual`, layout `cards`)
+
+- Chaque carte affiche **l’icône** du type de bonus (`poke_hub_render_bonus_asset_markup()`, badge ratio optionnel détecté dans le titre/description), puis **directement la description visible** sous l’icône : priorité **`event_description`** (texte au niveau du post dans `content_bonus`), puis description **catalogue** (`bonus_types.description`), via `wp_kses_post`.
+- Le **nom** du type (FR/EN) **n’est plus affiché comme libellé** sous la vignette dans ce layout (pour éviter le doublon avec la description ; le titre reste utilisable comme `alt` sur les images lorsque pertinent).
+- **CSS** du layout cartes : sur Me5rine Lab, les cartes utilisent **`css/poke-hub/parts/06-bonus-front.css`** dans le dépôt thème (référence : [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md) ; ancien fichier plugin `poke-hub-bonus-front.css`). Tuile **sans** `aspect-ratio` carré forcé lorsque plusieurs lignes de texte : même base que après refonte grille bonus.
+
+Voir aussi les classes `.pokehub-bonus-description--in-card` / `.pokehub-bonus-description--below` dans [POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md).
+
 ## Thème / CSS — vignettes et couleur des SVG (sans réglage admin)
 
 Comme pour les **icônes de types Pokémon**, la couleur des bonus n’est **pas** configurable dans l’admin : tout se fait par **CSS du thème** (ou surcharges).
 
-- Fichier plugin : `assets/css/poke-hub-bonus-front.css`.
+- Fichier **historique plugin** : `assets/css/poke-hub-bonus-front.css` ; en production avec le thème Me5rine Lab, l’équivalent est **`css/poke-hub/parts/06-bonus-front.css`** (thème enfant — voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)).
 - **Variables** (définies sur `:root` dans ce fichier, à surcharger dans le thème) :
   - `--pokehub-bonus-icon-color` — couleur principale des icônes (défaut : variables Admin Lab / texte accent).
   - `--pokehub-bonus-icon-bg` — fond discret derrière l’icône (`color-mix` à partir de la couleur ci-dessus).

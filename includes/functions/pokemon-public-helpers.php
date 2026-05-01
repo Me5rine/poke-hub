@@ -292,6 +292,32 @@ function poke_hub_pokemon_get_scatterbug_patterns(): array {
  */
 
 /**
+ * Placeholder métier créé à l’import Game Master (slug se terminant par `-family`).
+ * Hors module collections / inventaire, ces lignes ne doivent pas être traitées comme des Pokémon jouables (sélecteurs, lignées, blocages doublons).
+ */
+function pokehub_pokemon_slug_is_family_placeholder(?string $slug): bool {
+    $s = strtolower(trim((string) $slug));
+
+    return $s !== '' && substr($s, -7) === '-family';
+}
+
+/**
+ * Fragment SQL pour exclure les lignes *-family* (voir {@see pokehub_pokemon_slug_is_family_placeholder}).
+ * Équivalent au filtre collections sur le suffixe de slug `-family`.
+ *
+ * @param string $slug_column Expression SQL vers la colonne slug (ex. `p.slug`, `slug`, `tar.slug`).
+ */
+function pokehub_pokemon_sql_exclude_family_placeholder_slug_expr(string $slug_column): string {
+    $expr = 'p.slug';
+    if ($slug_column === 'slug' || preg_match('/^[a-z][a-z0-9_]{0,31}\.slug$/i', $slug_column)) {
+        $expr = $slug_column;
+    }
+
+    // Pas de `%` dans l’expression : compatible avec `$wpdb->prepare()` (sinon LIKE `%-family` casse les placeholders).
+    return "( LENGTH(TRIM(COALESCE({$expr}, ''))) < 7 OR RIGHT(LOWER(TRIM(COALESCE({$expr}, ''))), 7) <> '-family' )";
+}
+
+/**
  * Récupère les données d'un Pokémon par son ID (avec gestion des préfixes distants)
  * 
  * @param int $pokemon_id ID du Pokémon
@@ -1511,6 +1537,33 @@ function pokehub_pokemon_is_dimorphic_for_select(int $pokemon_id): bool {
     return $is_dimorphic;
 }
 
+/**
+ * Le dimorphisme visuel ne s'applique pas aux formes Mega / Gigamax.
+ *
+ * @param array<string, mixed> $pokemon
+ */
+function pokehub_pokemon_form_disables_gender_dimorphism(array $pokemon): bool {
+    $category = strtolower(trim((string) ($pokemon['form_category'] ?? '')));
+    if (in_array($category, ['mega', 'gigantamax'], true)) {
+        return true;
+    }
+
+    if (!empty($pokemon['synthetic_gigantamax'])) {
+        return true;
+    }
+
+    $slug = strtolower(trim((string) ($pokemon['slug'] ?? '')));
+    if ($slug !== '' && (
+        strpos($slug, 'mega-') === 0
+        || strpos($slug, 'primal-') === 0
+        || strpos($slug, 'gigantamax-') === 0
+    )) {
+        return true;
+    }
+
+    return false;
+}
+
 // --- Gigamax « virtuel » (extra.release.gigantamax sur la fiche de base) : même IDs que le module collections ---
 
 /**
@@ -1664,6 +1717,7 @@ function poke_hub_pokemon_gigantamax_fetch_synthetic_base_candidate_rows(): arra
         WHERE p.extra IS NOT NULL AND p.extra != ''
         AND TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.gigantamax')), '')) != ''
         AND NOT ( COALESCE(fv.category, 'normal') = 'gigantamax' OR COALESCE(fv.form_slug, '') LIKE %s )
+        AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug') . "
         ";
     $like = '%gigantamax%';
     $sql  = $wpdb->prepare($sql, $like);
@@ -1768,7 +1822,8 @@ function poke_hub_pokemon_gigantamax_data_to_select_item(array $data): array {
         'name_fr'              => (string) $name_fr,
         'name_en'              => (string) $name_en,
         'dex_number'           => $dex,
-        'has_gender_dimorphism' => $base > 0 ? (pokehub_pokemon_is_dimorphic_for_select($base) ? 1 : 0) : 0,
+        // Les formes Gigamax ne doivent jamais exposer de duplication ♂/♀.
+        'has_gender_dimorphism' => 0,
         'synthetic_gigantamax'  => 1,
         'gigantamax_base_pokemon_id' => $base,
     ];
@@ -1903,13 +1958,16 @@ function pokehub_pokemon_for_select_table_row_to_item(array $pokemon): array {
         $text .= ' #' . str_pad((string) $dex_number, 3, '0', STR_PAD_LEFT);
     }
 
+    $is_dimorphic = !pokehub_pokemon_form_disables_gender_dimorphism($pokemon)
+        && pokehub_pokemon_is_dimorphic_for_select($base_gender);
+
     $row = [
         'id'                    => $pid,
         'text'                  => $text,
         'name_fr'               => $name_fr,
         'name_en'               => $name_en,
         'dex_number'            => $dex_number,
-        'has_gender_dimorphism' => pokehub_pokemon_is_dimorphic_for_select($base_gender) ? 1 : 0,
+        'has_gender_dimorphism' => $is_dimorphic ? 1 : 0,
     ];
     if (!empty($pokemon['synthetic_gigantamax'])) {
         $row['synthetic_gigantamax'] = 1;
@@ -1980,6 +2038,7 @@ function pokehub_get_pokemon_for_select(): array {
                 COALESCE(fv.category, 'normal') AS form_category
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+         WHERE " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug') . "
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC";
     $rows = $wpdb->get_results($sql, ARRAY_A);
 
@@ -2004,6 +2063,105 @@ function pokehub_get_pokemon_for_select(): array {
     }
 
     return $result;
+}
+
+if (!function_exists('pokehub_get_pokemon_evolution_family_ids')) {
+    /**
+     * IDs de toute la lignée d'évolution (ascendants + descendants inclus).
+     *
+     * @return int[]
+     */
+    function pokehub_get_pokemon_evolution_family_ids(int $pokemon_id): array {
+        global $wpdb;
+        $pokemon_id = (int) $pokemon_id;
+        if ($pokemon_id <= 0 || !function_exists('pokehub_get_table')) {
+            return [];
+        }
+        $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+        $pokemon_table = $use_remote ? pokehub_get_table('remote_pokemon') : pokehub_get_table('pokemon');
+        $evolutions_table = $use_remote ? pokehub_get_table('remote_pokemon_evolutions') : pokehub_get_table('pokemon_evolutions');
+        if (!$pokemon_table || !$evolutions_table) {
+            return [$pokemon_id];
+        }
+
+        $queue = [$pokemon_id];
+        $seen = [];
+        while (!empty($queue)) {
+            $current = (int) array_shift($queue);
+            if ($current <= 0 || isset($seen[$current])) {
+                continue;
+            }
+            $seen[$current] = true;
+            $parents = $wpdb->get_col($wpdb->prepare("SELECT base_pokemon_id FROM {$evolutions_table} WHERE target_pokemon_id = %d", $current));
+            $children = $wpdb->get_col($wpdb->prepare("SELECT target_pokemon_id FROM {$evolutions_table} WHERE base_pokemon_id = %d", $current));
+            foreach (array_merge((array) $parents, (array) $children) as $id) {
+                $id = (int) $id;
+                if ($id > 0 && !isset($seen[$id])) {
+                    $queue[] = $id;
+                }
+            }
+        }
+        if (empty($seen)) {
+            return [$pokemon_id];
+        }
+        $ids = array_keys($seen);
+        $in = implode(',', array_map('intval', $ids));
+        $fam_sql = pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('slug');
+        $ordered = $wpdb->get_col("SELECT id FROM {$pokemon_table} WHERE id IN ({$in}) AND {$fam_sql} ORDER BY dex_number ASC, id ASC");
+        $ordered = array_values(array_filter(array_map('intval', (array) $ordered), static function ($id) {
+            return $id > 0;
+        }));
+        return $ordered ?: [$pokemon_id];
+    }
+}
+
+/**
+ * Attaques « spéciales » / événementielles pour un Pokémon (liste éditeur, REST…).
+ * Utilise les tables locales ou distantes comme {@see pokehub_get_pokemon_for_select()}
+ * (préfixe défini dans les réglages Poké HUB).
+ *
+ * @return array<int, array{id:int, name:string}>
+ */
+function pokehub_get_pokemon_special_attacks(int $pokemon_id, bool $include_family = false): array {
+    global $wpdb;
+
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0 || !function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    $use_remote = function_exists('pokehub_pokemon_uses_remote_dataset') && pokehub_pokemon_uses_remote_dataset();
+    $links_table   = $use_remote ? pokehub_get_table('remote_pokemon_attack_links') : pokehub_get_table('pokemon_attack_links');
+    $attacks_table = $use_remote ? pokehub_get_table('remote_attacks') : pokehub_get_table('attacks');
+    if (!$links_table || !$attacks_table) {
+        return [];
+    }
+
+    $target_ids = [$pokemon_id];
+    if ($include_family && function_exists('pokehub_get_pokemon_evolution_family_ids')) {
+        $target_ids = pokehub_get_pokemon_evolution_family_ids($pokemon_id);
+    }
+    $target_ids = array_values(array_filter(array_map('intval', (array) $target_ids), static function ($id) {
+        return $id > 0;
+    }));
+    if (empty($target_ids)) {
+        return [];
+    }
+    $in = implode(',', $target_ids);
+    $rows = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT DISTINCT a.id, COALESCE(NULLIF(a.name_fr, ''), a.name_en) AS name
+             FROM {$links_table} l
+             INNER JOIN {$attacks_table} a ON a.id = l.attack_id
+             WHERE l.pokemon_id IN ({$in})
+               AND (l.is_event = 1 OR l.role = %s)
+             ORDER BY name ASC",
+            'special'
+        ),
+        ARRAY_A
+    );
+
+    return $rows ?: [];
 }
 
 /**
@@ -2051,6 +2209,7 @@ function pokehub_get_pokemon_for_select_filtered(array $ids = [], string $search
             $where[] = '(p.name_fr LIKE %s OR p.name_en LIKE %s OR p.dex_number LIKE %s)';
             $prepare_args = array_merge($prepare_args, [$term, $term, $term]);
         }
+        $where[] = pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug');
         $where_sql = implode(' AND ', $where);
         $sql       = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.form_variant_id,
             COALESCE(fv.label, fv.form_slug, '') AS form,
@@ -2263,6 +2422,7 @@ function pokehub_get_mega_pokemon_for_select(): array {
          FROM {$pokemon_table} p
          INNER JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
          WHERE fv.category IN ('mega', 'primal')
+           AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug') . "
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );
@@ -2354,6 +2514,7 @@ function pokehub_get_base_pokemon_for_select(): array {
              FROM {$pokemon_table} p
              LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
              WHERE p.id NOT IN (SELECT DISTINCT target_pokemon_id FROM {$evolutions_table} WHERE target_pokemon_id > 0)
+               AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug') . "
              ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
             ARRAY_A
         );
@@ -2370,6 +2531,7 @@ function pokehub_get_base_pokemon_for_select(): array {
              FROM {$pokemon_table} p
              LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
              WHERE p.is_default = 1
+               AND " . pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug') . "
              ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
             ARRAY_A
         );

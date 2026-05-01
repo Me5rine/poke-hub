@@ -58,6 +58,10 @@ function pokehub_get_all_pokemon_for_select(): array {
     $pokemon_table = pokehub_get_table('pokemon');
     $form_variants_table = pokehub_get_table('pokemon_form_variants');
 
+    $fam_sql = function_exists('pokehub_pokemon_sql_exclude_family_placeholder_slug_expr')
+        ? pokehub_pokemon_sql_exclude_family_placeholder_slug_expr('p.slug')
+        : "( LENGTH(TRIM(COALESCE(p.slug, ''))) < 7 OR RIGHT(LOWER(TRIM(COALESCE(p.slug, ''))), 7) <> '-family' )";
+
     // Récupérer le label de la forme depuis pokemon_form_variants si form_variant_id > 0
     $rows = $wpdb->get_results(
         "SELECT p.id, 
@@ -70,6 +74,7 @@ function pokehub_get_all_pokemon_for_select(): array {
                 COALESCE(fv.category, 'normal') AS form_category
          FROM {$pokemon_table} p
          LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+         WHERE {$fam_sql}
          ORDER BY p.dex_number ASC, p.name_fr ASC, p.name_en ASC",
         ARRAY_A
     );
@@ -109,42 +114,6 @@ function pokehub_get_all_pokemon_for_select(): array {
         }
     }
     unset($row);
-
-    return $rows ?: [];
-}
-
-/**
- * Attaques spéciales pour un Pokémon donné (événementiel).
- * On s'appuie sur pokemon_attack_links avec is_event=1 ou role='special'.
- */
-function pokehub_get_pokemon_special_attacks(int $pokemon_id): array {
-    global $wpdb;
-
-    $pokemon_id = (int) $pokemon_id;
-    if ($pokemon_id <= 0) {
-        return [];
-    }
-
-    // ✅ Nouveau helper de table
-    $links_table   = pokehub_get_table('pokemon_attack_links');
-    $attacks_table = pokehub_get_table('attacks');
-
-    $rows = $wpdb->get_results(
-        $wpdb->prepare(
-            "
-            SELECT a.id, COALESCE(NULLIF(a.name_fr, ''), a.name_en) AS name
-            FROM {$links_table} l
-            INNER JOIN {$attacks_table} a
-                ON a.id = l.attack_id
-            WHERE l.pokemon_id = %d
-              AND (l.is_event = 1 OR l.role = %s)
-            ORDER BY name ASC
-            ",
-            $pokemon_id,
-            'special'
-        ),
-        ARRAY_A
-    );
 
     return $rows ?: [];
 }

@@ -57,7 +57,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     $has_explicit_normal_family = ! empty( $species_with_explicit_normal_form[ (string) $pokemon_id_proto ] );
 
     // Dex & génération
-    $dex_number        = poke_hub_pokemon_gm_template_to_dex( $template_id );
+    $dex_number = poke_hub_pokemon_gm_template_to_dex( $template_id );
+    if ( ! empty( $settings['__forced_dex_number'] ) ) {
+        $dex_number = (int) $settings['__forced_dex_number'];
+    }
     $generation_number = poke_hub_pokemon_guess_generation_by_dex( $dex_number );
 
     // Forme brute Niantic
@@ -406,6 +409,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             $game_key => $game_go,
         ],
     ];
+    if ( ! empty( $settings['__poke_hub_gm_skeleton'] ) ) {
+        $extra['gm_skeleton'] = true;
+    }
 
     // === TEMP EVO START : on stocke aussi les tempEvoOverrides dans la forme de base ===
     if ( ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
@@ -519,6 +525,14 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     if ( $row && function_exists( 'poke_hub_pokemon_gm_deep_merge_extra' ) ) {
         $extra = poke_hub_pokemon_gm_deep_merge_extra( $gm_existing_extra, $extra );
+    }
+    // Import réel pokemonSettings : retirer le marqueur squelette (sinon il resterait après merge avec l’ancien extra).
+    if ( empty( $settings['__poke_hub_gm_skeleton'] ) ) {
+        unset( $extra['gm_skeleton'] );
+    }
+    // pokemonClass du GM → extra.species_special_group (légendaire / fabuleux / ultra-chimère).
+    if ( function_exists( 'poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra' ) ) {
+        poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra( $extra, $settings );
     }
     // Invariant métier: has_gmax_form uniquement sur la fiche par défaut.
     // On force après merge pour éviter toute conservation d'une ancienne valeur true.
@@ -738,8 +752,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             $pokemon_index[ $pokemon_id_proto ] = [];
         }
         $pokemon_index[ $pokemon_id_proto ][ $form_key ] = [
-            'pokemon_id'      => $pokemon_id,
-            'form_variant_id' => $variant_id,
+            'pokemon_id'              => $pokemon_id,
+            'form_variant_id'        => $variant_id,
+            'slug'                    => $slug,
+            'is_family_placeholder'  => $is_family_placeholder ? 1 : 0,
         ];
     }
 
@@ -1117,6 +1133,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
             if ( $mega_row && function_exists( 'poke_hub_pokemon_gm_deep_merge_extra' ) ) {
                 $mega_extra = poke_hub_pokemon_gm_deep_merge_extra( $mega_existing_decoded, $mega_extra );
             }
+            // Même règle que la forme de base : pokemonClass dans les settings racine du Pokémon.
+            if ( function_exists( 'poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra' ) ) {
+                poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra( $mega_extra, $settings );
+            }
 
             $mega_extra_json = null;
             if ( $mega_row && ! $mega_existing_extra_valid ) {
@@ -1201,8 +1221,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     $pokemon_index[ $pokemon_id_proto ] = [];
                 }
                 $pokemon_index[ $pokemon_id_proto ][ $temp_evo_id ] = [
-                    'pokemon_id'      => $mega_pokemon_id,
-                    'form_variant_id' => $mega_variant_id,
+                    'pokemon_id'              => $mega_pokemon_id,
+                    'form_variant_id'        => $mega_variant_id,
+                    'slug'                    => $mega_slug,
+                    'is_family_placeholder'  => 0,
                 ];
             }
 
@@ -1235,6 +1257,71 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     /**
     * === TEMP EVO END ===
     */
+
+    return $stats;
+}
+
+/**
+ * Crée une fiche « squelette » quand genderSettings type SPAWN_V… référence une espèce
+ * encore absente de pokemonSettings au moment de l’import.
+ *
+ * @param array<int, mixed>        $decoded
+ * @param array<string, mixed>     $tables
+ * @param array<string, mixed>     $gender_index Proto => ['male'=>%, 'female'=>%]
+ *
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_import_spawn_gender_skeleton_pokemon_pass(
+    array $decoded,
+    array $tables,
+    array $stats,
+    array &$seen_pokemon_slugs,
+    array &$pokemon_index,
+    array $gender_index,
+    array $species_with_explicit_normal_form,
+    array $form_costume_index,
+    array $gmax_species
+): array {
+    if ( empty( $tables['pokemon'] ) || ! function_exists( 'poke_hub_gm_collect_spawn_gender_dex_hints' ) ) {
+        return $stats;
+    }
+
+    foreach ( poke_hub_gm_collect_spawn_gender_dex_hints( $decoded ) as $proto_u => $dex_hint ) {
+        if ( $dex_hint <= 0 || $proto_u === '' ) {
+            continue;
+        }
+        if ( ! empty( $pokemon_index[ $proto_u ] ) ) {
+            continue;
+        }
+
+        $minimal = [
+            'pokemonId'              => $proto_u,
+            'form'                   => '',
+            '__forced_dex_number'    => $dex_hint,
+            'type'                   => 'POKEMON_TYPE_NORMAL',
+            'stats'                  => [
+                'baseStamina' => 1,
+                'baseAttack'  => 1,
+                'baseDefense' => 1,
+            ],
+            'quickMoves'             => [],
+            'cinematicMoves'         => [],
+            '__poke_hub_gm_skeleton' => true,
+        ];
+
+        $stats = poke_hub_pokemon_import_from_pokemon_settings(
+            'GM_SPAWN_SKELETON_' . strtolower( $proto_u ),
+            $minimal,
+            $tables,
+            $stats,
+            $seen_pokemon_slugs,
+            $gender_index,
+            $pokemon_index,
+            $gmax_species,
+            $species_with_explicit_normal_form,
+            $form_costume_index
+        );
+    }
 
     return $stats;
 }
@@ -2149,6 +2236,18 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         }
     }
 
+    $stats = poke_hub_pokemon_gm_import_spawn_gender_skeleton_pokemon_pass(
+        $decoded,
+        $tables,
+        $stats,
+        $seen_pokemon_slugs,
+        $pokemon_index,
+        $gender_index,
+        $species_with_explicit_normal_form,
+        $form_costume_index,
+        $gmax_species
+    );
+
     // PASS 2C : lier attaques GMAX aux Pokémon importés
     if ( ! empty( $gmax_move_mappings ) ) {
         foreach ( $gmax_move_mappings as $pokemon_id_proto => $moves_by_form ) {
@@ -2203,7 +2302,8 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
      * PASS 3 : Evolutions (pokemon_evolutions)
      *
      * On a maintenant :
-     * - $pokemon_index[pokemonId_proto][form_proto] => ['pokemon_id','form_variant_id']
+     * - $pokemon_index[pokemonId_proto][form_proto] =>
+     *       ['pokemon_id','form_variant_id','slug','is_family_placeholder']; PASS 3 n’utilise jamais *-family* comme base/cible d’arête.
      * - les helpers :
      *   * poke_hub_pokemon_normalize_evolution_branches()
      *   * poke_hub_pokemon_sync_pokemon_evolutions()
@@ -2239,12 +2339,21 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 continue;
             }
 
+            $base_bucket = $pokemon_index[ $base_proto ];
+
             // On essaie d'abord forme exacte, sinon forme par défaut
-            $base_info = $pokemon_index[ $base_proto ][ $base_form_key ] ?? null;
-            if ( ! $base_info && isset( $pokemon_index[ $base_proto ][''] ) ) {
-                $base_info = $pokemon_index[ $base_proto ][''];
+            $base_info = $base_bucket[ $base_form_key ] ?? null;
+            if ( ! $base_info && isset( $base_bucket[''] ) ) {
+                $base_info = $base_bucket[''];
             }
 
+            if ( ! $base_info ) {
+                continue;
+            }
+
+            $base_info = function_exists( 'poke_hub_pokemon_gm_resolve_index_row_for_evolution_links' )
+                ? poke_hub_pokemon_gm_resolve_index_row_for_evolution_links( $base_bucket, $base_info, $base_proto )
+                : $base_info;
             if ( ! $base_info ) {
                 continue;
             }
@@ -2261,7 +2370,7 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 continue;
             }
 
-            // Resolver proto → (pokemon_id, form_variant_id)
+            // Resolver proto → (pokemon_id, form_variant_id), sans placeholders *-family*
             $resolver = static function( string $target_id_proto, string $target_form_proto ) use ( $pokemon_index ): array {
                 if ( $target_id_proto === '' ) {
                     return [ 0, 0 ];
@@ -2270,11 +2379,20 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                     return [ 0, 0 ];
                 }
 
-                $form_key = $target_form_proto !== '' ? $target_form_proto : '';
+                $target_bucket = $pokemon_index[ $target_id_proto ];
+                $form_key      = $target_form_proto !== '' ? $target_form_proto : '';
 
-                $info = $pokemon_index[ $target_id_proto ][ $form_key ] ?? null;
-                if ( ! $info && isset( $pokemon_index[ $target_id_proto ][''] ) ) {
-                    $info = $pokemon_index[ $target_id_proto ][''];
+                $info = $target_bucket[ $form_key ] ?? null;
+                if ( ! $info && isset( $target_bucket[''] ) ) {
+                    $info = $target_bucket[''];
+                }
+
+                if ( ! $info ) {
+                    return [ 0, 0 ];
+                }
+
+                if ( function_exists( 'poke_hub_pokemon_gm_resolve_index_row_for_evolution_links' ) ) {
+                    $info = poke_hub_pokemon_gm_resolve_index_row_for_evolution_links( $target_bucket, $info, $target_id_proto );
                 }
 
                 if ( ! $info ) {
@@ -2292,9 +2410,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 $base_form_variant_id,
                 $branches,
                 [
-                    'mode'     => 'import',
-                    'tables'   => $tables,
-                    'resolver' => $resolver,
+                    'mode'          => 'import',
+                    'tables'        => $tables,
+                    'resolver'      => $resolver,
+                    'base_id_proto' => $base_proto,
                 ]
             );            
         }

@@ -413,6 +413,7 @@ function pokehub_get_table(string $key): string {
         'content_wild_pokemon_entries'   => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon_entries'],
         'content_new_pokemon'             => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon'],
         'content_new_pokemon_entries'     => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon_entries'],
+        'content_community_day'          => ['scope' => 'content_source', 'suffix' => 'content_community_day'],
         'content_raids'                   => ['scope' => 'content_source', 'suffix' => 'content_raids'],
         'content_raid_bosses'             => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
         'content_go_pass'                => ['scope' => 'content_source', 'suffix' => 'content_go_pass'],
@@ -454,6 +455,7 @@ function pokehub_get_table(string $key): string {
         'pokehub_content_wild_pokemon_entries' => ['scope' => 'content_source', 'suffix' => 'content_wild_pokemon_entries'],
         'pokehub_content_new_pokemon' => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon'],
         'pokehub_content_new_pokemon_entries' => ['scope' => 'content_source', 'suffix' => 'content_new_pokemon_entries'],
+        'pokehub_content_community_day' => ['scope' => 'content_source', 'suffix' => 'content_community_day'],
         'pokehub_content_raids' => ['scope' => 'content_source', 'suffix' => 'content_raids'],
         'pokehub_content_raid_bosses' => ['scope' => 'content_source', 'suffix' => 'content_raid_bosses'],
 

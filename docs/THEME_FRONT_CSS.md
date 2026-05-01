@@ -6,7 +6,7 @@ Ce document est la **référence** pour le chargement du CSS public Poké HUB : 
 
 | Où ? | Contenu | Quand c’est utilisé |
 |------|---------|----------------------|
-| **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules (collections, blocs, profils, friend codes, variables `me5rine-lab-*`, etc.) : `poke-hub-front.css` → `@import` des `parts/*.css`, puis `poke-hub-late-overrides.css` en **dernière** couche. | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
+| **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules : chaque fichier `parts/*.css` est enqueued **séparément** via `functions.php` (ordre `01-…` → `16-…`, version `filemtime` par fichier), puis `poke-hub-late-overrides.css` en **dernière** couche. Le fichier **`poke-hub-front.css`** garde les `@import` des `parts/` comme **index lisible / référence** et pour **`add_editor_style()`** ; en front navigateur ce fichier n’est **plus** enqueue (évite dépend cache des `@import`). | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
 | **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; **`poke-hub-type-icons.css`** (icônes types en SVG — voir tableau *Ce qui reste* ci‑dessous) ; parfois un **filet** optionnel `poke-hub-collections-cascade-late.css`. | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris), **sauf** les feuilles **admin** et l’enqueue **explicite** des icônes de types en admin (voir tableau). |
 
 **Filtre WordPress** : `poke_hub_load_default_plugin_front_css`
@@ -19,8 +19,9 @@ Ce document est la **référence** pour le chargement du CSS public Poké HUB : 
 ```mermaid
 flowchart LR
   subgraph theme["Thème me5rine-lab"]
-    A[css/poke-hub/poke-hub-front.css] --> B[parts/01-…, 13-collections, …]
-    C[poke-hub-late-overrides.css] --> D[dernières surcharges]
+    A[parts/*.css enqueue chaînés ver=filemtime]
+    A --> B[poke-hub-late-overrides.css]
+    C[poke-hub-front.css ref / éditeur]
   end
   subgraph plugin["Plugin poke-hub"]
     E[admin-unified, metaboxes, …]
@@ -63,8 +64,8 @@ Code : `includes/functions/pokehub-front-styles-bridge.php` (helpers, liste des 
 1. **Thème parent** (Hello Elementor) — handles tels que `hello-elementor`, `hello-elementor-theme-style`, etc.
 2. **Me5rine Lab** — handle `me5rine-child-style` (fichier servi via `style-handler.php` d’après `style.css` : intégrations, formulaires, tableaux, dashboard, profils, menu, **responsive** `css/responsive.css`, **um** `css/um-responsive.css`). **Aucun** import Poké HUB dans ce `style.css`.
 3. **Poké HUB** — enqueued **après** `me5rine-child-style` (priorité `100000` dans le `functions.php` du thème) :
-   - `me5rine-poke-hub-front` → `css/poke-hub/poke-hub-front.css` (consolide `parts/*.css` : `01-global-colors` reprend la logique partagée avec le plugin, modules, `13-collections-front`, `14-collections-theme`, etc.) ;
-   - `me5rine-poke-hub-late` → `css/poke-hub/poke-hub-late-overrides.css` (correctifs de cascade, ex. Collections vs `dashboard.css` / responsive).
+   - `me5rine-poke-hub-part-<nom>` → un handle par fichier dans `css/poke-hub/parts/*.css` (tri naturel `01-…` … `16-…`, dépendances en chaîne, `?ver=` = `filemtime` du fichier) ;
+   - `me5rine-poke-hub-late` → `css/poke-hub/poke-hub-late-overrides.css` dépend du **dernier** `part` (correctifs de cascade, ex. Collections vs `dashboard.css` / responsive).
 
 Commentaires détaillés : en-tête de `style.css` du thème enfant.
 
@@ -76,14 +77,14 @@ Commentaires détaillés : en-tête de `style.css` du thème enfant.
 
 ### Surcharges « collections thème »
 
-Dégradés / variables spécifiques : voir le part **`parts/14-collections-theme.css`**, importé par `poke-hub-front.css` (et non plus un fichier orphelin sous `assets/theme/` du plugin). **`parts/13-collections-front.css`** : masquage des lignes de filtre (`label[data-collections-control].is-hidden`, etc.) pour les options de collection **selon la catégorie** — détail **docs/COLLECTIONS_MODULE.md** (*Options masquées par catégorie*) ; **bloc phrases de recherche GO** (layout, grille de groupes, toolbar des selects) — détail **modules/collections/COLLECTIONS_THEME_CSS.md** (*Bloc phrases de recherche*). Référence classes : **docs/POKEHUB_CSS_CLASSES.md** ; options et comportement du pool : **docs/COLLECTIONS_MODULE.md**.
+Dégradés / variables spécifiques : voir **`parts/14-collections-theme.css`** (listé aussi dans `poke-hub-front.css` pour l’éditeur / lisibilité). **`parts/13-collections-front.css`** : masquage des lignes de filtre (`label[data-collections-control].is-hidden`, etc.) pour les options de collection **selon la catégorie** — détail **docs/COLLECTIONS_MODULE.md** (*Options masquées par catégorie*) ; **bloc phrases de recherche GO** (layout, grille de groupes, toolbar des selects) — détail **modules/collections/COLLECTIONS_THEME_CSS.md** (*Bloc phrases de recherche*). Référence classes : **docs/POKEHUB_CSS_CLASSES.md** ; options et comportement du pool : **docs/COLLECTIONS_MODULE.md**.
 
 ## Fichiers de référence (dépôt thème, hors plugin)
 
 - `me5rine-lab/style.css` — plan de l’enchaînement me5rine.
 - `me5rine-lab/functions.php` — variables dynamiques, enqueue `me5rine-child-style`, couche Poké HUB, filtre `poke_hub_load_default_plugin_front_css`, `add_editor_style`.
 - `me5rine-lab/css/poke-hub/README.md` — point d’entrée rapide du dossier.
-- `me5rine-lab/css/poke-hub/poke-hub-front.css` — imports des `parts/`.
+- `me5rine-lab/css/poke-hub/poke-hub-front.css` — liste `@import` des `parts/` (référence + éditeur) ; en front, chargement effectif = `parts/*.css` individuels (voir `functions.php`).
 
 ## Documentation liée
 
