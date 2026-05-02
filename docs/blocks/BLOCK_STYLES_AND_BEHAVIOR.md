@@ -75,6 +75,21 @@ Le rendu replié des quêtes Field Research suit des contraintes visuelles pour 
 - Rendu : `modules/blocks/blocks/new-pokemon-evolutions/render.php`
 - Styles : `assets/css/poke-hub-new-pokemon-evolutions-front.css` (lignées, cartes, **pastilles de types** interactives)
 
+### Sélection des lignes d’évolution (`in` / `out`)
+
+Les helpers **`pokehub_get_pokemon_evolutions_in`** et **`pokehub_get_pokemon_evolutions_out`** joignent la table **`pokemon`** sur la **cible** lorsque pertinent, avec **`target_form_variant_id`** aligné sur **`COALESCE(form_variant_id, 0)`** de la ligne cible, pour coller au comportement admin et éviter les arêtes où la variante de forme ne correspond pas à une fiche existante.
+
+Les lignes **`pokemon.slug`** se terminant par le suffixe réservé **`-family`** (placeholders métier créés à l’import GM pour certaines espèces) sont **exclues** au niveau des jointures : aucune évolution entrante ou sortante n’est affichée si la base ou la cible jointe est un tel placeholder — cela évite les doublons avec la « vraie » forme canonique dans la lignée (détail : [../pokemon/GAME_MASTER_IMPORT.md](../pokemon/GAME_MASTER_IMPORT.md), § **Hors import**).
+
+Si **`extra.evolution_source === 'game_master'`** et que le filtre **`pokehub_filter_evolutions_by_game_master_proto`** renvoie **`true`** (défaut), les évolutions ainsi marquées ne sont gardées que si **`pokehub_np_evo_game_master_row_keeps_relation()`** trouve encore une correspondance entre les protos **`base_id_proto`** et **`target_id_proto`** en **`pokemon_evolutions.extra`** et **`extra.pokemon_id_proto`** sur les fiches **`pokemon`** base et cible. Le champ **`target_form_proto`** est stocké lors du PASS 3 pour tracer la variante GM ; il n’est **pas** utilisé dans ce contrôle proto (la cohérence de forme repose sur la jointure SQL **`target_form_variant_id`** décrite ci-dessus).
+
+```php
+// Désactiver le filtrage proto (cas maintenance / jeu de données mixte uniquement).
+add_filter( 'pokehub_filter_evolutions_by_game_master_proto', '__return_false' );
+```
+
+Les **types** affichés par pastille viennent de **`pokehub_get_pokemon_types_for_display()`** (liaisons **`pokemon_type_links`** / taxonomie) : des liens périmés sur une ligne donnée se reflètent directement dans l’UI jusqu’à correction des données ou resync.
+
 ### Pastilles de types
 
 Les types sont affichés en pastilles rondes avec **icône SVG** (sources / types) ; au survol ou au focus clavier, la pastille s’étend vers la **droite** avec le libellé, sans déplacer l’icône (colonne icône = diamètre fixe).

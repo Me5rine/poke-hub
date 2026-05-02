@@ -762,6 +762,7 @@ function poke_hub_collections_get_card_background_image_url(array $collection): 
 /**
  * Filtre « sorti dans GO » pour le pool collections, basé sur la fiche courante.
  *
+ * Une date doit être lisible comme date (voir {@see poke_hub_normalize_release_date}) et avoir un jour ≤ aujourd’hui (fuseau du site).
  * Important : on lit uniquement `extra.release` de la ligne en cours (pas de propagation
  * via la chaîne d’évolution), afin de respecter les sorties échelonnées par événement.
  *
@@ -793,36 +794,47 @@ function poke_hub_collections_row_passes_pool_release_filter(array $row, string 
         return false;
     }
 
-    // gm_skeleton : même règle que les fiches complètes — visibles dans un pool shiny / dynamax /
-    // shadow / normal… uniquement si extra.release pose une date pour ce contexte (plus de passe-partout).
+    // gm_skeleton : même règle — visibles seulement si extra.release donne une date déjà arrivée ou aujourd’hui (fuseau du site).
 
     $release_map = isset($extra['release']) && is_array($extra['release']) ? $extra['release'] : [];
-    $has_release = static function (array $map, string $key): bool {
-        return trim((string) ($map[$key] ?? '')) !== '';
+    $release_is_live_go = static function (array $map, string $key): bool {
+        $raw = trim((string) ($map[$key] ?? ''));
+        if ($raw === '') {
+            return false;
+        }
+
+        return function_exists('poke_hub_release_date_is_past_or_today')
+            ? poke_hub_release_date_is_past_or_today($raw)
+            : false;
     };
 
     if ($release_context !== 'normal') {
-        return $has_release($release_map, $release_context);
+        return $release_is_live_go($release_map, $release_context);
     }
 
-    if ($has_release($release_map, 'normal')) {
+    if ($release_is_live_go($release_map, 'normal')) {
         return true;
     }
-    if (!empty($opts['include_mega']) && $has_release($release_map, 'mega')) {
+    if (!empty($opts['include_mega']) && $release_is_live_go($release_map, 'mega')) {
         return true;
     }
-    if (!empty($opts['include_dynamax']) && $has_release($release_map, 'dynamax')) {
+    if (!empty($opts['include_dynamax']) && $release_is_live_go($release_map, 'dynamax')) {
         return true;
     }
-    if (!empty($opts['include_gigantamax']) && $has_release($release_map, 'gigantamax')) {
+    if (!empty($opts['include_gigantamax']) && $release_is_live_go($release_map, 'gigantamax')) {
         return true;
     }
 
-    // Contexte catalogue « normal » : accepter toute release.* renseignée (shiny, etc.)
+    // Contexte catalogue « normal » : au moins une release.* avec date déjà effective (shiny, etc.)
     // ou passer la variante alors que rien ne matche (dates parfois ailleurs en admin / JSON partiel).
     if ($release_context === 'normal' && $is_forces_var) {
         foreach ($release_map as $rv) {
-            if (trim((string) $rv) !== '') {
+            $raw = trim((string) $rv);
+            if (
+                $raw !== ''
+                && function_exists('poke_hub_release_date_is_past_or_today')
+                && poke_hub_release_date_is_past_or_today($raw)
+            ) {
                 return true;
             }
         }
@@ -1821,7 +1833,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         return [];
     }
 
-    // Ne garder que les Pokémon ayant une sortie GO pour ce contexte,
+    // Ne garder que les Pokémon ayant une sortie GO déjà effective (jour <= aujourd’hui) pour ce contexte,
     // en se basant sur la date de la fiche courante (pas de propagation évolution).
     $filtered = [];
     foreach ($results as $row) {

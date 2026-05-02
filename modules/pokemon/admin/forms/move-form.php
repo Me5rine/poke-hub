@@ -452,7 +452,7 @@ function poke_hub_pokemon_attacks_edit_form($edit_row = null) {
                 <div class="admin-lab-form-group">
                     <label for="pvp_buff_activation_chance"><?php esc_html_e('Activation Chance', 'poke-hub'); ?></label>
                     <input type="number" id="pvp_buff_activation_chance" name="pvp_buff_activation_chance" 
-                           step="0.01" min="0" max="1" style="max-width: 200px;"
+                           step="any" min="0" max="1" style="max-width: 200px;"
                            value="<?php echo esc_attr($pvp['buffs']['buff_activation_chance']); ?>" />
                     <p class="description"><?php esc_html_e('Value between 0.0 and 1.0 (e.g., 0.3 = 30%).', 'poke-hub'); ?></p>
                 </div>

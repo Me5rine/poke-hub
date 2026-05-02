@@ -42,9 +42,10 @@ function poke_hub_auto_tr_encode_extra(array $extra, $fallback_raw = '') {
  * @param int $pokemon_id ID du Pokémon
  * @param string $name_en Nom anglais
  * @param int $dex_number Numéro de Pokédex (optionnel)
+ * @param bool $fill_empty_string_slots Si false (formulaire admin, mise à jour), ne réécrit pas une langue dont la clé existe déjà (même valeur vide volontairement effacée). Si true (comportement historique / création), remplit encore les trous et chaînes vides.
  * @return bool True si des traductions ont été récupérées
  */
-function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_number = 0) {
+function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_number = 0, $fill_empty_string_slots = true) {
     if (empty($name_en) || $pokemon_id <= 0) {
         return false;
     }
@@ -106,14 +107,23 @@ function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_nu
             continue; // Ne pas écraser le nom anglais
         }
 
-        // Mettre à jour extra['names'][$lang]
-        if (!isset($extra['names'][$lang]) || empty($extra['names'][$lang])) {
-            $extra['names'][$lang] = $name;
-            $has_updates = true;
+        $key_exists = array_key_exists($lang, $extra['names']);
+        $value      = $key_exists ? trim((string) $extra['names'][$lang]) : '';
+
+        if ($fill_empty_string_slots) {
+            if ($value !== '') {
+                continue;
+            }
+        } elseif ($key_exists) {
+            // Clé présente dans extra (dont chaîne vide) : respecter la dernière sauvegarde admin.
+            continue;
         }
 
+        $extra['names'][$lang] = $name;
+        $has_updates = true;
+
         // Mettre à jour name_fr si c'est le français
-        if ($lang === 'fr' && (empty($row->name_fr) || $row->name_fr === $row->name_en)) {
+        if ($fill_empty_string_slots && $lang === 'fr' && (empty($row->name_fr) || $row->name_fr === $row->name_en)) {
             $update_data['name_fr'] = $name;
             $has_updates = true;
         }
@@ -129,7 +139,7 @@ function poke_hub_pokemon_auto_fetch_translations($pokemon_id, $name_en, $dex_nu
         return false;
     }
     $update_data['extra'] = $extra_json;
-    
+
     $format = ['%s']; // extra
     if (isset($update_data['name_fr'])) {
         $format[] = '%s'; // name_fr

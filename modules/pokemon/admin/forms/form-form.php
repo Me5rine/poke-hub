@@ -30,6 +30,8 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
     $names            = ['fr' => '', 'en' => ''];
     $current_events   = [];
 
+    $manual_protect_label = false;
+
     if ($is_edit) {
         $form_slug        = isset($edit_row->form_slug) ? (string) $edit_row->form_slug : '';
         $label            = isset($edit_row->label) ? (string) $edit_row->label : '';
@@ -43,9 +45,12 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
         // Récupérer les traductions depuis extra
         if (!empty($edit_row->extra)) {
             $extra = json_decode($edit_row->extra, true);
-            if (is_array($extra) && !empty($extra['names']) && is_array($extra['names'])) {
-                $names['fr'] = isset($extra['names']['fr']) ? trim((string) $extra['names']['fr']) : '';
-                $names['en'] = isset($extra['names']['en']) ? trim((string) $extra['names']['en']) : '';
+            if (is_array($extra)) {
+                $manual_protect_label = !empty($extra['manual_variant_label']);
+                if (!empty($extra['names']) && is_array($extra['names'])) {
+                    $names['fr'] = isset($extra['names']['fr']) ? trim((string) $extra['names']['fr']) : '';
+                    $names['en'] = isset($extra['names']['en']) ? trim((string) $extra['names']['en']) : '';
+                }
             }
         }
 
@@ -110,6 +115,11 @@ function poke_hub_pokemon_forms_edit_form($edit_row = null) {
                             <label for="label"><?php esc_html_e('Label', 'poke-hub'); ?> *</label>
                             <input type="text" id="label" name="label" value="<?php echo esc_attr($label); ?>" required />
                             <p class="description"><?php esc_html_e('Example: "Armored", "Fall 2019", "Costume".', 'poke-hub'); ?></p>
+                            <label style="margin-top:8px;display:block;">
+                                <input type="checkbox" name="manual_variant_label" value="1" <?php checked($manual_protect_label); ?> />
+                                <?php esc_html_e('Keep this label unchanged on Game Master import', 'poke-hub'); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e('If checked: the importer will refresh category/proto metadata but leave this display label exactly as typed.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                 </div>

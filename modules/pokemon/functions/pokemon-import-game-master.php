@@ -84,6 +84,21 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         )
     );
 
+    // Registre des variantes (pokemon_form_variants) : slug canonique optionnel sans changer le slug Pokémon (granular).
+    $variant_registry_slug = $form_slug;
+    if ( $form_slug !== '' && function_exists( 'poke_hub_resolve_gm_variant_registry_slug' ) ) {
+        $resolved = poke_hub_resolve_gm_variant_registry_slug(
+            $form_slug,
+            (string) $pokemon_id_proto,
+            (string) $template_id,
+            (string) $form_proto,
+            $settings
+        );
+        if ( $resolved !== '' ) {
+            $variant_registry_slug = $resolved;
+        }
+    }
+
     // Nom humain de base
     $base_name = poke_hub_pokemon_gm_id_to_label( $pokemon_id_proto );
 
@@ -125,7 +140,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $variant_label = $label_suffix !== '' ? $label_suffix : ucwords( str_replace( '-', ' ', $form_slug ) );
 
         if ( function_exists( 'poke_hub_pokemon_get_form_variant_by_slug' ) ) {
-            $existing_variant = poke_hub_pokemon_get_form_variant_by_slug( $form_slug );
+            $existing_variant = poke_hub_pokemon_get_form_variant_by_slug( $variant_registry_slug );
             if ( is_array( $existing_variant ) && ! empty( $existing_variant['id'] ) ) {
                 $variant_id = (int) $existing_variant['id'];
             }
@@ -145,7 +160,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 ? poke_hub_pokemon_guess_form_type_from_gm( $pokemon_id_proto, $form_proto, $form_slug, $guess_settings )
                 : 'default';
             $variant_id = (int) poke_hub_pokemon_upsert_form_variant(
-                $form_slug,
+                $variant_registry_slug,
                 $variant_label,
                 $auto_form_type, // category = type de forme
                 '', // group
@@ -155,11 +170,13 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                     'template_id'      => $template_id,
                     'form_type'        => $auto_form_type,
                 ],
-                $variant_id
+                $variant_id,
+                true,
+                $form_slug // liste « slugs supprimés » référencée par le slug granular GM
             );
         }
 
-        $variant_row = poke_hub_pokemon_get_form_variant_by_slug( $form_slug );
+        $variant_row = poke_hub_pokemon_get_form_variant_by_slug( $variant_registry_slug );
         if ( is_array( $variant_row ) ) {
             $variant_category = $variant_row['category'] ?? '';
             $variant_group    = $variant_row['group'] ?? '';
@@ -356,7 +373,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'generation_number'  => $generation_number,
         'game_key'           => $game_key,
 
-        'variant_form_slug'  => $form_slug,
+        'variant_form_slug'  => $variant_registry_slug,
         'variant_id'         => $variant_id,
         'variant_category'   => $variant_category,
         'variant_group'      => $variant_group,

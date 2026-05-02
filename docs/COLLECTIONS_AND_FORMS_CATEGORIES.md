@@ -35,6 +35,8 @@ Aligné sur `modules/pokemon/admin/forms/form-form.php` (libellés en anglais da
 | `shadow`        | Obscur |
 | `purified`      | Purifié |
 
+**Réf. pool collections** (mode une entrée par espèce) : en pratique, **`switch_battle`** hors slug **`…-family`** est surtout réservé aux cas **Kyurem**, **Necrozma**, **Genesect** (voir le WHERE de **`poke_hub_collections_get_pool()`**) ; **Tornadus, Fulguris, Démétéros, Amovénus** sont traités à part (exceptions + import **`special`** avant `ibfc`, voir **COLLECTIONS_MODULE.md** et **pokemon/GAME_MASTER_IMPORT.md**).
+
 Si une forme en base a une valeur **hors liste** (données anciennes, ex. `normal`, `alola`, `galar`), le formulaire affiche une option **« Other: &lt;valeur&gt; »**. En choisissant un type standard et en enregistrant, la valeur est migrée.
 
 **Costume / event :** si vous choisissez ce type pour une forme, tout Pokémon utilisant cette forme est considéré comme costumé/événement *via la forme* (sans avoir à cocher la case sur chaque fiche Pokémon).

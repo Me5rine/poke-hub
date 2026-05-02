@@ -503,6 +503,190 @@ function poke_hub_pokemon_get_all_variant_groups(): array {
     return array_values(array_unique(array_map('sanitize_title', $rows)));
 }
 
+/** @var string Nom d’option : form_slug dont l’import ne doit pas recréer la ligne après suppression admin. */
+const POKE_HUB_GM_SUPPRESSED_FORM_SLUG_OPTION = 'poke_hub_gm_suppressed_form_slugs';
+
+/** @var string Texte brut des alias slug variante GM → registre canonique (une ou plusieurs lignes, voir parsing). */
+const POKE_HUB_GM_VARIANT_REGISTRY_SLUG_ALIASES_LINES_OPTION = 'poke_hub_gm_variant_registry_slug_aliases_lines';
+
+/**
+ * Slugs suppression stockés en base sans filtre (évite boucle lors des filtres apply_filters).
+ *
+ * @return string[]
+ */
+function poke_hub_get_stored_gm_suppressed_form_slugs(): array {
+    if (!function_exists('get_option')) {
+        return [];
+    }
+    $raw = get_option(POKE_HUB_GM_SUPPRESSED_FORM_SLUG_OPTION, []);
+    $set = [];
+    foreach ((array) $raw as $s) {
+        $s = sanitize_title(trim((string) $s));
+        if ($s !== '') {
+            $set[$s] = true;
+        }
+    }
+
+    return array_keys($set);
+}
+
+/**
+ * Liste effective (filtre poke_hub_gm_suppressed_form_slugs) pour contrôler INSERT import.
+ *
+ * @return string[]
+ */
+function poke_hub_get_gm_suppressed_form_slugs(): array {
+    return array_values(
+        array_unique(
+            apply_filters(
+                'poke_hub_gm_suppressed_form_slugs',
+                poke_hub_get_stored_gm_suppressed_form_slugs()
+            )
+        )
+    );
+}
+
+/**
+ * Marque un form_slug pour ne pas être INSERT par l’import après suppressions manuelles.
+ */
+function poke_hub_suppress_form_slug_from_gm_auto_create(string $form_slug): void {
+    $slug = sanitize_title(trim($form_slug));
+    if ($slug === '' || !function_exists('get_option')) {
+        return;
+    }
+    $list   = poke_hub_get_stored_gm_suppressed_form_slugs();
+    $list[] = $slug;
+    update_option(
+        POKE_HUB_GM_SUPPRESSED_FORM_SLUG_OPTION,
+        array_values(array_unique($list)),
+        false
+    );
+}
+
+/**
+ * Autorise à nouveau la création auto après ajout / édition manuel(le) avec ce slug.
+ */
+function poke_hub_unsuppress_form_slug_for_gm_auto_create(string $form_slug): void {
+    $slug = sanitize_title(trim($form_slug));
+    if ($slug === '' || !function_exists('get_option')) {
+        return;
+    }
+    $fresh = [];
+    foreach (poke_hub_get_stored_gm_suppressed_form_slugs() as $s) {
+        if ($s !== $slug) {
+            $fresh[] = $s;
+        }
+    }
+    update_option(POKE_HUB_GM_SUPPRESSED_FORM_SLUG_OPTION, array_values(array_unique($fresh)), false);
+}
+
+/**
+ * Parse le texte d’alias (Réglages Game Master) vers un tableau sanitizé granular => canonique.
+ *
+ * Lignes reconnues (une paire par ligne ; ignorer les lignes vides ou commençant par #):
+ * - `slug-granulaire=>slug-canonical`
+ * - `slug-granulaire slug-canonical` (deux premiers jetons whitespace)
+ *
+ * @return array<string,string>
+ */
+function poke_hub_parse_gm_variant_registry_slug_aliases_lines(string $text): array {
+    $out = [];
+    foreach (preg_split("/\r\n|\r|\n/", $text) as $raw_line) {
+        $line = trim((string) $raw_line);
+        if ($line === '' || strpos($line, '#') === 0) {
+            continue;
+        }
+        $gran = '';
+        $canon = '';
+        if (strpos($line, '=>') !== false) {
+            $parts = explode('=>', $line, 2);
+            $gran  = sanitize_title(trim((string) ($parts[0] ?? '')));
+            $canon = sanitize_title(trim((string) ($parts[1] ?? '')));
+        } elseif (preg_match('/^(\S+)\s+(\S+)/', $line, $m)) {
+            $gran  = sanitize_title($m[1]);
+            $canon = sanitize_title($m[2]);
+        }
+        if ($gran !== '' && $canon !== '' && $gran !== $canon) {
+            $out[$gran] = $canon;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Carte effective slug GM (granulaire) → slug de la ligne pokemon_form_variants (registre).
+ *
+ * @return array<string,string>
+ */
+function poke_hub_get_gm_variant_registry_slug_aliases_map(): array {
+    static $revision = '';
+    static $cached   = [];
+
+    $text = function_exists('get_option')
+        ? (string) get_option(POKE_HUB_GM_VARIANT_REGISTRY_SLUG_ALIASES_LINES_OPTION, '')
+        : '';
+
+    $new_rev = md5($text);
+    if ($new_rev !== $revision) {
+        $parsed = poke_hub_parse_gm_variant_registry_slug_aliases_lines($text);
+        /** @var array<string,string> $filtered */
+        $filtered   = apply_filters('poke_hub_gm_variant_registry_slug_aliases_map', $parsed);
+        $normalized = [];
+        foreach ((array) $filtered as $k => $v) {
+            $gk = sanitize_title((string) $k);
+            $gv = sanitize_title((string) $v);
+            if ($gk !== '' && $gv !== '' && $gk !== $gv) {
+                $normalized[$gk] = $gv;
+            }
+        }
+        $revision = $new_rev;
+        $cached   = $normalized;
+    }
+
+    return $cached;
+}
+
+/**
+ * Resolve le slug registre utilisé pour upsert pokemon_form_variants (fusion optionnelle de formes GM).
+ *
+ * Le slug Pokémon (extra.form_slug et suffix URL) reste le slug granular ; uniquement la ligne de variante partagée change.
+ *
+ * @param array<string,mixed> $settings
+ */
+function poke_hub_resolve_gm_variant_registry_slug(
+    string $granular_slug,
+    string $pokemon_id_proto = '',
+    string $template_id = '',
+    string $form_proto = '',
+    array $settings = []
+): string {
+    $granular_slug = sanitize_title($granular_slug);
+    if ($granular_slug === '') {
+        return '';
+    }
+
+    $map       = poke_hub_get_gm_variant_registry_slug_aliases_map();
+    $resolved  = isset($map[$granular_slug]) ? $map[$granular_slug] : $granular_slug;
+    $resolved  = sanitize_title((string) $resolved);
+    if ($resolved === '') {
+        return $granular_slug;
+    }
+
+    $filtered = apply_filters(
+        'poke_hub_gm_variant_registry_slug',
+        $resolved,
+        $granular_slug,
+        $pokemon_id_proto,
+        $template_id,
+        $form_proto,
+        $settings
+    );
+    $out = sanitize_title((string) $filtered);
+
+    return $out !== '' ? $out : $granular_slug;
+}
+
 /**
  * Upsert d'une variante de forme globale dans pokemon_form_variants.
  *
@@ -510,12 +694,28 @@ function poke_hub_pokemon_get_all_variant_groups(): array {
  * @param string $label       Label humain (ex: 'Fall 2019')
  * @param string $category    Catégorie logique ('normal', 'costume', 'mega', etc.) - optionnel
  * @param string $group       Groupe logique (ex: 'halloween-2019') - optionnel
- * @param array  $extra_data  Données additionnelles stockées dans extra
+ * @param array  $extra_data  Données additionnelles stockées dans extra (fusionnées avec l’existant)
  * @param int    $variant_id  Si > 0 (édition admin), charge la ligne par id pour permettre de changer form_slug sans créer une nouvelle ligne.
+ * @param bool   $enforce_suppressed_slug_guard Si faux (sauvegarde admin), autorise INSERT même si ce slug est dans la liste post-suppression.
+ * @param string|null $gm_import_granular_slug_for_suppress Import GM uniquement : slug granular (tel que normalisé depuis le GM)
+ *                                                           pour tester la liste des slugs supprimés, si différent du form_slug registre après alias.
  *
- * @return int ID de la variante ou 0 (ex. slug déjà pris par une autre ligne)
+ * Si `extra.manual_variant_label` est vrai pour une ligne existante, la colonne label n’est pas remplacée par ce paramètre (import GM).
+ *
+ * Si le slug est absent de la base et listé comme supprim volontaire en admin (`poke_hub_suppress_form_slug_from_gm_auto_create`), aucun INSERT n’est fait (retour 0).
+ *
+ * @return int ID de la variante ou 0 (ex. slug déjà pris par une autre ligne, ou création réprimée pour slug supprimé)
  */
-function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category = '', $group = '', array $extra_data = [], $variant_id = 0) {
+function poke_hub_pokemon_upsert_form_variant(
+    $form_slug,
+    $label = '',
+    $category = '',
+    $group = '',
+    array $extra_data = [],
+    $variant_id = 0,
+    bool $enforce_suppressed_slug_guard = true,
+    ?string $gm_import_granular_slug_for_suppress = null
+) {
     if (!function_exists('pokehub_get_table')) {
         return 0;
     }
@@ -555,8 +755,35 @@ function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category
         );
     }
 
+    $current_extra = [];
+    if ($row && !empty($row->extra)) {
+        $ev_ok = true;
+        if (function_exists('poke_hub_pokemon_decode_extra_json')) {
+            $current_extra = poke_hub_pokemon_decode_extra_json((string) $row->extra, $ev_ok);
+            if (!$ev_ok) {
+                $current_extra = [];
+            }
+        } else {
+            $decoded_ce = json_decode((string) $row->extra, true);
+            $current_extra = is_array($decoded_ce) ? $decoded_ce : [];
+        }
+    }
+
+    $suppress_check_slug = $form_slug;
+    if ($gm_import_granular_slug_for_suppress !== null && $gm_import_granular_slug_for_suppress !== '') {
+        $suppress_check_slug = sanitize_title(trim($gm_import_granular_slug_for_suppress));
+    }
+    $suppress_slug = $enforce_suppressed_slug_guard && !$row && in_array($suppress_check_slug, poke_hub_get_gm_suppressed_form_slugs(), true);
+    if ($suppress_slug) {
+        return 0;
+    }
+
+    $preserve_manual_label = $row && !empty($current_extra['manual_variant_label']);
+
     // Label par défaut
-    if ($label === '' && $row) {
+    if ($preserve_manual_label) {
+        $label = (string) $row->label;
+    } elseif ($label === '' && $row) {
         $label = (string) $row->label;
     } elseif ($label === '') {
         $label = ucwords(str_replace(['-', '_'], ' ', $form_slug));
@@ -572,15 +799,7 @@ function poke_hub_pokemon_upsert_form_variant($form_slug, $label = '', $category
         $group = (string) $row->group;
     }
 
-    // Merge extra (on fusionne l'existant avec le nouveau)
-    $current_extra = [];
-    if ($row && !empty($row->extra)) {
-        $decoded = json_decode($row->extra, true);
-        if (is_array($decoded)) {
-            $current_extra = $decoded;
-        }
-    }
-
+    // Merge extra (existant ci-dessus fusionné avec le nouveau ; garde manual_variant_label si non écrasé)
     $extra = array_merge($current_extra, $extra_data);
     $extra_json = !empty($extra) ? wp_json_encode($extra) : null;
 

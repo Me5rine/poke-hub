@@ -1957,12 +1957,11 @@
                     var rootStyle = window.getComputedStyle(document.documentElement);
                     var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
                     var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
-                    var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
-                    var compactNav = stickyTools ? stickyTools.querySelector('.pokehub-collection-compact-nav') : null;
-                    var stickyToolsH = stickyTools ? stickyTools.getBoundingClientRect().height : 0;
-                    var compactNavH = (compactNav && !compactNav.hidden) ? compactNav.getBoundingClientRect().height : 0;
-                    var extraCompact = compactNavH > 0 ? 8 : 0;
-                    var offset = elOffset + adminOffset + stickyToolsH + extraCompact + 6;
+                    var fixedTb = wrap.querySelector('[data-collection-fixed-toolbar]');
+                    var fixedTbH = (fixedTb && !fixedTb.hasAttribute('hidden'))
+                        ? fixedTb.getBoundingClientRect().height
+                        : 0;
+                    var offset = elOffset + adminOffset + fixedTbH + 6;
                     var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
                     links.forEach(function (l) { l.classList.remove('is-active'); });
                     link.classList.add('is-active');
@@ -1983,10 +1982,12 @@
                 var rootStyle = window.getComputedStyle(document.documentElement);
                 var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
                 var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
-                var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
-                var stickyToolsH = stickyTools ? stickyTools.getBoundingClientRect().height : 0;
+                var fixedTb = wrap.querySelector('[data-collection-fixed-toolbar]');
+                var fixedTbH = (fixedTb && !fixedTb.hasAttribute('hidden'))
+                    ? fixedTb.getBoundingClientRect().height
+                    : 0;
                 var y = window.pageYOffset || document.documentElement.scrollTop || 0;
-                var pivot = y + elOffset + adminOffset + stickyToolsH + 8;
+                var pivot = y + elOffset + adminOffset + fixedTbH + 8;
                 var current = sections[0];
                 for (var i = 0; i < sections.length; i++) {
                     var topAbs = sections[i].node.getBoundingClientRect().top + y;
@@ -2014,27 +2015,41 @@
             updateActiveFromScroll();
         });
     }
-    function initCollectionCompactStickyMode() {
+    /** Barre hors flux sous le header du site ; tuiles lorsque les blocs filtres / GO / gén. / selects défilent sous cette barre. */
+    function initCollectionFixedToolbar() {
+        var defaultOrder = ['filters', 'pogo', 'generations', 'selectors'];
+
+        function fixedToolbarReflowSelects(collectionWrap) {
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                collectionWrap.querySelectorAll('.pokehub-collection-missing-select, .pokehub-collection-fortrade-select').forEach(function (el) {
+                    if (el.id && jQuery(el).hasClass && jQuery(el).hasClass('select2-hidden-accessible')) {
+                        try {
+                            jQuery(el).trigger('select2:close');
+                        } catch (eIgnore) {}
+                    }
+                });
+            }
+            window.dispatchEvent(new Event('resize'));
+        }
+
         var wraps = document.querySelectorAll('.pokehub-collection-view-wrap');
         wraps.forEach(function (wrap) {
-            var stickyWrap = wrap.querySelector('.pokehub-collection-header-sticky-wrap');
-            var stickyTools = wrap.querySelector('.pokehub-collection-sticky-tools');
-            if (!stickyWrap || !stickyTools) {
+            var fixedHost = wrap.querySelector('[data-collection-fixed-toolbar]');
+            var toolbarStack = wrap.querySelector('.pokehub-collection-toolbar-stack');
+            var tilesHost = wrap.querySelector('[data-fixed-tiles-host]');
+            var expandWrap = wrap.querySelector('[data-fixed-expand]');
+            var expandInner = wrap.querySelector('[data-fixed-expand-inner]');
+            var flowHeader = wrap.querySelector('.pokehub-collection-page-header-wrap');
+            if (!fixedHost || !toolbarStack || !tilesHost || !expandWrap || !expandInner) {
                 return;
             }
-            var compactNav = stickyTools.querySelector('.pokehub-collection-compact-nav');
-            var sections = {
-                header: stickyWrap,
-                filters: wrap.querySelector('[data-compact-section="filters"]'),
-                pogo: wrap.querySelector('[data-compact-section="pogo"]'),
-                selectors: wrap.querySelector('[data-compact-section="selectors"]'),
-            };
-            var buttons = compactNav ? compactNav.querySelectorAll('.pokehub-collection-compact-nav-btn[data-compact-target]') : [];
-            var orderedKeys = ['header', 'filters', 'pogo', 'selectors'];
-            var currentTarget = '';
-            var compactOn = false;
-            var anchors = {};
-            var visibleTiles = { header: false, filters: false, pogo: false, selectors: false };
+
+            var orderedKeys = [];
+            defaultOrder.forEach(function (k) {
+                if (wrap.querySelector('[data-collection-toolbar-slot="' + k + '"]')) {
+                    orderedKeys.push(k);
+                }
+            });
 
             function getDocumentTop(node) {
                 var top = 0;
@@ -2046,166 +2061,220 @@
                 return top;
             }
 
+            var stackAnchorDoc = getDocumentTop(toolbarStack);
+            var anchorsSlots = {};
+
             function computeAnchors() {
+                stackAnchorDoc = getDocumentTop(toolbarStack);
                 orderedKeys.forEach(function (k) {
-                    var node = sections[k];
-                    anchors[k] = node ? getDocumentTop(node) : Number.POSITIVE_INFINITY;
+                    var slot = wrap.querySelector('[data-collection-toolbar-slot="' + k + '"]');
+                    anchorsSlots[k] = slot ? getDocumentTop(slot) : Number.POSITIVE_INFINITY;
                 });
             }
 
-            function stickyOffsetPx() {
+            function stickyViewportOffset() {
                 var y = window.pageYOffset || document.documentElement.scrollTop || 0;
                 var rootStyle = window.getComputedStyle(document.documentElement);
                 var elOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-elementor-header-offset')) || 0;
                 var adminOffset = parseFloat(rootStyle.getPropertyValue('--pokehub-adminbar-offset')) || 0;
                 return {
-                    y: y,
-                    offset: elOffset + adminOffset,
+                    maskLine: y + elOffset + adminOffset,
+                    barOffset: elOffset + adminOffset
                 };
             }
 
             function currentMaskLine() {
-                var s = stickyOffsetPx();
-                return s.y + s.offset;
+                return stickyViewportOffset().maskLine;
             }
 
-            function applyCompactTarget(target) {
-                var t = target || '';
+            var fixedToolbarOn = false;
+            var visibleTiles = {};
+            var openExpandedKey = '';
+            var lastTilesFingerprint = '';
+            orderedKeys.forEach(function (k) {
+                visibleTiles[k] = false;
+            });
+
+            function visibleTilesFingerprint() {
+                return orderedKeys.filter(function (k) {
+                    return visibleTiles[k];
+                }).join('|');
+            }
+
+            function sectionBodyFor(type) {
+                return wrap.querySelector('[data-collection-fixed-tile="' + type + '"]');
+            }
+
+            function slotFor(type) {
+                return wrap.querySelector('[data-collection-toolbar-slot="' + type + '"]');
+            }
+
+            function closeExpand(reason) {
+                if (!openExpandedKey) return;
+                var k = openExpandedKey;
+                var body = sectionBodyFor(k);
+                var slot = slotFor(k);
+                openExpandedKey = '';
+                expandWrap.setAttribute('hidden', 'hidden');
+                expandInner.removeAttribute('data-active-key');
+                if (slot && body && body.parentNode === expandInner) {
+                    slot.appendChild(body);
+                    slot.style.minHeight = '';
+                }
+                var btn = tilesHost.querySelector('[data-fixed-tile-key="' + k + '"]');
+                if (btn) {
+                    btn.classList.remove('is-active');
+                    btn.setAttribute('aria-pressed', 'false');
+                }
+                if (reason !== 'preserve-select2') {
+                    fixedToolbarReflowSelects(wrap);
+                }
+                if (fixedToolbarOn && fixedHost) {
+                    wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', Math.ceil(fixedHost.getBoundingClientRect().height) + 'px');
+                }
+            }
+
+            function openExpand(type) {
+                var body = sectionBodyFor(type);
+                var slot = slotFor(type);
+                if (!body || !slot) return;
+                if (openExpandedKey && openExpandedKey !== type) {
+                    closeExpand('preserve-select2');
+                }
+                if (openExpandedKey === type) {
+                    return;
+                }
+                var h = Math.max(body.offsetHeight, body.getBoundingClientRect().height);
+                slot.style.minHeight = Math.ceil(h) + 'px';
+                expandInner.appendChild(body);
+                openExpandedKey = type;
+                expandInner.setAttribute('data-active-key', type);
+                expandWrap.removeAttribute('hidden');
+                tilesHost.querySelectorAll('.pokehub-collection-fixed-tile-btn').forEach(function (b) {
+                    var on = (b.getAttribute('data-fixed-tile-key') || '') === type;
+                    b.classList.toggle('is-active', on);
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                });
+                fixedToolbarReflowSelects(wrap);
+                wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', Math.ceil(fixedHost.getBoundingClientRect().height) + 'px');
+            }
+
+            function clearTilesUi() {
+                tilesHost.innerHTML = '';
+            }
+
+            function rebuildTiles(buttonActiveKey) {
+                clearTilesUi();
                 orderedKeys.forEach(function (k) {
-                    var node = sections[k];
-                    if (!node) return;
-                    var show = (t !== '' && t === k);
-                    node.classList.toggle('is-compact-hidden', !show);
+                    if (!visibleTiles[k]) return;
+                    var body = sectionBodyFor(k);
+                    if (!body) return;
+                    var label = body.getAttribute('data-collection-fixed-label') || k;
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'pokehub-collection-fixed-tile-btn';
+                    btn.setAttribute('data-fixed-tile-key', k);
+                    btn.setAttribute('role', 'tab');
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.textContent = label;
+                    btn.addEventListener('click', function () {
+                        var key = btn.getAttribute('data-fixed-tile-key') || '';
+                        if (openExpandedKey === key) {
+                            closeExpand('');
+                        } else {
+                            openExpand(key);
+                        }
+                    });
+                    tilesHost.appendChild(btn);
+                    if (buttonActiveKey === k) {
+                        btn.classList.add('is-active');
+                        btn.setAttribute('aria-pressed', 'true');
+                    }
                 });
-                buttons.forEach(function (btn) {
-                    var active = (btn.getAttribute('data-compact-target') || '') === t;
-                    btn.classList.toggle('is-active', active);
-                });
-                currentTarget = t;
             }
 
             function updateTilesFromMaskLine(maskLine) {
                 orderedKeys.forEach(function (k) {
-                    if (!sections[k]) {
+                    var anch = anchorsSlots[k];
+                    if (anch >= Number.POSITIVE_INFINITY / 2) {
                         visibleTiles[k] = false;
                         return;
                     }
-                    if (!visibleTiles[k] && maskLine >= (anchors[k] + 6)) {
+                    if (!visibleTiles[k] && maskLine >= (anch + 6)) {
                         visibleTiles[k] = true;
-                    } else if (visibleTiles[k] && maskLine <= (anchors[k] - 28)) {
+                    } else if (visibleTiles[k] && maskLine <= (anch - 28)) {
                         visibleTiles[k] = false;
                     }
                 });
-                buttons.forEach(function (btn) {
-                    var key = btn.getAttribute('data-compact-target') || '';
-                    btn.hidden = !visibleTiles[key];
-                });
-                if (currentTarget && !visibleTiles[currentTarget]) {
-                    currentTarget = '';
+                if (openExpandedKey && !visibleTiles[openExpandedKey]) {
+                    closeExpand('');
                 }
             }
 
-            function firstVisibleTileKey() {
-                for (var i = 0; i < orderedKeys.length; i++) {
-                    var k = orderedKeys[i];
-                    if (visibleTiles[k]) {
-                        return k;
+            function setFixedToolbar(active) {
+                if (fixedToolbarOn === active) return;
+                fixedToolbarOn = active;
+                wrap.classList.toggle('pokehub-collection--fixed-toolbar', active);
+                if (active) {
+                    fixedHost.removeAttribute('hidden');
+                    fixedHost.setAttribute('aria-hidden', 'false');
+                    if (flowHeader) {
+                        try {
+                            flowHeader.setAttribute('inert', '');
+                        } catch (eInert) {}
                     }
-                }
-                return '';
-            }
-
-            function showAllNormalSections() {
-                orderedKeys.forEach(function (k) {
-                    var node = sections[k];
-                    if (node) node.classList.remove('is-compact-hidden');
-                    visibleTiles[k] = false;
-                });
-                buttons.forEach(function (btn) {
-                    btn.hidden = true;
-                    btn.classList.remove('is-active');
-                });
-                currentTarget = '';
-            }
-
-            function scrollSectionUnderSticky(key) {
-                var node = sections[key];
-                if (!node) return;
-                var s = stickyOffsetPx();
-                var stickyH = stickyTools.getBoundingClientRect().height || 0;
-                var targetTop = anchors[key] - (s.offset + stickyH + 8);
-                window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-            }
-
-            function updateCompactMode() {
-                var maskLine = currentMaskLine();
-                var firstAnchor = anchors.header;
-                if (!compactOn && maskLine >= (firstAnchor + 6)) {
-                    compactOn = true;
-                } else if (compactOn && maskLine <= (firstAnchor - 72)) {
-                    compactOn = false;
-                }
-
-                wrap.classList.toggle('pokehub-collection--compact', compactOn);
-                if (compactNav) {
-                    compactNav.hidden = !compactOn;
-                }
-
-                if (!compactOn) {
-                    showAllNormalSections();
                 } else {
-                    updateTilesFromMaskLine(maskLine);
-                    if (!currentTarget) {
-                        var k = firstVisibleTileKey();
-                        if (k) {
-                            applyCompactTarget(k);
-                        } else {
-                            applyCompactTarget('');
-                        }
-                    } else if (visibleTiles[currentTarget]) {
-                        applyCompactTarget(currentTarget);
-                    } else {
-                        var fallback = firstVisibleTileKey();
-                        if (fallback) {
-                            applyCompactTarget(fallback);
-                        } else {
-                            applyCompactTarget('');
-                        }
+                    closeExpand('');
+                    clearTilesUi();
+                    lastTilesFingerprint = '';
+                    fixedHost.setAttribute('hidden', 'hidden');
+                    fixedHost.setAttribute('aria-hidden', 'true');
+                    if (flowHeader) {
+                        flowHeader.removeAttribute('inert');
                     }
-                }
-
-                wrap.style.setProperty('--pokehub-sticky-tools-current-height', Math.ceil(stickyTools.getBoundingClientRect().height) + 'px');
-            }
-
-            if (buttons.length) {
-                buttons.forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        var target = btn.getAttribute('data-compact-target') || '';
-                        if (currentTarget === target) {
-                            applyCompactTarget('');
-                        } else {
-                            applyCompactTarget(target);
-                            scrollSectionUnderSticky(target);
-                        }
+                    orderedKeys.forEach(function (k) {
+                        visibleTiles[k] = false;
                     });
-                });
+                }
             }
+
+            function tick() {
+                var maskLine = currentMaskLine();
+                if (!fixedToolbarOn && maskLine >= (stackAnchorDoc + 6)) {
+                    setFixedToolbar(true);
+                } else if (fixedToolbarOn && maskLine <= (stackAnchorDoc - 72)) {
+                    setFixedToolbar(false);
+                }
+                if (!fixedToolbarOn) {
+                    wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', '0px');
+                    return;
+                }
+                updateTilesFromMaskLine(maskLine);
+                var fp = visibleTilesFingerprint();
+                if (fp !== lastTilesFingerprint) {
+                    lastTilesFingerprint = fp;
+                    rebuildTiles(openExpandedKey);
+                }
+                if (openExpandedKey && sectionBodyFor(openExpandedKey) && sectionBodyFor(openExpandedKey).parentNode === expandInner) {
+                    expandWrap.removeAttribute('hidden');
+                }
+                wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', Math.ceil(fixedHost.getBoundingClientRect().height) + 'px');
+            }
+
             var raf = 0;
             function onScrollOrResize() {
                 if (raf) return;
                 raf = window.requestAnimationFrame(function () {
                     raf = 0;
                     computeAnchors();
-                    updateCompactMode();
+                    tick();
                 });
             }
             window.addEventListener('scroll', onScrollOrResize, { passive: true });
             window.addEventListener('resize', onScrollOrResize);
             computeAnchors();
-            window.setTimeout(function () {
-                onScrollOrResize();
-            }, 250);
-            updateCompactMode();
+            window.setTimeout(onScrollOrResize, 250);
+            tick();
         });
     }
     window.pokeHubPogoSearchRefresh = function (wrap) {
@@ -2227,7 +2296,7 @@
         bindCollectionSpriteFallbacks(document);
         initPogoSearch();
         initCollectionGenerationJump();
-        initCollectionCompactStickyMode();
+        initCollectionFixedToolbar();
     }
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(initCollectionsAndPogo, 0);

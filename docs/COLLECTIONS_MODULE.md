@@ -83,7 +83,13 @@ Options communes (toutes catégories) : `one_per_species` (une entrée par espè
 
 ### Pool et date de sortie
 
-Le **pool** = Pokémon (table `pokemon` + formes) filtrés par catégorie et options. Seuls les Pokémon ayant une **date de sortie dans Pokémon GO** pour le contexte (normal, shiny, shadow, gigantamax, dynamax) sont inclus. Si aucun Pokémon n’a de date de sortie renseignée, le pool est **vide** (pas de repli sur toute la liste).
+Le **pool** = Pokémon (table `pokemon` + formes) filtrés par catégorie et options. Après la requête SQL du pool, **`poke_hub_collections_row_passes_pool_release_filter()`** retire toute ligne sans **date de sortie adaptée au contexte**, en ne lisant que **`extra.release`** de la fiche courante (pas de propagation évolution). Résumé des clés utilisées selon la collection : **`normal`** (listes « génériques » comme Custom, Lucky, Perfect 4\*…), **`shiny`**, **`shadow`**, **`gigantamax`**, **`dynamax`** — et en contexte **`normal`**, le filtre peut aussi accepter une entrée si les options du pool incluent Méga / Dynamax / Gigamax et que la clé correspondante est renseignée.
+
+**Squelettes import GM** (`extra.gm_skeleton` : fiches pré-remplies type spawn / genre sans `pokemonSettings` complet au premier passage) : même règle que les fiches complètes — **aucun passe-partout** ; la ligne n’apparaît dans une liste **shiny** / **shadow** / etc. que si **`extra.release.<contexte>`** contient une valeur non vide (comme tout autre Pokémon).
+
+Si aucune ligne ne satisfait le filtre dans le contexte courant, la partie du pool après filtrage est **vide**.
+
+**Formes Forces de la nature et Amovénus** (№ National **641**, **642**, **645**, **905**) : cas particuliers sur le filtre **`switch_battle`** SQL (ibfc GM) — voir § *Pool SQL* ci‑dessous ; la liste des № est surchargeable avec le filtre WordPress **`poke_hub_collections_forces_nature_dual_form_dex_numbers`**.
 
 ### Catégories spécifiques (paramètres adaptatifs)
 
@@ -137,13 +143,15 @@ Le pool est construit dans **`poke_hub_collections_get_pool()`**. Comportements 
 - **`one_per_species` activé**  
   - Logique de **famille par espèce** (slugs `-family`, `is_default`, formes incluses selon options : régional, méga, costume, Dynamax synthétique, etc.). Les variantes **`fusion` / `special`** (ex. plusieurs formes « mécaniquement » distinctes) restent des entrées séparées quand les options les autorisent ; la ligne famille seule peut être masquée si ces formes explicites existent déjà (évite triple affichage type Giratina).
 
-- **Formes catalogue** (`pokemon_form_variants.category`) : certaines lignes (**`switch_form`**, exceptions **`switch_battle`** pour cas documentés comme Kyurem blanc / Genesect drives avec slugs compatibles, etc.) sont nécessaires au pool alors que d’autres combinaisons sont exclues (ex. **`switch_battle`** pour les changements purement combat hors exceptions).
+- **Formes catalogue** (`pokemon_form_variants.category`) : en mode **une entrée par espèce**, les variantes **`switch_form`** hors slug **`…-family`** sont en principe retirées du pool (regroupement type Shaymin / Keldeo) ; les **`switch_battle`** hors **`…-family`** aussi, **sauf** les cas explicites du WHERE (**drives Genesect**, **Kyurem** / **Necrozma**, et **Tornadus / Fulguris / Démétéros / Amovénus**, № **641 / 642 / 645 / 905**, pour afficher **deux** cartes **Incarnateur / Totémique** plutôt que seulement **`…-family`**). Pour ces quatre espèces, une variante encore en **`normal`** ou **`default`** avec **slug suffixé** (tiret) est aussi admise par la disjonction SQL dédiée. Filtre PHP sur dates de sortie pour les formes hors famille : **`poke_hub_collections_row_is_forces_nature_dual_variant_row()`** et filtres `poke_hub_collections_forces_dual_*` (`collections-helpers.php`).
 
 - **Synthèses Dynamax / Gigamax** (collections **non** catégories `dynamax` / `gigantamax` dédiées) : si la fiche a une sortie prévue mais pas de ligne variante en table, une tuile peut être dérivée (ids synthétiques `1000000000+` / `2100000000+`). **Il ne doit pas exister** de ligne combinée impossible type « Dynamax **et** Gigantamax » pour la même ligne de pool ; la génération évite aussi qu’une synthèse se réapplique en chaîne depuis une ligne déjà Dynamax ou déjà Gigamax.
 
 - **Cohérence données** : garde SQL optionnel contre un slug improbable **`dynamax` + `gigantamax`** sur une même ligne (données importées corrompues).
 
 Référence code : **`modules/collections/functions/collections-helpers.php`** (filtres `WHERE`, `poke_hub_collections_maybe_mark_*_synthetic_base_row`, `poke_hub_collections_apply_*_synthetic_*`, `poke_hub_collections_sort_pool_display`).
+
+**Distinction** : le module **collections** garde une logique métier propre aux slugs `-family` ci-dessus. **Hors collections**, les sélecteurs (blocs, événements, heures vedette, REST, etc.) et les affichages de lignées excluent ces placeholders ; l’import PASS 3 évite d’attacher les évolutions aux seules lignes famille quand une autre fiche existe — synthèse **[pokemon/GAME_MASTER_IMPORT.md](./pokemon/GAME_MASTER_IMPORT.md)** (§ *PASS 3*, *Hors import*).
 
 ### Images des tuiles (collections)
 

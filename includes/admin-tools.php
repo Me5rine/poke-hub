@@ -1333,16 +1333,18 @@ function poke_hub_admin_tools_page() {
         $dry_run       = !empty($_POST['poke_hub_pokekalos_dry_run']);
         $limit         = isset($_POST['poke_hub_pokekalos_limit']) ? (int) $_POST['poke_hub_pokekalos_limit'] : 0;
         $delay         = isset($_POST['poke_hub_pokekalos_delay']) ? (int) $_POST['poke_hub_pokekalos_delay'] : 1;
-        $skip_existing = !empty($_POST['poke_hub_pokekalos_skip_existing']);
+        $skip_existing    = !empty($_POST['poke_hub_pokekalos_skip_existing']);
+        $overwrite_dates  = !empty($_POST['poke_hub_pokekalos_overwrite_existing']);
         if ($delay < 0) {
             $delay = 1;
         }
         set_time_limit(0);
         $result = poke_hub_run_pokekalos_import([
-            'dry_run'       => $dry_run,
-            'limit'         => $limit,
-            'delay'         => $delay,
-            'skip_existing' => $skip_existing,
+            'dry_run'                   => $dry_run,
+            'limit'                     => $limit,
+            'delay'                     => $delay,
+            'skip_existing'             => $skip_existing,
+            'overwrite_existing_dates'  => $overwrite_dates,
         ]);
     }
 
@@ -1483,13 +1485,23 @@ function poke_hub_admin_tools_page() {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Skip existing entries', 'poke-hub'); ?></th>
+                        <th scope="row"><?php esc_html_e('Narrow queue (optional)', 'poke-hub'); ?></th>
                         <td>
                             <label>
                                 <input type="checkbox" name="poke_hub_pokekalos_skip_existing" value="1" />
-                                <?php esc_html_e('Only Pokémon with no release date at all', 'poke-hub'); ?>
+                                <?php esc_html_e('Only Pokémon with an empty « normal » release date', 'poke-hub'); ?>
                             </label>
-                            <span class="description"><?php esc_html_e('If checked: process only the first X without release date (DB order). Otherwise: process the first X overall.', 'poke-hub'); ?></span>
+                            <span class="description"><?php esc_html_e('If checked: select only rows where release.normal is empty (SQL filter). Mega row can still carry other dates. Otherwise: first X rows in DB order.', 'poke-hub'); ?></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Overwrite existing dates', 'poke-hub'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="poke_hub_pokekalos_overwrite_existing" value="1" />
+                                <?php esc_html_e('Replace every release field already filled', 'poke-hub'); ?>
+                            </label>
+                            <span class="description"><?php esc_html_e('Unchecked (default): for each slot (normal, shiny, mega, …), keep the database value when it is already set—even if it differs from Pokekalos. Check to force-fill from Pokekalos.', 'poke-hub'); ?></span>
                         </td>
                     </tr>
                     <tr>

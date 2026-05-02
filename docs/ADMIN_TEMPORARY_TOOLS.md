@@ -23,6 +23,12 @@ L’écran est découpé en **onglets** (paramètre d’URL `tab=…`) pour sép
 
 Les onglets **events** ne s’affichent que si le module **events** est actif et que les helpers correspondants sont chargés. Les onglets **gamemaster**, **translation** et **images-sync** ne s’affichent que si le module **pokemon** est actif.
 
+## Game Master (`tab=gamemaster`)
+
+Au-delà du chemin fichier / S3 et des cases **Force import**, **Import types from Bulbapedia** :
+
+- **Variant registry slug aliases** : zone texte permettant de déclarer une ligne **`slug_GM => slug_partagé`** (ou deux jetons séparés par une espace). Utilisée à l’import pour **fusionner plusieurs formes GM** dans **une ligne** `pokemon_form_variants` sans changer le **slug Pokémon** individuel ni `extra.form_slug`. Option **`poke_hub_gm_variant_registry_slug_aliases_lines`** ; comportement et filtres : [pokemon/GAME_MASTER_IMPORT.md](./pokemon/GAME_MASTER_IMPORT.md) § *Variantes globales*.
+
 ## Images sync (`tab=images-sync`)
 
 **Objectif.** Préparer les **chemins de fichiers** attendus pour les sprites / icônes (conventions comparable à PogoMiners ou copie depuis un dossier local), puis éventuellement **télécharger** ou **copier** en masse depuis un CSV.
@@ -74,7 +80,7 @@ Les changements de **gabarit** ou de **source des noms** ne **réécrivent pas**
 |---------|------|
 | `includes/admin-tools.php` | Sous-menu, page, onglets (dont `gamemaster`, `translation`, `images-sync`), import Pokekalos depuis l’admin ; génération manifest CSV / téléchargement d’icônes ; `poke_hub_temporary_tools_enabled()`, `poke_hub_admin_tools_url($tab)`. |
 | `includes/settings/settings.php` | Enregistrement de l’option `poke_hub_temporary_tools_enabled` ; page **Settings** sans onglets Game Master / Translation (déplacés ici). |
-| `includes/settings/tabs/settings-tab-gamemaster.php` | UI import Game Master (chargée uniquement sous **Temporary tools** quand le module Pokémon est actif). |
+| `includes/settings/tabs/settings-tab-gamemaster.php` | UI import Game Master (chargée uniquement sous **Temporary tools** quand le module Pokémon est actif) ; options incl. alias registre variantes → option `poke_hub_gm_variant_registry_slug_aliases_lines`. |
 | `includes/settings/tabs/settings-tab-translation.php` | UI traductions données Pokémon (idem ; URLs d’action adaptées au contexte *tools*). |
 | `includes/settings/tabs/settings-tab-general.php` | Case à cocher dans l’onglet **General**. |
 | `poke-hub.php` | Fonction `poke_hub_admin_pages()` : retire `poke-hub-tools` de la liste utilisée pour le surlignage du menu parent lorsque l’option est désactivée. |

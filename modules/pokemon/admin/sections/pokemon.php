@@ -1181,7 +1181,8 @@ function poke_hub_pokemon_clone_suffix_extra_names_recursive($node, string $suff
 }
 
 /**
- * Ajuste extra JSON après duplication : noms i18n, repères GM enlevés, dates de sortie effacées.
+ * Ajuste extra JSON après duplication : noms i18n, repères GM enlevés, dates de sortie effacées,
+ * flags Gigamax / shadow / purified dans extra (racine et bloc GO) réinitialisés pour la copie.
  */
 function poke_hub_pokemon_clone_adjust_extra_after_copy(string $raw_extra, string $name_suffix): string {
     $valid = true;
@@ -1202,6 +1203,43 @@ function poke_hub_pokemon_clone_adjust_extra_after_copy(string $raw_extra, strin
 
     // Dates de sortie (normal/shiny/etc.) propres au déploiement : ne pas reporter la fiche source.
     unset($extra['release']);
+
+    // Gigamax / obscurificaton : état espèce‑dépendant ou propres au déploiement — réinitialiser sur une copie.
+    unset($extra['has_gmax_form']);
+
+    /** @var array<string, mixed>|null $sh */
+    $normalize_shadow_clone = static function (?array $sh): array {
+        $base = is_array($sh) ? $sh : [];
+        unset($base['shadow_move'], $base['purified_move']);
+        $base['has_shadow']   = false;
+        $base['has_purified'] = false;
+        $base['stardust']     = 0;
+        $base['candy']        = 0;
+
+        return $base;
+    };
+
+    if (isset($extra['shadow']) && is_array($extra['shadow'])) {
+        $extra['shadow'] = $normalize_shadow_clone($extra['shadow']);
+    }
+
+    foreach (['games', 'go'] as $gk) {
+        if (! isset($extra[ $gk ]) || ! is_array($extra[ $gk ])) {
+            continue;
+        }
+        if ($gk === 'games' ) {
+            if (! isset($extra['games']['pokemon_go']) || ! is_array($extra['games']['pokemon_go'])) {
+                continue;
+            }
+            $go_block = &$extra['games']['pokemon_go'];
+        } else {
+            $go_block = &$extra['go'];
+        }
+        if (isset($go_block['shadow']) && is_array($go_block['shadow'])) {
+            $go_block['shadow'] = $normalize_shadow_clone($go_block['shadow']);
+        }
+        unset($go_block);
+    }
 
     $encoded = null;
     if (function_exists('poke_hub_pokemon_encode_extra_json')) {
@@ -1248,7 +1286,7 @@ function poke_hub_pokemon_clone_link_rows(int $source_id, int $new_id): bool {
             "
             INSERT INTO {$at} (pokemon_id, attack_id, role, is_legacy, is_event, is_elite_tm, extra)
             SELECT %d, attack_id, role, is_legacy, is_event, is_elite_tm, extra
-            FROM {$at} WHERE pokemon_id = %d
+            FROM {$at} WHERE pokemon_id = %d AND role <> 'gmax'
             ",
             $new_id,
             $source_id
@@ -1391,10 +1429,10 @@ function poke_hub_pokemon_duplicate_pokemon(int $source_id) {
         'base_sta'                       => isset($row->base_sta) ? (int) $row->base_sta : 0,
         'is_tradable'                    => !empty($row->is_tradable) ? 1 : 0,
         'is_transferable'                => !empty($row->is_transferable) ? 1 : 0,
-        'has_shadow'                     => !empty($row->has_shadow) ? 1 : 0,
-        'has_purified'                   => !empty($row->has_purified) ? 1 : 0,
-        'shadow_purification_stardust'   => isset($row->shadow_purification_stardust) ? (int) $row->shadow_purification_stardust : 0,
-        'shadow_purification_candy'      => isset($row->shadow_purification_candy) ? (int) $row->shadow_purification_candy : 0,
+        'has_shadow'                     => 0,
+        'has_purified'                   => 0,
+        'shadow_purification_stardust'   => 0,
+        'shadow_purification_candy'      => 0,
         'buddy_walked_mega_energy_award'  => isset($row->buddy_walked_mega_energy_award) ? (int) $row->buddy_walked_mega_energy_award : 0,
         'dodge_probability'              => isset($row->dodge_probability) ? (float) $row->dodge_probability : 0.0,
         'attack_probability'             => isset($row->attack_probability) ? (float) $row->attack_probability : 0.0,
@@ -2235,7 +2273,8 @@ function poke_hub_pokemon_handle_pokemon_form() {
     }
     $extra['has_gender_dimorphism'] = (bool) $has_gender_dimorphism;
     if (function_exists('poke_hub_pokemon_gm_merge_extra_names_with_existing')) {
-        $names = poke_hub_pokemon_gm_merge_extra_names_with_existing($names, $existing_extra);
+        // Formulaire admin : vide = suppression volontaire (ne pas réinjecter l’extra existant).
+        $names = poke_hub_pokemon_gm_merge_extra_names_with_existing($names, $existing_extra, false);
     }
     $extra['names']    = $names;
 
@@ -2534,9 +2573,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
         $wpdb->update($table, $update_data, ['id' => $id], $update_format, ['%d']);
     }
 
-    // Récupération automatique des traductions depuis Bulbapedia (si name_en a changé ou traductions manquantes)
+    // Récupération auto Bulbapedia : nouvelles clés absentes de extra.names seulement (ne pas réécraser une trad effacée).
     if ($id > 0 && !empty($name_en) && function_exists('poke_hub_pokemon_auto_fetch_translations')) {
-        poke_hub_pokemon_auto_fetch_translations($id, $name_en, $dex_number);
+        poke_hub_pokemon_auto_fetch_translations($id, $name_en, $dex_number, false);
     }
 
     if ($id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_attacks')) {

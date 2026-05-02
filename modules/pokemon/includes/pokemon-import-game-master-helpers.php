@@ -320,13 +320,33 @@ function poke_hub_pokemon_get_i18n_names( $category, $slug, $default_en ) {
  * pour cette langue (chaîne vide). Évite d’effacer DE, IT, ES, JA, KO, etc. ajoutés
  * via l’admin Traduction ou un filtre, au re-import Game Master.
  *
+ * Quand `$preserve_empty_from_existing` vaut false (sauvegarde formulaire admin), une chaîne
+ * vide envoyée pour une langue du formulaire doit effacer cette traduction. Les langues présentes
+ * uniquement dans l’extra existant (hors tableau importé) sont conservées.
+ *
  * @param array<string, string>  $import_names   Noms issus de poke_hub_pokemon_get_i18n_names().
  * @param array<string, mixed>   $existing_extra JSON décodé de la ligne existante (colonne extra).
+ * @param bool                   $preserve_empty_from_existing Si true, réutilise l’ancien nom quand la source fournit vide.
  * @return array<string, string>
  */
-function poke_hub_pokemon_gm_merge_extra_names_with_existing( array $import_names, array $existing_extra ): array {
+function poke_hub_pokemon_gm_merge_extra_names_with_existing( array $import_names, array $existing_extra, bool $preserve_empty_from_existing = true ): array {
     if ( empty( $existing_extra['names'] ) || ! is_array( $existing_extra['names'] ) ) {
         return $import_names;
+    }
+
+    if ( ! $preserve_empty_from_existing ) {
+        $out = $import_names;
+        foreach ( $existing_extra['names'] as $lang => $old_val ) {
+            $lang = (string) $lang;
+            if ( $lang === '' || array_key_exists( $lang, $import_names ) ) {
+                continue;
+            }
+            $old_val = trim( (string) $old_val );
+            if ( $old_val !== '' ) {
+                $out[ $lang ] = $old_val;
+            }
+        }
+        return $out;
     }
 
     $out = $import_names;

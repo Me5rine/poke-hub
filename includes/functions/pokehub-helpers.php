@@ -1249,6 +1249,22 @@ function poke_hub_normalize_release_date(string $date): string {
 }
 
 /**
+ * Indique si une date de sortie (formats acceptés par {@see poke_hub_normalize_release_date}) est déjà arrivée ou est aujourd’hui,
+ * selon la date locale du site (WordPress « current_time »).
+ *
+ * Une chaîne non vide mais non analysable comme date retourne false.
+ */
+function poke_hub_release_date_is_past_or_today(string $raw): bool {
+    $norm = poke_hub_normalize_release_date($raw);
+    if ($norm === '') {
+        return false;
+    }
+    $today = function_exists('current_time') ? (string) current_time('Y-m-d') : gmdate('Y-m-d');
+
+    return strcmp($norm, $today) <= 0;
+}
+
+/**
  * Installe ou met à jour le schéma SQL (dbDelta) pour une liste de modules Poké HUB.
  *
  * Délègue à `Pokehub_DB::createTables()` : les noms de tables résolus passent par `pokehub_get_table()`

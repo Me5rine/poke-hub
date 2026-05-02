@@ -8,9 +8,12 @@ if (!defined('ABSPATH')) {
 /**
  * Lance l'import des dates de sortie Pokekalos (utilisable en CLI ou depuis l'admin).
  *
- * @param array $options  dry_run (bool), limit (int, 0 = toutes), delay (int), skip_existing (bool).
- *                        skip_existing = true : ne traiter que les Pokémon sans aucune date de sortie (les X premiers dans l'ordre BDD).
- *                        skip_existing = false : traiter les X premiers dans l'ordre BDD.
+ * @param array $options  dry_run (bool), limit (int, 0 = toutes), delay (int), skip_existing (bool),
+ *                        overwrite_existing_dates (bool).
+ *                        skip_existing : filtre la file d'attente (ne sélectionner que les fiches sans `release.normal` en SQL).
+ *                        overwrite_existing_dates = false (défaut) : ne pas remplacer une clé déjà renseignée dans `extra['release']`
+ *                        même si la date Pokekalos diffère.
+ *                        overwrite_existing_dates = true : ancien comportement agressif, remplacer par les dates Pokekalos.
  * @return array  [ 'log' => string[], 'updated' => int, 'skipped' => int, 'errors' => int, 'species_count' => int ]
  */
 function poke_hub_run_pokekalos_import(array $options = []): array {
@@ -20,6 +23,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
     $limit         = isset($options['limit']) ? (int) $options['limit'] : 0;
     $delay         = isset($options['delay']) ? (int) $options['delay'] : 1;
     $skip_existing = !empty($options['skip_existing']);
+    $overwrite_dates = !empty($options['overwrite_existing_dates']);
     if ($delay < 0) {
         $delay = 1;
     }
@@ -148,7 +152,8 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
     $log[] = 'Import des dates de sortie Pokekalos (uniquement Pokémon avec nom FR) — ' . count($tasks) . ' élément(s) (bases + méga dans l\'ordre dex)'
         . ($limit > 0 ? ' (limite ' . $limit . ')' : '')
         . ($dry_run ? ' [DRY RUN]' : '')
-        . ($skip_existing ? ' — uniquement ceux sans date de sortie' : '');
+        . ($skip_existing ? ' — file : uniquement fiches sans `release.normal`' : '')
+        . ($overwrite_dates ? ' — écraser les dates déjà en base pour chaque clé' : ' — conserver les dates déjà renseignées (ignorer divergences Pokekalos)');
     $log[] = '';
 
     foreach ($tasks as $task) {
@@ -249,8 +254,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
 
             foreach ($release as $key => $value) {
                 if ($value !== '') {
-                    // Skip : ne pas écraser une date déjà renseignée
-                    if ($skip_existing && trim((string) ($existing_release[$key] ?? '')) !== '') {
+                    if (!$overwrite_dates && trim((string) ($existing_release[$key] ?? '')) !== '') {
                         continue;
                     }
                     // Extraire la date JJ/MM/AAAA puis normaliser en YYYY-MM-DD (format en base)
@@ -392,7 +396,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                 ], $existing_release);
                 foreach ($release as $key => $value) {
                     if ($value !== '') {
-                        if ($skip_existing && trim((string) ($existing_release[$key] ?? '')) !== '') {
+                        if (!$overwrite_dates && trim((string) ($existing_release[$key] ?? '')) !== '') {
                             continue;
                         }
                         if (preg_match('#(\d{2}/\d{2}/\d{4})#', $value, $m)) {
@@ -442,7 +446,7 @@ function poke_hub_run_pokekalos_import(array $options = []): array {
                         $base_release = isset($base_extra['release']) && is_array($base_extra['release'])
                             ? $base_extra['release']
                             : [];
-                        if ($skip_existing && trim((string) ($base_release['mega'] ?? '')) !== '') {
+                        if (!$overwrite_dates && trim((string) ($base_release['mega'] ?? '')) !== '') {
                             continue;
                         }
                         $base_release = array_merge([

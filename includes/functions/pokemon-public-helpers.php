@@ -742,8 +742,8 @@ function pokehub_pokemon_can_be_shiny(int $pokemon_id): bool {
 }
 
 /**
- * Indique si un Pokémon a une date de sortie dans Pokémon GO pour le contexte donné.
- * Utilise extra->release (normal, shiny, shadow, mega, dynamax, gigantamax).
+ * Indique si un Pokémon est considéré comme sorti dans Pokémon GO pour le contexte donné
+ * (extra->release avec date normalisable et antérieure ou égale au jour courant dans le fuseau du site).
  *
  * @param int    $pokemon_id ID du Pokémon
  * @param string $context    Clé de sortie : 'normal', 'shiny', 'shadow', 'mega', 'dynamax', 'gigantamax'
@@ -795,7 +795,9 @@ function poke_hub_pokemon_is_released_in_go(int $pokemon_id, string $context = '
         $release = trim((string) ($rel['normal'] ?? ''));
     }
 
-    return $release !== '';
+    return function_exists('poke_hub_release_date_is_past_or_today')
+        ? poke_hub_release_date_is_past_or_today($release)
+        : ($release !== '');
 }
 
 /**

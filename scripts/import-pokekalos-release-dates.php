@@ -5,7 +5,9 @@
  * Non automatique : à lancer manuellement. Ne traite que les Pokémon avec nom français.
  *
  * Usage :
- *   php scripts/import-pokekalos-release-dates.php [--dry-run] [--limit=N] [--delay=N] [--skip-existing]
+ *   php scripts/import-pokekalos-release-dates.php [--dry-run] [--limit=N] [--delay=N] [--skip-existing] [--overwrite-existing]
+ *
+ * Sans --overwrite-existing : ne pas remplacer une date déjà renseignée en base pour une même clé.
  */
 
 $script_dir = __DIR__;
@@ -32,8 +34,9 @@ if (!function_exists('poke_hub_run_pokekalos_import')) {
 }
 
 $argv = $argv ?? [];
-$dry_run       = in_array('--dry-run', $argv, true);
-$skip_existing = in_array('--skip-existing', $argv, true);
+$dry_run            = in_array('--dry-run', $argv, true);
+$skip_existing      = in_array('--skip-existing', $argv, true);
+$overwrite_existing = in_array('--overwrite-existing', $argv, true);
 $limit         = 0;
 $delay         = 1;
 foreach ($argv as $arg) {
@@ -46,10 +49,11 @@ foreach ($argv as $arg) {
 }
 
 $result = poke_hub_run_pokekalos_import([
-    'dry_run'       => $dry_run,
-    'limit'         => $limit,
-    'delay'         => $delay,
-    'skip_existing' => $skip_existing,
+    'dry_run'                   => $dry_run,
+    'limit'                     => $limit,
+    'delay'                     => $delay,
+    'skip_existing'             => $skip_existing,
+    'overwrite_existing_dates'   => $overwrite_existing,
 ]);
 
 foreach ($result['log'] as $line) {

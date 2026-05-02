@@ -187,6 +187,15 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
 
         $in = implode(',', array_fill(0, count($ids), '%d'));
 
+        if (function_exists('poke_hub_suppress_form_slug_from_gm_auto_create')) {
+            $slug_rows = $wpdb->get_col(
+                call_user_func_array([$wpdb, 'prepare'], array_merge(["SELECT form_slug FROM {$table} WHERE id IN ($in)"], $ids))
+            );
+            foreach ($slug_rows as $slug_row) {
+                poke_hub_suppress_form_slug_from_gm_auto_create((string) $slug_row);
+            }
+        }
+
         if ($events_table) {
             $wpdb->query(
                 $wpdb->prepare(
@@ -421,6 +430,15 @@ function poke_hub_pokemon_handle_forms_form() {
         }
     }
 
+    // Libellé : ne pas l’écraser à l’import GM lorsque demandé en admin (`extra.manual_variant_label`).
+    if (!isset($extra_json)) {
+        if (!empty($_POST['manual_variant_label'])) {
+            $extra['manual_variant_label'] = true;
+        } else {
+            unset($extra['manual_variant_label']);
+        }
+    }
+
     // On laisse l'upsert s'occuper de :
     // - INSERT si form_slug inexistant
     // - UPDATE si déjà présent
@@ -492,13 +510,23 @@ function poke_hub_pokemon_handle_forms_form() {
             $category,
             $group_key,
             $extra,
-            ($action === 'update_form' && $id > 0) ? $id : 0
+            ($action === 'update_form' && $id > 0) ? $id : 0,
+            false
         );
     }
 
     if ($action === 'update_form' && $id > 0 && $variant_id <= 0) {
         wp_safe_redirect(add_query_arg('ph_msg', 'slug_conflict', $redirect_base));
         exit;
+    }
+
+    if ($action === 'add_form' && $variant_id <= 0) {
+        wp_safe_redirect(add_query_arg('ph_msg', 'slug_conflict', $redirect_base));
+        exit;
+    }
+
+    if ($variant_id > 0 && function_exists('poke_hub_unsuppress_form_slug_for_gm_auto_create')) {
+        poke_hub_unsuppress_form_slug_for_gm_auto_create($form_slug);
     }
 
     if ($variant_id > 0) {
@@ -574,6 +602,11 @@ function poke_hub_pokemon_handle_forms_delete() {
     $events_table = pokehub_get_table('pokemon_form_variant_events');
     if (!$table) {
         return;
+    }
+
+    $del_row = $wpdb->get_row($wpdb->prepare("SELECT form_slug FROM {$table} WHERE id = %d", $id));
+    if ($del_row && function_exists('poke_hub_suppress_form_slug_from_gm_auto_create')) {
+        poke_hub_suppress_form_slug_from_gm_auto_create((string) $del_row->form_slug);
     }
 
     if ($events_table) {
