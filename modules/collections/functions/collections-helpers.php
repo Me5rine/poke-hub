@@ -681,17 +681,18 @@ function poke_hub_collections_default_options(): array {
         'toolbar_decoration' => [
             'filters' => [
                 'image_url'    => '',
-                'object_key'   => '',
+                /* Relatif au dossier « Collections toolbar » (réglages Sources). */
+                'object_key'   => 'filters.png',
                 'content_type' => '',
             ],
             'pogo' => [
                 'image_url'    => '',
-                'object_key'   => '',
+                'object_key'   => 'search-strings.png',
                 'content_type' => '',
             ],
             'generations' => [
                 'image_url'    => '',
-                'object_key'   => '',
+                'object_key'   => 'generations.png',
                 'content_type' => '',
             ],
         ],
@@ -814,7 +815,15 @@ function poke_hub_collections_merge_toolbar_decoration_defaults(array $options):
             continue;
         }
         $b = isset($raw[ $strip ]) && is_array($raw[ $strip ]) ? $raw[ $strip ] : [];
-        $out[ $strip ] = array_merge($strip_def, $b);
+        $merged = array_merge($strip_def, $b);
+        $img    = isset($merged['image_url']) ? trim((string) $merged['image_url']) : '';
+        $ok     = isset($merged['object_key']) ? trim((string) $merged['object_key']) : '';
+        $def_ok = isset($strip_def['object_key']) ? trim((string) $strip_def['object_key']) : '';
+        /* Formulaire qui enregistre des chaînes vides : réappliquer la convention fichier par défaut si aucune URL directe. */
+        if ($img === '' && $ok === '' && $def_ok !== '') {
+            $merged['object_key'] = $def_ok;
+        }
+        $out[ $strip ] = $merged;
     }
     $options['toolbar_decoration'] = $out;
 
@@ -854,13 +863,18 @@ function poke_hub_collections_build_toolbar_decoration_asset_url(string $object_
     $base = function_exists('poke_hub_get_assets_bucket_base_url')
         ? poke_hub_get_assets_bucket_base_url()
         : (string) get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
-    $base = rtrim($base, '/');
+    $base = trim(rtrim($base, '/'));
     if ($base === '') {
-        return '';
+        $base = 'https://pokemon.me5rine-lab.com';
     }
-    $path = (string) get_option('poke_hub_assets_path_collections_toolbar', '/pokemon-go/collections-toolbar/');
-    $path = trim($path, '/');
-    $rel  = ltrim($object_key, '/');
+    $path = '';
+    if (function_exists('poke_hub_get_assets_path')) {
+        $path = trim((string) poke_hub_get_assets_path('collections_toolbar'), '/');
+    }
+    if ($path === '') {
+        $path = trim((string) get_option('poke_hub_assets_path_collections_toolbar', '/pokemon-go/collections-toolbar/'), '/');
+    }
+    $rel = ltrim($object_key, '/');
 
     return esc_url_raw($base . '/' . ($path !== '' ? $path . '/' : '') . $rel);
 }
@@ -877,6 +891,10 @@ function poke_hub_collections_get_toolbar_decoration_image_url(array $options, s
         return esc_url($url);
     }
     $key = isset($block['object_key']) ? trim((string) $block['object_key']) : '';
+    /* Désactiver explicitement le décor (rare) : object_key « - » ou « none » sans image_url. */
+    if ($key === '-' || strtolower($key) === 'none') {
+        return '';
+    }
     if ($key === '') {
         return '';
     }

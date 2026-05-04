@@ -261,6 +261,247 @@
     }
 
     /**
+     * Recalcule progression par région / génération (même logique que le PHP) et met à jour
+     * compteurs en-tête, liens « jump », résumés <summary> et images tuile (missing vs actif).
+     */
+    function pokehubItemStatusForId(items, id) {
+        if (!items) return undefined;
+        var k = String(id);
+        if (Object.prototype.hasOwnProperty.call(items, k) && items[k] != null) return String(items[k]);
+        if (Object.prototype.hasOwnProperty.call(items, id) && items[id] != null) return String(items[id]);
+        return undefined;
+    }
+
+    function pokehubPoolRowGenerationGroupLabel(p, i18n) {
+        i18n = i18n || {};
+        var region = (p.pokemon_region_name && String(p.pokemon_region_name).trim()) || '';
+        if (region) return region;
+        var fromGen = (p.generation_region_fallback_name && String(p.generation_region_fallback_name).trim()) || '';
+        if (fromGen) return fromGen;
+        var genNum = parseInt(p.generation_number, 10) || 0;
+        var genName = (p.generation_name && String(p.generation_name).trim()) || '';
+        if (genName) return genName;
+        if (genNum > 0) {
+            var tpl = i18n.generationNumber || 'Generation %d';
+            return tpl.replace('%d', String(genNum));
+        }
+        return '';
+    }
+
+    function pokehubResolvedStatusForRow(p, items) {
+        var id = parseInt(p.id, 10) || 0;
+        var st = pokehubItemStatusForId(items, id);
+        if (st !== undefined) {
+            return (st === 'owned' || st === 'for_trade' || st === 'missing') ? st : 'missing';
+        }
+        var bid = parseInt(p.synthetic_sex_base_id, 10) || 0;
+        if (p.synthetic_sex_collector && bid > 0) {
+            st = pokehubItemStatusForId(items, bid);
+            if (st !== undefined) {
+                return (st === 'owned' || st === 'for_trade' || st === 'missing') ? st : 'missing';
+            }
+        }
+        return 'missing';
+    }
+
+    function pokehubGenerationProgressFromPool(pool, items) {
+        var map = {};
+        var i18n = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
+        pool.forEach(function (p) {
+            if (!p || typeof p !== 'object') return;
+            var label = pokehubPoolRowGenerationGroupLabel(p, i18n);
+            if (!Object.prototype.hasOwnProperty.call(map, label)) {
+                map[label] = { owned: 0, for_trade: 0, total: 0 };
+            }
+            map[label].total++;
+            var st = pokehubResolvedStatusForRow(p, items);
+            if (st === 'owned') map[label].owned++;
+            else if (st === 'for_trade') map[label].for_trade++;
+        });
+        return map;
+    }
+
+    function pokehubSetTileMediaBackgroundFromAttrs(mediaEl, allMissing) {
+        if (!mediaEl) return;
+        var uMiss = mediaEl.getAttribute('data-pokehub-gen-tile-bg-missing') || '';
+        var uAct = mediaEl.getAttribute('data-pokehub-gen-tile-bg-active') || '';
+        var pick = allMissing ? (uMiss || uAct) : (uAct || uMiss);
+        if (!pick) return;
+        var urlCss = 'url(' + JSON.stringify(pick).slice(1, -1) + ')';
+        if (mediaEl.classList && mediaEl.classList.contains('pokehub-collection-generation-jump-link--has-media') && mediaEl.classList.contains('pokehub-collection-region-tile--jump')) {
+            mediaEl.style.setProperty('--pokehub-gen-jump-bg', urlCss);
+            return;
+        }
+        mediaEl.style.backgroundImage = urlCss;
+    }
+
+    function pokehubUpdateRegionTileProgressUI(tileRoot, prog, o) {
+        var gOwned = prog.owned;
+        var gTotal = prog.total;
+        var gForTrade = prog.for_trade || 0;
+        var gAllMissing = gTotal > 0 && gOwned === 0 && gForTrade === 0;
+        var gDone = gTotal > 0 && gOwned >= gTotal;
+        var gPct = gTotal > 0 ? Math.min(100, Math.round((gOwned / gTotal) * 100)) : 0;
+        var gjShowBar = gTotal > 0 && !gDone;
+        var genLabel = o.genLabel;
+
+        if (o.isJump) {
+            tileRoot.classList.toggle('pokehub-collection-generation-jump-link--empty', gTotal === 0);
+            tileRoot.classList.toggle('pokehub-collection-generation-jump-link--zero-progress', gTotal > 0 && gAllMissing);
+            tileRoot.classList.toggle('pokehub-collection-region-tile--has-owned', gTotal > 0 && gOwned > 0);
+            if (o.ariaJumpTpl) {
+                var ariaj = o.ariaJumpTpl.replace(/%1\$s/g, genLabel).replace(/%2\$d/g, String(gOwned)).replace(/%3\$d/g, String(gTotal));
+                tileRoot.setAttribute('aria-label', ariaj);
+            }
+        } else {
+            tileRoot.classList.toggle('pokehub-collection-region-tile--empty-region', gTotal === 0);
+            tileRoot.classList.toggle('pokehub-collection-region-tile--zero-progress', gTotal > 0 && gAllMissing);
+            tileRoot.classList.toggle('pokehub-collection-region-tile--has-owned', gTotal > 0 && gOwned > 0);
+        }
+
+        var body = tileRoot.querySelector('.pokehub-collection-region-tile__body');
+        if (!body) return;
+        var titleEl = body.querySelector('.pokehub-collection-region-tile__title');
+        var finishedText = o.finishedText || 'Finished';
+
+        var completeEl = body.querySelector('.pokehub-collection-region-tile__complete');
+        if (gDone) {
+            if (!completeEl && titleEl) {
+                var sp = document.createElement('span');
+                sp.className = 'pokehub-collection-region-tile__complete';
+                sp.textContent = finishedText;
+                titleEl.insertAdjacentElement('afterend', sp);
+            }
+        } else if (completeEl) {
+            completeEl.remove();
+        }
+
+        var barWrap = body.querySelector('.pokehub-collection-region-tile__bar');
+        if (gjShowBar) {
+            if (!barWrap) {
+                barWrap = document.createElement('span');
+                barWrap.className = 'pokehub-collection-region-tile__bar';
+                barWrap.setAttribute('role', 'progressbar');
+                barWrap.setAttribute('aria-valuemin', '0');
+                var barInner = document.createElement('span');
+                barInner.className = 'pokehub-collection-region-tile__bar-fill';
+                barWrap.appendChild(barInner);
+                var statsEl0 = body.querySelector('.pokehub-collection-region-tile__stats');
+                if (statsEl0) {
+                    body.insertBefore(barWrap, statsEl0);
+                } else {
+                    body.appendChild(barWrap);
+                }
+            }
+            var fill = barWrap.querySelector('.pokehub-collection-region-tile__bar-fill');
+            if (!fill) {
+                fill = document.createElement('span');
+                fill.className = 'pokehub-collection-region-tile__bar-fill';
+                barWrap.appendChild(fill);
+            }
+            fill.style.width = String(gPct) + '%';
+            barWrap.setAttribute('aria-valuemax', String(gTotal));
+            barWrap.setAttribute('aria-valuenow', String(gOwned));
+            if (o.isJump && o.ariaJumpTpl) {
+                var aBar = o.ariaJumpTpl.replace(/%1\$s/g, genLabel).replace(/%2\$d/g, String(gOwned)).replace(/%3\$d/g, String(gTotal));
+                barWrap.setAttribute('aria-label', aBar);
+            } else if (!o.isJump && o.ariaSummaryTpl) {
+                var aBar2 = o.ariaSummaryTpl.replace(/%1\$s/g, genLabel).replace(/%2\$d/g, String(gOwned)).replace(/%3\$d/g, String(gTotal));
+                barWrap.setAttribute('aria-label', aBar2);
+            }
+        } else if (barWrap) {
+            barWrap.remove();
+        }
+
+        var statsEl = body.querySelector('.pokehub-collection-region-tile__stats');
+        if (gTotal > 0) {
+            if (!statsEl) {
+                statsEl = document.createElement('span');
+                statsEl.className = 'pokehub-collection-region-tile__stats';
+                if (o.isJump) statsEl.setAttribute('aria-hidden', 'true');
+                body.appendChild(statsEl);
+            }
+            statsEl.textContent = String(gOwned) + ' / ' + String(gTotal);
+        } else if (statsEl) {
+            statsEl.remove();
+        }
+
+        var mediaTarget = (o.isJump && tileRoot.classList && tileRoot.classList.contains('pokehub-collection-generation-jump-link--has-media'))
+            ? tileRoot
+            : tileRoot.querySelector('.pokehub-collection-region-tile__media');
+        pokehubSetTileMediaBackgroundFromAttrs(mediaTarget, gAllMissing);
+    }
+
+    function pokehubRefreshCollectionProgressUIFromItems(viewWrap, tileContainer, items) {
+        if (!viewWrap || !tileContainer) return;
+        var pool = [];
+        try {
+            pool = JSON.parse(tileContainer.getAttribute('data-pool') || '[]');
+        } catch (e0) {}
+        if (!pool.length) return;
+
+        var genProg = pokehubGenerationProgressFromPool(pool, items);
+        var ownedAll = 0;
+        pool.forEach(function (p) {
+            if (pokehubResolvedStatusForRow(p, items) === 'owned') ownedAll++;
+        });
+        var totalPool = pool.length;
+
+        var ariaProg = viewWrap.getAttribute('data-pokehub-aria-progress') || '';
+        var ariaJump = viewWrap.getAttribute('data-pokehub-aria-jump') || '';
+        var ariaSum = viewWrap.getAttribute('data-pokehub-aria-summary') || '';
+        var finishedText = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n && pokeHubCollections.i18n.finished)
+            ? pokeHubCollections.i18n.finished
+            : 'Finished';
+
+        viewWrap.querySelectorAll('.pokehub-collection-progress-n').forEach(function (n) {
+            n.textContent = String(ownedAll);
+        });
+        viewWrap.querySelectorAll('.pokehub-collection-progress-total').forEach(function (t) {
+            t.textContent = String(totalPool);
+        });
+        if (ariaProg) {
+            var ariaBadge = ariaProg.replace(/%1\$d/g, String(ownedAll)).replace(/%2\$d/g, String(totalPool));
+            viewWrap.querySelectorAll('.pokehub-collection-progress-badge').forEach(function (b) {
+                b.setAttribute('aria-label', ariaBadge);
+            });
+        }
+
+        viewWrap.querySelectorAll('.pokehub-collection-generation-block[data-generation]').forEach(function (details) {
+            var genKey = details.getAttribute('data-generation') || '';
+            var prog = genProg[genKey] || { owned: 0, for_trade: 0, total: 0 };
+            details.classList.toggle('pokehub-collection-generation-block--empty', prog.total === 0);
+
+            var summary = details.querySelector('summary.pokehub-collection-region-tile--summary');
+            if (summary) {
+                pokehubUpdateRegionTileProgressUI(summary, prog, {
+                    isJump: false,
+                    genLabel: genKey,
+                    ariaJumpTpl: ariaJump,
+                    ariaSummaryTpl: ariaSum,
+                    finishedText: finishedText,
+                });
+            }
+
+            var anchor = details.getAttribute('id') || '';
+            if (!anchor) return;
+            var jump = null;
+            viewWrap.querySelectorAll('.pokehub-collection-generation-jump-link[data-generation-anchor]').forEach(function (a) {
+                if (!jump && a.getAttribute('data-generation-anchor') === anchor) jump = a;
+            });
+            if (jump) {
+                pokehubUpdateRegionTileProgressUI(jump, prog, {
+                    isJump: true,
+                    genLabel: genKey,
+                    ariaJumpTpl: ariaJump,
+                    ariaSummaryTpl: ariaSum,
+                    finishedText: finishedText,
+                });
+            }
+        });
+    }
+
+    /**
      * Filtre d’affichage : masque ou réaffiche les tuiles selon le bloc « Afficher dans la grille »
      * (cases = statuts visibles : possédé / à l'échange / manquant → données owned / for_trade / missing).
      * @returns {function} fonction apply() à rappeler après changement de statut d’une tuile
@@ -614,12 +855,20 @@
                 tileContainer.setAttribute('data-items', JSON.stringify(items));
             } catch (err) {}
             var pogoViewWrap = (tile && tile.closest) ? tile.closest('.pokehub-collection-view-wrap') : null;
-            if (typeof window.pokeHubPogoSearchRefresh === 'function' && pogoViewWrap) {
-                window.pokeHubPogoSearchRefresh(pogoViewWrap);
-            } else if (typeof window.pokeHubPogoSearchRefresh === 'function' && viewWrapTiles) {
-                window.pokeHubPogoSearchRefresh(viewWrapTiles);
+            if (pogoViewWrap) {
+                pogoScheduleRefreshForWrap(pogoViewWrap);
+            } else if (viewWrapTiles) {
+                pogoScheduleRefreshForWrap(viewWrapTiles);
             }
             applyStatusFilters();
+            pokehubRefreshCollectionProgressUIFromItems(viewWrapTiles || tileWrap, tileContainer, items);
+            if (typeof tile.focus === 'function') {
+                try {
+                    tile.focus({ preventScroll: true });
+                } catch (errFocus) {
+                    tile.focus();
+                }
+            }
 
             if (isLocal || !collectionId) {
                 var localSlug = new URLSearchParams(window.location.search).get('collection');
@@ -681,6 +930,7 @@
                     }
                 });
                 applyStatusFilters();
+                pokehubRefreshCollectionProgressUIFromItems(viewWrapTiles || tileWrap, tileContainer, items);
             }
         }
     }
@@ -802,11 +1052,16 @@
                                 });
                                 tilesEl.setAttribute('data-items', JSON.stringify(mR));
                             }
-                            if (typeof window.pokeHubPogoSearchRefresh === 'function') {
-                                window.pokeHubPogoSearchRefresh(localWrap);
-                            }
+                            pogoScheduleRefreshForWrap(localWrap);
                             applyLocalFilters();
                             updateLocalCollectionStats();
+                            if (typeof tile.focus === 'function') {
+                                try {
+                                    tile.focus({ preventScroll: true });
+                                } catch (errLf) {
+                                    tile.focus();
+                                }
+                            }
                         });
                         tilesEl.appendChild(tile);
                     });
@@ -819,9 +1074,7 @@
                         tilesEl.setAttribute('data-items', JSON.stringify(m));
                     }());
                     tilesEl.setAttribute('data-pool', JSON.stringify(pool));
-                    if (typeof window.pokeHubPogoSearchRefresh === 'function') {
-                        window.pokeHubPogoSearchRefresh(localWrap);
-                    }
+                    pogoScheduleRefreshForWrap(localWrap);
                     applyLocalFilters();
                     updateLocalCollectionStats();
                 })
@@ -1319,7 +1572,25 @@
         console.log.apply(console, a);
     }
 
-    var POGO_GROUP_ORDER = ['base', 'alola', 'galar', 'paldea', 'hisui', 'mega', 'gigamax', 'dynamax', 'male', 'female', 'costume', 'fond', 'fond_dynamax', 'fond_gigamax'];
+    var POGO_GROUP_ORDER = [
+        'base',
+        'alola', 'alolaMale', 'alolaFemale',
+        'galar', 'galarMale', 'galarFemale',
+        'paldea', 'paldeaMale', 'paldeaFemale',
+        'hisui', 'hisuiMale', 'hisuiFemale',
+        'mega', 'megaMale', 'megaFemale',
+        'gigamax', 'gigamaxMale', 'gigamaxFemale',
+        'dynamax', 'dynamaxMale', 'dynamaxFemale',
+        'male', 'female',
+        'costume', 'costumeMale', 'costumeFemale',
+        'fond', 'fond_dynamax', 'fond_gigamax',
+    ];
+    /** Groupes « variante + sexe » (jeton listé une fois : la dédup retire le parent nu et les listes mâle/femelle hors variante). */
+    var POGO_SEX_COMPOUND_GROUPS = [
+        'alolaMale', 'alolaFemale', 'galarMale', 'galarFemale', 'paldeaMale', 'paldeaFemale', 'hisuiMale', 'hisuiFemale',
+        'megaMale', 'megaFemale', 'gigamaxMale', 'gigamaxFemale', 'dynamaxMale', 'dynamaxFemale',
+        'costumeMale', 'costumeFemale',
+    ];
     var POGO_PREFIX = {
         base: '',
         alola: '',
@@ -1329,6 +1600,8 @@
         mega: '',
         gigamax: '',
         dynamax: '',
+        dynamaxMale: '',
+        dynamaxFemale: '',
         male: 'male&',
         female: 'female&',
         costume: '', /* no filtre sûr partout : liste de noms seulement */
@@ -1336,6 +1609,10 @@
         fond_dynamax: '',
         fond_gigamax: '',
     };
+    function pogoSexCompoundParentGkey(gkey) {
+        var m = /^(dynamax|costume|mega|gigamax|alola|galar|paldea|hisui)(Male|Female)$/.exec(String(gkey || ''));
+        return m ? m[1] : '';
+    }
     function pogoGroupPrefix(gkey, tokenMode, sampleRow) {
         var k = tokenMode === 'name_en' ? 'pogo_group_prefix_en' : 'pogo_group_prefix_fr';
         if (gkey === 'fond_dynamax') {
@@ -1350,11 +1627,21 @@
         if (gkey === 'gigamax') {
             return (tokenMode === 'name_en') ? 'gigantamax&' : 'gigamax&';
         }
+        var compoundParent = pogoSexCompoundParentGkey(gkey);
+        if (compoundParent) {
+            var sexBit = /Female$/.test(gkey) ? 'female&' : 'male&';
+            return pogoGroupPrefix(compoundParent, tokenMode, sampleRow) + sexBit;
+        }
         if (gkey === 'dynamax') {
             return 'dynamax&';
         }
         if (gkey === 'costume') {
             return (tokenMode === 'name_en') ? 'event&' : 'costume&';
+        }
+        /* Mâle / femelle : toujours male& / female& — pas le préfixe variante (pogo_group_prefix_*) de la ligne
+         * d’exemple (ex. jeton « costume » / donnée erronée type « copy2019 » qui remplaçait « female& »). */
+        if (gkey === 'male' || gkey === 'female') {
+            return POGO_PREFIX[gkey] !== undefined ? POGO_PREFIX[gkey] : '';
         }
         if (sampleRow && sampleRow[k]) {
             var raw = String(sampleRow[k]).trim();
@@ -1504,6 +1791,8 @@
             }
         }
         if (gk === 'male' || gk === 'female') {
+            /* Lignes mâle/fem. « classiques » : retirer un suffixe Dynamax resté sur le jeton (ex. venusaurdynamax). */
+            out = pogoSearchFormTokenNamePart(String(out || ''), 'dynamax') || out;
             out = pogoStripSexDimorphismFromToken(out);
         }
         return out;
@@ -1554,6 +1843,41 @@
         if (s.indexOf('paldea') !== -1 || s.indexOf('paldean') !== -1) return 'paldea';
         if (s.indexOf('hisui') !== -1 || s.indexOf('hisuian') !== -1) return 'hisui';
         return '';
+    }
+    /**
+     * Groupe « parent » pour une ligne collector sexe synthétique : sans bruit slug mâle/femelle (évite Nidoran♀/♂ → female/male).
+     * @return {string} dynamax|gigamax|mega|costume|alola|galar|paldea|hisui|base
+     */
+    function pogoSexVariantParentGroup(row) {
+        if (!row) {
+            return 'base';
+        }
+        if (row.synthetic_gigantamax || String(row.form_category || '').toLowerCase() === 'gigantamax') {
+            return 'gigamax';
+        }
+        if (row.synthetic_dynamax || String(row.form_category || '').toLowerCase() === 'dynamax') {
+            return 'dynamax';
+        }
+        var c = String(row.form_category || 'normal').toLowerCase();
+        if (c === 'mega' || c === 'megax' || c === 'primal') {
+            return 'mega';
+        }
+        var prk = row.pogo_regional_key ? String(row.pogo_regional_key).toLowerCase() : '';
+        if (prk === 'alola' || prk === 'galar' || prk === 'paldea' || prk === 'hisui') {
+            return prk;
+        }
+        if (c === 'costume' || c === 'costume_shiny') {
+            return 'costume';
+        }
+        var slug = String(row.form_slug || row.slug || '').toLowerCase();
+        var reg = pogoGuessRegionalGroupFromSlugs(slug);
+        if (reg) {
+            return reg;
+        }
+        if (slug.indexOf('costume') !== -1) {
+            return 'costume';
+        }
+        return 'base';
     }
     /**
      * Même logique d’avant, sans mâle/femelle ni fond : pour placer D/G-Max+ fond / jetons d’assise.
@@ -1607,6 +1931,15 @@
         if (c !== 'normal' && c !== '' && c !== 'standard') {
             return 'other';
         }
+        /* Forme Dynamax : le slug peut rester celui de l’espèce (ex. venusaur) ; le jeton GO fusionne déjà « …dynamax ». */
+        if (!row.synthetic_gigantamax) {
+            var tokBlob = pogoStripAccents(String(
+                (row.pogo_token_fr || '') + ' ' + (row.pogo_token_en || '') + ' ' + pogoNameToken(row, 'fr') + ' ' + pogoNameToken(row, 'en')
+            ).toLowerCase().replace(/[^a-z0-9]/g, ''));
+            if (tokBlob.indexOf('dynamax') !== -1) {
+                return 'dynamax';
+            }
+        }
         return 'base';
     }
     /**
@@ -1639,6 +1972,10 @@
         if (gkey === 'fond') {
             return pogoFondListTokenGkey(row);
         }
+        var pc = pogoSexCompoundParentGkey(gkey);
+        if (pc) {
+            return pc;
+        }
         return gkey;
     }
     /**
@@ -1647,7 +1984,26 @@
      */
     function pogoDetectGroup(row) {
         if (row.synthetic_sex_collector && row.synthetic_sex) {
-            return String(row.synthetic_sex) === 'female' ? 'female' : 'male';
+            var sexLow = String(row.synthetic_sex).toLowerCase();
+            var isFemale = sexLow === 'female';
+            var suf = isFemale ? 'Female' : 'Male';
+            var parent = pogoSexVariantParentGroup(row);
+            if (parent === 'dynamax') {
+                return 'dynamax' + suf;
+            }
+            if (parent === 'costume') {
+                return 'costume' + suf;
+            }
+            if (parent === 'mega') {
+                return 'mega' + suf;
+            }
+            if (parent === 'gigamax') {
+                return 'gigamax' + suf;
+            }
+            if (parent === 'alola' || parent === 'galar' || parent === 'paldea' || parent === 'hisui') {
+                return parent + suf;
+            }
+            return isFemale ? 'female' : 'male';
         }
         var hasBg = (row.synthetic_go_background) || (row.background_image_url && String(row.background_image_url).trim() !== '');
         if (hasBg) {
@@ -1708,6 +2064,95 @@
             });
         } else {
             arr.sort();
+        }
+    }
+
+    /**
+     * Jeton déjà listé en « variante + sexe » (ex. costume&female&, mega&male&, dynamax&male&) : ne pas le répéter
+     * dans la phrase du parent nu ni en classique / mâle / femelle hors cette variante (même jeton = une seule ligne utile).
+     *
+     * @param {Object<string, string[]>} byGroup
+     */
+    function pogoDedupeTokensForSexCompoundVariants(byGroup) {
+        var pri = {};
+        for (var ci = 0; ci < POGO_SEX_COMPOUND_GROUPS.length; ci++) {
+            var ck = POGO_SEX_COMPOUND_GROUPS[ci];
+            (byGroup[ck] || []).forEach(function (t) {
+                if (t) {
+                    pri[t] = true;
+                }
+            });
+        }
+        if (!Object.keys(pri).length) {
+            return;
+        }
+        var stripFrom = ['base', 'male', 'female', 'dynamax', 'mega', 'gigamax', 'costume', 'alola', 'galar', 'paldea', 'hisui'];
+        stripFrom.forEach(function (g) {
+            var arr = byGroup[g];
+            if (!arr || !arr.length) {
+                return;
+            }
+            byGroup[g] = arr.filter(function (t) {
+                return t && !pri[t];
+            });
+        });
+    }
+
+    /**
+     * Même jeton en variante+mâle et variante+femelle (ex. dynamax&male&venusaur et dynamax&female&venusaur) :
+     * une seule recherche sans sexe suffit → on retire des deux listes composées et on place le jeton dans le parent (dynamax&, …).
+     *
+     * @param {Object<string, string[]>} byGroup
+     * @param {string} listBy 'number' | 'name'
+     */
+    function pogoMergeSexCompoundDupesIntoParent(byGroup, listBy) {
+        var parents = ['dynamax', 'costume', 'mega', 'gigamax', 'alola', 'galar', 'paldea', 'hisui'];
+        for (var pi = 0; pi < parents.length; pi++) {
+            var p = parents[pi];
+            var gm = p + 'Male';
+            var gf = p + 'Female';
+            var maleArr = byGroup[gm] || [];
+            var femaleArr = byGroup[gf] || [];
+            if (!maleArr.length || !femaleArr.length) {
+                continue;
+            }
+            var fset = {};
+            for (var fi = 0; fi < femaleArr.length; fi++) {
+                fset[femaleArr[fi]] = true;
+            }
+            var inBoth = [];
+            var inBothSet = {};
+            for (var mi = 0; mi < maleArr.length; mi++) {
+                var t = maleArr[mi];
+                if (t && fset[t] && !inBothSet[t]) {
+                    inBothSet[t] = true;
+                    inBoth.push(t);
+                }
+            }
+            if (!inBoth.length) {
+                continue;
+            }
+            var rm = inBothSet;
+            byGroup[gm] = maleArr.filter(function (x) {
+                return !rm[x];
+            });
+            byGroup[gf] = femaleArr.filter(function (x) {
+                return !rm[x];
+            });
+            var parentArr = byGroup[p] ? byGroup[p].slice() : [];
+            var bseen = {};
+            for (var bi = 0; bi < parentArr.length; bi++) {
+                bseen[parentArr[bi]] = true;
+            }
+            for (var ii = 0; ii < inBoth.length; ii++) {
+                var tok = inBoth[ii];
+                if (tok && !bseen[tok]) {
+                    parentArr.push(tok);
+                    bseen[tok] = true;
+                }
+            }
+            pogoSortTokenStrings(parentArr, listBy);
+            byGroup[p] = parentArr;
         }
     }
 
@@ -1847,6 +2292,8 @@
             }
             byGroup[k] = toks;
         }
+        pogoDedupeTokensForSexCompoundVariants(byGroup);
+        pogoMergeSexCompoundDupesIntoParent(byGroup, listBy);
         pogoMergeMaleFemaleDupesIntoBase(byGroup, listBy);
         outEl.textContent = '';
         var any = false;
@@ -2050,7 +2497,8 @@
      * le scroll lissé fait ensuite apparaître la barre : une correction de scroll compense (voir jump).
      */
     function pokeHubCollectionJumpOcclusionBottomPx(wrap) {
-        var fixedTb = wrap.querySelector('[data-collection-fixed-toolbar]');
+        /** La barre est déplacée sous document.body (initCollectionFixedToolbar) : ne plus la chercher avec wrap.querySelector. */
+        var fixedTb = document.querySelector('[data-collection-fixed-toolbar]');
         if (fixedTb && !fixedTb.hasAttribute('hidden')) {
             return fixedTb.getBoundingClientRect().bottom;
         }
@@ -2321,6 +2769,13 @@
                 return;
             }
 
+            /** Hors du wrap : un ancêtre (p. ex. colonne Elementor avec transform) recréerait un bloc de positionnement pour les descendants en position:fixed — header site + barre semblent « décollés » du viewport. */
+            try {
+                if (fixedHost.parentNode && fixedHost.parentNode !== document.body) {
+                    document.body.appendChild(fixedHost);
+                }
+            } catch (eTbReparent) {}
+
             var orderedKeys = [];
             defaultOrder.forEach(function (k) {
                 if (wrap.querySelector('[data-collection-toolbar-slot="' + k + '"]')) {
@@ -2387,8 +2842,21 @@
                 }).join('|');
             }
 
+            /**
+             * Panneau filtres / GO / gén. / selectors : en flux il est sous .pokehub-collection-view-wrap ;
+             * une fois la barre fixe reparentée sous document.body, le panneau ouvert vit dans [data-fixed-expand-inner],
+             * donc wrap.querySelector seul ne le trouve plus — d’où accumulations dans l’expand et tuiles « fantômes ».
+             */
             function sectionBodyFor(type) {
-                return wrap.querySelector('[data-collection-fixed-tile="' + type + '"]');
+                if (!type) {
+                    return null;
+                }
+                var sel = '[data-collection-fixed-tile="' + type + '"]';
+                var inWrap = wrap.querySelector(sel);
+                if (inWrap) {
+                    return inWrap;
+                }
+                return expandInner && expandInner.querySelector ? expandInner.querySelector(sel) : null;
             }
 
             function slotFor(type) {
@@ -2428,6 +2896,20 @@
                 var body = sectionBodyFor(type);
                 var slot = slotFor(type);
                 if (!body || !slot) return;
+                /* Rattrapage si l’état DOM a dérivé (anciennes versions ou race) : un seul panneau dans l’expand. */
+                if (expandInner && expandInner.querySelectorAll) {
+                    expandInner.querySelectorAll('[data-collection-fixed-tile]').forEach(function (node) {
+                        var nk = (node.getAttribute('data-collection-fixed-tile') || '').trim();
+                        if (!nk || nk === type || node.parentNode !== expandInner) {
+                            return;
+                        }
+                        var sl = slotFor(nk);
+                        if (sl) {
+                            sl.appendChild(node);
+                            sl.style.minHeight = '';
+                        }
+                    });
+                }
                 if (openExpandedKey && openExpandedKey !== type) {
                     closeExpand('preserve-select2');
                 }
@@ -2462,6 +2944,55 @@
                 return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
             }
 
+            /** Extrait la première URL d’un `background-image` CSS (url("…") ou url(…)). */
+            function pokehubParseCssBackgroundImageUrl(bi) {
+                var s = String(bi || '').trim();
+                if (!s || s === 'none') {
+                    return '';
+                }
+                var dq = s.match(/url\s*\(\s*"([^"]*)"\s*\)/i);
+                if (dq) {
+                    return dq[1].trim();
+                }
+                var sq = s.match(/url\s*\(\s*'([^']*)'\s*\)/i);
+                if (sq) {
+                    return sq[1].trim();
+                }
+                var uq = s.match(/url\s*\(\s*([^)]+)\s*\)/i);
+                if (!uq) {
+                    return '';
+                }
+                var inner = uq[1].trim();
+                if ((inner.charAt(0) === '"' && inner.charAt(inner.length - 1) === '"') || (inner.charAt(0) === "'" && inner.charAt(inner.length - 1) === "'")) {
+                    inner = inner.slice(1, -1).trim();
+                }
+                return inner;
+            }
+
+            /** URL décor barre fixe : attribut data, sinon même image que la carte flux (.toolbar-panel-media). */
+            function pokehubFixedToolbarDecorationUrl(panelEl) {
+                if (!panelEl) {
+                    return '';
+                }
+                var u = (panelEl.getAttribute('data-toolbar-decoration-url') || '').trim();
+                if (u) {
+                    return u;
+                }
+                var hel = panelEl.querySelector('.pokehub-collection-toolbar-panel-media');
+                if (!hel) {
+                    return '';
+                }
+                var bi = (hel.style && hel.style.backgroundImage) ? String(hel.style.backgroundImage).trim() : '';
+                if (!bi || bi === 'none') {
+                    try {
+                        bi = window.getComputedStyle ? String(window.getComputedStyle(hel).backgroundImage || '').trim() : '';
+                    } catch (eBg) {
+                        bi = '';
+                    }
+                }
+                return pokehubParseCssBackgroundImageUrl(bi);
+            }
+
             function rebuildTiles(buttonActiveKey) {
                 clearTilesUi();
                 var added = [];
@@ -2472,7 +3003,7 @@
                     added.push(k);
                     var labelFull = (body.getAttribute('data-collection-fixed-label') || k).trim();
                     var labelShort = (body.getAttribute('data-collection-fixed-label-short') || labelFull).trim();
-                    var decoUrl = (body.getAttribute('data-toolbar-decoration-url') || '').trim();
+                    var decoUrl = pokehubFixedToolbarDecorationUrl(body);
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'pokehub-collection-fixed-tile-btn' + (decoUrl ? ' pokehub-collection-fixed-tile-btn--has-media' : '');
@@ -2487,10 +3018,10 @@
                     labelSpan.textContent = pokehubUseShortFixedTileLabels() ? labelShort : labelFull;
                     btn.appendChild(labelSpan);
                     if (decoUrl) {
+                        btn.style.setProperty('--pokehub-fixed-tile-bg', 'url(' + JSON.stringify(decoUrl) + ')');
                         var media = document.createElement('span');
                         media.className = 'pokehub-collection-fixed-tile-btn-media';
                         media.setAttribute('aria-hidden', 'true');
-                        media.style.backgroundImage = 'url(' + JSON.stringify(decoUrl) + ')';
                         btn.appendChild(media);
                     }
                     btn.addEventListener('click', function () {
