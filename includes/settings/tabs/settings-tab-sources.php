@@ -52,6 +52,8 @@ $assets_path_vivillon = get_option('poke_hub_assets_path_vivillon', '/pokemon-go
 $assets_path_weathers = get_option('poke_hub_assets_path_weathers', '/pokemon-go/weathers/');
 $assets_path_avatar_shop = get_option('poke_hub_assets_path_avatar_shop', '/pokemon-go/avatar-shop/');
 $assets_path_in_game_stickers = get_option('poke_hub_assets_path_in_game_stickers', '/pokemon-go/in-game-stickers/');
+/** Décors barre d’outils collections + tuiles région / saut génération : un seul dossier bucket (voir description formulaire). */
+$assets_path_collections_toolbar = get_option('poke_hub_assets_path_collections_toolbar', '/pokemon-go/collections-toolbar/');
 
 // Pokémon images fallback base URL (bucket secondaire, même clés de fichiers)
 $pokemon_assets_fallback_url = get_option('poke_hub_pokemon_assets_fallback_base_url', '');
@@ -154,6 +156,12 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     }
     if (isset($_POST['poke_hub_assets_path_in_game_stickers'])) {
         update_option('poke_hub_assets_path_in_game_stickers', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_in_game_stickers'])));
+    }
+    if (isset($_POST['poke_hub_assets_path_collections_toolbar'])) {
+        update_option('poke_hub_assets_path_collections_toolbar', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_collections_toolbar'])));
+        delete_option('poke_hub_generation_jump_tile_template');
+        delete_option('poke_hub_generation_jump_tile_template_active');
+        delete_option('poke_hub_generation_jump_tile_template_all_missing');
     }
 
     if (isset($_POST['poke_hub_pokemon_assets_fallback_base_url'])) {
@@ -566,6 +574,20 @@ foreach ($messages as $msg) {
                                     placeholder="/pokemon-go/in-game-stickers/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
                                     <?php _e('Raster: slug.webp preferred, slug.png fallback (same folder as item slug).', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Collections toolbar (bucket folder)', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_collections_toolbar"
+                                    value="<?php echo esc_attr($assets_path_collections_toolbar); ?>"
+                                    class="regular-text"
+                                    placeholder="/pokemon-go/collections-toolbar/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('Single folder under the assets bucket for this site: panel decorations (filters, GO strings, jump to generation) and region shortcut tiles. In collection settings, « Object key » is a path under this folder (e.g. filters.png, go-banner.png, generation-tiles/pokehub-gen-kanto.png). Region tiles use slug-based files: generation-tiles/pokehub-gen-{slug}.png when you have at least one owned or for trade, and the same path with -grey before the extension when all are still missing (e.g. …-kanto-grey.png). You can also use a flat layout (my-region-slug.png). Absolute URLs in collection settings still override.', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

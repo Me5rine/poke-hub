@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.5.6
+Version: 2.5.7
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -521,6 +521,57 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
     );
 }
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_admin_unified_styles');
+
+/**
+ * Thème / outils tiers : éviter WP 6.9.1 « dependencies that are not registered » en admin lorsqu’une feuille
+ * (ex. admin-lab-colors-style) liste elementor-frontend alors que Elementor ne l’enregistre pas dans le back-office.
+ */
+function poke_hub_normalize_admin_lab_colors_style_dependency(): void {
+    if (!is_admin()) {
+        return;
+    }
+
+    $handle = 'admin-lab-colors-style';
+    $wp_styles = wp_styles();
+    if (empty($wp_styles->registered[$handle])) {
+        return;
+    }
+
+    /** @var _WP_Dependency $dependency */
+    $dependency = $wp_styles->registered[$handle];
+    $deps = isset($dependency->deps) ? (array) $dependency->deps : [];
+    $fixed = [];
+    foreach ($deps as $dep) {
+        $dep = (string) $dep;
+        if ($dep === '') {
+            continue;
+        }
+        if (isset($wp_styles->registered[$dep])) {
+            $fixed[] = $dep;
+        }
+    }
+    if ($fixed === $deps) {
+        return;
+    }
+
+    $src = (string) $dependency->src;
+    if ($src === '') {
+        return;
+    }
+
+    $enqueued = wp_style_is($handle, 'enqueued');
+
+    wp_deregister_style($handle);
+    wp_register_style($handle, $src, $fixed, $dependency->ver);
+    foreach ((array) $dependency->extra as $extra_key => $extra_val) {
+        wp_style_add_data($handle, (string) $extra_key, $extra_val);
+    }
+
+    if ($enqueued) {
+        wp_enqueue_style($handle);
+    }
+}
+add_action('admin_enqueue_scripts', 'poke_hub_normalize_admin_lab_colors_style_dependency', PHP_INT_MAX);
 
 /**
  * Charger le CSS des metaboxes PokeHub sur l’écran d’édition d’article / événement

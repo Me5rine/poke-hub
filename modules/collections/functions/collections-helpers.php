@@ -674,6 +674,45 @@ function poke_hub_collections_default_options(): array {
         'include_both_sexes_collector' => false,
         /* Liste personnalisée (custom) : ne garder que les Pokémon pouvant être shiny en GO. */
         'only_shiny' => false,
+        /**
+         * Illustrations optionnelles à droite des blocs barre d’outils (filtres statut, chaînes GO, saut par génération).
+         * Priorité : image_url directe ; sinon object_key résolu via le filtre poke_hub_collections_toolbar_decoration_image_url.
+         */
+        'toolbar_decoration' => [
+            'filters' => [
+                'image_url'    => '',
+                'object_key'   => '',
+                'content_type' => '',
+            ],
+            'pogo' => [
+                'image_url'    => '',
+                'object_key'   => '',
+                'content_type' => '',
+            ],
+            'generations' => [
+                'image_url'    => '',
+                'object_key'   => '',
+                'content_type' => '',
+            ],
+        ],
+        /**
+         * Surcharges par ancre (#… id) pour les vignettes à droite de chaque lien « saut par génération » (clé = ancre, ex. pokehub-gen-9).
+         * Vide par défaut : convention bucket + dossier toolbar + generation-tiles/{ancre}.png
+         *
+         * @var array<string, array{image_url?: string, object_key?: string, content_type?: string}>
+         */
+        'generation_jump_tiles' => [],
+        /**
+         * Illustration unique pour toutes les tuiles « région / génération » lorsque le pool ne contient aucun Pokémon.
+         * Priorité : image_url → object_key → convention generation-tiles/empty-pool.png (bucket Sources).
+         *
+         * @var array{image_url?: string, object_key?: string, content_type?: string}
+         */
+        'generation_jump_tile_empty_pool' => [
+            'image_url'    => '',
+            'object_key'   => '',
+            'content_type' => '',
+        ],
     ];
 }
 
@@ -757,6 +796,322 @@ function poke_hub_collections_get_card_background_image_url(array $collection): 
     }
     $category = isset($collection['category']) ? $collection['category'] : 'custom';
     return (string) apply_filters('poke_hub_collections_card_background_image_url', '', $category);
+}
+
+/**
+ * Fusionne les clés manquantes de toolbar_decoration avec les défauts.
+ *
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function poke_hub_collections_merge_toolbar_decoration_defaults(array $options): array {
+    $defs = poke_hub_collections_default_options();
+    $def  = isset($defs['toolbar_decoration']) && is_array($defs['toolbar_decoration']) ? $defs['toolbar_decoration'] : [];
+    $raw  = isset($options['toolbar_decoration']) && is_array($options['toolbar_decoration']) ? $options['toolbar_decoration'] : [];
+    $out  = [];
+    foreach ($def as $strip => $strip_def) {
+        if (! is_array($strip_def)) {
+            continue;
+        }
+        $b = isset($raw[ $strip ]) && is_array($raw[ $strip ]) ? $raw[ $strip ] : [];
+        $out[ $strip ] = array_merge($strip_def, $b);
+    }
+    $options['toolbar_decoration'] = $out;
+
+    $def_ep = isset($defs['generation_jump_tile_empty_pool']) && is_array($defs['generation_jump_tile_empty_pool'])
+        ? $defs['generation_jump_tile_empty_pool']
+        : [];
+    $raw_ep = isset($options['generation_jump_tile_empty_pool']) && is_array($options['generation_jump_tile_empty_pool'])
+        ? $options['generation_jump_tile_empty_pool']
+        : [];
+    if ($def_ep !== []) {
+        $options['generation_jump_tile_empty_pool'] = array_merge($def_ep, $raw_ep);
+    }
+
+    return $options;
+}
+
+/**
+ * URL affichable pour la zone décorative d’un bloc barre d’outils.
+ *
+ * @param array<string, mixed> $options Options collection (déjà fusionnées avec les défauts).
+ * @param string               $strip   filters | pogo | generations
+ * @param string               $category Catégorie collection (pour le filtre).
+ */
+/**
+ * Construit l’URL d’un fichier décor barre d’outils collections à partir de l’onglet Sources
+ * (poke_hub_assets_bucket_base_url + poke_hub_assets_path_collections_toolbar + clé relative).
+ * Accepte aussi une URL absolue dans $object_key pour flexibilité.
+ */
+function poke_hub_collections_build_toolbar_decoration_asset_url(string $object_key): string {
+    $object_key = trim($object_key);
+    if ($object_key === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $object_key)) {
+        return esc_url_raw($object_key);
+    }
+    $base = function_exists('poke_hub_get_assets_bucket_base_url')
+        ? poke_hub_get_assets_bucket_base_url()
+        : (string) get_option('poke_hub_assets_bucket_base_url', 'https://pokemon.me5rine-lab.com/');
+    $base = rtrim($base, '/');
+    if ($base === '') {
+        return '';
+    }
+    $path = (string) get_option('poke_hub_assets_path_collections_toolbar', '/pokemon-go/collections-toolbar/');
+    $path = trim($path, '/');
+    $rel  = ltrim($object_key, '/');
+
+    return esc_url_raw($base . '/' . ($path !== '' ? $path . '/' : '') . $rel);
+}
+
+function poke_hub_collections_get_toolbar_decoration_image_url(array $options, string $strip, string $category = ''): string {
+    $strip     = sanitize_key($strip);
+    $allowed   = ['filters', 'pogo', 'generations'];
+    $decor     = isset($options['toolbar_decoration']) && is_array($options['toolbar_decoration']) ? $options['toolbar_decoration'] : [];
+    $block     = ( $strip !== '' && in_array($strip, $allowed, true) && isset($decor[ $strip ]) && is_array($decor[ $strip ]) )
+        ? $decor[ $strip ]
+        : [];
+    $url = isset($block['image_url']) ? trim((string) $block['image_url']) : '';
+    if ($url !== '') {
+        return esc_url($url);
+    }
+    $key = isset($block['object_key']) ? trim((string) $block['object_key']) : '';
+    if ($key === '') {
+        return '';
+    }
+    $category = $category !== '' ? sanitize_key($category) : 'custom';
+
+    $from_sources = poke_hub_collections_build_toolbar_decoration_asset_url($key);
+    $resolved     = (string) apply_filters('poke_hub_collections_toolbar_decoration_image_url', $from_sources, $strip, $key, $block, $category);
+
+    return $resolved !== '' ? esc_url($resolved) : '';
+}
+
+/**
+ * Ancre saut génération (slug HTML) utilisée aussi comme nom de fichier par défaut.
+ */
+function poke_hub_collections_sanitize_generation_jump_tile_anchor_key(string $anchor): string {
+    $anchor = strtolower(trim($anchor));
+
+    return ( preg_match('#^[a-z0-9][a-z0-9_-]{0,120}$#', $anchor) ) ? $anchor : '';
+}
+
+/**
+ * Segment de slug (région / génération) pour le nom de fichier generation-tiles/pokehub-gen-{segment}.png.
+ * Même motif que l’ancre HTML sans imposer le préfixe pokehub-gen- en entrée.
+ */
+function poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment(string $segment): string {
+    return poke_hub_collections_sanitize_generation_jump_tile_anchor_key($segment);
+}
+
+/**
+ * Image par vignette lien génération (dossier generation-tiles/ sous le dossier toolbar Sources).
+ * Si $image_slug_segment est renseigné (slug BDD région ou génération), le fichier conventionnel est
+ * generation-tiles/pokehub-gen-{segment}.png ; sinon on garde generation-tiles/{anchor}.png (ancre HTML complète).
+ */
+function poke_hub_collections_build_generation_jump_tile_convention_url(string $anchor, string $image_slug_segment = ''): string {
+    $seg = $image_slug_segment !== ''
+        ? poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($image_slug_segment)
+        : '';
+    if ($seg !== '') {
+        return poke_hub_collections_build_toolbar_decoration_asset_url('generation-tiles/pokehub-gen-' . $seg . '.png');
+    }
+    $a = poke_hub_collections_sanitize_generation_jump_tile_anchor_key($anchor);
+    if ($a === '') {
+        return '';
+    }
+
+    return poke_hub_collections_build_toolbar_decoration_asset_url('generation-tiles/' . $a . '.png');
+}
+
+/**
+ * Clé objet relative au dossier « Collections toolbar » (même bucket) pour les motifs de tuile saut région.
+ * Le motif canonique en code contient {slug} (slug BDD).
+ */
+function poke_hub_collections_sanitize_generation_jump_tile_template_object_key(string $key): string {
+    $key = trim($key);
+    $key = preg_replace('/[^a-zA-Z0-9\/_.\-{}]/', '', $key);
+    if (strlen($key) > 500) {
+        $key = substr($key, 0, 500);
+    }
+
+    return $key;
+}
+
+/**
+ * À partir du modèle « normal », dérive le fichier gris : insertion de -grey avant la dernière extension.
+ * Ex. generation-tiles/pokehub-gen-{slug}.png → generation-tiles/pokehub-gen-{slug}-grey.png
+ */
+function poke_hub_collections_derive_generation_jump_grey_template_from_active(string $template): string {
+    $template = trim($template);
+    if ($template === '') {
+        return '';
+    }
+    $pos = strrpos($template, '.');
+    if ($pos === false) {
+        return $template . '-grey';
+    }
+
+    return substr($template, 0, $pos) . '-grey' . substr($template, $pos);
+}
+
+/**
+ * Chemin relatif sous Sources → « Collections toolbar » : convention fixe (dossier unique).
+ * Normal : generation-tiles/pokehub-gen-{slug}.png — tout missing : -grey avant l’extension.
+ * Personnalisation : filtre {@see 'poke_hub_collections_generation_jump_tile_template_object_key'}.
+ */
+function poke_hub_collections_get_generation_jump_tile_template_key_from_settings(bool $all_missing): string {
+    $default = 'generation-tiles/pokehub-gen-{slug}.png';
+    $san     = poke_hub_collections_sanitize_generation_jump_tile_template_object_key($default);
+    if ($all_missing) {
+        $san = poke_hub_collections_derive_generation_jump_grey_template_from_active($san);
+        $san = poke_hub_collections_sanitize_generation_jump_tile_template_object_key($san);
+    }
+
+    return $san;
+}
+
+/**
+ * URL finale dans le bucket (barre « Jump to generation » / en-tête région), selon la progression.
+ */
+function poke_hub_collections_build_generation_jump_tile_url_from_sources_template(string $slug_segment, bool $all_missing): string {
+    $seg = poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($slug_segment);
+    if ($seg === '') {
+        return '';
+    }
+    $template = poke_hub_collections_get_generation_jump_tile_template_key_from_settings($all_missing);
+    $template = (string) apply_filters(
+        'poke_hub_collections_generation_jump_tile_template_object_key',
+        $template,
+        $all_missing,
+        $seg
+    );
+    $template = poke_hub_collections_sanitize_generation_jump_tile_template_object_key($template);
+    if ($template === '' || strpos($template, '{slug}') === false) {
+        return '';
+    }
+    $rel = str_replace('{slug}', $seg, $template);
+    $u   = poke_hub_collections_build_toolbar_decoration_asset_url($rel);
+
+    return $u !== '' ? esc_url($u) : '';
+}
+
+/**
+ * Fichier convention pour « pool vide » : même dossier generation-tiles/ que les ancres.
+ */
+function poke_hub_collections_build_generation_jump_empty_pool_convention_url(): string {
+    return poke_hub_collections_build_toolbar_decoration_asset_url('generation-tiles/empty-pool.png');
+}
+
+/**
+ * URL affichée pour toutes les tuiles région / saut génération lorsqu’il n’y a aucun Pokémon dans le pool.
+ * Priorité : image_url → object_key → convention generation-tiles/empty-pool.png ; filtre poke_hub_collections_generation_jump_empty_pool_tile_url.
+ *
+ * @param array<string, mixed> $merged_opts Options fusionnées avec défauts.
+ */
+function poke_hub_collections_get_generation_jump_tile_empty_pool_image_url(array $merged_opts, string $category = '', array $collection = []): string {
+    $block = isset($merged_opts['generation_jump_tile_empty_pool']) && is_array($merged_opts['generation_jump_tile_empty_pool'])
+        ? $merged_opts['generation_jump_tile_empty_pool']
+        : [];
+    $cat   = $category !== '' ? sanitize_key($category) : 'custom';
+    $base  = '';
+
+    $iu = isset($block['image_url']) ? trim((string) $block['image_url']) : '';
+    if ($iu !== '') {
+        $base = esc_url_raw($iu);
+    }
+    if ($base === '') {
+        $key = isset($block['object_key']) ? trim((string) $block['object_key']) : '';
+        if ($key !== '') {
+            $base = preg_match('#^https?://#i', $key) ? esc_url_raw($key) : poke_hub_collections_build_toolbar_decoration_asset_url($key);
+        }
+    }
+    if ($base === '') {
+        $base = poke_hub_collections_build_generation_jump_empty_pool_convention_url();
+    }
+
+    $resolved = (string) apply_filters(
+        'poke_hub_collections_generation_jump_empty_pool_tile_url',
+        $base,
+        $merged_opts,
+        $cat,
+        $collection
+    );
+
+    return $resolved !== '' ? esc_url($resolved) : '';
+}
+
+/**
+ * URL image pour une pastille « saut par génération » (#ancre).
+ * Priorité : image_url puis object_key puis convention generation-tiles/pokehub-gen-{slug}.png (slug BDD) ou generation-tiles/{ancre}.png ; filtre poke_hub_collections_generation_jump_tile_url à la fin.
+ * Si $pool_total_count vaut 0, on tente d’abord l’illustration « pool vide » ({@see poke_hub_collections_get_generation_jump_tile_empty_pool_image_url}).
+ *
+ * @param array<string, mixed> $merged_opts       Options fusionnées avec défauts.
+ * @param string               $anchor            Ancre slug (data-generation-anchor).
+ * @param string               $generation_label Libellé génération (affiché).
+ * @param string               $category         Catégorie collection.
+ * @param array<string, mixed> $collection       Ligne collection (min. id / category si besoin côté filtre).
+ * @param int                  $pool_total_count Nombre de Pokémon dans le pool ; 0 = tenter l’image pool vide d’abord. -1 = ignorer.
+ * @param string               $image_slug_segment Slug SQL (région / génération) pour le fichier conventionnel ; vide = ancien mode (ancre seule).
+ * @param bool|null            $region_all_missing  null = n’applique pas les modèles Sources actif/gris ; true = tout missing, false = au moins owned ou for trade.
+ */
+function poke_hub_collections_get_generation_jump_tile_image_url(
+    array $merged_opts,
+    string $anchor,
+    string $generation_label = '',
+    string $category = '',
+    array $collection = [],
+    int $pool_total_count = -1,
+    string $image_slug_segment = '',
+    ?bool $region_all_missing = null
+): string {
+    $anchor_raw = $anchor;
+    $anchor     = poke_hub_collections_sanitize_generation_jump_tile_anchor_key($anchor);
+    if ($anchor === '') {
+        return '';
+    }
+    if ($pool_total_count === 0) {
+        $when_empty = poke_hub_collections_get_generation_jump_tile_empty_pool_image_url($merged_opts, $category, $collection);
+        if ($when_empty !== '') {
+            return $when_empty;
+        }
+    }
+    $gj     = isset($merged_opts['generation_jump_tiles']) && is_array($merged_opts['generation_jump_tiles']) ? $merged_opts['generation_jump_tiles'] : [];
+    $block  = isset($gj[ $anchor ]) && is_array($gj[ $anchor ]) ? $gj[ $anchor ] : [];
+    $cat    = $category !== '' ? sanitize_key($category) : 'custom';
+    $base   = '';
+
+    $iu = isset($block['image_url']) ? trim((string) $block['image_url']) : '';
+    if ($iu !== '') {
+        $base = esc_url_raw($iu);
+    }
+    if ($base === '') {
+        $key = isset($block['object_key']) ? trim((string) $block['object_key']) : '';
+        if ($key !== '') {
+            $base = preg_match('#^https?://#i', $key) ? esc_url_raw($key) : poke_hub_collections_build_toolbar_decoration_asset_url($key);
+        }
+    }
+    if ($base === '' && $pool_total_count > 0 && $image_slug_segment !== '' && $region_all_missing !== null) {
+        $base = poke_hub_collections_build_generation_jump_tile_url_from_sources_template($image_slug_segment, $region_all_missing);
+    }
+    if ($base === '') {
+        $base = poke_hub_collections_build_generation_jump_tile_convention_url($anchor_raw, $image_slug_segment);
+    }
+
+    $resolved = (string) apply_filters(
+        'poke_hub_collections_generation_jump_tile_url',
+        $base,
+        $anchor,
+        $generation_label,
+        $merged_opts,
+        $cat,
+        $collection,
+        $image_slug_segment,
+        $region_all_missing
+    );
+
+    return $resolved !== '' ? esc_url($resolved) : '';
 }
 
 /**
@@ -1806,12 +2161,9 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             break;
     }
 
-    $gen_select = $generations_table
-        ? "p.generation_id, COALESCE(g.name_fr, g.name_en, g.slug, '') AS generation_name, COALESCE(g.generation_number, 0) AS generation_number"
-        : "p.generation_id, '' AS generation_name, 0 AS generation_number";
-    $gen_join   = $generations_table
-        ? "LEFT JOIN {$generations_table} g ON p.generation_id = g.id"
-        : '';
+    $gen_sql     = poke_hub_collections_pool_generation_sql_parts();
+    $gen_select  = $gen_sql['select_main'];
+    $gen_join    = $gen_sql['join_sql'];
     $order_gen  = $generations_table
         ? "COALESCE(g.generation_number, 999) ASC,"
         : "p.generation_id ASC,";
@@ -2819,26 +3171,177 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
 }
 
 /**
- * Groupe le pool de Pokémon par génération pour l'affichage (clé = libellé génération).
+ * Colonnes SQL : génération + région du Pokémon (origin_region_id) + repli région liée à la génération (region_id, liaison 1 seule en N–N).
  *
- * @param array $pool Liste retournée par poke_hub_collections_get_pool (avec generation_id, generation_name, generation_number)
- * @return array [ 'Génération 1' => [ ... ], 'Génération 2' => [ ... ], '' => [ ... ] ] ('' = sans génération, en dernier)
+ * @return array{join_sql: string, select_main: string, select_comma: string}
+ */
+function poke_hub_collections_pool_generation_sql_parts(): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $generations_table = pokehub_get_table('generations');
+    $regions_table     = pokehub_get_table('regions');
+    if (!$generations_table) {
+        $cache = [
+            'join_sql'     => '',
+            'select_main'  => "p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug",
+            'select_comma' => ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug",
+        ];
+        return $cache;
+    }
+    $oreg_join = '';
+    $origin_cols = 'p.origin_region_id, \'\' AS pokemon_region_name, 999 AS pokemon_region_sort, \'\' AS pokemon_region_slug';
+    if ($regions_table) {
+        $oreg_join   = " LEFT JOIN {$regions_table} oreg ON oreg.id = p.origin_region_id AND p.origin_region_id > 0 ";
+        $origin_cols = 'p.origin_region_id, COALESCE(oreg.name_fr, oreg.name_en, \'\') AS pokemon_region_name, COALESCE(oreg.sort_order, 999) AS pokemon_region_sort, COALESCE(NULLIF(TRIM(oreg.slug), \'\'), \'\') AS pokemon_region_slug';
+    }
+    $fallback_join = '';
+    $fallback_cols = '\'\' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, \'\' AS generation_region_fallback_slug';
+    if ($regions_table) {
+        $fallback_join = " LEFT JOIN {$regions_table} rgen ON rgen.id = g.region_id AND g.region_id > 0 ";
+        $gen_reg_table = pokehub_get_table('generation_regions');
+        $has_grgr      = $gen_reg_table !== ''
+            && function_exists('pokehub_table_exists')
+            && pokehub_table_exists($gen_reg_table);
+        if ($has_grgr) {
+            $fallback_join .= "
+            LEFT JOIN (
+                SELECT gr.generation_id AS ggid,
+                       MAX(COALESCE(ru.name_fr, ru.name_en, '')) AS one_reg_name,
+                       MIN(COALESCE(ru.sort_order, 999)) AS one_reg_sort,
+                       MAX(TRIM(COALESCE(ru.slug, ''))) AS one_reg_slug
+                FROM {$gen_reg_table} gr
+                INNER JOIN {$regions_table} ru ON ru.id = gr.region_id
+                GROUP BY gr.generation_id
+                HAVING COUNT(*) = 1
+            ) gr_one ON gr_one.ggid = g.id
+            ";
+            $fallback_cols = "TRIM(COALESCE(
+                NULLIF(TRIM(gr_one.one_reg_name), ''),
+                NULLIF(TRIM(COALESCE(rgen.name_fr, rgen.name_en, '')), '')
+            )) AS generation_region_fallback_name,
+            CASE
+                WHEN gr_one.ggid IS NOT NULL THEN gr_one.one_reg_sort
+                ELSE COALESCE(rgen.sort_order, 999)
+            END AS generation_region_fallback_sort,
+            TRIM(COALESCE(
+                NULLIF(TRIM(gr_one.one_reg_slug), ''),
+                NULLIF(TRIM(COALESCE(rgen.slug, '')), '')
+            )) AS generation_region_fallback_slug";
+        } else {
+            $fallback_cols = "TRIM(COALESCE(rgen.name_fr, rgen.name_en, '')) AS generation_region_fallback_name,
+            COALESCE(rgen.sort_order, 999) AS generation_region_fallback_sort,
+            COALESCE(NULLIF(TRIM(rgen.slug), ''), '') AS generation_region_fallback_slug";
+        }
+    }
+    $join = "LEFT JOIN {$generations_table} g ON p.generation_id = g.id{$oreg_join}{$fallback_join}";
+    $cols = "p.generation_id, COALESCE(g.name_fr, g.name_en, g.slug, '') AS generation_name, COALESCE(g.generation_number, 0) AS generation_number, {$origin_cols}, {$fallback_cols}, COALESCE(NULLIF(TRIM(g.slug), ''), '') AS generation_group_slug";
+    $cache = [
+        'join_sql'     => $join,
+        'select_main'  => $cols,
+        'select_comma' => ', ' . $cols,
+    ];
+    return $cache;
+}
+
+/**
+ * Libellé d’affichage : région du Pokémon (origin_region_id), sinon région(s) liée(s) à la génération, sinon nom de génération, sinon « Generation n ».
+ */
+function poke_hub_collections_pool_row_generation_group_label(array $p): string {
+    $region = isset($p['pokemon_region_name']) ? trim((string) $p['pokemon_region_name']) : '';
+    if ($region !== '') {
+        return $region;
+    }
+    $from_gen = isset($p['generation_region_fallback_name']) ? trim((string) $p['generation_region_fallback_name']) : '';
+    if ($from_gen !== '') {
+        return $from_gen;
+    }
+    $gen_num = isset($p['generation_number']) ? (int) $p['generation_number'] : 0;
+    $gen_name = isset($p['generation_name']) ? trim((string) $p['generation_name']) : '';
+    if ($gen_name !== '') {
+        return $gen_name;
+    }
+    if ($gen_num > 0) {
+        return sprintf(__('Generation %d', 'poke-hub'), $gen_num);
+    }
+    return '';
+}
+
+/**
+ * Slug BDD (région d’origine, région de repli liée à la génération, ou slug de la génération) pour les fichiers
+ * generation-tiles/pokehub-gen-{slug}.png — stable quelle que soit la langue du libellé affiché.
+ */
+function poke_hub_collections_pool_row_generation_tile_slug(array $p): string {
+    $region = isset($p['pokemon_region_name']) ? trim((string) $p['pokemon_region_name']) : '';
+    if ($region !== '') {
+        $s = isset($p['pokemon_region_slug']) ? trim((string) $p['pokemon_region_slug']) : '';
+        $clean = poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($s);
+        if ($clean !== '') {
+            return $clean;
+        }
+    }
+    $from_gen = isset($p['generation_region_fallback_name']) ? trim((string) $p['generation_region_fallback_name']) : '';
+    if ($from_gen !== '') {
+        $s = isset($p['generation_region_fallback_slug']) ? trim((string) $p['generation_region_fallback_slug']) : '';
+        $clean = poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($s);
+        if ($clean !== '') {
+            return $clean;
+        }
+    }
+    $g = isset($p['generation_group_slug']) ? trim((string) $p['generation_group_slug']) : '';
+
+    return poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($g);
+}
+
+/**
+ * Groupe le pool de Pokémon par génération pour l'affichage (clé = région ou libellé génération).
+ *
+ * @param array $pool Liste retournée par poke_hub_collections_get_pool (generation_region_fallback_* + origin_region_id, pokemon_region_* …)
+ * @return array<string, array<int, array<string, mixed>>>  ('' = sans génération, en dernier)
  */
 function poke_hub_collections_group_pool_by_generation(array $pool): array {
     $by_gen = [];
     foreach ($pool as $p) {
         $gen_num = isset($p['generation_number']) ? (int) $p['generation_number'] : 0;
-        $gen_name = isset($p['generation_name']) && (string) $p['generation_name'] !== ''
-            ? $p['generation_name']
-            : ($gen_num > 0 ? sprintf(__('Generation %d', 'poke-hub'), $gen_num) : '');
-        $key = $gen_name !== '' ? $gen_name : "\xFF"; // sans nom en dernier après tri
+        $pr_name = isset($p['pokemon_region_name']) ? trim((string) $p['pokemon_region_name']) : '';
+        if ($pr_name !== '') {
+            $region_sort = isset($p['pokemon_region_sort']) ? (int) $p['pokemon_region_sort'] : 999;
+        } else {
+            $fb_name = isset($p['generation_region_fallback_name']) ? trim((string) $p['generation_region_fallback_name']) : '';
+            $region_sort = $fb_name !== ''
+                ? (int) ($p['generation_region_fallback_sort'] ?? 999)
+                : 999;
+        }
+        $gen_name     = poke_hub_collections_pool_row_generation_group_label($p);
+        $key          = $gen_name !== '' ? $gen_name : "\xFF"; // sans nom en dernier après tri
         if (!isset($by_gen[$key])) {
-            $by_gen[$key] = ['order' => $gen_num > 0 ? $gen_num : 999, 'items' => []];
+            $by_gen[$key] = [
+                'order'        => $gen_num > 0 ? $gen_num : 999,
+                'region_sort'  => $region_sort,
+                'items'        => [],
+            ];
         }
         $by_gen[$key]['items'][] = $p;
     }
-    uasort($by_gen, function ($a, $b) {
-        return $a['order'] <=> $b['order'];
+    uksort($by_gen, function ($ka, $kb) use ($by_gen) {
+        $oa = $by_gen[ $ka ]['order'];
+        $ob = $by_gen[ $kb ]['order'];
+        if ($oa !== $ob) {
+            return $oa <=> $ob;
+        }
+        $rsa = (int) ($by_gen[ $ka ]['region_sort'] ?? 999);
+        $rsb = (int) ($by_gen[ $kb ]['region_sort'] ?? 999);
+        if ($rsa !== $rsb) {
+            return $rsa <=> $rsb;
+        }
+        if ($ka === "\xFF") {
+            return 1;
+        }
+        if ($kb === "\xFF") {
+            return -1;
+        }
+        return strcmp((string) $ka, (string) $kb);
     });
     $out = [];
     foreach ($by_gen as $key => $data) {
@@ -2853,24 +3356,30 @@ function poke_hub_collections_group_pool_by_generation(array $pool): array {
  *
  * @param array $pool  Pool complet (poke_hub_collections_get_pool)
  * @param array $items  pokemon_id => status
- * @return array [ libellé_générations => [ 'owned' => int, 'total' => int ], ... ]
+ * @return array [ libellé_générations => [ 'owned' => int, 'for_trade' => int, 'total' => int ], ... ]
  */
 function poke_hub_collections_get_generation_progress(array $pool, array $items): array {
     $by_gen = poke_hub_collections_group_pool_by_generation($pool);
     $out    = [];
     foreach ($by_gen as $label => $gen_pool) {
-        $total = count($gen_pool);
-        $owned = 0;
+        $total     = count($gen_pool);
+        $owned     = 0;
+        $for_trade = 0;
         foreach ($gen_pool as $p) {
-            if (poke_hub_collections_resolved_status_for_row($p, $items) === 'owned') {
+            $st = poke_hub_collections_resolved_status_for_row($p, $items);
+            if ($st === 'owned') {
                 $owned++;
+            } elseif ($st === 'for_trade') {
+                $for_trade++;
             }
         }
-        $out[$label] = [
-            'owned' => $owned,
-            'total' => $total,
+        $out[ $label ] = [
+            'owned'     => $owned,
+            'for_trade' => $for_trade,
+            'total'     => $total,
         ];
     }
+
     return $out;
 }
 
@@ -2943,6 +3452,84 @@ function poke_hub_collections_get_client_ip(): string {
 function poke_hub_collections_sanitize_options(array $options): array {
     if (isset($options['card_background_image_url']) && is_string($options['card_background_image_url'])) {
         $options['card_background_image_url'] = esc_url_raw(trim($options['card_background_image_url']));
+    }
+    if (isset($options['toolbar_decoration']) && is_array($options['toolbar_decoration'])) {
+        $allowed_ct = ['', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'];
+        $def_strip  = poke_hub_collections_default_options()['toolbar_decoration'] ?? [];
+        $san        = [];
+        foreach (array_keys(is_array($def_strip) ? $def_strip : []) as $strip) {
+            if (! is_string($strip)) {
+                continue;
+            }
+            $strip = sanitize_key($strip);
+            if (! in_array($strip, ['filters', 'pogo', 'generations'], true)) {
+                continue;
+            }
+            $b = isset($options['toolbar_decoration'][ $strip ]) && is_array($options['toolbar_decoration'][ $strip ])
+                ? $options['toolbar_decoration'][ $strip ]
+                : [];
+            $iu = isset($b['image_url']) && is_string($b['image_url']) ? esc_url_raw(trim($b['image_url'])) : '';
+            $ok = isset($b['object_key']) && is_string($b['object_key']) ? trim($b['object_key']) : '';
+            $ok = $ok === '' ? '' : preg_replace('/[^a-zA-Z0-9\/_.\-]/', '', $ok);
+            if (strlen($ok) > 500) {
+                $ok = substr($ok, 0, 500);
+            }
+            $ct = isset($b['content_type']) && is_string($b['content_type']) ? trim($b['content_type']) : '';
+            $ct = in_array($ct, $allowed_ct, true) ? $ct : '';
+            $san[ $strip ] = [
+                'image_url'    => $iu,
+                'object_key'   => $ok,
+                'content_type' => $ct,
+            ];
+        }
+        $options['toolbar_decoration'] = $san;
+    }
+    if (isset($options['generation_jump_tiles']) && is_array($options['generation_jump_tiles'])) {
+        $allowed_ct = ['', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'];
+        $san_gj     = [];
+        foreach ($options['generation_jump_tiles'] as $raw_key => $raw_block) {
+            if (! is_string($raw_key) || ! is_array($raw_block)) {
+                continue;
+            }
+            $ak = poke_hub_collections_sanitize_generation_jump_tile_anchor_key($raw_key);
+            if ($ak === '') {
+                continue;
+            }
+            $iu = isset($raw_block['image_url']) && is_string($raw_block['image_url']) ? esc_url_raw(trim($raw_block['image_url'])) : '';
+            $ok = isset($raw_block['object_key']) && is_string($raw_block['object_key']) ? trim($raw_block['object_key']) : '';
+            $ok = $ok === '' ? '' : preg_replace('/[^a-zA-Z0-9\/_.\-]/', '', $ok);
+            if (strlen($ok) > 500) {
+                $ok = substr($ok, 0, 500);
+            }
+            $ct = isset($raw_block['content_type']) && is_string($raw_block['content_type']) ? trim($raw_block['content_type']) : '';
+            $ct = in_array($ct, $allowed_ct, true) ? $ct : '';
+            if ($iu === '' && $ok === '') {
+                continue;
+            }
+            $san_gj[ $ak ] = [
+                'image_url'    => $iu,
+                'object_key'   => $ok,
+                'content_type' => $ct,
+            ];
+        }
+        $options['generation_jump_tiles'] = $san_gj;
+    }
+    if (isset($options['generation_jump_tile_empty_pool']) && is_array($options['generation_jump_tile_empty_pool'])) {
+        $allowed_ct = ['', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'];
+        $b          = $options['generation_jump_tile_empty_pool'];
+        $iu         = isset($b['image_url']) && is_string($b['image_url']) ? esc_url_raw(trim($b['image_url'])) : '';
+        $ok         = isset($b['object_key']) && is_string($b['object_key']) ? trim($b['object_key']) : '';
+        $ok         = $ok === '' ? '' : preg_replace('/[^a-zA-Z0-9\/_.\-]/', '', $ok);
+        if (strlen($ok) > 500) {
+            $ok = substr($ok, 0, 500);
+        }
+        $ct = isset($b['content_type']) && is_string($b['content_type']) ? trim($b['content_type']) : '';
+        $ct = in_array($ct, $allowed_ct, true) ? $ct : '';
+        $options['generation_jump_tile_empty_pool'] = [
+            'image_url'    => $iu,
+            'object_key'   => $ok,
+            'content_type' => $ct,
+        ];
     }
     if (array_key_exists('include_forms', $options)) {
         $options = poke_hub_collections_merge_legacy_include_forms_option($options);
@@ -3400,12 +3987,13 @@ function poke_hub_collections_append_switch_battle_family_anchor_rows(array $row
         return $rows;
     }
 
+    $gen_sql    = poke_hub_collections_pool_generation_sql_parts();
     $gen_join   = ($generations_table !== '' && $generations_table)
-        ? "LEFT JOIN {$generations_table} g ON p.generation_id = g.id"
+        ? $gen_sql['join_sql']
         : '';
     $gen_select = ($generations_table !== '' && $generations_table)
-        ? ', p.generation_id, COALESCE(g.name_fr, g.name_en, g.slug, \'\') AS generation_name, COALESCE(g.generation_number, 0) AS generation_number'
-        : ', p.generation_id, \'\' AS generation_name, 0 AS generation_number';
+        ? $gen_sql['select_comma']
+        : ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug";
 
     $anchors = apply_filters(
         'poke_hub_collections_switch_battle_family_anchor_slugs',
@@ -3646,12 +4234,13 @@ function poke_hub_collections_append_switch_form_family_placeholder_one_per_spec
         return $rows;
     }
 
+    $gen_sql    = poke_hub_collections_pool_generation_sql_parts();
     $gen_join   = ($generations_table !== '' && $generations_table)
-        ? "LEFT JOIN {$generations_table} g ON p.generation_id = g.id"
+        ? $gen_sql['join_sql']
         : '';
     $gen_select = ($generations_table !== '' && $generations_table)
-        ? ', p.generation_id, COALESCE(g.name_fr, g.name_en, g.slug, \'\') AS generation_name, COALESCE(g.generation_number, 0) AS generation_number'
-        : ', p.generation_id, \'\' AS generation_name, 0 AS generation_number';
+        ? $gen_sql['select_comma']
+        : ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug";
 
     foreach ($dex_list as $dex_raw ) {
         $dex = (int) $dex_raw;
@@ -3811,12 +4400,13 @@ function poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool
     }
     $out = array_values($out);
 
+    $gen_sql    = poke_hub_collections_pool_generation_sql_parts();
     $gen_join   = ($generations_table !== '' && $generations_table)
-        ? "LEFT JOIN {$generations_table} g ON p.generation_id = g.id"
+        ? $gen_sql['join_sql']
         : '';
     $gen_select = ($generations_table !== '' && $generations_table)
-        ? ', p.generation_id, COALESCE(g.name_fr, g.name_en, g.slug, \'\') AS generation_name, COALESCE(g.generation_number, 0) AS generation_number'
-        : ', p.generation_id, \'\' AS generation_name, 0 AS generation_number';
+        ? $gen_sql['select_comma']
+        : ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug";
 
     foreach ($by_dex_fusion_idx as $dex => $_idx_list) {
         $dex = (int) $dex;
@@ -4164,6 +4754,7 @@ function poke_hub_collections_create(int $user_id, array $data): array {
     }
 
     $options = array_merge(poke_hub_collections_default_options(), $options);
+    $options = poke_hub_collections_merge_toolbar_decoration_defaults($options);
     $options = poke_hub_collections_sanitize_options($options);
     $options = poke_hub_collections_options_align_with_category($options, $category);
     $options_json = wp_json_encode($options);
@@ -4238,6 +4829,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
     }
 
     $options    = array_merge(poke_hub_collections_default_options(), $options);
+    $options    = poke_hub_collections_merge_toolbar_decoration_defaults($options);
     $options    = poke_hub_collections_sanitize_options($options);
     $options    = poke_hub_collections_options_align_with_category($options, $category);
     $options_json = wp_json_encode($options);
@@ -4324,6 +4916,7 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
 
     if (isset($data['options']) && is_array($data['options'])) {
         $options = array_merge(poke_hub_collections_default_options(), $data['options']);
+        $options = poke_hub_collections_merge_toolbar_decoration_defaults($options);
         $options = poke_hub_collections_sanitize_options($options);
         $options = poke_hub_collections_options_align_with_category($options, $current_category);
         $updates['options'] = wp_json_encode($options);

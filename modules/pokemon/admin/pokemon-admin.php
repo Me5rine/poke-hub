@@ -987,7 +987,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
 
     // Le CSS admin unifié est chargé via admin-unified.css (dans le plugin principal)
 
-    // On limite Select2 aux onglets qui en ont besoin (pokemon, backgrounds)
+    // On limite Select2 aux onglets qui en ont besoin (pokemon, backgrounds, biomes, generations)
     // Mais on charge toujours le script d'évolutions pour pokemon
     if ($section === 'pokemon') {
         // Script pour gérer l'affichage conditionnel des champs d'évolution
@@ -1000,7 +1000,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
         );
     }
     
-    if ($section !== 'pokemon' && $section !== 'backgrounds' && $section !== 'biomes') {
+    if ($section !== 'pokemon' && $section !== 'backgrounds' && $section !== 'biomes' && $section !== 'generations') {
         return;
     }
 
@@ -1038,6 +1038,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
             'selectItem'         => __('Select item (optional)', 'poke-hub'),
             'selectLure'         => __('Select lure (optional)', 'poke-hub'),
             'selectTargetPokemon' => __('Select target Pokémon', 'poke-hub'),
+            'searchGameRegions'   => __('Search regions by name…', 'poke-hub'),
         ]
     );
 }

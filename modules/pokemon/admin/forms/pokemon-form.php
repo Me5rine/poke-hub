@@ -58,6 +58,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
 
     $is_default    = $is_edit ? (int) $edit_row->is_default : 0;
     $generation_id = $is_edit ? (int) $edit_row->generation_id : 0;
+    $origin_region_id = ($is_edit && isset($edit_row->origin_region_id)) ? (int) $edit_row->origin_region_id : 0;
     $base_atk      = $is_edit ? (int) $edit_row->base_atk : 0;
     $base_def      = $is_edit ? (int) $edit_row->base_def : 0;
     $base_sta      = $is_edit ? (int) $edit_row->base_sta : 0;
@@ -261,6 +262,14 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             FROM {$gens_table}
             ORDER BY generation_number ASC
         ");
+    }
+
+    $game_regions = [];
+    $regions_table = pokehub_get_table('regions');
+    if ($regions_table) {
+        $game_regions = $wpdb->get_results(
+            "SELECT id, slug, name_en, name_fr FROM {$regions_table} ORDER BY sort_order ASC, name_fr ASC, name_en ASC, slug ASC"
+        );
     }
 
     // 2) Variantes globales (pokemon_form_variants)
@@ -595,6 +604,26 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+                </div>
+                <div class="admin-lab-form-col">
+                    <div class="admin-lab-form-group">
+                        <label for="origin_region_id"><?php esc_html_e('Game origin region', 'poke-hub'); ?></label>
+                        <select name="origin_region_id" id="origin_region_id" style="max-width: 220px;">
+                            <option value="0"><?php esc_html_e('— None —', 'poke-hub'); ?></option>
+                            <?php foreach ($game_regions as $gr) : ?>
+                                <option value="<?php echo (int) $gr->id; ?>" <?php selected($origin_region_id, (int) $gr->id); ?>>
+                                    <?php
+                                    $gr_label = !empty($gr->name_fr) ? $gr->name_fr : $gr->name_en;
+                                    if ($gr_label === '') {
+                                        $gr_label = (string) $gr->slug;
+                                    }
+                                    echo esc_html($gr_label . ' (' . $gr->slug . ')');
+                                    ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Distinct from geographical regional availability (spawn map). Examples: Hisui dex block, linked to Pokémon GO grouping.', 'poke-hub'); ?></p>
                     </div>
                 </div>
                 <div class="admin-lab-form-col">

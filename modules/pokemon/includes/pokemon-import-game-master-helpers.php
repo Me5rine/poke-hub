@@ -206,7 +206,10 @@ function poke_hub_gm_spawn_template_to_dex( $template_id ) {
 }
 
 /**
- * Devine la génération depuis le numéro de Pokédex.
+ * Devine le numéro de génération « canon » (table `generations`) depuis le national dex.
+ * Neuf générations : la plage 899…905 reste en **génération 8** (comme le reste 810…898).
+ * Pokémon GO classe ce bloc dex à part : utiliser {@see poke_hub_pokemon_guess_go_origin_region_slug_by_dex()}
+ * qui renvoie `hisui` pour 899–905.
  *
  * @param int $dex_number
  * @return int 1..9 ou 0 si inconnu
@@ -238,12 +241,37 @@ function poke_hub_pokemon_guess_generation_by_dex( $dex_number ) {
     if ( $dex >= 810 && $dex <= 905 ) {
         return 8;
     }
-    // Génération 9 (Paldea + DLC) : plage National Dex 906…1026.
     if ( $dex >= 906 && $dex <= 1026 ) {
         return 9;
     }
 
     return 0;
+}
+
+/**
+ * Région d’origine côté regroupement Pokémon GO (distinct du nombre de génération taxonomique).
+ * À relier au loisible à la table `regions` (`slug`).
+ *
+ * @param int $dex_number Numéro de Pokédex national.
+ * @return string slug vide ou ex. `hisui`
+ */
+function poke_hub_pokemon_guess_go_origin_region_slug_by_dex( int $dex_number ): string {
+    $dex = max( 0, $dex_number );
+    /** @var int $hisui_first */
+    /** @var int $hisui_last */
+    $hisui_first = (int) apply_filters( 'poke_hub_pokemon_go_hisui_dex_first', 899 );
+    $hisui_last  = (int) apply_filters( 'poke_hub_pokemon_go_hisui_dex_last', 905 );
+    $hisui_first = max( 1, min( $hisui_first, 9999 ) );
+    $hisui_last  = max( $hisui_first, min( $hisui_last, 9999 ) );
+
+    if ( $dex >= $hisui_first && $dex <= $hisui_last ) {
+        $slug = (string) apply_filters( 'poke_hub_pokemon_go_hisui_region_slug', 'hisui', $dex );
+        $slug = sanitize_title( $slug );
+
+        return $slug !== '' ? $slug : 'hisui';
+    }
+
+    return '';
 }
 
 /**
@@ -1681,7 +1709,7 @@ function poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( array $data ): array {
     $format = [];
     foreach ( $data as $key => $value ) {
         if ( $key === 'dex_number' || $key === 'form_variant_id' || $key === 'is_default'
-            || $key === 'generation_id' || $key === 'base_atk' || $key === 'base_def'
+            || $key === 'generation_id' || $key === 'origin_region_id' || $key === 'base_atk' || $key === 'base_def'
             || $key === 'base_sta' || $key === 'is_tradable' || $key === 'is_transferable'
             || $key === 'has_shadow' || $key === 'has_purified'
             || $key === 'shadow_purification_stardust' || $key === 'shadow_purification_candy'

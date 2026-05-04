@@ -840,6 +840,318 @@ function poke_hub_pokemon_upsert_form_variant(
 }
 
 /**
+ * Trouve ou crée une ligne dans la table `regions` (Kanto, Hisui, Paldea…).
+ * Utilisé pour `pokemon.origin_region_id` et filtres par région « jeu ».
+ *
+ * @param string $slug     ex. hisui, paldea
+ * @param string $label_en Libellé EN si création
+ * @return int ID région ou 0
+ */
+function poke_hub_pokemon_find_or_create_game_region_by_slug(string $slug, string $label_en = ''): int {
+    if (!function_exists('pokehub_get_table')) {
+        return 0;
+    }
+
+    global $wpdb;
+
+    $slug = sanitize_title($slug);
+    if ($slug === '') {
+        return 0;
+    }
+
+    $table = pokehub_get_table('regions');
+    if (!$table) {
+        return 0;
+    }
+
+    $id = (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT id FROM {$table} WHERE slug = %s LIMIT 1",
+            $slug
+        )
+    );
+    if ($id > 0) {
+        return $id;
+    }
+
+    if ($label_en === '') {
+        $label_en = ucwords(str_replace('-', ' ', $slug));
+    }
+
+    $wpdb->insert(
+        $table,
+        [
+            'slug'       => $slug,
+            'name_en'    => $label_en,
+            'name_fr'    => '',
+            'sort_order' => 0,
+            'extra'      => '',
+        ],
+        ['%s', '%s', '%s', '%d', '%s']
+    );
+
+    return (int) $wpdb->insert_id;
+}
+
+/**
+ * Région d’origine « par défaut » pour une génération (liaison N–N ou colonne generations.region_id).
+ * Utilisé par l’import Game Master quand le dex n’a pas de cas spécial GO (ex. Hisui 899–905).
+ *
+ * @return array{id: int, slug: string} slug vide possible si la ligne regions est absente
+ */
+function poke_hub_pokemon_get_default_origin_region_for_generation(int $generation_id): array {
+    global $wpdb;
+
+    if ($generation_id <= 0 || !function_exists('pokehub_get_table')) {
+        return ['id' => 0, 'slug' => ''];
+    }
+
+    $regions_table = pokehub_get_table('regions');
+    $gens_table     = pokehub_get_table('generations');
+    $gr_table       = pokehub_get_table('generation_regions');
+    if ($regions_table === '' || $gens_table === '') {
+        return ['id' => 0, 'slug' => ''];
+    }
+
+    $rid = 0;
+    if (
+        $gr_table !== ''
+        && function_exists('pokehub_table_exists')
+        && pokehub_table_exists($gr_table)
+        && function_exists('poke_hub_get_generation_region_ids_ordered')
+    ) {
+        $ordered = poke_hub_get_generation_region_ids_ordered($generation_id);
+        if (!empty($ordered)) {
+            $rid = (int) $ordered[0];
+        }
+    }
+
+    if ($rid <= 0) {
+        $rid = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT region_id FROM {$gens_table} WHERE id = %d LIMIT 1",
+                $generation_id
+            )
+        );
+    }
+
+    if ($rid <= 0) {
+        return ['id' => 0, 'slug' => ''];
+    }
+
+    $slug = (string) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT slug FROM {$regions_table} WHERE id = %d LIMIT 1",
+            $rid
+        )
+    );
+    $slug = $slug !== '' ? sanitize_title($slug) : '';
+
+    return ['id' => $rid, 'slug' => $slug];
+}
+
+/**
+ * IDs des régions « jeu » liées à une génération (table generation_regions), ordre admin.
+ *
+ * @return int[]
+ */
+function poke_hub_get_generation_region_ids_ordered(int $generation_id): array {
+    global $wpdb;
+
+    if ($generation_id <= 0 || !function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    $gr = pokehub_get_table('generation_regions');
+    if (!$gr) {
+        return [];
+    }
+
+    $sql = "SELECT region_id FROM {$gr} WHERE generation_id = %d ORDER BY sort_order ASC, region_id ASC";
+
+    $cols = $wpdb->get_col($wpdb->prepare($sql, $generation_id));
+
+    if (!is_array($cols)) {
+        return [];
+    }
+
+    $out = [];
+    foreach ($cols as $v) {
+        $rid = (int) $v;
+        if ($rid > 0) {
+            $out[] = $rid;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Remplace les liaisons génération ↔ régions. Met à jour aussi generations.region_id avec la 1re région (rétrocompat).
+ */
+function poke_hub_sync_generation_region_links(int $generation_id, array $region_ids): void {
+    global $wpdb;
+
+    if ($generation_id <= 0 || !function_exists('pokehub_get_table')) {
+        return;
+    }
+
+    $gr   = pokehub_get_table('generation_regions');
+    $gens = pokehub_get_table('generations');
+    if (!$gr || !$gens) {
+        return;
+    }
+
+    $region_ids = array_values(array_unique(array_filter(array_map('intval', $region_ids))));
+
+    $wpdb->delete($gr, ['generation_id' => $generation_id], ['%d']);
+
+    $sort = 0;
+    foreach ($region_ids as $rid) {
+        if ($rid <= 0) {
+            continue;
+        }
+        $wpdb->insert(
+            $gr,
+            [
+                'generation_id' => $generation_id,
+                'region_id'     => $rid,
+                'sort_order'    => $sort,
+            ],
+            ['%d', '%d', '%d']
+        );
+        ++$sort;
+    }
+
+    $first = $region_ids[0] ?? 0;
+
+    $wpdb->update(
+        $gens,
+        ['region_id' => $first > 0 ? $first : 0],
+        ['id' => $generation_id],
+        ['%d'],
+        ['%d']
+    );
+}
+
+/**
+ * IDs des Pokémon ayant cette région d’origine (`origin_region_id`).
+ *
+ * @return int[]
+ */
+function poke_hub_pokemon_get_ids_by_origin_region_id(int $region_id): array {
+    global $wpdb;
+
+    if ($region_id <= 0 || !function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    $t = pokehub_get_table('pokemon');
+    if (!$t) {
+        return [];
+    }
+
+    $rows = $wpdb->get_col(
+        $wpdb->prepare(
+            "SELECT id FROM {$t} WHERE origin_region_id = %d ORDER BY dex_number ASC, slug ASC",
+            $region_id
+        )
+    );
+
+    if (!is_array($rows)) {
+        return [];
+    }
+
+    $out = array_values(array_unique(array_map('intval', $rows)));
+
+    return apply_filters('poke_hub_pokemon_ids_by_origin_region_id', $out, $region_id);
+}
+
+/**
+ * Comme {@see poke_hub_pokemon_get_ids_by_origin_region_id()} mais par slug `regions`.
+ *
+ * @return int[]
+ */
+function poke_hub_pokemon_get_ids_by_origin_region_slug(string $slug): array {
+    if (!function_exists('pokehub_get_table')) {
+        return [];
+    }
+
+    global $wpdb;
+
+    $slug = sanitize_title($slug);
+    if ($slug === '') {
+        return [];
+    }
+
+    $regions = pokehub_get_table('regions');
+    $pokemon = pokehub_get_table('pokemon');
+    if (!$regions || !$pokemon) {
+        return [];
+    }
+
+    $region_id = (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT id FROM {$regions} WHERE slug = %s LIMIT 1",
+            $slug
+        )
+    );
+
+    return poke_hub_pokemon_get_ids_by_origin_region_id($region_id);
+}
+
+/**
+ * Résout `origin_region_id` pour une ligne objet/array Pokémon (colonne en priorité).
+ *
+ * @param object|array|null $row Ligne stdClass ou tableau avec origin_region_id / extra
+ * @param string              $raw_extra JSON extra si $row ne l’expose pas
+ */
+function poke_hub_pokemon_resolve_origin_region_id($row, string $raw_extra = ''): int {
+    if (is_object($row) && isset($row->origin_region_id)) {
+        return max(0, (int) $row->origin_region_id);
+    }
+    if (is_array($row) && array_key_exists('origin_region_id', $row)) {
+        return max(0, (int) $row['origin_region_id']);
+    }
+
+    $raw = $raw_extra;
+    if ($raw === '' && is_object($row) && isset($row->extra)) {
+        $raw = (string) $row->extra;
+    }
+    if ($raw === '' && is_array($row) && isset($row['extra'])) {
+        $raw = (string) $row['extra'];
+    }
+
+    if ($raw === '') {
+        return 0;
+    }
+
+    $valid = true;
+    $extra = poke_hub_pokemon_decode_extra_json($raw, $valid);
+    if (!$valid || empty($extra['origin_region_slug'])) {
+        return 0;
+    }
+
+    global $wpdb;
+    $slug = sanitize_title((string) $extra['origin_region_slug']);
+    if ($slug === '' || !function_exists('pokehub_get_table')) {
+        return 0;
+    }
+
+    $regions = pokehub_get_table('regions');
+    if (!$regions) {
+        return 0;
+    }
+
+    return (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT id FROM {$regions} WHERE slug = %s LIMIT 1",
+            $slug
+        )
+    );
+}
+
+/**
  * NOTE: La fonction poke_hub_pokemon_get_scatterbug_patterns() a été déplacée
  * dans includes/functions/pokemon-public-helpers.php pour être disponible
  * même si le module Pokémon n'est pas actif.

@@ -171,6 +171,16 @@ class Poke_Hub_Pokemon_Generations_List_Table extends WP_List_Table {
         $ids = array_filter($ids);
 
         if ($ids) {
+            $gr = pokehub_get_table('generation_regions');
+            if ($gr) {
+                $in = implode(',', array_fill(0, count($ids), '%d'));
+                $wpdb->query(
+                    $wpdb->prepare(
+                        "DELETE FROM {$gr} WHERE generation_id IN ($in)",
+                        $ids
+                    )
+                );
+            }
             $in = implode(',', array_fill(0, count($ids), '%d'));
             $wpdb->query(
                 $wpdb->prepare(
@@ -192,6 +202,7 @@ class Poke_Hub_Pokemon_Generations_List_Table extends WP_List_Table {
         $table_gens    = pokehub_get_table('pokemon_generations');
         // NEW : table des régions Pokémon (multilingue)
         $table_regions = pokehub_get_table('pokemon_regions');
+        $table_gen_reg = pokehub_get_table('generation_regions');
 
         $per_page     = 20;
         $current_page = $this->get_pagenum();
@@ -236,13 +247,41 @@ class Poke_Hub_Pokemon_Generations_List_Table extends WP_List_Table {
             ? (int) $wpdb->get_var($wpdb->prepare($sql_count, $params))
             : (int) $wpdb->get_var($sql_count);
 
-        // Items
+        // Items (régions : N–N generation_regions, repli sur generations.region_id).
+        // Ne pas joindre la sous-requête si la table n’existe pas encore : sinon la requête échoue
+        // alors que le COUNT sans jointure reste correct (liste vide mais « X éléments »).
+        $greg_join = '';
+        if (
+            $table_gen_reg !== ''
+            && $table_regions !== ''
+            && function_exists('pokehub_table_exists')
+            && pokehub_table_exists($table_gen_reg)
+            && pokehub_table_exists($table_regions)
+        ) {
+            $greg_join = "
+            LEFT JOIN (
+                SELECT gr.generation_id,
+                    GROUP_CONCAT(COALESCE(r2.name_fr, r2.name_en, r2.slug) ORDER BY gr.sort_order ASC, r2.id ASC SEPARATOR ', ') AS greg_labels
+                FROM {$table_gen_reg} gr
+                INNER JOIN {$table_regions} r2 ON r2.id = gr.region_id
+                GROUP BY gr.generation_id
+            ) greg ON greg.generation_id = g.id
+            ";
+        }
+        $region_label_sql = ($greg_join !== '')
+            ? "COALESCE(
+                    NULLIF(TRIM(greg.greg_labels), ''),
+                    COALESCE(r.name_fr, r.name_en)
+                ) AS region_label"
+            : 'COALESCE(r.name_fr, r.name_en) AS region_label';
+
         $sql_items = "
             SELECT 
                 g.*,
                 COALESCE(g.name_fr, g.name_en) AS ui_label,
-                COALESCE(r.name_fr, r.name_en) AS region_label
+                {$region_label_sql}
             FROM {$table_gens} AS g
+            {$greg_join}
             LEFT JOIN {$table_regions} AS r ON g.region_id = r.id
             {$where}
             ORDER BY {$sql_orderby} {$order}
@@ -313,6 +352,11 @@ function poke_hub_pokemon_handle_generations_delete() {
     check_admin_referer('poke_hub_delete_generation_' . $id);
 
     global $wpdb;
+
+    $gr = pokehub_get_table('generation_regions');
+    if ($gr) {
+        $wpdb->delete($gr, ['generation_id' => $id], ['%d']);
+    }
     $table = pokehub_get_table('pokemon_generations');
     $wpdb->delete($table, ['id' => $id], ['%d']);
 
@@ -385,7 +429,24 @@ function poke_hub_pokemon_handle_generations_form() {
 
     $slug       = isset($_POST['slug']) ? sanitize_title($_POST['slug']) : '';
     $gen_number = isset($_POST['generation_number']) ? (int) $_POST['generation_number'] : 0;
-    $region_id  = isset($_POST['region_id']) ? (int) $_POST['region_id'] : 0;
+
+    $region_ids = [];
+    if (!empty($_POST['region_ids']) && is_array($_POST['region_ids'])) {
+        foreach (wp_unslash($_POST['region_ids']) as $raw) {
+            $rid = (int) $raw;
+            if ($rid > 0) {
+                $region_ids[] = $rid;
+            }
+        }
+        $region_ids = array_values(array_unique($region_ids));
+    }
+    if ($region_ids === [] && isset($_POST['region_id'])) {
+        $legacy = (int) $_POST['region_id'];
+        if ($legacy > 0) {
+            $region_ids = [$legacy];
+        }
+    }
+    $primary_region_id = $region_ids[0] ?? 0;
 
     // Au moins un nom requis
     if ($name_fr === '' && $name_en === '') {
@@ -400,9 +461,6 @@ function poke_hub_pokemon_handle_generations_form() {
     if ($gen_number < 0) {
         $gen_number = 0;
     }
-    if ($region_id < 0) {
-        $region_id = 0;
-    }
 
     $table = pokehub_get_table('pokemon_generations');
     $now   = current_time('mysql');
@@ -414,7 +472,7 @@ function poke_hub_pokemon_handle_generations_form() {
         'name_en'           => $name_en,
         'name_fr'           => $name_fr,
         'generation_number' => $gen_number,
-        'region_id'         => $region_id,
+        'region_id'           => $primary_region_id,
     ];
     $format = ['%s', '%s', '%s', '%d', '%d'];
 
@@ -424,6 +482,11 @@ function poke_hub_pokemon_handle_generations_form() {
         $format[] = '%s';
 
         $wpdb->insert($table, $data, $format);
+
+        $new_id = (int) $wpdb->insert_id;
+        if ($new_id > 0 && function_exists('poke_hub_sync_generation_region_links')) {
+            poke_hub_sync_generation_region_links($new_id, $region_ids);
+        }
 
         wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
         exit;
@@ -436,6 +499,10 @@ function poke_hub_pokemon_handle_generations_form() {
     }
 
     $wpdb->update($table, $data, ['id' => $id], $format, ['%d']);
+
+    if (function_exists('poke_hub_sync_generation_region_links')) {
+        poke_hub_sync_generation_region_links($id, $region_ids);
+    }
 
     $redirect = add_query_arg(
         [

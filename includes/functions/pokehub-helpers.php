@@ -353,6 +353,7 @@ function pokehub_get_table(string $key): string {
         'pokemon_regions'            => ['scope' => 'local',  'suffix' => 'regions'],         // alias
         'generations'                => ['scope' => 'local',  'suffix' => 'generations'],
         'pokemon_generations'        => ['scope' => 'local',  'suffix' => 'generations'],     // alias
+        'generation_regions'       => ['scope' => 'local',  'suffix' => 'generation_regions'],
         'attacks'                    => ['scope' => 'local',  'suffix' => 'attacks'],
         'pokemon_attacks'            => ['scope' => 'local',  'suffix' => 'attacks'],         // alias
         'attack_stats'               => ['scope' => 'local',  'suffix' => 'attack_stats'],

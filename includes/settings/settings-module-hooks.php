@@ -171,6 +171,7 @@ add_action('admin_init', function () {
             pokehub_get_table('pokemon_types'),
             pokehub_get_table('regions'),
             pokehub_get_table('generations'),
+            pokehub_get_table('generation_regions'),
             pokehub_get_table('attacks'),
             pokehub_get_table('attack_stats'),
             pokehub_get_table('attack_type_links'),

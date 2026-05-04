@@ -1016,5 +1016,27 @@ jQuery(function($) {
             });
         }
     });
+
+    // Générations : plusieurs régions « jeu » (recherche FR/EN + libellé affiché)
+    $('.pokehub-generation-game-regions-select').each(function() {
+        var $select = $(this);
+        if (!$select.length || typeof $.fn.select2 === 'undefined' || $select.data('select2')) {
+            return;
+        }
+        var ph = $select.attr('data-placeholder') || '';
+        if (!ph && typeof pokehubSelect2Strings !== 'undefined' && pokehubSelect2Strings.searchGameRegions) {
+            ph = pokehubSelect2Strings.searchGameRegions;
+        }
+        if (!ph) {
+            ph = 'Search regions…';
+        }
+        $select.select2({
+            width: '100%',
+            placeholder: ph,
+            allowClear: false,
+            closeOnSelect: false,
+            matcher: typeof pokehubMultilingualMatcher !== 'undefined' ? pokehubMultilingualMatcher : undefined
+        });
+    });
 });
 

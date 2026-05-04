@@ -355,6 +355,26 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         ],
     ];
 
+    $go_origin_region_slug = '';
+    if ( function_exists( 'poke_hub_pokemon_guess_go_origin_region_slug_by_dex' ) ) {
+        $go_origin_region_slug = poke_hub_pokemon_guess_go_origin_region_slug_by_dex( (int) $dex_number );
+    }
+
+    $origin_region_id = 0;
+    $stored_origin_region_slug = '';
+    if ( $go_origin_region_slug !== '' && function_exists( 'poke_hub_pokemon_find_or_create_game_region_by_slug' ) ) {
+        $origin_region_id = poke_hub_pokemon_find_or_create_game_region_by_slug( $go_origin_region_slug );
+        $stored_origin_region_slug = $go_origin_region_slug;
+    } elseif ( $generation_id > 0 && function_exists( 'poke_hub_pokemon_get_default_origin_region_for_generation' ) ) {
+        $def_origin = poke_hub_pokemon_get_default_origin_region_for_generation( $generation_id );
+        $origin_region_id = (int) ( $def_origin['id'] ?? 0 );
+        $stored_origin_region_slug = (string) ( $def_origin['slug'] ?? '' );
+    }
+
+    if ( $stored_origin_region_slug !== '' ) {
+        $game_go['origin_region_slug'] = $stored_origin_region_slug;
+    }
+
     // Meta extra pour la forme de base
     $extra = [
         'pokemon_id_proto'   => $pokemon_id_proto,
@@ -372,6 +392,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'names'              => $names,
         'generation_number'  => $generation_number,
         'game_key'           => $game_key,
+
+        'origin_region_slug' => $stored_origin_region_slug,
 
         'variant_form_slug'  => $variant_registry_slug,
         'variant_id'         => $variant_id,
@@ -555,6 +577,19 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     // On force après merge pour éviter toute conservation d'une ancienne valeur true.
     $extra['has_gmax_form'] = (bool) $has_gmax_form;
 
+    // Région d’origine GO : dex spécial (ex. Hisui) ou 1re région liée à la génération (admin).
+    if ( $stored_origin_region_slug !== '' ) {
+        $extra['origin_region_slug'] = $stored_origin_region_slug;
+        if ( isset( $extra['games'][ $game_key ] ) && is_array( $extra['games'][ $game_key ] ) ) {
+            $extra['games'][ $game_key ]['origin_region_slug'] = $stored_origin_region_slug;
+        }
+    } else {
+        unset( $extra['origin_region_slug'] );
+        if ( isset( $extra['games'][ $game_key ] ) && is_array( $extra['games'][ $game_key ] ) ) {
+            unset( $extra['games'][ $game_key ]['origin_region_slug'] );
+        }
+    }
+
     if ( $row && ! $gm_existing_extra_valid ) {
         // JSON existant invalide: on n'écrase jamais le champ extra.
         $extra_json = $existing_extra_raw;
@@ -573,6 +608,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         'is_default'      => $is_default,
 
         'generation_id'   => $generation_id,
+        'origin_region_id'=> $origin_region_id,
 
         'base_atk'        => $base_atk,
         'base_def'        => $base_def,
@@ -1072,6 +1108,8 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'generation_number'  => $generation_number,
                 'game_key'           => $game_key,
 
+                'origin_region_slug' => $stored_origin_region_slug,
+
                 'variant_form_slug'  => $temp_form_slug,
                 'variant_id'         => $mega_variant_id,
                 'variant_category'   => $mega_variant_category,
@@ -1155,6 +1193,18 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 poke_hub_pokemon_gm_apply_species_special_group_from_settings_to_extra( $mega_extra, $settings );
             }
 
+            if ( $stored_origin_region_slug !== '' ) {
+                $mega_extra['origin_region_slug'] = $stored_origin_region_slug;
+                if ( isset( $mega_extra['games'][ $game_key ] ) && is_array( $mega_extra['games'][ $game_key ] ) ) {
+                    $mega_extra['games'][ $game_key ]['origin_region_slug'] = $stored_origin_region_slug;
+                }
+            } else {
+                unset( $mega_extra['origin_region_slug'] );
+                if ( isset( $mega_extra['games'][ $game_key ] ) && is_array( $mega_extra['games'][ $game_key ] ) ) {
+                    unset( $mega_extra['games'][ $game_key ]['origin_region_slug'] );
+                }
+            }
+
             $mega_extra_json = null;
             if ( $mega_row && ! $mega_existing_extra_valid ) {
                 $mega_extra_json = $mega_existing_extra_raw;
@@ -1173,6 +1223,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 'is_default'      => 0,
 
                 'generation_id'   => $generation_id,
+                'origin_region_id'=> $origin_region_id,
 
                 'base_atk'        => $mega_atk,
                 'base_def'        => $mega_def,

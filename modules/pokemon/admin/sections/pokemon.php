@@ -1424,6 +1424,7 @@ function poke_hub_pokemon_duplicate_pokemon(int $source_id) {
         'form_variant_id'                => isset($row->form_variant_id) ? (int) $row->form_variant_id : 0,
         'is_default'                     => 0,
         'generation_id'                  => isset($row->generation_id) ? (int) $row->generation_id : 0,
+        'origin_region_id'              => isset($row->origin_region_id) ? (int) $row->origin_region_id : 0,
         'base_atk'                       => isset($row->base_atk) ? (int) $row->base_atk : 0,
         'base_def'                       => isset($row->base_def) ? (int) $row->base_def : 0,
         'base_sta'                       => isset($row->base_sta) ? (int) $row->base_sta : 0,
@@ -2003,6 +2004,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
 
     $is_default    = !empty($_POST['is_default']) ? 1 : 0;
     $generation_id = isset($_POST['generation_id']) ? (int) $_POST['generation_id'] : 0;
+    $origin_region_id = isset($_POST['origin_region_id']) ? max(0, (int) $_POST['origin_region_id']) : 0;
 
     $base_atk = isset($_POST['base_atk']) ? (int) $_POST['base_atk'] : 0;
     $base_def = isset($_POST['base_def']) ? (int) $_POST['base_def'] : 0;
@@ -2452,6 +2454,28 @@ function poke_hub_pokemon_handle_pokemon_form() {
     $games['pokemon_go'] = $game_go;
     $extra['games']      = $games;
 
+    $regions_ref = function_exists('pokehub_get_table') ? pokehub_get_table('regions') : '';
+    if ($origin_region_id > 0 && $regions_ref) {
+        $rslug_row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT slug FROM {$regions_ref} WHERE id = %d LIMIT 1",
+                $origin_region_id
+            )
+        );
+        $rslug_clean = ($rslug_row && !empty($rslug_row->slug)) ? sanitize_title((string) $rslug_row->slug) : '';
+        if ($rslug_clean !== '') {
+            $extra['origin_region_slug'] = $rslug_clean;
+            if (isset($extra['games']['pokemon_go']) && is_array($extra['games']['pokemon_go'])) {
+                $extra['games']['pokemon_go']['origin_region_slug'] = $rslug_clean;
+            }
+        }
+    } else {
+        unset($extra['origin_region_slug']);
+        if (isset($extra['games']['pokemon_go']) && is_array($extra['games']['pokemon_go'])) {
+            unset($extra['games']['pokemon_go']['origin_region_slug']);
+        }
+    }
+
     // ---------- Data communs ----------
 
     $extra_json = null;
@@ -2471,6 +2495,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
         'form_variant_id' => $form_variant_id,
         'is_default'      => $is_default,
         'generation_id'   => $generation_id,
+        'origin_region_id'=> $origin_region_id,
         'base_atk'        => $base_atk,
         'base_def'        => $base_def,
         'base_sta'        => $base_sta,

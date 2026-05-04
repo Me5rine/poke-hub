@@ -21,9 +21,12 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
         $regions = $wpdb->get_results(
             "SELECT 
                 id,
-                COALESCE(name_fr, name_en) AS label
+                slug,
+                name_fr,
+                name_en,
+                COALESCE(name_fr, name_en, slug) AS label
              FROM {$table_regions}
-             ORDER BY name_fr ASC, name_en ASC"
+             ORDER BY name_fr ASC, name_en ASC, slug ASC"
         );
     }
 
@@ -40,7 +43,13 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
     // Valeurs par défaut / édition
     $current_gen_number = $is_edit ? (int) $edit_row->generation_number : '';
     $current_slug       = $is_edit ? (string) $edit_row->slug : '';
-    $current_region_id  = $is_edit ? (int) $edit_row->region_id : 0;
+    $current_region_ids = [];
+    if ($is_edit && !empty($edit_row->id) && function_exists('poke_hub_get_generation_region_ids_ordered')) {
+        $current_region_ids = poke_hub_get_generation_region_ids_ordered((int) $edit_row->id);
+    }
+    if ($current_region_ids === [] && $is_edit && !empty($edit_row->region_id)) {
+        $current_region_ids = [(int) $edit_row->region_id];
+    }
 
     // Noms multilingues
     $current_name_fr = '';
@@ -96,17 +105,30 @@ function poke_hub_pokemon_generations_edit_form($edit_row = null) {
                     </div>
                     <div class="admin-lab-form-col">
                         <div class="admin-lab-form-group">
-                            <label for="gen_region"><?php esc_html_e('Region', 'poke-hub'); ?></label>
-                            <select name="region_id" id="gen_region">
-                                <option value="0"><?php esc_html_e('-- No region --', 'poke-hub'); ?></option>
+                            <label for="gen_regions"><?php esc_html_e('Regions (game)', 'poke-hub'); ?></label>
+                            <select name="region_ids[]" id="gen_regions" class="pokehub-generation-game-regions-select" multiple="multiple"
+                                data-placeholder="<?php echo esc_attr(__('Search regions by name…', 'poke-hub')); ?>"
+                                style="min-width: 220px; width: 100%; max-width: 480px;">
                                 <?php foreach ($regions as $r) : ?>
-                                    <option value="<?php echo (int) $r->id; ?>"
-                                        <?php selected($current_region_id, (int) $r->id); ?>>
-                                        <?php echo esc_html($r->label); ?>
+                                    <?php
+                                    $rid = (int) $r->id;
+                                    $nf  = isset($r->name_fr) ? (string) $r->name_fr : '';
+                                    $ne  = isset($r->name_en) ? (string) $r->name_en : '';
+                                    $sl  = isset($r->slug) ? (string) $r->slug : '';
+                                    $opt_label = (string) $r->label;
+                                    if ($sl !== '' && stripos($opt_label, $sl) === false) {
+                                        $opt_label .= ' (' . $sl . ')';
+                                    }
+                                    ?>
+                                    <option value="<?php echo $rid; ?>"
+                                        data-name-fr="<?php echo esc_attr($nf); ?>"
+                                        data-name-en="<?php echo esc_attr($ne); ?>"
+                                        <?php echo in_array($rid, $current_region_ids, true) ? 'selected="selected"' : ''; ?>>
+                                        <?php echo esc_html($opt_label); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <p class="description"><?php esc_html_e('Associated Pokémon region.', 'poke-hub'); ?></p>
+                            <p class="description"><?php esc_html_e('One generation can cover several regions (e.g. Galar and Hisui). Hold Ctrl or Cmd to select multiple. The first selected is also stored in the legacy single region field for compatibility.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                 </div>

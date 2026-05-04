@@ -104,8 +104,9 @@ class Pokehub_DB {
 
         $pokemon_table         = pokehub_get_table('pokemon');
         $types_table           = pokehub_get_table('pokemon_types');
-        $regions_table         = pokehub_get_table('regions');
-        $gens_table            = pokehub_get_table('generations');
+        $regions_table              = pokehub_get_table('regions');
+        $gens_table                 = pokehub_get_table('generations');
+        $generation_regions_table   = pokehub_get_table('generation_regions');
         $attacks_table         = pokehub_get_table('attacks');
         $attack_stats_table    = pokehub_get_table('attack_stats');
         $attack_type_links     = pokehub_get_table('attack_type_links');
@@ -146,6 +147,8 @@ class Pokehub_DB {
 
             generation_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
 
+            origin_region_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+
             base_atk SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             base_def SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             base_sta SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -182,6 +185,7 @@ class Pokehub_DB {
             KEY form_variant_id (form_variant_id),
             KEY is_default (is_default),
             KEY generation_id (generation_id),
+            KEY origin_region_id (origin_region_id),
             KEY is_tradable (is_tradable),
             KEY is_transferable (is_transferable),
             KEY has_shadow (has_shadow),
@@ -235,6 +239,15 @@ class Pokehub_DB {
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug)
+        ) {$charset_collate};";
+
+        // 4bis) Régions associées à une génération (N–N ; ex. Galar + Hisui pour la même gen.)
+        $sql_generation_regions = "CREATE TABLE {$generation_regions_table} (
+            generation_id BIGINT UNSIGNED NOT NULL,
+            region_id BIGINT UNSIGNED NOT NULL,
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY  (generation_id, region_id),
+            KEY region_id (region_id)
         ) {$charset_collate};";
 
         // 5) Attaques (moves)
@@ -580,6 +593,17 @@ class Pokehub_DB {
         dbDelta($sql_types);
         dbDelta($sql_regions);
         dbDelta($sql_gens);
+        if ($generation_regions_table) {
+            dbDelta($sql_generation_regions);
+            // Une fois : recopier generations.region_id dans la liaison (sans réinjecter après nettoyage admin).
+            if (! get_option('pokehub_generation_regions_migrated_v1', false)) {
+                $wpdb->query(
+                    "INSERT IGNORE INTO {$generation_regions_table} (generation_id, region_id, sort_order)
+                    SELECT id, region_id, 0 FROM {$gens_table} WHERE region_id > 0"
+                );
+                update_option('pokehub_generation_regions_migrated_v1', 1, false);
+            }
+        }
         dbDelta($sql_attacks);
         dbDelta($sql_attack_stats);
         dbDelta($sql_pokemon_type_links);

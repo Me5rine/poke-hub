@@ -3232,6 +3232,7 @@ function poke_hub_get_assets_path(string $asset_type): string {
         'candies' => get_option('poke_hub_assets_path_candies', '/pokemon-go/candies/'),
         'mega_energies' => get_option('poke_hub_assets_path_mega_energies', '/pokemon-go/mega-energies/'),
         'fallback' => get_option('poke_hub_assets_path_fallback', '/pokemon-go/icons/home/'),
+        'collections_toolbar' => get_option('poke_hub_assets_path_collections_toolbar', '/pokemon-go/collections-toolbar/'),
     ];
     
     return $paths[$asset_type] ?? '';

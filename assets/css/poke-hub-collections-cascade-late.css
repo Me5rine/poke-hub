@@ -121,15 +121,3 @@ ul.pokehub-collections-grid {
     line-height: 1.15;
     margin: 0;
 }
-.pokehub-collection-tile-form-line {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    font-size: 0.72rem;
-    line-height: 1.2;
-    font-weight: 600;
-    color: var(--me5rine-lab-text-muted, #5c6570);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
