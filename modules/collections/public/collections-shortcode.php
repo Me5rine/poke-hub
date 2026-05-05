@@ -346,7 +346,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
             <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-labelledby="pokehub-status-filters-heading-local-<?php echo esc_attr($slug); ?>">
                 <div class="pokehub-collection-toolbar-section-head pokehub-collection-toolbar-section-head--compact-mobile" role="presentation">
-                    <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="pokehub-status-filters-heading-local-<?php echo esc_attr($slug); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Grid', 'poke-hub'); ?></span></h3>
+                    <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="pokehub-status-filters-heading-local-<?php echo esc_attr($slug); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Show/Hide Pokémon', 'poke-hub'); ?></span></h3>
                     <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint"><?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?></p>
                 </div>
                 <div class="pokehub-collection-status-filters-tiles-row" role="presentation">
@@ -642,7 +642,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                     <?php $pokehub_filters_heading_id = 'pokehub-toolbar-filters-heading-c' . (int) $collection['id']; ?>
                     <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-labelledby="<?php echo esc_attr($pokehub_filters_heading_id); ?>">
                         <div class="pokehub-collection-toolbar-section-head pokehub-collection-toolbar-section-head--compact-mobile" role="presentation">
-                            <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_filters_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Grid', 'poke-hub'); ?></span></h3>
+                            <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_filters_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Show/Hide Pokémon', 'poke-hub'); ?></span></h3>
                             <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint"><?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?></p>
                         </div>
                         <div class="pokehub-collection-status-filters-tiles-row" role="presentation">
@@ -661,7 +661,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                     <?php
                     $pokehub_pogo_heading_id = 'pokehub-toolbar-pogo-heading-c' . (int) $collection['id'];
                     ?>
-                    <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_pogo_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Pokémon GO search strings', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php echo esc_html(_x('GO', 'Short section title: GO strings', 'poke-hub')); ?></span></h3>
+                    <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_pogo_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Pokémon GO search strings', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php echo esc_html(_x('Search strings', 'Short section title: GO strings', 'poke-hub')); ?></span></h3>
                     <?php
                     poke_hub_collections_output_pogo_search_block(
                         'c' . (int) $collection['id'],
@@ -683,7 +683,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 <div class="pokehub-collection-toolbar-panel-main">
                     <?php $pokehub_gen_heading_id = 'pokehub-toolbar-generations-heading-c' . (int) $collection['id']; ?>
                     <nav class="pokehub-collection-generation-jump" aria-labelledby="<?php echo esc_attr($pokehub_gen_heading_id); ?>">
-                        <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_gen_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Select a generation', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php echo esc_html(_x('Gen.', 'Short section title: jump to generation', 'poke-hub')); ?></span></h3>
+                        <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_gen_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Select a generation', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php echo esc_html(_x('Regions', 'Short section title: jump to generation', 'poke-hub')); ?></span></h3>
                         <?php
                         $pokehub_gen_track_id = 'pokehub-gen-jump-track-c' . (int) $collection['id'];
                         ?>
