@@ -4970,6 +4970,16 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
         return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
     }
 
+    if (array_key_exists('is_public', $data)) {
+        $row_uid_quick = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT user_id FROM {$collections_table} WHERE id = %d",
+            $collection_id
+        ));
+        if ($row_uid_quick === 0) {
+            unset($data['is_public']);
+        }
+    }
+
     $current_category = (string) $wpdb->get_var($wpdb->prepare(
         "SELECT category FROM {$collections_table} WHERE id = %d",
         $collection_id
@@ -5130,6 +5140,36 @@ function poke_hub_collections_get_by_share_token(string $token): ?array {
 
     $row['options'] = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
     return $row;
+}
+
+/**
+ * Droits lecture de la vue collection front (sans édition).
+ *
+ * — Publique : tout visiteur avec l’URL. — Privée compte WP : uniquement ce compte si connecté.
+ * — Privée anonyme : même règle que l’édition (cookie owner_key ou IP enregistrée).
+ *
+ * @param array  $collection
+ * @param int    $current_user_id get_current_user_id()
+ * @param string $client_ip       IP depuis {@see poke_hub_collections_get_client_ip()} (vide = recalcul)
+ * @param string $owner_key       Clé anonyme (cookie/header)
+ */
+function poke_hub_collections_user_can_view(array $collection, int $current_user_id = 0, string $client_ip = '', string $owner_key = ''): bool {
+    if (!empty($collection['is_public'])) {
+        return true;
+    }
+    $col_uid = (int) ($collection['user_id'] ?? 0);
+    $cid     = (int) ($collection['id'] ?? 0);
+    if ($col_uid > 0) {
+        return $current_user_id > 0 && $current_user_id === $col_uid;
+    }
+    if ($cid <= 0) {
+        return false;
+    }
+    if ($client_ip === '' && function_exists('poke_hub_collections_get_client_ip')) {
+        $client_ip = poke_hub_collections_get_client_ip();
+    }
+
+    return poke_hub_collections_can_edit_anonymous($cid, $client_ip, $owner_key);
 }
 
 /**

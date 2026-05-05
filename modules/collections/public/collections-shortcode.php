@@ -58,6 +58,100 @@ function poke_hub_collections_output_pogo_search_block($instance_suffix = '', ar
 }
 
 /**
+ * Case à cocher « réglages collection » rendue comme interrupteur (drawer créer / modifier).
+ *
+ * Le JS frontal continue d’utiliser les attributs id des inputs.
+ *
+ * @param string               $input_id         Attribut HTML id du checkbox.
+ * @param bool                 $checked          Valeur initiale cochée.
+ * @param string               $label_text       Libellé (chaîne déjà traduite avec __()/esc_html__ si besoin côté appel).
+ * @param array<string,string> $label_attributes Attributs optionnels du &lt;label&gt; (ex. data-collections-control).
+ * @param array<string,mixed>  $input_attributes bool true → attribut booléen HTML (disabled, aria-invalid).
+ * @param string               $extra_label_class Classe CSS sur &lt;label&gt; (ex. état grisé).
+ */
+function poke_hub_collections_render_setting_switch($input_id, $checked, $label_text, $label_attributes = [], $input_attributes = [], $extra_label_class = '') {
+    $input_id = is_string($input_id) ? $input_id : '';
+    if ($input_id === '') {
+        return;
+    }
+    $label_attrs_html = '';
+    if (is_array($label_attributes)) {
+        foreach ($label_attributes as $attr_name => $attr_value) {
+            if (!is_string($attr_name) || $attr_name === '') {
+                continue;
+            }
+            $label_attrs_html .= ' ' . esc_attr($attr_name) . '="' . esc_attr((string) $attr_value) . '"';
+        }
+    }
+    $input_attrs_html = '';
+    if (is_array($input_attributes)) {
+        foreach ($input_attributes as $ina => $inv) {
+            if (!is_string($ina) || $ina === '' || $inv === null || $inv === false) {
+                continue;
+            }
+            if ($inv === true) {
+                $input_attrs_html .= ' ' . esc_attr($ina);
+            } else {
+                $input_attrs_html .= ' ' . esc_attr($ina) . '="' . esc_attr((string) $inv) . '"';
+            }
+        }
+    }
+    $label_class = 'pokehub-collections-setting-switch';
+    $extra_lc = is_string($extra_label_class) ? trim($extra_label_class) : '';
+    if ($extra_lc !== '') {
+        $label_class .= ' ' . $extra_lc;
+    }
+    ?>
+    <label class="<?php echo esc_attr($label_class); ?>"<?php echo $label_attrs_html; ?>>
+        <input type="checkbox" id="<?php echo esc_attr($input_id); ?>" class="pokehub-collections-setting-switch-input" <?php checked($checked); ?><?php echo $input_attrs_html; ?> />
+        <span class="pokehub-collections-setting-switch-track" aria-hidden="true"><span class="pokehub-collections-setting-switch-thumb"></span></span>
+        <span class="pokehub-collections-setting-switch-text"><?php echo esc_html(is_string($label_text) ? $label_text : ''); ?></span>
+    </label>
+    <?php
+}
+
+/**
+ * Section « Partage / visibilité » (liste publique) pour les drawers création et édition.
+ *
+ * @param string               $switch_id      id du checkbox.
+ * @param bool                 $checked        État coché si autorisé.
+ * @param bool                 $enable_switch faux → interrupteur désactivé.
+ * @param string               $notice_message Texte sous l’interrupteur (déjà internationalisé, vide = rien).
+ */
+function poke_hub_collections_render_visibility_share_section($switch_id, $checked, $enable_switch, $notice_message = '') {
+    $switch_id       = is_string($switch_id) ? $switch_id : '';
+    $notice_message = is_string($notice_message) ? $notice_message : '';
+    if ($switch_id === '') {
+        return;
+    }
+    $in_attr = [];
+    $label_extra = '';
+    if (!$enable_switch) {
+        $in_attr['disabled'] = true;
+        $label_extra = 'pokehub-collections-setting-switch--disabled';
+    }
+    ?>
+    <fieldset class="pokehub-collections-setting-section pokehub-collections-setting-section--share">
+        <legend class="me5rine-lab-form-label"><?php esc_html_e('Sharing & visibility', 'poke-hub'); ?></legend>
+        <p class="me5rine-lab-form-hint pokehub-collections-share-subtitle"><?php esc_html_e('When this is on, anyone with the link can view the collection.', 'poke-hub'); ?></p>
+        <?php
+        poke_hub_collections_render_setting_switch(
+            $switch_id,
+            $checked,
+            __('Make this collection public', 'poke-hub'),
+            [],
+            $in_attr,
+            $label_extra
+        );
+        if ($notice_message !== '') :
+            ?>
+            <p class="me5rine-lab-form-hint pokehub-collections-share-notice"><?php echo esc_html($notice_message); ?></p>
+        <?php endif; ?>
+    </fieldset>
+    <?php
+}
+
+/**
  * Shortcode unique : affiche soit la page de gestion (liste, création, suppression),
  * soit la page d’une collection (remplissage, paramètres). Une seule vue à la fois.
  * Usage recommandé: [poke_hub_collections_page]
@@ -193,9 +287,15 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="me5rine-lab-form-field">
-                            <label><input type="checkbox" id="pokehub-collection-public" /> <?php esc_html_e('Make this collection public', 'poke-hub'); ?></label>
-                        </div>
+                        <?php
+                        $pokehub_create_can_public = $is_logged_in;
+                        poke_hub_collections_render_visibility_share_section(
+                            'pokehub-collection-public',
+                            false,
+                            $pokehub_create_can_public,
+                            $pokehub_create_can_public ? '' : __('Log in to make this list public and share it.', 'poke-hub')
+                        );
+                        ?>
 
                         <details class="pokehub-collections-advanced me5rine-lab-form-block" id="pokehub-collection-advanced">
                             <summary class="me5rine-lab-title-medium pokehub-collections-advanced-summary"><?php esc_html_e('Customize content and display', 'poke-hub'); ?></summary>
@@ -203,25 +303,25 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                 <fieldset class="me5rine-lab-form-block" id="pokehub-collection-content-filter-wrap">
                                     <legend class="me5rine-lab-form-label"><?php esc_html_e('Content filter', 'poke-hub'); ?></legend>
                                     <div class="pokehub-collections-options-additive" id="pokehub-collection-options-additive">
-                                        <label data-collections-control="include_gender"><input type="checkbox" id="pokehub-collection-include-gender" checked /> <?php esc_html_e('Include sexual dimorphism', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_both_sexes_collector"><input type="checkbox" id="pokehub-collection-both-sexes-collector" /> <?php esc_html_e('Include male and female', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_regional_forms"><input type="checkbox" id="pokehub-collection-include-regional-forms" checked /> <?php esc_html_e('Include regional forms', 'poke-hub'); ?></label>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-gender', true, __('Include sexual dimorphism', 'poke-hub'), ['data-collections-control' => 'include_gender']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-both-sexes-collector', false, __('Include male and female', 'poke-hub'), ['data-collections-control' => 'include_both_sexes_collector']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-regional-forms', true, __('Include regional forms', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
                                         <div class="pokehub-collections-pool-special-species" role="group" aria-label="<?php esc_attr_e('Legendary, Mythical, Ultra Beasts', 'poke-hub'); ?>">
-                                            <label><input type="checkbox" id="pokehub-collection-include-legendary" checked /> <?php esc_html_e('Include Legendary', 'poke-hub'); ?></label>
-                                            <label><input type="checkbox" id="pokehub-collection-include-mythical" checked /> <?php esc_html_e('Include Mythical', 'poke-hub'); ?></label>
-                                            <label><input type="checkbox" id="pokehub-collection-include-ultra-beast" checked /> <?php esc_html_e('Include Ultra Beast', 'poke-hub'); ?></label>
+                                            <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-legendary', true, __('Include Legendary', 'poke-hub')); ?>
+                                            <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-mythical', true, __('Include Mythical', 'poke-hub')); ?>
+                                            <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-ultra-beast', true, __('Include Ultra Beast', 'poke-hub')); ?>
                                         </div>
-                                        <label data-collections-control="include_mega"><input type="checkbox" id="pokehub-collection-include-mega" checked /> <?php esc_html_e('Include Mega evolutions', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_gigantamax"><input type="checkbox" id="pokehub-collection-include-gigantamax" checked /> <?php esc_html_e('Include Gigantamax', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_dynamax"><input type="checkbox" id="pokehub-collection-include-dynamax" checked /> <?php esc_html_e('Include Dynamax', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_special_attacks"><input type="checkbox" id="pokehub-collection-include-special-attacks" /> <?php esc_html_e('Include special attacks', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_backgrounds"><input type="checkbox" id="pokehub-collection-include-backgrounds" checked /> <?php esc_html_e('Inclure les fonds d’arrière-plan (Pokémon GO, in-game : backgrounds)', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_costumes"><input type="checkbox" id="pokehub-collection-include-costumes" checked /> <?php esc_html_e('Include costumed Pokémon', 'poke-hub'); ?></label>
-                                        <label data-collections-control="include_baby_pokemon"><input type="checkbox" id="pokehub-collection-include-babies" checked /> <?php esc_html_e('Include baby Pokémon', 'poke-hub'); ?></label>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-mega', true, __('Include Mega evolutions', 'poke-hub'), ['data-collections-control' => 'include_mega']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-gigantamax', true, __('Include Gigantamax', 'poke-hub'), ['data-collections-control' => 'include_gigantamax']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-dynamax', true, __('Include Dynamax', 'poke-hub'), ['data-collections-control' => 'include_dynamax']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-special-attacks', false, __('Include special attacks', 'poke-hub'), ['data-collections-control' => 'include_special_attacks']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-backgrounds', true, __('Inclure les fonds d’arrière-plan (Pokémon GO, in-game : backgrounds)', 'poke-hub'), ['data-collections-control' => 'include_backgrounds']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-costumes', true, __('Include costumed Pokémon', 'poke-hub'), ['data-collections-control' => 'include_costumes']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-babies', true, __('Include baby Pokémon', 'poke-hub'), ['data-collections-control' => 'include_baby_pokemon']); ?>
                                     </div>
                                 </fieldset>
                                 <div class="me5rine-lab-form-field is-hidden" id="pokehub-collection-only-shiny-wrap">
-                                    <label><input type="checkbox" id="pokehub-collection-only-shiny" /> <?php esc_html_e('Custom list: only include Pokémon that can be Shiny in Pokémon GO', 'poke-hub'); ?></label>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-only-shiny', false, __('Custom list: only include Pokémon that can be Shiny in Pokémon GO', 'poke-hub')); ?>
                                 </div>
                                 <fieldset class="me5rine-lab-form-block pokehub-collections-create-pool-show-fieldset" id="pokehub-collection-pool-show-only-wrap">
                                     <legend class="me5rine-lab-form-label"><?php esc_html_e('Include only', 'poke-hub'); ?></legend>
@@ -243,11 +343,11 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                 </fieldset>
                                 <fieldset class="me5rine-lab-form-block">
                                     <legend class="me5rine-lab-form-label"><?php esc_html_e('Display', 'poke-hub'); ?></legend>
-                                    <label><input type="checkbox" id="pokehub-collection-include-national" checked /> <?php esc_html_e('Show Pokédex numbers', 'poke-hub'); ?></label>
-                                    <label><input type="checkbox" id="pokehub-collection-one-per-species" /> <?php esc_html_e('Show only one entry per species', 'poke-hub'); ?></label>
-                                    <label><input type="checkbox" id="pokehub-collection-group-by-generation" checked /> <?php esc_html_e('Group by generation', 'poke-hub'); ?></label>
-                                    <label><input type="checkbox" id="pokehub-collection-generations-collapsed" /> <?php esc_html_e('Collapse generations by default', 'poke-hub'); ?></label>
-                                    <label><input type="checkbox" id="pokehub-collection-add-selectors" /> <?php esc_html_e('Add selectors to add Pokémon', 'poke-hub'); ?></label>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-national', true, __('Show Pokédex numbers', 'poke-hub')); ?>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-one-per-species', false, __('Show only one entry per species', 'poke-hub')); ?>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-group-by-generation', true, __('Group by generation', 'poke-hub')); ?>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-generations-collapsed', false, __('Collapse generations by default', 'poke-hub')); ?>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-add-selectors', false, __('Add selectors to add Pokémon', 'poke-hub')); ?>
                                 </fieldset>
                             </div>
                         </details>
@@ -382,6 +482,16 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         return '<p class="pokehub-collections-not-found">' . esc_html__('Collection not found.', 'poke-hub') . '</p>';
     }
 
+    $visitor_owner_key = '';
+    if ((int) ($collection['user_id'] ?? 0) === 0 && !empty($collection['share_token']) && function_exists('poke_hub_collections_get_owner_key_from_cookie')) {
+        $visitor_owner_key = poke_hub_collections_get_owner_key_from_cookie((string) $collection['share_token']);
+    }
+    $visitor_ip = function_exists('poke_hub_collections_get_client_ip') ? poke_hub_collections_get_client_ip() : '';
+    if (function_exists('poke_hub_collections_user_can_view')
+        && !poke_hub_collections_user_can_view($collection, $user_id, $visitor_ip, $visitor_owner_key)) {
+        return '<p class="pokehub-collections-not-found pokehub-collections-not-found--private">' . esc_html__('This collection is private or cannot be viewed.', 'poke-hub') . '</p>';
+    }
+
     $collections_base = rtrim(get_permalink(), '/');
     $canonical_url    = $collections_base . '/' . ($collection['share_token'] ?? '');
 
@@ -474,10 +584,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             $generation_icon_url_map[(string) $gen_key_tmp] = $icon_url;
         }
     }
-    $owner_key_cookie = '';
-    if ((int) ($collection['user_id'] ?? 0) === 0 && !empty($collection['share_token']) && function_exists('poke_hub_collections_get_owner_key_from_cookie')) {
-        $owner_key_cookie = poke_hub_collections_get_owner_key_from_cookie((string) $collection['share_token']);
-    }
+    $owner_key_cookie = $visitor_owner_key;
     $can_edit = ($user_id > 0 && (int) $collection['user_id'] === $user_id)
         || poke_hub_collections_can_edit_anonymous((int) $collection['id'], poke_hub_collections_get_client_ip(), $owner_key_cookie);
 
@@ -494,7 +601,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
     ob_start();
     ?>
     <?php $collection_category = $collection['category']; $is_specific_category = poke_hub_collections_category_is_specific($collection_category); ?>
-    <div class="pokehub-collection-view-wrap collection-view-dashboard me5rine-lab-dashboard" data-collection-id="<?php echo (int) $collection['id']; ?>" data-collection-category="<?php echo esc_attr($collection_category); ?>" data-specific-categories="<?php echo esc_attr(wp_json_encode(poke_hub_collections_get_specific_categories())); ?>" data-can-edit="<?php echo $can_edit ? '1' : '0'; ?>"
+    <div class="pokehub-collection-view-wrap collection-view-dashboard me5rine-lab-dashboard" data-collection-id="<?php echo (int) $collection['id']; ?>" data-collection-account-linked="<?php echo (int) ($collection['user_id'] ?? 0) > 0 ? '1' : '0'; ?>" data-collection-category="<?php echo esc_attr($collection_category); ?>" data-specific-categories="<?php echo esc_attr(wp_json_encode(poke_hub_collections_get_specific_categories())); ?>" data-can-edit="<?php echo $can_edit ? '1' : '0'; ?>"
          data-share-token="<?php echo esc_attr($collection['share_token'] ?? ''); ?>"
          data-share-url="<?php echo esc_url($canonical_url); ?>"
          data-edit-name="<?php echo esc_attr($collection['name']); ?>"
@@ -554,16 +661,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 </header>
             </div>
             <div class="pokehub-collection-toolbar-tiles" data-fixed-tiles-host role="tablist" aria-label="<?php esc_attr_e('Jump to toolbar sections', 'poke-hub'); ?>"></div>
-            <div class="pokehub-collection-toolbar-active-region" data-fixed-active-region hidden aria-hidden="true">
-                <span class="pokehub-collection-toolbar-active-region-left">
-                    <span class="pokehub-collection-toolbar-active-region-icon" data-fixed-active-region-icon aria-hidden="true"></span>
-                    <span class="pokehub-collection-toolbar-active-region-name" data-fixed-active-region-name></span>
-                </span>
-                <span class="pokehub-collection-toolbar-active-region-stats" data-fixed-active-region-stats></span>
-                <span class="pokehub-collection-toolbar-active-region-bar" data-fixed-active-region-bar role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
-                    <span class="pokehub-collection-toolbar-active-region-bar-fill" data-fixed-active-region-bar-fill></span>
-                </span>
-            </div>
             <div class="pokehub-collection-fixed-expand" data-fixed-expand hidden>
                 <div class="pokehub-collection-fixed-expand-inner" data-fixed-expand-inner></div>
             </div>
@@ -626,18 +723,8 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         <?php if ($total > 0) : ?>
         <div class="pokehub-collection-toolbar-tools">
             <div class="pokehub-collection-toolbar-tiles" data-flow-tiles-host role="tablist" aria-label="<?php esc_attr_e('Jump to toolbar sections', 'poke-hub'); ?>"></div>
-            <div class="pokehub-collection-toolbar-active-region" data-flow-active-region hidden aria-hidden="true">
-                <span class="pokehub-collection-toolbar-active-region-left">
-                    <span class="pokehub-collection-toolbar-active-region-icon" data-fixed-active-region-icon aria-hidden="true"></span>
-                    <span class="pokehub-collection-toolbar-active-region-name" data-fixed-active-region-name></span>
-                </span>
-                <span class="pokehub-collection-toolbar-active-region-stats" data-fixed-active-region-stats></span>
-                <span class="pokehub-collection-toolbar-active-region-bar" data-fixed-active-region-bar role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
-                    <span class="pokehub-collection-toolbar-active-region-bar-fill" data-fixed-active-region-bar-fill></span>
-                </span>
-            </div>
             <div class="pokehub-collection-toolbar-slot" data-collection-toolbar-slot="filters">
-            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--filters" data-collection-fixed-tile="filters" data-collection-fixed-label="<?php esc_attr_e('Show/Hide Pokémon', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Grid', 'Short fixed-toolbar tab: status filters', 'poke-hub')); ?>"<?php echo $toolbar_dec_filters_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_filters_url) . '"' : ''; ?>>
+            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--filters" data-collection-fixed-tile="filters" data-collection-fixed-label="<?php esc_attr_e('Show/Hide Pokémon', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Show/Hide', 'Short fixed-toolbar tab: status filters', 'poke-hub')); ?>"<?php echo $toolbar_dec_filters_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_filters_url) . '"' : ''; ?>>
                 <div class="pokehub-collection-toolbar-panel-main">
                     <?php $pokehub_filters_heading_id = 'pokehub-toolbar-filters-heading-c' . (int) $collection['id']; ?>
                     <div class="pokehub-collection-status-filters me5rine-lab-form-block" role="group" aria-labelledby="<?php echo esc_attr($pokehub_filters_heading_id); ?>">
@@ -656,7 +743,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
             </div>
             <div class="pokehub-collection-toolbar-slot" data-collection-toolbar-slot="pogo">
-            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--pogo pokehub-collection-compact-section" data-collection-fixed-tile="pogo" data-collection-fixed-label="<?php esc_attr_e('GO strings', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('GO', 'Short fixed-toolbar tab: GO strings', 'poke-hub')); ?>"<?php echo $toolbar_dec_pogo_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_pogo_url) . '"' : ''; ?>>
+            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--pogo pokehub-collection-compact-section" data-collection-fixed-tile="pogo" data-collection-fixed-label="<?php esc_attr_e('GO strings', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Search strings', 'Short fixed-toolbar tab: GO strings', 'poke-hub')); ?>"<?php echo $toolbar_dec_pogo_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_pogo_url) . '"' : ''; ?>>
                 <div class="pokehub-collection-toolbar-panel-main">
                     <?php
                     $pokehub_pogo_heading_id = 'pokehub-toolbar-pogo-heading-c' . (int) $collection['id'];
@@ -679,7 +766,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         if (count($generation_anchor_map) > 1) :
         ?>
             <div class="pokehub-collection-toolbar-slot" data-collection-toolbar-slot="generations">
-            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--generations" data-collection-fixed-tile="generations" data-collection-fixed-label="<?php esc_attr_e('Jump to generation', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Gen.', 'Short fixed-toolbar tab: jump to generation', 'poke-hub')); ?>"<?php echo $toolbar_dec_generations_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_generations_url) . '"' : ''; ?>>
+            <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--generations" data-collection-fixed-tile="generations" data-collection-fixed-label="<?php esc_attr_e('Jump to generation', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Regions', 'Short fixed-toolbar tab: jump to generation', 'poke-hub')); ?>"<?php echo $toolbar_dec_generations_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_generations_url) . '"' : ''; ?>>
                 <div class="pokehub-collection-toolbar-panel-main">
                     <?php $pokehub_gen_heading_id = 'pokehub-toolbar-generations-heading-c' . (int) $collection['id']; ?>
                     <nav class="pokehub-collection-generation-jump" aria-labelledby="<?php echo esc_attr($pokehub_gen_heading_id); ?>">
@@ -775,18 +862,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
         <?php endif; ?>
         </div>
-        <?php if ($total > 0) : ?>
-        <div class="pokehub-collections-drawer pokehub-collections-drawer--toolbar" data-toolbar-menu-drawer role="dialog" aria-label="<?php esc_attr_e('Collection toolbar menu', 'poke-hub'); ?>" aria-hidden="true">
-            <div class="pokehub-collections-drawer-backdrop" data-toolbar-menu-backdrop></div>
-            <div class="pokehub-collections-drawer-panel">
-                <div class="me5rine-lab-card-header pokehub-collections-drawer-header">
-                    <h3 class="me5rine-lab-title-medium" data-toolbar-menu-title><?php esc_html_e('Menu', 'poke-hub'); ?></h3>
-                    <button type="button" class="pokehub-collections-drawer-close" data-toolbar-menu-close aria-label="<?php esc_attr_e('Close', 'poke-hub'); ?>">&times;</button>
-                </div>
-                <div class="pokehub-collections-drawer-body" data-toolbar-menu-body></div>
-            </div>
-        </div>
-        <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($total === 0) : ?>
@@ -821,6 +896,19 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         <?php endif; ?>
 
         </div><?php /* .pokehub-collection-toolbar-stack */ ?>
+
+        <?php if ($total > 0) : ?>
+        <div class="pokehub-collections-drawer pokehub-collections-drawer--toolbar" data-toolbar-menu-drawer role="dialog" aria-label="<?php esc_attr_e('Collection toolbar menu', 'poke-hub'); ?>" aria-hidden="true">
+            <div class="pokehub-collections-drawer-backdrop" data-toolbar-menu-backdrop></div>
+            <div class="pokehub-collections-drawer-panel">
+                <div class="me5rine-lab-card-header pokehub-collections-drawer-header">
+                    <h3 class="me5rine-lab-title-medium" data-toolbar-menu-title><?php esc_html_e('Menu', 'poke-hub'); ?></h3>
+                    <button type="button" class="pokehub-collections-drawer-close" data-toolbar-menu-close aria-label="<?php esc_attr_e('Close', 'poke-hub'); ?>">&times;</button>
+                </div>
+                <div class="pokehub-collections-drawer-body" data-toolbar-menu-body></div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="pokehub-collection-tiles" data-pool="<?php echo esc_attr(wp_json_encode($pool)); ?>" data-items="<?php echo esc_attr(wp_json_encode($items_resolved)); ?>">
             <?php foreach ($pool_by_gen as $gen_key => $gen_pool) : ?>
@@ -975,13 +1063,26 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                             <input type="text" id="pokehub-edit-collection-name" class="me5rine-lab-form-input" value="<?php echo esc_attr($collection['name']); ?>" />
                         </div>
                         <div class="me5rine-lab-form-field">
-                            <label><input type="checkbox" id="pokehub-edit-collection-public" <?php checked(!empty($collection['is_public'])); ?> /> <?php esc_html_e('Make this collection public', 'poke-hub'); ?></label>
-                        </div>
-                        <div class="me5rine-lab-form-field">
                             <label for="pokehub-edit-card-background-image" class="me5rine-lab-form-label"><?php esc_html_e('Cover image (card on collections list)', 'poke-hub'); ?></label>
                             <input type="url" id="pokehub-edit-card-background-image" class="me5rine-lab-form-input" placeholder="https://…" value="<?php echo esc_attr($opts['card_background_image_url'] ?? ''); ?>" />
                             <p class="me5rine-lab-form-description"><?php esc_html_e('Optional. Leave empty to use the default image for this collection type.', 'poke-hub'); ?></p>
                         </div>
+                        <?php
+                        $edit_linked_account_b = (int) ($collection['user_id'] ?? 0) > 0;
+                        $edit_logged_b         = is_user_logged_in();
+                        $edit_share_notice_b   = '';
+                        if (!$edit_linked_account_b) {
+                            $edit_share_notice_b = $edit_logged_b
+                                ? __('Publishing the list publicly is only available once the collection is tied to your account (for example claim it from the collections page).', 'poke-hub')
+                                : __('Log in to make this list public and share it.', 'poke-hub');
+                        }
+                        poke_hub_collections_render_visibility_share_section(
+                            'pokehub-edit-collection-public',
+                            !empty($collection['is_public']),
+                            $edit_linked_account_b,
+                            $edit_share_notice_b
+                        );
+                        ?>
                         <?php
                         $edit_settings_hidden = $is_specific_category ? [] : poke_hub_collections_settings_hidden_control_keys($collection_category);
                         ?>
@@ -989,42 +1090,42 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         <fieldset>
                             <legend class="me5rine-lab-form-label"><?php esc_html_e('Content filter', 'poke-hub'); ?></legend>
                             <?php if (!in_array('include_gender', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_gender"><input type="checkbox" id="pokehub-edit-include-gender" <?php checked(!empty($opts['include_gender'])); ?> /> <?php esc_html_e('Include sexual dimorphism', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-gender', !empty($opts['include_gender']), __('Include sexual dimorphism', 'poke-hub'), ['data-collections-control' => 'include_gender']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_both_sexes_collector', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_both_sexes_collector"><input type="checkbox" id="pokehub-edit-both-sexes-collector" <?php checked(!empty($opts['include_both_sexes_collector'])); ?> /> <?php esc_html_e('Include male and female', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-both-sexes-collector', !empty($opts['include_both_sexes_collector']), __('Include male and female', 'poke-hub'), ['data-collections-control' => 'include_both_sexes_collector']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_regional_forms', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_regional_forms"><input type="checkbox" id="pokehub-edit-include-regional-forms" <?php checked(!isset($opts['include_regional_forms']) || !empty($opts['include_regional_forms'])); ?> /> <?php esc_html_e('Include regional forms', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-regional-forms', !isset($opts['include_regional_forms']) || !empty($opts['include_regional_forms']), __('Include regional forms', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
                             <?php endif; ?>
                             <div class="pokehub-collections-pool-special-species" role="group" aria-label="<?php esc_attr_e('Legendary, Mythical, Ultra Beasts', 'poke-hub'); ?>">
-                                <label><input type="checkbox" id="pokehub-edit-include-legendary" <?php checked(!isset($opts['include_legendary_pokemon']) || !empty($opts['include_legendary_pokemon'])); ?> /> <?php esc_html_e('Include Legendary', 'poke-hub'); ?></label>
-                                <label><input type="checkbox" id="pokehub-edit-include-mythical" <?php checked(!isset($opts['include_mythical_pokemon']) || !empty($opts['include_mythical_pokemon'])); ?> /> <?php esc_html_e('Include Mythical', 'poke-hub'); ?></label>
-                                <label><input type="checkbox" id="pokehub-edit-include-ultra-beast" <?php checked(!isset($opts['include_ultra_beast_pokemon']) || !empty($opts['include_ultra_beast_pokemon'])); ?> /> <?php esc_html_e('Include Ultra Beast', 'poke-hub'); ?></label>
+                                <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-legendary', !isset($opts['include_legendary_pokemon']) || !empty($opts['include_legendary_pokemon']), __('Include Legendary', 'poke-hub')); ?>
+                                <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-mythical', !isset($opts['include_mythical_pokemon']) || !empty($opts['include_mythical_pokemon']), __('Include Mythical', 'poke-hub')); ?>
+                                <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-ultra-beast', !isset($opts['include_ultra_beast_pokemon']) || !empty($opts['include_ultra_beast_pokemon']), __('Include Ultra Beast', 'poke-hub')); ?>
                             </div>
                             <?php if (!in_array('include_mega', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_mega"><input type="checkbox" id="pokehub-edit-include-mega" <?php checked($edit_include_mega); ?> /> <?php esc_html_e('Include Mega evolutions', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-mega', $edit_include_mega, __('Include Mega evolutions', 'poke-hub'), ['data-collections-control' => 'include_mega']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_gigantamax', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_gigantamax"><input type="checkbox" id="pokehub-edit-include-gigantamax" <?php checked(!empty($opts['include_gigantamax'])); ?> /> <?php esc_html_e('Include Gigantamax', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-gigantamax', !empty($opts['include_gigantamax']), __('Include Gigantamax', 'poke-hub'), ['data-collections-control' => 'include_gigantamax']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_dynamax', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_dynamax"><input type="checkbox" id="pokehub-edit-include-dynamax" <?php checked(!empty($opts['include_dynamax'])); ?> /> <?php esc_html_e('Include Dynamax', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-dynamax', !empty($opts['include_dynamax']), __('Include Dynamax', 'poke-hub'), ['data-collections-control' => 'include_dynamax']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_special_attacks', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_special_attacks"><input type="checkbox" id="pokehub-edit-include-special-attacks" <?php checked(!empty($opts['include_special_attacks'])); ?> /> <?php esc_html_e('Include special attacks', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-special-attacks', !empty($opts['include_special_attacks']), __('Include special attacks', 'poke-hub'), ['data-collections-control' => 'include_special_attacks']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_backgrounds', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_backgrounds"><input type="checkbox" id="pokehub-edit-include-backgrounds" <?php checked(!empty($opts['include_backgrounds'])); ?> /> <?php esc_html_e('Inclure les fonds d’arrière-plan (Pokémon GO, in-game : backgrounds)', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-backgrounds', !empty($opts['include_backgrounds']), __('Inclure les fonds d’arrière-plan (Pokémon GO, in-game : backgrounds)', 'poke-hub'), ['data-collections-control' => 'include_backgrounds']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_costumes', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_costumes"><input type="checkbox" id="pokehub-edit-include-costumes" <?php checked(!empty($opts['include_costumes'])); ?> /> <?php esc_html_e('Include costumed Pokémon', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-costumes', !empty($opts['include_costumes']), __('Include costumed Pokémon', 'poke-hub'), ['data-collections-control' => 'include_costumes']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_baby_pokemon', $edit_settings_hidden, true)) : ?>
-                            <label data-collections-control="include_baby_pokemon"><input type="checkbox" id="pokehub-edit-include-babies" <?php checked(!isset($opts['include_baby_pokemon']) || !empty($opts['include_baby_pokemon'])); ?> /> <?php esc_html_e('Include baby Pokémon', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-babies', !isset($opts['include_baby_pokemon']) || !empty($opts['include_baby_pokemon']), __('Include baby Pokémon', 'poke-hub'), ['data-collections-control' => 'include_baby_pokemon']); ?>
                             <?php endif; ?>
                             <?php if ($collection_category === 'custom') : ?>
-                            <label><input type="checkbox" id="pokehub-edit-only-shiny" <?php checked(!empty($opts['only_shiny'])); ?> /> <?php esc_html_e('Custom list: only include Pokémon that can be Shiny in Pokémon GO', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-only-shiny', !empty($opts['only_shiny']), __('Custom list: only include Pokémon that can be Shiny in Pokémon GO', 'poke-hub')); ?>
                             <?php endif; ?>
                         </fieldset>
                         <?php endif; ?>
@@ -1054,16 +1155,16 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         <?php endif; ?>
                         <fieldset>
                             <legend class="me5rine-lab-form-label"><?php esc_html_e('Display', 'poke-hub'); ?></legend>
-                            <label><input type="checkbox" id="pokehub-edit-include-national" <?php checked(!empty($opts['include_national_dex'])); ?> /> <?php esc_html_e('Show Pokédex numbers', 'poke-hub'); ?></label>
-                            <label><input type="checkbox" id="pokehub-edit-one-per-species" <?php checked(!empty($opts['one_per_species'])); ?> /> <?php esc_html_e('Show only one entry per species', 'poke-hub'); ?></label>
-                            <label><input type="checkbox" id="pokehub-edit-group-by-generation" <?php checked(!empty($opts['group_by_generation'])); ?> /> <?php esc_html_e('Group by generation', 'poke-hub'); ?></label>
-                            <label><input type="checkbox" id="pokehub-edit-generations-collapsed" <?php checked(!empty($opts['generations_collapsed'])); ?> /> <?php esc_html_e('Collapse generations by default', 'poke-hub'); ?></label>
-                            <label><input type="checkbox" id="pokehub-edit-add-selectors" <?php checked(in_array($opts['display_mode'] ?? 'tiles', ['select', 'tiles_select'], true)); ?> /> <?php esc_html_e('Add selectors to add Pokémon', 'poke-hub'); ?></label>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-national', !empty($opts['include_national_dex']), __('Show Pokédex numbers', 'poke-hub')); ?>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-one-per-species', !empty($opts['one_per_species']), __('Show only one entry per species', 'poke-hub')); ?>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-group-by-generation', !empty($opts['group_by_generation']), __('Group by generation', 'poke-hub')); ?>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-generations-collapsed', !empty($opts['generations_collapsed']), __('Collapse generations by default', 'poke-hub')); ?>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-add-selectors', in_array($opts['display_mode'] ?? 'tiles', ['select', 'tiles_select'], true), __('Add selectors to add Pokémon', 'poke-hub')); ?>
                         </fieldset>
                 </div>
                 <div class="pokehub-collections-drawer-footer">
-                    <button type="button" class="pokehub-collections-modal-edit-save me5rine-lab-form-button button" id="pokehub-collections-drawer-save"><?php esc_html_e('Save', 'poke-hub'); ?></button>
-                    <button type="button" class="pokehub-collections-btn-delete-collection me5rine-lab-form-button-remove button"><?php esc_html_e('Delete collection', 'poke-hub'); ?></button>
+                    <button type="button" class="pokehub-collections-modal-edit-save me5rine-lab-form-button me5rine-lab-form-button-secondary button" id="pokehub-collections-drawer-save"><?php esc_html_e('Save', 'poke-hub'); ?></button>
+                    <button type="button" class="pokehub-collections-btn-delete-collection me5rine-lab-form-button button"><?php esc_html_e('Delete collection', 'poke-hub'); ?></button>
                 </div>
             </div>
         </div>

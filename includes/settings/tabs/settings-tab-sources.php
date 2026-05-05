@@ -535,7 +535,7 @@ foreach ($messages as $msg) {
                                     class="regular-text"
                                     placeholder="/pokemon-go/regions/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
-                                    <?php _e('PNG: slug.png (used for collection region headers and sticky active-region line).', 'poke-hub'); ?>
+                                    <?php _e('PNG: slug.png (used for collection region headers and jump tiles).', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>

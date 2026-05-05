@@ -54,14 +54,12 @@ Dans `modules/collections/public/collections-shortcode.php` :
 - bloc sticky : `.pokehub-collection-sticky-tools`
 - chrome interne : `.pokehub-collection-flow-toolbar-chrome`
 - tuiles nav : `[data-flow-tiles-host]`
-- recap région active : `[data-flow-active-region]`
 
 ### Comportement
 
 Le JS (`modules/collections/assets/js/collections-front.js`) gère :
 
 - la barre “pinned” (`.pokehub-toolbar-stack--pinned`) quand nécessaire,
-- la mise à jour de la région active (nom, icône, stats, barre),
 - l’ouverture des contenus (`Filters / GO / Gen`) dans le drawer toolbar.
 
 ## 4) Contrat CSS/JS à respecter
@@ -71,8 +69,6 @@ Pour éviter les régressions, ne pas renommer sans mise à jour JS associée :
 - `.pokehub-collection-toolbar-stack`
 - `.pokehub-collection-sticky-tools`
 - `[data-flow-tiles-host]`
-- `[data-flow-active-region]`
-- `[data-fixed-active-region-*]`
 - `.pokehub-collections-drawer--toolbar`
 
 ## 5) Checklist “nouveau module”
