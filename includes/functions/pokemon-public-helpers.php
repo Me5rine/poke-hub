@@ -3227,6 +3227,7 @@ function poke_hub_get_assets_path(string $asset_type): string {
         'habitats' => get_option('poke_hub_assets_path_habitats', '/pokemon-go/habitats/'),
         'bonus' => get_option('poke_hub_assets_path_bonus', '/pokemon-go/bonus/'),
         'types' => get_option('poke_hub_assets_path_types', '/pokemon-go/types/'),
+        'regions' => get_option('poke_hub_assets_path_regions', '/pokemon-go/regions/'),
         'vivillon' => get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/'),
         'teams' => get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/'),
         'candies' => get_option('poke_hub_assets_path_candies', '/pokemon-go/candies/'),
@@ -3814,6 +3815,13 @@ function poke_hub_get_vivillon_pattern_icon_url(string $slug): string {
  */
 function poke_hub_get_team_icon_url(string $slug): string {
     return poke_hub_get_asset_url('teams', $slug);
+}
+
+/**
+ * Récupère l'URL de l'icône d'une région (PNG bucket).
+ */
+function poke_hub_get_region_icon_url(string $slug): string {
+    return poke_hub_get_asset_url('regions', $slug, 'png');
 }
 
 /**

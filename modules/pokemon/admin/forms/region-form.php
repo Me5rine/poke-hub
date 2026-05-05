@@ -21,6 +21,7 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
     // Noms multilingues actuels
     $current_name_fr = '';
     $current_name_en = '';
+    $current_slug = '';
 
     if ($is_edit) {
         if (isset($edit_row->name_fr)) {
@@ -34,6 +35,7 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
         if ($current_name_fr === '' && $current_name_en === '' && isset($edit_row->name)) {
             $current_name_fr = (string) $edit_row->name;
         }
+        $current_slug = isset($edit_row->slug) ? sanitize_title((string) $edit_row->slug) : '';
     }
 
     $back_url = add_query_arg(
@@ -101,6 +103,28 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
                                    value="<?php echo esc_attr($is_edit ? (int) $edit_row->sort_order : '0'); ?>" 
                                    style="max-width: 150px;" />
                             <p class="description"><?php esc_html_e('Lower = appears first in lists.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-lab-form-row">
+                    <div class="admin-lab-form-col">
+                        <div class="admin-lab-form-group">
+                            <label><?php esc_html_e('Icon preview', 'poke-hub'); ?></label>
+                            <p class="description"><?php esc_html_e('Resolved automatically from region slug via Settings > Sources > Regions path: {slug}.png', 'poke-hub'); ?></p>
+                            <?php $preview_icon_url = ($current_slug !== '' && function_exists('poke_hub_get_region_icon_url')) ? poke_hub_get_region_icon_url($current_slug) : ''; ?>
+                            <?php if ($preview_icon_url !== '') : ?>
+                                <div style="margin-top:10px;display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px;">
+                                    <img src="<?php echo esc_url($preview_icon_url); ?>" alt="" style="max-width:100%;max-height:100%;" loading="lazy" decoding="async" />
+                                </div>
+                                <p class="description" style="margin-top:8px;">
+                                    <code><?php echo esc_html($preview_icon_url); ?></code>
+                                </p>
+                            <?php else : ?>
+                                <p class="description" style="margin-top:8px;color:#646970;">
+                                    <?php esc_html_e('Save a slug first to show the preview.', 'poke-hub'); ?>
+                                </p>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

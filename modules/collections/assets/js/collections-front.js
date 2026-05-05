@@ -376,6 +376,19 @@
             completeEl.remove();
         }
 
+        var statsEl = body.querySelector('.pokehub-collection-region-tile__stats');
+        if (gTotal > 0) {
+            if (!statsEl) {
+                statsEl = document.createElement('span');
+                statsEl.className = 'pokehub-collection-region-tile__stats';
+                if (o.isJump) statsEl.setAttribute('aria-hidden', 'true');
+                body.appendChild(statsEl);
+            }
+            statsEl.textContent = String(gOwned) + ' / ' + String(gTotal);
+        } else if (statsEl) {
+            statsEl.remove();
+        }
+
         var barWrap = body.querySelector('.pokehub-collection-region-tile__bar');
         if (gjShowBar) {
             if (!barWrap) {
@@ -383,15 +396,7 @@
                 barWrap.className = 'pokehub-collection-region-tile__bar';
                 barWrap.setAttribute('role', 'progressbar');
                 barWrap.setAttribute('aria-valuemin', '0');
-                var barInner = document.createElement('span');
-                barInner.className = 'pokehub-collection-region-tile__bar-fill';
-                barWrap.appendChild(barInner);
-                var statsEl0 = body.querySelector('.pokehub-collection-region-tile__stats');
-                if (statsEl0) {
-                    body.insertBefore(barWrap, statsEl0);
-                } else {
-                    body.appendChild(barWrap);
-                }
+                body.appendChild(barWrap);
             }
             var fill = barWrap.querySelector('.pokehub-collection-region-tile__bar-fill');
             if (!fill) {
@@ -409,21 +414,13 @@
                 var aBar2 = o.ariaSummaryTpl.replace(/%1\$s/g, genLabel).replace(/%2\$d/g, String(gOwned)).replace(/%3\$d/g, String(gTotal));
                 barWrap.setAttribute('aria-label', aBar2);
             }
+            if (statsEl && statsEl.nextSibling !== barWrap) {
+                statsEl.insertAdjacentElement('afterend', barWrap);
+            } else if (!statsEl && body.lastElementChild !== barWrap) {
+                body.appendChild(barWrap);
+            }
         } else if (barWrap) {
             barWrap.remove();
-        }
-
-        var statsEl = body.querySelector('.pokehub-collection-region-tile__stats');
-        if (gTotal > 0) {
-            if (!statsEl) {
-                statsEl = document.createElement('span');
-                statsEl.className = 'pokehub-collection-region-tile__stats';
-                if (o.isJump) statsEl.setAttribute('aria-hidden', 'true');
-                body.appendChild(statsEl);
-            }
-            statsEl.textContent = String(gOwned) + ' / ' + String(gTotal);
-        } else if (statsEl) {
-            statsEl.remove();
         }
 
         var mediaTarget = (o.isJump && tileRoot.classList && tileRoot.classList.contains('pokehub-collection-generation-jump-link--has-media'))
@@ -499,6 +496,69 @@
                 });
             }
         });
+
+        /* Récap région (barre fixe) : se met à jour aussi lors d'un clic tuile Pokémon, pas uniquement au scroll. */
+        (function refreshFixedActiveRegionNow() {
+            var host = viewWrap.querySelector('[data-flow-active-region]')
+                || document.querySelector('[data-flow-active-region]')
+                || document.querySelector('[data-fixed-active-region]');
+            if (!host) {
+                return;
+            }
+            var activeJump = viewWrap.querySelector('.pokehub-collection-generation-jump-link.is-active[data-generation-anchor]');
+            if (!activeJump) {
+                return;
+            }
+            var anchor = activeJump.getAttribute('data-generation-anchor') || '';
+            if (!anchor) {
+                return;
+            }
+            var details = viewWrap.querySelector('#' + anchor);
+            var summary = details ? details.querySelector('summary.pokehub-collection-region-tile--summary') : null;
+            var source = summary || activeJump;
+            if (!source) {
+                return;
+            }
+            var titleEl = source.querySelector('.pokehub-collection-region-tile__title');
+            var statsEl = source.querySelector('.pokehub-collection-region-tile__stats');
+            var barEl = source.querySelector('.pokehub-collection-region-tile__bar');
+            var fillEl = source.querySelector('.pokehub-collection-region-tile__bar-fill');
+            var name = titleEl ? String(titleEl.textContent || '').trim() : '';
+            var stats = statsEl ? String(statsEl.textContent || '').trim() : '';
+            if (!name || !stats) {
+                return;
+            }
+            var nameTarget = host.querySelector('[data-fixed-active-region-name]');
+            var statsTarget = host.querySelector('[data-fixed-active-region-stats]');
+            var barTarget = host.querySelector('[data-fixed-active-region-bar]');
+            var barFillTarget = host.querySelector('[data-fixed-active-region-bar-fill]');
+            var iconTarget = host.querySelector('[data-fixed-active-region-icon]');
+            if (nameTarget) nameTarget.textContent = name;
+            if (statsTarget) statsTarget.textContent = stats;
+            if (barTarget) {
+                var now = barEl ? (barEl.getAttribute('aria-valuenow') || '0') : '0';
+                var max = barEl ? (barEl.getAttribute('aria-valuemax') || '0') : '0';
+                barTarget.setAttribute('aria-valuenow', now);
+                barTarget.setAttribute('aria-valuemax', max);
+                barTarget.toggleAttribute('hidden', !barEl);
+            }
+            if (barFillTarget) {
+                var width = fillEl ? String(fillEl.style.width || '') : '';
+                barFillTarget.style.width = width || '0%';
+            }
+            if (iconTarget) {
+                var iconUrl = source.getAttribute('data-region-icon-url') || activeJump.getAttribute('data-region-icon-url') || '';
+                if (iconUrl) {
+                    iconTarget.style.setProperty('--pokehub-region-icon-url', 'url(' + JSON.stringify(iconUrl) + ')');
+                    iconTarget.removeAttribute('hidden');
+                } else {
+                    iconTarget.style.removeProperty('--pokehub-region-icon-url');
+                    iconTarget.setAttribute('hidden', 'hidden');
+                }
+            }
+            host.removeAttribute('hidden');
+            host.setAttribute('aria-hidden', 'false');
+        }());
     }
 
     /**
@@ -2588,6 +2648,66 @@
                     sections.push({ id: id, node: node, link: link });
                 }
             });
+            function updateFixedActiveRegionRow(currentSection) {
+                var host = wrap.querySelector('[data-flow-active-region]')
+                    || document.querySelector('[data-flow-active-region]')
+                    || document.querySelector('[data-fixed-active-region]');
+                if (!host) return;
+                if (!currentSection || !currentSection.node) {
+                    host.setAttribute('hidden', 'hidden');
+                    host.setAttribute('aria-hidden', 'true');
+                    return;
+                }
+                var summary = currentSection.node.querySelector('summary.pokehub-collection-region-tile--summary');
+                var source = summary || currentSection.link;
+                if (!source) {
+                    host.setAttribute('hidden', 'hidden');
+                    host.setAttribute('aria-hidden', 'true');
+                    return;
+                }
+                var titleEl = source.querySelector('.pokehub-collection-region-tile__title');
+                var statsEl = source.querySelector('.pokehub-collection-region-tile__stats');
+                var barEl = source.querySelector('.pokehub-collection-region-tile__bar');
+                var fillEl = source.querySelector('.pokehub-collection-region-tile__bar-fill');
+                var name = titleEl ? String(titleEl.textContent || '').trim() : '';
+                var stats = statsEl ? String(statsEl.textContent || '').trim() : '';
+                if (!name || !stats) {
+                    host.setAttribute('hidden', 'hidden');
+                    host.setAttribute('aria-hidden', 'true');
+                    return;
+                }
+                var nameTarget = host.querySelector('[data-fixed-active-region-name]');
+                var statsTarget = host.querySelector('[data-fixed-active-region-stats]');
+                var barTarget = host.querySelector('[data-fixed-active-region-bar]');
+                var barFillTarget = host.querySelector('[data-fixed-active-region-bar-fill]');
+                var iconTarget = host.querySelector('[data-fixed-active-region-icon]');
+                if (nameTarget) nameTarget.textContent = name;
+                if (statsTarget) statsTarget.textContent = stats;
+                if (barTarget) {
+                    var now = barEl ? (barEl.getAttribute('aria-valuenow') || '0') : '0';
+                    var max = barEl ? (barEl.getAttribute('aria-valuemax') || '0') : '0';
+                    barTarget.setAttribute('aria-valuenow', now);
+                    barTarget.setAttribute('aria-valuemax', max);
+                    barTarget.toggleAttribute('hidden', !barEl);
+                }
+                if (barFillTarget) {
+                    var width = fillEl ? String(fillEl.style.width || '') : '';
+                    barFillTarget.style.width = width || '0%';
+                }
+                if (iconTarget) {
+                    var iconUrl = source.getAttribute('data-region-icon-url') || (currentSection.link ? (currentSection.link.getAttribute('data-region-icon-url') || '') : '');
+                    if (iconUrl) {
+                        iconTarget.style.setProperty('--pokehub-region-icon-url', 'url(' + JSON.stringify(iconUrl) + ')');
+                        iconTarget.removeAttribute('hidden');
+                    } else {
+                        iconTarget.style.removeProperty('--pokehub-region-icon-url');
+                        iconTarget.setAttribute('hidden', 'hidden');
+                    }
+                }
+                host.removeAttribute('hidden');
+                host.setAttribute('aria-hidden', 'false');
+            }
+
             function updateActiveFromScroll() {
                 if (!sections.length) return;
                 var occBottom = pokeHubCollectionJumpOcclusionBottomPx(wrap);
@@ -2606,6 +2726,7 @@
                 if (current && current.link) {
                     current.link.classList.add('is-active');
                 }
+                updateFixedActiveRegionRow(current);
             }
             var raf = 0;
             var resizeJumpTimer = null;
@@ -2761,11 +2882,14 @@
         wraps.forEach(function (wrap) {
             var fixedHost = wrap.querySelector('[data-collection-fixed-toolbar]');
             var toolbarStack = wrap.querySelector('.pokehub-collection-toolbar-stack');
-            var tilesHost = wrap.querySelector('[data-fixed-tiles-host]');
-            var expandWrap = wrap.querySelector('[data-fixed-expand]');
-            var expandInner = wrap.querySelector('[data-fixed-expand-inner]');
+            var fixedTilesHost = wrap.querySelector('[data-fixed-tiles-host]');
+            var fixedExpandWrap = wrap.querySelector('[data-fixed-expand]');
+            var fixedExpandInner = wrap.querySelector('[data-fixed-expand-inner]');
+            var flowTilesHost = wrap.querySelector('[data-flow-tiles-host]');
+            var flowExpandWrap = wrap.querySelector('[data-flow-expand]');
+            var flowExpandInner = wrap.querySelector('[data-flow-expand-inner]');
             var flowHeader = wrap.querySelector('.pokehub-collection-page-header-wrap');
-            if (!fixedHost || !toolbarStack || !tilesHost || !expandWrap || !expandInner) {
+            if (!fixedHost || !toolbarStack || !fixedTilesHost || !fixedExpandWrap || !fixedExpandInner || !flowTilesHost || !flowExpandWrap || !flowExpandInner) {
                 return;
             }
 
@@ -2791,12 +2915,20 @@
             }
 
             var anchorsSlots = {};
+            var anchorsDirty = true;
 
             function computeAnchors() {
                 orderedKeys.forEach(function (k) {
                     var slot = wrap.querySelector('[data-collection-toolbar-slot="' + k + '"]');
                     anchorsSlots[k] = slot ? getElementDocumentTop(slot) : Number.POSITIVE_INFINITY;
                 });
+                anchorsDirty = false;
+            }
+
+            function ensureAnchors() {
+                if (anchorsDirty) {
+                    computeAnchors();
+                }
             }
 
             function syncFixedToolbarToWrapBox() {
@@ -2831,7 +2963,14 @@
             var fixedToolbarOn = false;
             var visibleTiles = {};
             var openExpandedKey = '';
+            var openExpandedMode = '';
             var lastTilesFingerprint = '';
+            var eConInner = (function () {
+                if (!wrap || !wrap.closest) {
+                    return null;
+                }
+                return wrap.closest('.e-con-inner');
+            })();
             orderedKeys.forEach(function (k) {
                 visibleTiles[k] = false;
             });
@@ -2840,6 +2979,24 @@
                 return orderedKeys.filter(function (k) {
                     return visibleTiles[k];
                 }).join('|');
+            }
+
+            function activeTilesHost() {
+                return fixedToolbarOn ? fixedTilesHost : flowTilesHost;
+            }
+            function activeExpandWrap() {
+                return fixedToolbarOn ? fixedExpandWrap : flowExpandWrap;
+            }
+            function activeExpandInner() {
+                return fixedToolbarOn ? fixedExpandInner : flowExpandInner;
+            }
+
+            function isEConInnerFullyVisible(barOffPx) {
+                if (!eConInner || !eConInner.getBoundingClientRect) {
+                    return false;
+                }
+                var r = eConInner.getBoundingClientRect();
+                return r.top >= (barOffPx - 1) && r.bottom <= (window.innerHeight + 1);
             }
 
             /**
@@ -2856,7 +3013,11 @@
                 if (inWrap) {
                     return inWrap;
                 }
-                return expandInner && expandInner.querySelector ? expandInner.querySelector(sel) : null;
+                var inFixed = fixedExpandInner && fixedExpandInner.querySelector ? fixedExpandInner.querySelector(sel) : null;
+                if (inFixed) {
+                    return inFixed;
+                }
+                return flowExpandInner && flowExpandInner.querySelector ? flowExpandInner.querySelector(sel) : null;
             }
 
             function slotFor(type) {
@@ -2869,17 +3030,25 @@
                 var body = sectionBodyFor(k);
                 var slot = slotFor(k);
                 openExpandedKey = '';
-                expandWrap.setAttribute('hidden', 'hidden');
-                expandInner.removeAttribute('data-active-key');
-                if (slot && body && body.parentNode === expandInner) {
+                var aWrap = activeExpandWrap();
+                var aInner = activeExpandInner();
+                fixedExpandWrap.setAttribute('hidden', 'hidden');
+                flowExpandWrap.setAttribute('hidden', 'hidden');
+                if (aInner) {
+                    aInner.removeAttribute('data-active-key');
+                }
+                if (slot && body && (body.parentNode === fixedExpandInner || body.parentNode === flowExpandInner)) {
                     slot.appendChild(body);
                     slot.style.minHeight = '';
                 }
-                var btn = tilesHost.querySelector('[data-fixed-tile-key="' + k + '"]');
-                if (btn) {
-                    btn.classList.remove('is-active');
-                    btn.setAttribute('aria-pressed', 'false');
-                }
+                [fixedTilesHost, flowTilesHost].forEach(function (host) {
+                    if (!host) return;
+                    var btn = host.querySelector('[data-fixed-tile-key="' + k + '"]');
+                    if (btn) {
+                        btn.classList.remove('is-active');
+                        btn.setAttribute('aria-pressed', 'false');
+                    }
+                });
                 if (reason !== 'preserve-select2') {
                     fixedToolbarReflowSelects(wrap);
                 }
@@ -2890,17 +3059,23 @@
                         wrap.setAttribute('data-pokehub-last-fixed-toolbar-h', String(tbClose));
                     }
                 }
+                anchorsDirty = true;
             }
 
             function openExpand(type) {
                 var body = sectionBodyFor(type);
                 var slot = slotFor(type);
                 if (!body || !slot) return;
+                var aWrap = activeExpandWrap();
+                var aInner = activeExpandInner();
+                if (!aWrap || !aInner) {
+                    return;
+                }
                 /* Rattrapage si l’état DOM a dérivé (anciennes versions ou race) : un seul panneau dans l’expand. */
-                if (expandInner && expandInner.querySelectorAll) {
-                    expandInner.querySelectorAll('[data-collection-fixed-tile]').forEach(function (node) {
+                if (aInner && aInner.querySelectorAll) {
+                    aInner.querySelectorAll('[data-collection-fixed-tile]').forEach(function (node) {
                         var nk = (node.getAttribute('data-collection-fixed-tile') || '').trim();
-                        if (!nk || nk === type || node.parentNode !== expandInner) {
+                        if (!nk || nk === type || node.parentNode !== aInner) {
                             return;
                         }
                         var sl = slotFor(nk);
@@ -2916,13 +3091,14 @@
                 if (openExpandedKey === type) {
                     return;
                 }
+                aInner.appendChild(body);
                 var h = Math.max(body.offsetHeight, body.getBoundingClientRect().height);
                 slot.style.minHeight = Math.ceil(h) + 'px';
-                expandInner.appendChild(body);
                 openExpandedKey = type;
-                expandInner.setAttribute('data-active-key', type);
-                expandWrap.removeAttribute('hidden');
-                tilesHost.querySelectorAll('.pokehub-collection-fixed-tile-btn').forEach(function (b) {
+                openExpandedMode = fixedToolbarOn ? 'fixed' : 'flow';
+                aInner.setAttribute('data-active-key', type);
+                aWrap.removeAttribute('hidden');
+                activeTilesHost().querySelectorAll('.pokehub-collection-fixed-tile-btn').forEach(function (b) {
                     var on = (b.getAttribute('data-fixed-tile-key') || '') === type;
                     b.classList.toggle('is-active', on);
                     b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -2933,11 +3109,41 @@
                 if (tbOpen > 0) {
                     wrap.setAttribute('data-pokehub-last-fixed-toolbar-h', String(tbOpen));
                 }
+                anchorsDirty = true;
+            }
+
+            function syncOpenExpandAcrossModes() {
+                if (!openExpandedKey) {
+                    return;
+                }
+                var body = sectionBodyFor(openExpandedKey);
+                var slot = slotFor(openExpandedKey);
+                var aWrap = activeExpandWrap();
+                var aInner = activeExpandInner();
+                if (!body || !slot || !aWrap || !aInner) {
+                    return;
+                }
+                if (body.parentNode !== aInner) {
+                    aInner.appendChild(body);
+                }
+                var h = Math.max(body.offsetHeight, body.getBoundingClientRect().height);
+                slot.style.minHeight = Math.ceil(h) + 'px';
+                aInner.setAttribute('data-active-key', openExpandedKey);
+                aWrap.removeAttribute('hidden');
+                if (fixedExpandWrap !== aWrap) {
+                    fixedExpandWrap.setAttribute('hidden', 'hidden');
+                }
+                if (flowExpandWrap !== aWrap) {
+                    flowExpandWrap.setAttribute('hidden', 'hidden');
+                }
             }
 
             function clearTilesUi() {
-                tilesHost.innerHTML = '';
-                tilesHost.removeAttribute('data-fixed-visible-count');
+                [fixedTilesHost, flowTilesHost].forEach(function (host) {
+                    if (!host) return;
+                    host.innerHTML = '';
+                    host.removeAttribute('data-fixed-visible-count');
+                });
             }
 
             function pokehubUseShortFixedTileLabels() {
@@ -2994,7 +3200,16 @@
             }
 
             function rebuildTiles(buttonActiveKey) {
-                clearTilesUi();
+                var tilesHost = activeTilesHost();
+                if (!tilesHost) return;
+                tilesHost.innerHTML = '';
+                tilesHost.removeAttribute('data-fixed-visible-count');
+                var subtitleByKey = {
+                    filters: 'Legend & statuses',
+                    pogo: 'Copy search strings',
+                    generations: 'Quick region jump',
+                    selectors: 'Add / mark quickly'
+                };
                 var added = [];
                 orderedKeys.forEach(function (k) {
                     if (!visibleTiles[k]) return;
@@ -3017,6 +3232,10 @@
                     labelSpan.className = 'pokehub-collection-fixed-tile-btn-label';
                     labelSpan.textContent = pokehubUseShortFixedTileLabels() ? labelShort : labelFull;
                     btn.appendChild(labelSpan);
+                    var subtitleSpan = document.createElement('span');
+                    subtitleSpan.className = 'pokehub-collection-fixed-tile-btn-subtitle';
+                    subtitleSpan.textContent = subtitleByKey[k] || '';
+                    btn.appendChild(subtitleSpan);
                     if (decoUrl) {
                         btn.style.setProperty('--pokehub-fixed-tile-bg', 'url(' + JSON.stringify(decoUrl) + ')');
                         var media = document.createElement('span');
@@ -3065,104 +3284,39 @@
             }
 
             function setFixedToolbar(active) {
-                if (fixedToolbarOn === active) return;
-                fixedToolbarOn = active;
-                wrap.classList.toggle('pokehub-collection--fixed-toolbar', active);
-                if (active) {
-                    fixedHost.removeAttribute('hidden');
-                    fixedHost.setAttribute('aria-hidden', 'false');
-                    if (flowHeader) {
-                        try {
-                            flowHeader.setAttribute('inert', '');
-                        } catch (eInert) {}
+                fixedToolbarOn = false;
+                wrap.classList.remove('pokehub-collection--fixed-toolbar');
+                if (fixedHost) {
+                    var fixedActiveRegion = fixedHost.querySelector('[data-fixed-active-region]');
+                    if (fixedActiveRegion) {
+                        fixedActiveRegion.setAttribute('hidden', 'hidden');
+                        fixedActiveRegion.setAttribute('aria-hidden', 'true');
                     }
-                } else {
-                    closeExpand('');
-                    clearTilesUi();
-                    lastTilesFingerprint = '';
                     fixedHost.setAttribute('hidden', 'hidden');
                     fixedHost.setAttribute('aria-hidden', 'true');
-                    syncFixedToolbarToWrapBox();
-                    if (flowHeader) {
-                        flowHeader.removeAttribute('inert');
-                    }
-                    orderedKeys.forEach(function (k) {
-                        visibleTiles[k] = false;
-                    });
+                }
+                if (flowHeader) {
+                    flowHeader.removeAttribute('inert');
                 }
             }
 
             function tick() {
-                computeAnchors();
-                var barOffPx = stickyViewportOffset().barOffset;
-                /** Hauteur du header site (viewport) — pas les coords document : sinon la barre fixe peut rester active en haut de page si le bloc commence « sous » maskLine même sans scroll. */
-                var stackTopVx = toolbarStack.getBoundingClientRect().top;
-                var scrollDocY = window.pageYOffset || document.documentElement.scrollTop || 0;
-                /**
-                 * Retour header flux : dès que la tuile .pokehub-collection-header-inner de la barre fixe
-                 * coïncide visuellement avec celle du .pokehub-collection-page-header-wrap (même boîte viewport).
-                 * Repli : pile d’outils repasse sous le header site, ou tout en haut de page si paire DOM absente.
-                 */
-                var collectionFixedUnstickEarlyScrollPx = 96;
-                if (typeof window.matchMedia === 'function') {
-                    var mqlPc = window.matchMedia('(min-width: 900px) and (pointer: fine)');
-                    if (mqlPc.matches) {
-                        collectionFixedUnstickEarlyScrollPx = 20;
-                    }
-                }
-                var fixedFlowInnerPair = (function () {
-                    var fi = fixedHost.querySelector(
-                        '.pokehub-collection-fixed-toolbar-inner .pokehub-collection-header-inner'
-                    );
-                    var vi = flowHeader
-                        ? flowHeader.querySelector('.pokehub-collection-header-inner')
-                        : null;
-                    return fi && vi ? { fixed: fi, flow: vi } : null;
-                })();
-                var geomUnstick = false;
-                if (fixedFlowInnerPair) {
-                    var rf = fixedFlowInnerPair.fixed.getBoundingClientRect();
-                    var rv = fixedFlowInnerPair.flow.getBoundingClientRect();
-                    var tol = 2.5;
-                    geomUnstick =
-                        Math.abs(rf.top - rv.top) <= tol &&
-                        Math.abs(rf.left - rv.left) <= tol &&
-                        Math.abs(rf.width - rv.width) <= tol &&
-                        Math.abs(rf.height - rv.height) <= tol;
-                }
-
-                if (!fixedToolbarOn && stackTopVx < barOffPx - 6) {
-                    setFixedToolbar(true);
-                } else if (
-                    fixedToolbarOn &&
-                    (geomUnstick ||
-                        stackTopVx > barOffPx + 12 ||
-                        (!fixedFlowInnerPair && scrollDocY <= collectionFixedUnstickEarlyScrollPx))
-                ) {
-                    setFixedToolbar(false);
-                }
-
-                var maskLine = currentMaskLine();
-                if (!fixedToolbarOn) {
-                    wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', '0px');
-                    syncFixedToolbarToWrapBox();
-                    return;
-                }
-                syncFixedToolbarToWrapBox();
-                updateTilesFromMaskLine(maskLine);
-                var fp = visibleTilesFingerprint();
-                if (fp !== lastTilesFingerprint) {
-                    lastTilesFingerprint = fp;
+                ensureAnchors();
+                setFixedToolbar(false);
+                orderedKeys.forEach(function (k) {
+                    visibleTiles[k] = !!slotFor(k);
+                });
+                var fpFlow = visibleTilesFingerprint() + '|flow';
+                if (fpFlow !== lastTilesFingerprint) {
+                    lastTilesFingerprint = fpFlow;
                     rebuildTiles(openExpandedKey);
                 }
-                if (openExpandedKey && sectionBodyFor(openExpandedKey) && sectionBodyFor(openExpandedKey).parentNode === expandInner) {
-                    expandWrap.removeAttribute('hidden');
+                syncOpenExpandAcrossModes();
+                if (openExpandedKey && sectionBodyFor(openExpandedKey) && sectionBodyFor(openExpandedKey).parentNode === flowExpandInner) {
+                    flowExpandWrap.removeAttribute('hidden');
                 }
-                var tbPx = Math.ceil(fixedHost.getBoundingClientRect().height);
-                wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', tbPx + 'px');
-                if (tbPx > 0) {
-                    wrap.setAttribute('data-pokehub-last-fixed-toolbar-h', String(tbPx));
-                }
+                wrap.style.setProperty('--pokehub-collection-fixed-toolbar-height', '0px');
+                syncFixedToolbarToWrapBox();
             }
 
             var raf = 0;
@@ -3189,6 +3343,7 @@
                 }
                 resizeTickTimer = window.setTimeout(function () {
                     resizeTickTimer = null;
+                    anchorsDirty = true;
                     tick();
                 }, 100);
             }

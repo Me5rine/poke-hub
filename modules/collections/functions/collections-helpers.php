@@ -3203,19 +3203,19 @@ function poke_hub_collections_pool_generation_sql_parts(): array {
     if (!$generations_table) {
         $cache = [
             'join_sql'     => '',
-            'select_main'  => "p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug",
-            'select_comma' => ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug",
+            'select_main'  => "p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS pokemon_region_icon_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_region_fallback_icon_slug, '' AS generation_group_slug",
+            'select_comma' => ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS pokemon_region_icon_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_region_fallback_icon_slug, '' AS generation_group_slug",
         ];
         return $cache;
     }
     $oreg_join = '';
-    $origin_cols = 'p.origin_region_id, \'\' AS pokemon_region_name, 999 AS pokemon_region_sort, \'\' AS pokemon_region_slug';
+    $origin_cols = 'p.origin_region_id, \'\' AS pokemon_region_name, 999 AS pokemon_region_sort, \'\' AS pokemon_region_slug, \'\' AS pokemon_region_icon_slug';
     if ($regions_table) {
         $oreg_join   = " LEFT JOIN {$regions_table} oreg ON oreg.id = p.origin_region_id AND p.origin_region_id > 0 ";
-        $origin_cols = 'p.origin_region_id, COALESCE(oreg.name_fr, oreg.name_en, \'\') AS pokemon_region_name, COALESCE(oreg.sort_order, 999) AS pokemon_region_sort, COALESCE(NULLIF(TRIM(oreg.slug), \'\'), \'\') AS pokemon_region_slug';
+        $origin_cols = "p.origin_region_id, COALESCE(oreg.name_fr, oreg.name_en, '') AS pokemon_region_name, COALESCE(oreg.sort_order, 999) AS pokemon_region_sort, COALESCE(NULLIF(TRIM(oreg.slug), ''), '') AS pokemon_region_slug, COALESCE(NULLIF(TRIM(oreg.slug), ''), '') AS pokemon_region_icon_slug";
     }
     $fallback_join = '';
-    $fallback_cols = '\'\' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, \'\' AS generation_region_fallback_slug';
+    $fallback_cols = '\'\' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, \'\' AS generation_region_fallback_slug, \'\' AS generation_region_fallback_icon_slug';
     if ($regions_table) {
         $fallback_join = " LEFT JOIN {$regions_table} rgen ON rgen.id = g.region_id AND g.region_id > 0 ";
         $gen_reg_table = pokehub_get_table('generation_regions');
@@ -3246,11 +3246,16 @@ function poke_hub_collections_pool_generation_sql_parts(): array {
             TRIM(COALESCE(
                 NULLIF(TRIM(gr_one.one_reg_slug), ''),
                 NULLIF(TRIM(COALESCE(rgen.slug, '')), '')
-            )) AS generation_region_fallback_slug";
+            )) AS generation_region_fallback_slug,
+            TRIM(COALESCE(
+                NULLIF(TRIM(gr_one.one_reg_slug), ''),
+                NULLIF(TRIM(COALESCE(rgen.slug, '')), '')
+            )) AS generation_region_fallback_icon_slug";
         } else {
             $fallback_cols = "TRIM(COALESCE(rgen.name_fr, rgen.name_en, '')) AS generation_region_fallback_name,
             COALESCE(rgen.sort_order, 999) AS generation_region_fallback_sort,
-            COALESCE(NULLIF(TRIM(rgen.slug), ''), '') AS generation_region_fallback_slug";
+            COALESCE(NULLIF(TRIM(rgen.slug), ''), '') AS generation_region_fallback_slug,
+            COALESCE(NULLIF(TRIM(rgen.slug), ''), '') AS generation_region_fallback_icon_slug";
         }
     }
     $join = "LEFT JOIN {$generations_table} g ON p.generation_id = g.id{$oreg_join}{$fallback_join}";
@@ -3310,6 +3315,35 @@ function poke_hub_collections_pool_row_generation_tile_slug(array $p): string {
     $g = isset($p['generation_group_slug']) ? trim((string) $p['generation_group_slug']) : '';
 
     return poke_hub_collections_sanitize_generation_jump_tile_image_slug_segment($g);
+}
+
+/**
+ * URL d'icône de région (SVG bucket) pour un groupe génération/région.
+ */
+function poke_hub_collections_pool_row_region_icon_url(array $p): string {
+    $icon_slug = '';
+    $region = isset($p['pokemon_region_name']) ? trim((string) $p['pokemon_region_name']) : '';
+    if ($region !== '') {
+        $icon_slug = isset($p['pokemon_region_icon_slug']) ? trim((string) $p['pokemon_region_icon_slug']) : '';
+        if ($icon_slug === '') {
+            $icon_slug = isset($p['pokemon_region_slug']) ? trim((string) $p['pokemon_region_slug']) : '';
+        }
+    }
+    if ($icon_slug === '') {
+        $from_gen = isset($p['generation_region_fallback_name']) ? trim((string) $p['generation_region_fallback_name']) : '';
+        if ($from_gen !== '') {
+            $icon_slug = isset($p['generation_region_fallback_icon_slug']) ? trim((string) $p['generation_region_fallback_icon_slug']) : '';
+            if ($icon_slug === '') {
+                $icon_slug = isset($p['generation_region_fallback_slug']) ? trim((string) $p['generation_region_fallback_slug']) : '';
+            }
+        }
+    }
+    $icon_slug = sanitize_title($icon_slug);
+    if ($icon_slug === '' || !function_exists('poke_hub_get_region_icon_url')) {
+        return '';
+    }
+
+    return poke_hub_get_region_icon_url($icon_slug);
 }
 
 /**

@@ -21,12 +21,13 @@ function poke_hub_collections_output_pogo_search_block($instance_suffix = '', ar
     $toolbar_embed = ! empty($args['collection_toolbar_embed']);
     $summary_class = 'pokehub-collection-pogo-search-summary' . ( $toolbar_embed ? ' pokehub-collection-pogo-search-summary--secondary' : '' );
     $details_class = 'pokehub-collection-pogo-search me5rine-lab-form-block' . ( $toolbar_embed ? ' pokehub-collection-pogo-search--toolbar-embed' : '' );
+    $details_open_attr = ( $toolbar_embed && ! empty($args['collection_toolbar_open']) ) ? ' open' : '';
     $details_aria    = '';
     if ( $toolbar_embed && ! empty( $args['toolbar_section_title_id'] ) && is_string( $args['toolbar_section_title_id'] ) ) {
         $details_aria = ' aria-labelledby="' . esc_attr( $args['toolbar_section_title_id'] ) . '"';
     }
     ?>
-    <details class="<?php echo esc_attr($details_class); ?>" id="pokehub-collection-pogo-search-<?php echo esc_attr($uid); ?>"<?php echo $details_aria; ?>>
+    <details class="<?php echo esc_attr($details_class); ?>" id="pokehub-collection-pogo-search-<?php echo esc_attr($uid); ?>"<?php echo $details_aria; ?><?php echo $details_open_attr; ?>>
         <summary class="<?php echo esc_attr($summary_class); ?>"><?php echo $toolbar_embed
             ? esc_html__('Paste lines & filters', 'poke-hub')
             : esc_html__('Pokémon GO: strings to paste', 'poke-hub'); ?></summary>
@@ -430,6 +431,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
     $gens_collapsed = !empty($opts['generations_collapsed']);
     $generation_anchor_map = [];
     $generation_tile_slug_map = [];
+    $generation_icon_url_map = [];
     if (is_array($pool_by_gen) && $pool_by_gen !== []) {
         foreach ($pool_by_gen as $gen_key_tmp => $gen_pool_tmp) {
             if ($gen_key_tmp === '') {
@@ -445,6 +447,11 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 $slug_seg = poke_hub_collections_pool_row_generation_tile_slug($gen_pool_tmp[0]);
             }
             $generation_tile_slug_map[(string) $gen_key_tmp] = $slug_seg;
+            $icon_url = '';
+            if (!empty($gen_pool_tmp) && is_array($gen_pool_tmp) && function_exists('poke_hub_collections_pool_row_region_icon_url')) {
+                $icon_url = (string) poke_hub_collections_pool_row_region_icon_url($gen_pool_tmp[0]);
+            }
+            $generation_icon_url_map[(string) $gen_key_tmp] = $icon_url;
         }
     }
     $owner_key_cookie = '';
@@ -528,6 +535,16 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
             <div class="pokehub-collection-fixed-toolbar-chrome">
                 <div class="pokehub-collection-fixed-tiles" data-fixed-tiles-host role="tablist" aria-label="<?php esc_attr_e('Jump to toolbar sections', 'poke-hub'); ?>"></div>
+                <div class="pokehub-collection-fixed-active-region" data-fixed-active-region hidden aria-hidden="true">
+                    <span class="pokehub-collection-fixed-active-region-left">
+                        <span class="pokehub-collection-fixed-active-region-icon" data-fixed-active-region-icon aria-hidden="true"></span>
+                        <span class="pokehub-collection-fixed-active-region-name" data-fixed-active-region-name></span>
+                    </span>
+                    <span class="pokehub-collection-fixed-active-region-stats" data-fixed-active-region-stats></span>
+                    <span class="pokehub-collection-fixed-active-region-bar" data-fixed-active-region-bar role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+                        <span class="pokehub-collection-fixed-active-region-bar-fill" data-fixed-active-region-bar-fill></span>
+                    </span>
+                </div>
                 <div class="pokehub-collection-fixed-expand" data-fixed-expand hidden>
                     <div class="pokehub-collection-fixed-expand-inner" data-fixed-expand-inner></div>
                 </div>
@@ -590,6 +607,23 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
 
         <?php if ($total > 0) : ?>
         <div class="pokehub-collection-sticky-tools">
+            <div class="pokehub-collection-flow-toolbar-inner">
+            <div class="pokehub-collection-flow-toolbar-chrome">
+                <div class="pokehub-collection-fixed-tiles" data-flow-tiles-host role="tablist" aria-label="<?php esc_attr_e('Jump to toolbar sections', 'poke-hub'); ?>"></div>
+                <div class="pokehub-collection-fixed-expand" data-flow-expand hidden>
+                    <div class="pokehub-collection-fixed-expand-inner" data-flow-expand-inner></div>
+                </div>
+                <div class="pokehub-collection-fixed-active-region" data-flow-active-region hidden aria-hidden="true">
+                    <span class="pokehub-collection-fixed-active-region-left">
+                        <span class="pokehub-collection-fixed-active-region-icon" data-fixed-active-region-icon aria-hidden="true"></span>
+                        <span class="pokehub-collection-fixed-active-region-name" data-fixed-active-region-name></span>
+                    </span>
+                    <span class="pokehub-collection-fixed-active-region-stats" data-fixed-active-region-stats></span>
+                    <span class="pokehub-collection-fixed-active-region-bar" data-fixed-active-region-bar role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+                        <span class="pokehub-collection-fixed-active-region-bar-fill" data-fixed-active-region-bar-fill></span>
+                    </span>
+                </div>
+            </div>
             <div class="pokehub-collection-toolbar-slot" data-collection-toolbar-slot="filters">
             <div class="pokehub-collection-toolbar-panel pokehub-collection-toolbar-panel--filters" data-collection-fixed-tile="filters" data-collection-fixed-label="<?php esc_attr_e('Filters', 'poke-hub'); ?>" data-collection-fixed-label-short="<?php echo esc_attr(_x('Grid', 'Short fixed-toolbar tab: status filters', 'poke-hub')); ?>"<?php echo $toolbar_dec_filters_url !== '' ? ' data-toolbar-decoration-url="' . esc_attr($toolbar_dec_filters_url) . '"' : ''; ?>>
                 <div class="pokehub-collection-toolbar-panel-main">
@@ -621,6 +655,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         'c' . (int) $collection['id'],
                         [
                             'collection_toolbar_embed'   => true,
+                            'collection_toolbar_open'    => true,
                             'toolbar_section_title_id'  => $pokehub_pogo_heading_id,
                         ]
                     );
@@ -698,19 +733,20 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                                     . ( ( ! $gj_is_empty && $gj_owned > 0 ) ? ' pokehub-collection-region-tile--has-owned' : '' );
                                 $jump_link_style = ( $gen_v_url !== '' ) ? '--pokehub-gen-jump-bg:url(' . esc_url( $gen_v_url ) . ');' : '';
                                 ?>
-                            <a href="#<?php echo esc_attr($gen_anchor); ?>" class="pokehub-collection-generation-jump-link<?php echo esc_attr($jump_mods); ?>"<?php echo $jump_link_style !== '' ? ' style="' . esc_attr( $jump_link_style ) . '"' : ''; ?> data-generation-anchor="<?php echo esc_attr($gen_anchor); ?>" aria-label="<?php echo esc_attr($gj_aria); ?>"<?php echo $gen_v_url !== '' && $gen_v_url_all_missing !== '' ? ' data-pokehub-gen-tile-bg-missing="' . esc_attr( $gen_v_url_all_missing ) . '"' : ''; ?><?php echo $gen_v_url !== '' && $gen_v_url_has_progress !== '' ? ' data-pokehub-gen-tile-bg-active="' . esc_attr( $gen_v_url_has_progress ) . '"' : ''; ?>>
+                            <?php $gj_icon_url = isset($generation_icon_url_map[(string) $gen_name]) ? (string) $generation_icon_url_map[(string) $gen_name] : ''; ?>
+                            <a href="#<?php echo esc_attr($gen_anchor); ?>" class="pokehub-collection-generation-jump-link<?php echo esc_attr($jump_mods); ?>"<?php echo $jump_link_style !== '' ? ' style="' . esc_attr( $jump_link_style ) . '"' : ''; ?> data-generation-anchor="<?php echo esc_attr($gen_anchor); ?>" aria-label="<?php echo esc_attr($gj_aria); ?>"<?php echo $gen_v_url !== '' && $gen_v_url_all_missing !== '' ? ' data-pokehub-gen-tile-bg-missing="' . esc_attr( $gen_v_url_all_missing ) . '"' : ''; ?><?php echo $gen_v_url !== '' && $gen_v_url_has_progress !== '' ? ' data-pokehub-gen-tile-bg-active="' . esc_attr( $gen_v_url_has_progress ) . '"' : ''; ?><?php echo $gj_icon_url !== '' ? ' data-region-icon-url="' . esc_attr($gj_icon_url) . '"' : ''; ?>>
                                 <div class="pokehub-collection-region-tile__body">
                                     <span class="pokehub-collection-region-tile__title"><?php echo esc_html((string) $gen_name); ?></span>
                                     <?php if ($gj_complete) : ?>
                                     <span class="pokehub-collection-region-tile__complete"><?php esc_html_e('Finished', 'poke-hub'); ?></span>
                                     <?php endif; ?>
+                                    <?php if ($gj_total > 0) : ?>
+                                    <span class="pokehub-collection-region-tile__stats" aria-hidden="true"><?php echo (int) $gj_owned; ?> / <?php echo (int) $gj_total; ?></span>
+                                    <?php endif; ?>
                                     <?php if ($gj_show_bar) : ?>
                                     <span class="pokehub-collection-region-tile__bar" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo (int) $gj_total; ?>" aria-valuenow="<?php echo (int) $gj_owned; ?>" aria-label="<?php echo esc_attr($gj_aria); ?>">
                                         <span class="pokehub-collection-region-tile__bar-fill" style="width: <?php echo (int) $gj_pct; ?>%;"></span>
                                     </span>
-                                    <?php endif; ?>
-                                    <?php if ($gj_total > 0) : ?>
-                                    <span class="pokehub-collection-region-tile__stats" aria-hidden="true"><?php echo (int) $gj_owned; ?> / <?php echo (int) $gj_total; ?></span>
                                     <?php endif; ?>
                                 </div>
                             </a>
@@ -723,6 +759,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         </div>
                     </nav>
                 </div>
+            </div>
             </div>
             </div>
         <?php endif; ?>
@@ -811,25 +848,26 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         $g_total
                     );
                     ?>
+                    <?php $sum_icon_url = function_exists('poke_hub_collections_pool_row_region_icon_url') && !empty($gen_pool) ? (string) poke_hub_collections_pool_row_region_icon_url($gen_pool[0]) : ''; ?>
                     <details id="<?php echo esc_attr($generation_anchor_map[(string) $gen_key] ?? ''); ?>" class="pokehub-collection-generation-block<?php echo $g_total === 0 ? ' pokehub-collection-generation-block--empty' : ''; ?>" data-generation="<?php echo esc_attr($gen_key); ?>" <?php echo $gens_collapsed ? '' : ' open'; ?>>
                         <summary class="pokehub-collection-region-tile pokehub-collection-region-tile--summary<?php
                             echo $g_total === 0
                                 ? ' pokehub-collection-region-tile--empty-region'
                                 : ( $g_all_missing ? ' pokehub-collection-region-tile--zero-progress' : ( $g_owned > 0 ? ' pokehub-collection-region-tile--has-owned' : '' ) );
-                            ?>">
+                            ?>"<?php echo $sum_icon_url !== '' ? ' data-region-icon-url="' . esc_attr($sum_icon_url) . '"' : ''; ?>>
                             <span class="pokehub-collection-region-tile__chev" aria-hidden="true"></span>
                             <div class="pokehub-collection-region-tile__body">
                                 <span class="pokehub-collection-region-tile__title"><?php echo esc_html((string) $gen_key); ?></span>
                                 <?php if ($g_done) : ?>
                                 <span class="pokehub-collection-region-tile__complete"><?php esc_html_e('Finished', 'poke-hub'); ?></span>
                                 <?php endif; ?>
+                                <?php if ($g_total > 0) : ?>
+                                <span class="pokehub-collection-region-tile__stats"><?php echo (int) $g_owned; ?> / <?php echo (int) $g_total; ?></span>
+                                <?php endif; ?>
                                 <?php if ($g_bar) : ?>
                                 <span class="pokehub-collection-region-tile__bar" role="progressbar" aria-valuenow="<?php echo (int) $g_owned; ?>" aria-valuemin="0" aria-valuemax="<?php echo (int) $g_total; ?>" aria-label="<?php echo esc_attr($sum_aria); ?>">
                                     <span class="pokehub-collection-region-tile__bar-fill" style="width: <?php echo (int) $g_pct; ?>%;"></span>
                                 </span>
-                                <?php endif; ?>
-                                <?php if ($g_total > 0) : ?>
-                                <span class="pokehub-collection-region-tile__stats"><?php echo (int) $g_owned; ?> / <?php echo (int) $g_total; ?></span>
                                 <?php endif; ?>
                             </div>
                             <?php if ($sum_img !== '') : ?>

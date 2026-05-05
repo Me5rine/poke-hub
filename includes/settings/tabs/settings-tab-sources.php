@@ -48,6 +48,7 @@ $assets_path_pokemon_alternate = get_option('poke_hub_assets_path_pokemon_altern
 $assets_path_raids = get_option('poke_hub_assets_path_raids', '/pokemon-go/raids/');
 $assets_path_teams = get_option('poke_hub_assets_path_teams', '/pokemon-go/teams/');
 $assets_path_types = get_option('poke_hub_assets_path_types', '/pokemon-go/types/');
+$assets_path_regions = get_option('poke_hub_assets_path_regions', '/pokemon-go/regions/');
 $assets_path_vivillon = get_option('poke_hub_assets_path_vivillon', '/pokemon-go/vivillon/');
 $assets_path_weathers = get_option('poke_hub_assets_path_weathers', '/pokemon-go/weathers/');
 $assets_path_avatar_shop = get_option('poke_hub_assets_path_avatar_shop', '/pokemon-go/avatar-shop/');
@@ -144,6 +145,9 @@ if (!empty($_POST['poke_hub_sources_submit'])) {
     }
     if (isset($_POST['poke_hub_assets_path_types'])) {
         update_option('poke_hub_assets_path_types', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_types'])));
+    }
+    if (isset($_POST['poke_hub_assets_path_regions'])) {
+        update_option('poke_hub_assets_path_regions', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_regions'])));
     }
     if (isset($_POST['poke_hub_assets_path_vivillon'])) {
         update_option('poke_hub_assets_path_vivillon', sanitize_text_field(wp_unslash($_POST['poke_hub_assets_path_vivillon'])));
@@ -518,6 +522,20 @@ foreach ($messages as $msg) {
                                     placeholder="/pokemon-go/types/">
                                 <p class="description" style="margin-top: 4px; font-size: 11px;">
                                     <?php _e('SVG: slug.svg', 'poke-hub'); ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row"><?php _e('Regions', 'poke-hub'); ?></th>
+                            <td>
+                                <input type="text"
+                                    name="poke_hub_assets_path_regions"
+                                    value="<?php echo esc_attr($assets_path_regions); ?>"
+                                    class="regular-text"
+                                    placeholder="/pokemon-go/regions/">
+                                <p class="description" style="margin-top: 4px; font-size: 11px;">
+                                    <?php _e('PNG: slug.png (used for collection region headers and sticky active-region line).', 'poke-hub'); ?>
                                 </p>
                             </td>
                         </tr>
