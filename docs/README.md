@@ -59,6 +59,7 @@ La documentation générale se trouve à la racine du dossier `docs/` :
 - **[THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)** - CSS public : thème Me5rine vs plugin (tableau *En bref*, filtre, déqueue, schéma mermaid, exceptions), ordre d’enqueue, contenu de `assets/css/` (dont `poke-hub-type-icons.css` et parité `parts/02-type-icons.css`)
 - **[THEME_INTEGRATION.md](./THEME_INTEGRATION.md)** - Intégration thème (lien vers THEME_FRONT_CSS ; méthodes génériques via FRONT_CSS / CSS_RULES)
 - **[PLUGIN_INTEGRATION.md](./PLUGIN_INTEGRATION.md)** - Guide d’intégration pour utiliser les classes CSS dans d’autres plugins
+- **[FRONT_MODULE_CONTRACT.md](./FRONT_MODULE_CONTRACT.md)** - Contrat front générique pour tous les modules (structure page/header, conventions CSS/JS, accessibilité, responsive, perf)
 - **[POKEHUB_CSS_CLASSES.md](./POKEHUB_CSS_CLASSES.md)** - Classes `pokehub-*` (blocs, collections, etc.) et lien avec le système *me5rine-lab*
 - **[CSS_SYSTEM.md](./CSS_SYSTEM.md)** - Documentation complète du système de classes CSS
 - **[CSS_RULES.md](./CSS_RULES.md)** - Règles CSS complètes pour les formulaires
@@ -157,6 +158,7 @@ Consultez la documentation dans le dossier correspondant au module (ex: `blocks/
 - [Bonus : source de vérité et bloc](./BONUS_SOURCE_AND_BLOCKS.md)
 - [CSS public thème / plugin](./THEME_FRONT_CSS.md) · [Guide d’intégration dans le thème](./THEME_INTEGRATION.md)
 - [Système CSS](./CSS_SYSTEM.md)
+- [Contrat front modules](./FRONT_MODULE_CONTRACT.md)
 - [Classes pokehub-*](./POKEHUB_CSS_CLASSES.md)
 - [Blocs de contenu](./CONTENT_BLOCKS.md)
 - [Module Blocks](./blocks/)

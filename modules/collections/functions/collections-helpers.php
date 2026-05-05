@@ -524,7 +524,7 @@ function poke_hub_collections_get_all_go_backgrounds_for_pool_row( array $row, s
  *
  * @param int[]  $pokemon_ids
  * @param string $link_kind   POKE_HUB_BG_LINK_*
- * @return list<array{background_id: int, image_url: string, background_title: string}>
+ * @return list<array{background_id: int, image_url: string, background_title: string, background_type: string}>
  */
 function poke_hub_collections_get_all_go_backgrounds_for_pokemon_ids( array $pokemon_ids, string $link_kind, bool $only_shiny_active = false ): array {
     global $wpdb;
@@ -546,6 +546,7 @@ function poke_hub_collections_get_all_go_backgrounds_for_pokemon_ids( array $pok
     $lock_sql  = $only_shiny_active ? ' AND l.is_shiny_locked = 0' : '';
     $placehold = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
     $sql       = "SELECT DISTINCT b.id AS background_id, b.image_url,
+        LOWER(TRIM(COALESCE(b.background_type, ''))) AS background_type,
         COALESCE(
             NULLIF(TRIM(b.name_fr), ''),
             NULLIF(TRIM(b.name_en), ''),
@@ -574,10 +575,12 @@ function poke_hub_collections_get_all_go_backgrounds_for_pokemon_ids( array $pok
         $url = isset( $r['image_url'] ) && is_string( $r['image_url'] ) ? trim( $r['image_url'] ) : '';
         if ( $bid > 0 && $url !== '' ) {
             $title = isset( $r['background_title'] ) && is_string( $r['background_title'] ) ? trim( $r['background_title'] ) : '';
+            $bt    = isset( $r['background_type'] ) && is_string( $r['background_type'] ) ? trim( $r['background_type'] ) : '';
             $out[] = [
                 'background_id'    => $bid,
                 'image_url'        => $url,
                 'background_title' => $title,
+                'background_type'  => $bt,
             ];
         }
     }
@@ -2965,11 +2968,29 @@ function poke_hub_collections_go_background_synthetic_pokemon_id_from_source_and
 }
 
 /**
+ * Normalise le type de fond GO pour le regroupement des phrases de recherche (fond générique / lieu / spécial).
+ *
+ * @param string $raw Valeur brute `pokemon_backgrounds.background_type`.
+ * @return string '' | 'special' | 'location'
+ */
+function poke_hub_collections_normalize_synthetic_go_background_type( string $raw ): string {
+    $x = strtolower( trim( $raw ) );
+    if ( $x === 'special' ) {
+        return 'special';
+    }
+    if ( in_array( $x, [ 'location', 'lieu', 'place' ], true ) ) {
+        return 'location';
+    }
+
+    return '';
+}
+
+/**
  * @param array<string, mixed> $source   Ligne de pool d’origine
  * @param string                 $bg_title Libellé du fond (pokemon_backgrounds.title), affiché sous le nom
  * @return array<string, mixed>|null
  */
-function poke_hub_collections_go_background_synthetic_row_from_base( array $source, int $link_pokemon_id, int $background_id, string $bg_url, string $bg_title = '' ): ?array {
+function poke_hub_collections_go_background_synthetic_row_from_base( array $source, int $link_pokemon_id, int $background_id, string $bg_url, string $bg_title = '', string $background_type_raw = '' ): ?array {
     $bg_url = trim($bg_url);
     if ($bg_url === '' || $link_pokemon_id <= 0 || $background_id <= 0) {
         return null;
@@ -2986,6 +3007,7 @@ function poke_hub_collections_go_background_synthetic_row_from_base( array $sour
     $t['synthetic_go_background_link_pokemon_id'] = $link_pokemon_id;
     $t['synthetic_go_background_background_id']   = $background_id;
     $t['synthetic_go_background_from_pool_row_id'] = $source_id;
+    $t['synthetic_go_background_background_type'] = poke_hub_collections_normalize_synthetic_go_background_type( $background_type_raw );
     $t['background_image_url']                    = $bg_url;
     $t['form_label']                              = $bg_title !== '' ? $bg_title : ( trim( (string) ( $t['form_label'] ?? '' ) ) );
 
@@ -3034,7 +3056,8 @@ function poke_hub_collections_apply_synthetic_go_background_pool(array $rows, st
             if ($bg_id <= 0 || $bg_url === '') {
                 continue;
             }
-            $extra = poke_hub_collections_go_background_synthetic_row_from_base( $row, $link_pid, $bg_id, $bg_url, $bg_title );
+            $bg_type = isset( $bg['background_type'] ) && is_string( $bg['background_type'] ) ? $bg['background_type'] : '';
+            $extra   = poke_hub_collections_go_background_synthetic_row_from_base( $row, $link_pid, $bg_id, $bg_url, $bg_title, $bg_type );
             if ($extra !== null) {
                 $out[] = $extra;
             }

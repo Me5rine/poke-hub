@@ -11,12 +11,6 @@
     line-height: 1.5;
 }
 
-@media screen and (min-width: 783px) {
-    .pokehub-collections-wrap.me5rine-lab-dashboard {
-        border-left: none;
-    }
-}
-
 ul.pokehub-collections-grid {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr);

@@ -198,15 +198,19 @@ function poke_hub_shortcode_pokedle($atts) {
         <!-- Interface de jeu -->
         <div id="pokedle-game-container" class="pokedle-game-container">
             <div class="pokedle-header">
-                <div class="me5rine-lab-dashboard-header">
+                <div class="pokedle-module-header me5rine-lab-form-block">
                     <h2 class="me5rine-lab-title-large"><?php echo esc_html__('Pokedle', 'poke-hub'); ?></h2>
-                    <button id="pokedle-change-game" class="me5rine-lab-form-button me5rine-lab-form-button-secondary">
-                        <?php echo esc_html__('Choose another Pokedle', 'poke-hub'); ?>
-                    </button>
+                    <div class="me5rine-lab-dashboard-header">
+                        <p class="me5rine-lab-subtitle" id="pokedle-description">
+                            <?php echo esc_html__('Guess the mystery Pokémon of the day!', 'poke-hub'); ?>
+                        </p>
+                        <div class="me5rine-lab-dashboard-header-actions">
+                            <button id="pokedle-change-game" class="me5rine-lab-form-button me5rine-lab-form-button-secondary">
+                                <?php echo esc_html__('Choose another Pokedle', 'poke-hub'); ?>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <p class="me5rine-lab-subtitle" id="pokedle-description">
-                    <?php echo esc_html__('Guess the mystery Pokémon of the day!', 'poke-hub'); ?>
-                </p>
                 <div class="pokedle-game-info">
                     <span id="pokedle-current-mode" class="me5rine-lab-status me5rine-lab-status-info"><?php echo esc_html__('All Generations', 'poke-hub'); ?></span>
                     <span id="pokedle-attempts-count" class="me5rine-lab-status me5rine-lab-status-info"></span>

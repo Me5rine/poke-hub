@@ -1,6 +1,6 @@
 # Collections – CSS et thème
 
-Référence technique complémentaire à **[docs/README.md](../../docs/README.md)**, à **[docs/THEME_FRONT_CSS.md](../../docs/THEME_FRONT_CSS.md)** (ordre thème / plugin) et à la **[charte doc](../../docs/REDACTION.md)**.
+Référence technique complémentaire à **[docs/README.md](../../docs/README.md)**, à **[docs/THEME_FRONT_CSS.md](../../docs/THEME_FRONT_CSS.md)** (ordre thème / plugin), à la **[charte doc](../../docs/REDACTION.md)** et à **[COLLECTIONS_HEADERS.md](./COLLECTIONS_HEADERS.md)** (contrat des headers du module).
 
 **Emplacement du CSS (production Me5rine Lab)** : les styles spécifiques modules sont dans le thème enfant — **`css/poke-hub/parts/13-collections-front.css`** (chargé comme les autres `parts/` avec son propre `?ver=filemtime`). La liste officielle inclut encore **`poke-hub-front.css`** (`@import` des `parts/`) comme index / éditeur. Les surcharges de variables (dégradés) sont dans **`parts/14-collections-theme.css`**. Un correctif de cascade final peut exister dans **`css/poke-hub/poke-hub-late-overrides.css`**. Aucun fichier CSS dans le dossier du module : tout passe par l’enchaînement documenté dans THEME_FRONT_CSS.
 

@@ -58,8 +58,11 @@ function poke_hub_shortcode_games_leaderboard($atts) {
     ob_start();
     ?>
     <div id="poke-hub-games-leaderboard" class="poke-hub-games-leaderboard">
-        <div class="me5rine-lab-dashboard-header">
+        <div class="poke-hub-games-module-header me5rine-lab-form-block">
             <h2 class="me5rine-lab-title-large"><?php echo esc_html__('Games Leaderboard', 'poke-hub'); ?></h2>
+            <div class="me5rine-lab-dashboard-header">
+                <p class="me5rine-lab-subtitle"><?php echo esc_html__('Track top players by period and compare scores across mini-games.', 'poke-hub'); ?></p>
+            </div>
         </div>
         
         <div class="me5rine-lab-filters">
