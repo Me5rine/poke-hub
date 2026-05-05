@@ -293,6 +293,25 @@ function poke_hub_collections_dex_for_visual_variants_base_slug_only(): array {
 }
 
 /**
+ * № pour lesquels on conserve la ligne au slug « nu » (sans suffixe) même s’il existe des variantes
+ * fv.category = visual qui prolongent ce slug (Morphéo : castform vs castform-sunny, etc. — ce ne sont pas des
+ * motifs Zarbi/Prismillon sur un placeholder).
+ *
+ * @return int[]
+ */
+function poke_hub_collections_visual_variant_base_stub_keep_dex_numbers(): array {
+    /** @var int[] */
+    $out = array_map(
+        'intval',
+        array_values((array) apply_filters('poke_hub_collections_visual_variant_base_stub_keep_dex_numbers', [351]))
+    );
+
+    return array_values(array_filter(array_unique($out), static function (int $d): bool {
+        return $d > 0;
+    }));
+}
+
+/**
  * SQL : aucune ligne « significative » du même № ne prolonge le slug avec un tiret (Kyurem, Giratina…).
  * N’inclut pas : costumes / clones, ni variantes régionales (Raichu d’Alola ne doit pas faire disparaître Raichu de base…).
  *
@@ -1837,7 +1856,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         if ($visual_placeholder_dexes !== []) {
             $visual_legacy_or = ' OR p.dex_number IN (' . implode(',', array_map('intval', $visual_placeholder_dexes)) . ') ';
         }
-        $where[] = "NOT (
+        $visual_keep_stub_dexes = poke_hub_collections_visual_variant_base_stub_keep_dex_numbers();
+        $visual_stub_inner      = "
             p.slug IS NOT NULL AND TRIM(p.slug) != ''
             AND (
                 EXISTS (
@@ -1852,7 +1872,16 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 )
                 {$visual_legacy_or}
             )
-        )";
+        ";
+        if ($visual_keep_stub_dexes !== []) {
+            $exc_in  = implode(',', array_map('intval', $visual_keep_stub_dexes));
+            $where[] = "(
+                p.dex_number IN ({$exc_in})
+                OR NOT ( {$visual_stub_inner} )
+            )";
+        } else {
+            $where[] = 'NOT ( ' . $visual_stub_inner . ' )';
+        }
         // Mode "toutes les formes" : on exclut uniquement *-family.
         // La forme normale (slug sans suffixe) doit rester visible (ex: kyurem, necrozma).
     } else {
