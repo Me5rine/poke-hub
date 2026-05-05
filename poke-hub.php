@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.6.3
+Version: 2.6.4
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -296,6 +296,7 @@ function poke_hub_admin_pages() {
         'poke-hub-settings',
         'poke-hub-pokemon',
         'poke-hub-events',
+        'poke-hub-collections',
         'poke-hub-user-profiles',
         'poke-hub-games',
         'poke-hub-bonus-types',
@@ -497,7 +498,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-global-colors',
         POKE_HUB_URL . 'assets/css/global-colors.css',
         [],
-        POKE_HUB_VERSION
+        poke_hub_plugin_asset_version('assets/css/global-colors.css')
     );
 
     // Icônes types (SVG + teinte currentColor) : toujours charger en admin, même si
@@ -508,7 +509,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
             'pokehub-type-icons',
             POKE_HUB_URL . 'assets/css/poke-hub-type-icons.css',
             [],
-            POKE_HUB_VERSION
+            poke_hub_plugin_asset_version('assets/css/poke-hub-type-icons.css')
         );
     }
 
@@ -517,7 +518,7 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-admin-unified',
         POKE_HUB_URL . 'assets/css/admin-unified.css',
         ['poke-hub-global-colors'],
-        POKE_HUB_VERSION
+        poke_hub_plugin_asset_version('assets/css/admin-unified.css')
     );
 }
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_admin_unified_styles');
@@ -584,7 +585,7 @@ function poke_hub_enqueue_metaboxes_admin_styles($hook) {
         'pokehub-metaboxes-admin',
         POKE_HUB_URL . 'assets/css/pokehub-metaboxes-admin.css',
         [],
-        POKE_HUB_VERSION
+        poke_hub_plugin_asset_version('assets/css/pokehub-metaboxes-admin.css')
     );
 }
 add_action('admin_enqueue_scripts', 'poke_hub_enqueue_metaboxes_admin_styles');
@@ -605,7 +606,7 @@ function poke_hub_enqueue_pokemon_image_fallback_script() {
         'poke-hub-pokemon-image-fallback',
         POKE_HUB_URL . 'assets/js/pokehub-pokemon-image-fallback.js',
         [],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-pokemon-image-fallback.js'),
         true
     );
 
@@ -625,7 +626,7 @@ function poke_hub_register_raster_format_fallback_script(): void {
         'pokehub-raster-format-fallback',
         POKE_HUB_URL . 'assets/js/pokehub-raster-format-fallback.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-raster-format-fallback.js'),
         true
     );
 }

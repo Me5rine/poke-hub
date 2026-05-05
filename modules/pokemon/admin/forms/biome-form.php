@@ -75,7 +75,7 @@ function poke_hub_pokemon_biomes_edit_form($edit_row = null) {
         'pokehub-media-url',
         POKE_HUB_URL . 'assets/js/pokehub-media-url.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-media-url.js'),
         true
     );
 

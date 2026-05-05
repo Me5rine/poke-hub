@@ -7,8 +7,7 @@
  * Voir : docs/THEME_FRONT_CSS.md.
  *
  * Fichiers typiquement conservés côté plugin : `global-colors.css` (Gutenberg / notices), feuilles **admin**,
- * `poke-hub-type-icons.css` (icônes types ; **admin** : enqueue explicite dans `poke-hub.php`, indépendant du filtre) ;
- * le module Collections peut enfiler en plus `poke-hub-collections-cascade-late.css` (hors de cette liste, voir doc).
+ * `poke-hub-type-icons.css` (icônes types ; **admin** : enqueue explicite dans `poke-hub.php`, indépendant du filtre).
  *
  * Filtre : `poke_hub_load_default_plugin_front_css` (défaut : true).
  * Si le thème retourne false : pas d’enqueue `poke_hub_enqueue_bundled_front_style` ; le hook
@@ -47,7 +46,7 @@ function poke_hub_enqueue_bundled_front_style(string $handle, string $filename, 
         $handle,
         POKE_HUB_URL . 'assets/css/' . $filename,
         $deps,
-        POKE_HUB_VERSION
+        poke_hub_plugin_asset_version('assets/css/' . $filename)
     );
 }
 
@@ -64,7 +63,7 @@ function poke_hub_register_bundled_front_style(string $handle, string $filename,
     if (!is_readable($path)) {
         return;
     }
-    $ver = $ver !== null ? $ver : POKE_HUB_VERSION;
+    $ver = $ver !== null ? $ver : poke_hub_plugin_asset_version('assets/css/' . $filename);
     wp_register_style(
         $handle,
         POKE_HUB_URL . 'assets/css/' . $filename,

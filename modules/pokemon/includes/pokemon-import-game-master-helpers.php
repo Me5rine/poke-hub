@@ -667,6 +667,37 @@ function poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto, 
 }
 
 /**
+ * Compose le slug ligne Pokémon (espèce + forme) pour l’import GM.
+ *
+ * Quand {@see poke_hub_pokemon_normalize_form_proto()} préfixe déjà une forme courte
+ * avec l’espèce (ex. lettre Zarbi : `unown-b` au lieu de `b`), évite `unown` + `-` + `unown-b` → `unown-unown-b`.
+ *
+ * @param string $slug_base  `poke_hub_pokemon_gm_id_to_slug()` (ex. `unown`)
+ * @param string $form_slug  résultat de la normalisation (ex. `b` ou `unown-b`)
+ */
+function poke_hub_pokemon_compose_pokemon_row_slug( $slug_base, $form_slug ) {
+    $slug_base = trim( (string) $slug_base );
+    $form_slug = trim( (string) $form_slug );
+
+    if ( $form_slug === '' ) {
+        return $slug_base;
+    }
+    if ( $slug_base === '' ) {
+        return $form_slug;
+    }
+
+    $prefix_len = strlen( $slug_base ) + 1;
+    if (
+        strlen( $form_slug ) >= $prefix_len
+        && strtolower( substr( $form_slug, 0, $prefix_len ) ) === strtolower( $slug_base . '-' )
+    ) {
+        return $form_slug;
+    }
+
+    return $slug_base . '-' . $form_slug;
+}
+
+/**
  * Indique si une ligne formChange du GM décrit une fusion (autre Pokémon + ressource FUSE).
  *
  * @param array<string,mixed> $row
@@ -1854,7 +1885,9 @@ function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_
         $slug_base = poke_hub_pokemon_gm_id_to_slug($pokemon_id_proto);
         $exact_slug = $slug_base;
         if (!empty($form_slug)) {
-            $exact_slug .= '-' . $form_slug;
+            $exact_slug = function_exists('poke_hub_pokemon_compose_pokemon_row_slug')
+                ? poke_hub_pokemon_compose_pokemon_row_slug($slug_base, $form_slug)
+                : $slug_base . '-' . $form_slug;
         }
     }
 
@@ -2014,7 +2047,9 @@ function poke_hub_pokemon_should_be_regional_on_import($template_id, $form_slug,
         $slug_base = poke_hub_pokemon_gm_id_to_slug($pokemon_id_proto);
         $slug = $slug_base;
         if (!empty($form_slug)) {
-            $slug .= '-' . $form_slug;
+            $slug = function_exists('poke_hub_pokemon_compose_pokemon_row_slug')
+                ? poke_hub_pokemon_compose_pokemon_row_slug($slug_base, $form_slug)
+                : $slug_base . '-' . $form_slug;
         }
         
         // Check if mapping exists in database

@@ -995,7 +995,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
             'pokehub-pokemon-evolutions-admin',
             POKE_HUB_URL . 'assets/js/pokehub-pokemon-evolutions-admin.js',
             ['jquery'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-pokemon-evolutions-admin.js'),
             true
         );
     }
@@ -1024,7 +1024,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
         'pokehub-pokemon-admin-select2',
         POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js',
         ['jquery', 'select2'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-admin-select2.js'),
         true
     );
     

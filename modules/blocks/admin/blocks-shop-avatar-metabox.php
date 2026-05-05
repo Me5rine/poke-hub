@@ -149,7 +149,7 @@ function pokehub_blocks_shop_avatar_metabox_enqueue_assets(string $hook): void {
         'pokehub-shop-avatar-metabox-admin',
         $metabox_js,
         ['jquery', 'select2', 'media-upload'],
-        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0',
+        poke_hub_plugin_asset_version('modules/blocks/admin/js/pokehub-shop-avatar-metabox-admin.js'),
         true
     );
 

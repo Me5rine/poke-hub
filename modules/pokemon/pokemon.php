@@ -55,7 +55,7 @@ function poke_hub_pokemon_admin_assets($hook) {
         'pokehub-media-url',
         POKE_HUB_URL . 'assets/js/pokehub-media-url.js',
         ['jquery', 'media-views', 'wp-color-picker'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-media-url.js'),
         true
     );
 

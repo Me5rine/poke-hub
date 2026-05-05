@@ -61,7 +61,7 @@ function poke_hub_events_assets() {
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
         ['jquery', 'select2'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-front-select2.js'),
         true
     );
 
@@ -70,7 +70,7 @@ function poke_hub_events_assets() {
         'pokehub-events-quests',
         POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-events-quests.js'),
         true
     );
 
@@ -108,7 +108,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             'pokehub-media-url',
             POKE_HUB_URL . 'assets/js/pokehub-media-url.js',
             ['jquery', 'media-views'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-media-url.js'),
             true
         );
 
@@ -129,7 +129,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
         'pokehub-special-events-admin',
         POKE_HUB_URL . 'assets/js/pokehub-special-events-admin.js',
         ['jquery', 'select2'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-special-events-admin.js'),
         true
     );
 
@@ -139,7 +139,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             'pokehub-admin-select2',
             POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js',
             ['jquery', 'select2'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-admin-select2.js'),
             true
         );
 
@@ -178,7 +178,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             'pokehub-go-pass-admin',
             POKE_HUB_URL . 'assets/js/pokehub-go-pass-admin.js',
             ['jquery', 'jquery-ui-sortable', 'select2', 'pokehub-admin-select2', 'pokehub-media-url'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-go-pass-admin.js'),
             true
         );
         wp_localize_script(

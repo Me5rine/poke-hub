@@ -193,7 +193,7 @@ function poke_hub_eggs_admin_assets($hook) {
     }
     wp_enqueue_style('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
     wp_enqueue_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
-    wp_enqueue_script('pokehub-admin-select2', POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js', ['jquery', 'select2'], POKE_HUB_VERSION, true);
+    wp_enqueue_script('pokehub-admin-select2', POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js', ['jquery', 'select2'], poke_hub_plugin_asset_version('assets/js/pokehub-admin-select2.js'), true);
     $pokemon_list = function_exists('pokehub_get_pokemon_for_select') ? pokehub_get_pokemon_for_select() : [];
     wp_localize_script('pokehub-admin-select2', 'pokehubQuestsData', [
         'pokemon' => $pokemon_list,

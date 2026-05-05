@@ -149,7 +149,7 @@ function pokehub_blocks_shop_sticker_metabox_enqueue_assets(string $hook): void 
         'pokehub-shop-sticker-metabox-admin',
         $metabox_js,
         ['jquery', 'select2', 'media-upload'],
-        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0',
+        poke_hub_plugin_asset_version('modules/blocks/admin/js/pokehub-shop-sticker-metabox-admin.js'),
         true
     );
 

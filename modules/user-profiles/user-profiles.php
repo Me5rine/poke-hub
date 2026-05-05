@@ -70,7 +70,7 @@ function poke_hub_user_profiles_admin_assets($hook) {
         'pokehub-user-profiles-admin-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-admin.js',
         ['jquery', 'select2', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-user-profiles-admin.js'),
         true
     );
 
@@ -249,7 +249,7 @@ function poke_hub_user_profiles_frontend_assets() {
         'pokehub-user-profiles-um-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
         ['jquery', 'select2', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-user-profiles-um.js'),
         true
     );
 
@@ -301,7 +301,7 @@ function poke_hub_user_profiles_frontend_assets() {
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
         ['jquery', 'select2', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-front-select2.js'),
         true
     );
 
@@ -340,7 +340,7 @@ function poke_hub_user_profiles_shortcode_assets() {
         'poke-hub-country-detection',
         POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-country-detection.js'),
         true
     );
     
@@ -355,7 +355,7 @@ function poke_hub_user_profiles_shortcode_assets() {
         'pokehub-user-profiles-um-script',
         POKE_HUB_URL . 'assets/js/poke-hub-user-profiles-um.js',
         ['jquery', 'select2', 'poke-hub-country-detection'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-user-profiles-um.js'),
         true
     );
     
@@ -403,27 +403,12 @@ function poke_hub_user_profiles_shortcode_assets() {
         'countryUpdatedMessage' => __('Country updated successfully!', 'poke-hub'),
     ]);
 
-    // Shared country detection script (must be loaded before scripts that use it)
-    wp_enqueue_script(
-        'poke-hub-country-detection',
-        POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
-        ['jquery'],
-        POKE_HUB_VERSION,
-        true
-    );
-    
-    // Localize AJAX URL and nonce for country detection
-    wp_localize_script('poke-hub-country-detection', 'pokeHubAjax', [
-        'ajaxurl' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('poke_hub_detect_country')
-    ]);
-
     // Initialisation centralisée de Select2 pour le front-end
     wp_enqueue_script(
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
         ['jquery', 'select2', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-front-select2.js'),
         true
     );
 
@@ -482,7 +467,7 @@ function poke_hub_friend_codes_shortcode_assets() {
         'poke-hub-country-detection',
         POKE_HUB_URL . 'assets/js/poke-hub-country-detection.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-country-detection.js'),
         true
     );
     
@@ -497,7 +482,7 @@ function poke_hub_friend_codes_shortcode_assets() {
         'poke-hub-friend-codes',
         POKE_HUB_URL . 'assets/js/user-profiles-friend-codes.js',
         ['jquery', 'select2', 'poke-hub-country-detection', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/user-profiles-friend-codes.js'),
         true
     );
     
@@ -560,7 +545,7 @@ function poke_hub_friend_codes_shortcode_assets() {
         'pokehub-front-select2',
         POKE_HUB_URL . 'assets/js/pokehub-front-select2.js',
         ['jquery', 'select2', 'pokehub-raster-format-fallback'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/pokehub-front-select2.js'),
         true
     );
 

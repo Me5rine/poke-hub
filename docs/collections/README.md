@@ -6,7 +6,8 @@ Le module **collections** gère les **listes de collection** (shortcodes, pool d
 
 | Document | Emplacement | Contenu principal |
 |----------|-------------|-------------------|
-| Module Collections (shortcodes, grille, filtres) | [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) | Usage, shortcodes, statuts, bloc *Include in grid*, ordre des variantes, vue compact/sticky au § expérience utilisateur ; **pool** : `extra.release` par contexte, squelettes GM (`gm_skeleton`), exceptions **Forces + Amovénus** / `switch_battle` (§ *Pool et date de sortie*, *Pool SQL*) |
+| Module Collections (shortcodes, grille, filtres) | [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) | Usage, shortcodes, statuts, bloc *Include in grid*, ordre des variantes, vue compact/sticky au § expérience utilisateur ; **pool** : `extra.release` par contexte, squelettes GM (`gm_skeleton`), exceptions **Forces + Amovénus** / `switch_battle` , **exceptions stub visuel Morphéo** ; **§ Administration WordPress** (liste collections) |
+| Journal changements Collections (sessions dev) | [CHANGELOG.md](./CHANGELOG.md) | Ex. Morphéo n° 351 dans le pool « toutes les formes », page admin **Poké HUB → Collections** |
 | Formes vs catégories de collections | [COLLECTIONS_AND_FORMS_CATEGORIES.md](../COLLECTIONS_AND_FORMS_CATEGORIES.md) | Variants Pokémon vs type de liste |
 | Thème / classes CSS collections | [../modules/collections/COLLECTIONS_THEME_CSS.md](../../modules/collections/COLLECTIONS_THEME_CSS.md) | Variables, classes ; intégration thème : [THEME_FRONT_CSS.md](../THEME_FRONT_CSS.md) |
 
@@ -14,6 +15,7 @@ Le module **collections** gère les **listes de collection** (shortcodes, pool d
 
 - Point d’entrée : `modules/collections/collections.php`
 - Slug module dans `poke_hub_get_modules_config()` : **`collections`** (libellé admin : *Pokémon GO Collections*)
+- Liste des collections utilisateur **côté admin** : **`modules/collections/admin/collections-admin.php`** (voir [CHANGELOG.md](./CHANGELOG.md))
 
 ## Voir aussi
 

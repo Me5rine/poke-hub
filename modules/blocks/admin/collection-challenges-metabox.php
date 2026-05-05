@@ -65,7 +65,7 @@ function pokehub_collection_challenges_metabox_assets($hook) {
         wp_register_script('select2', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
     }
     if (!wp_script_is('pokehub-admin-select2', 'registered')) {
-        wp_register_script('pokehub-admin-select2', POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js', ['jquery', 'select2'], defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0', true);
+        wp_register_script('pokehub-admin-select2', POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js', ['jquery', 'select2'], poke_hub_plugin_asset_version('assets/js/pokehub-admin-select2.js'), true);
     }
     wp_enqueue_style('select2');
     wp_enqueue_script('select2');

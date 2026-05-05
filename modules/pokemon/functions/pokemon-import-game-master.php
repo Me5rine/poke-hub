@@ -191,7 +191,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
     } elseif ( $keep_normal_form && $form_slug === 'normal' ) {
         $slug = $slug_base;
     } elseif ( $form_slug !== '' ) {
-        $slug .= '-' . $form_slug;
+        $slug = function_exists( 'poke_hub_pokemon_compose_pokemon_row_slug' )
+            ? poke_hub_pokemon_compose_pokemon_row_slug( $slug_base, $form_slug )
+            : $slug_base . '-' . $form_slug;
     }
 
     // Par défaut :

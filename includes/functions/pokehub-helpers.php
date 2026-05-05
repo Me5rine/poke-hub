@@ -6,6 +6,26 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Paramètre `ver` pour les scripts/styles dont le fichier vit sous {@see POKE_HUB_PATH} :
+ * utilise le `filemtime` du fichier pour invalider cache navigateur / CDN quand le fichier change,
+ * sans incrémenter la version du plugin dans l’en-tête.
+ *
+ * @param string $relative_path Chemin relatif depuis la racine du plugin (ex. `assets/js/pokehub-events-quests.js`).
+ */
+function poke_hub_plugin_asset_version(string $relative_path): string {
+    $relative_path = str_replace('\\', '/', $relative_path);
+    $relative_path = ltrim($relative_path, '/');
+    if (!defined('POKE_HUB_PATH')) {
+        return defined('POKE_HUB_VERSION') ? (string) POKE_HUB_VERSION : '1';
+    }
+    $full = POKE_HUB_PATH . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
+    if (is_readable($full)) {
+        return (string) filemtime($full);
+    }
+    return defined('POKE_HUB_VERSION') ? (string) POKE_HUB_VERSION : '1';
+}
+
+/**
  * Vérifie si un module Poké HUB est actif.
  *
  * @param string $module Slug du module (ex: "pokedex", "events").

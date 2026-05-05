@@ -251,7 +251,7 @@ function pokehub_blocks_go_pass_metabox_enqueue_assets(string $hook): void {
         'pokehub-go-pass-metabox-admin',
         POKE_HUB_URL . 'assets/js/pokehub-go-pass-metabox-admin.js',
         ['jquery', 'select2'],
-        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0',
+        poke_hub_plugin_asset_version('assets/js/pokehub-go-pass-metabox-admin.js'),
         true
     );
 

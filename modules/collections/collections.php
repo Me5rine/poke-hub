@@ -25,6 +25,9 @@ require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-pages.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-routing.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-shortcode.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-rest.php';
+if ( is_admin() ) {
+    require_once POKE_HUB_COLLECTIONS_PATH . '/admin/collections-admin.php';
+}
 
 add_action('init', 'poke_hub_collections_maybe_add_share_token_column', 1);
 add_action('init', 'poke_hub_collections_maybe_add_anonymous_ip_column', 2);
@@ -45,27 +48,11 @@ function poke_hub_collections_enqueue_front_assets() {
         'poke-hub-global-colors',
     ]);
 
-    // Réordonne en dernier (après thème) quand le lot plugin est actif ; sinon seul filet de secours
-    if (apply_filters('poke_hub_enqueue_collections_cascade_late', true)) {
-        $late = POKE_HUB_PATH . 'assets/css/poke-hub-collections-cascade-late.css';
-        if (is_readable($late)) {
-            $late_deps = function_exists('poke_hub_is_plugin_bundled_front_css_enabled') && poke_hub_is_plugin_bundled_front_css_enabled()
-                ? ['poke-hub-collections-front']
-                : [];
-            wp_enqueue_style(
-                'poke-hub-collections-cascade-late',
-                POKE_HUB_URL . 'assets/css/poke-hub-collections-cascade-late.css',
-                $late_deps,
-                POKE_HUB_VERSION
-            );
-        }
-    }
-
     wp_enqueue_script(
         'poke-hub-collections-front',
         POKE_HUB_COLLECTIONS_URL . 'assets/js/collections-front.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('modules/collections/assets/js/collections-front.js'),
         true
     );
 

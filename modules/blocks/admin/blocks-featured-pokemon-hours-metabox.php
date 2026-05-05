@@ -53,7 +53,7 @@ if (!function_exists('pokehub_day_pokemon_hours_metabox_assets')) {
             'pokehub-admin-select2',
             POKE_HUB_URL . 'assets/js/pokehub-admin-select2.js',
             ['jquery', 'select2'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-admin-select2.js'),
             true
         );
 

@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$version = defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0.0';
+$version = poke_hub_plugin_asset_version('modules/blocks/blocks/go-pass/index.js');
 
 return [
     'dependencies' => [

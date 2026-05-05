@@ -141,7 +141,7 @@ function pokehub_render_all_active_quests() {
             'pokehub-events-quests',
             POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
             ['jquery'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-events-quests.js'),
             true
         );
     }

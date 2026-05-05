@@ -185,7 +185,7 @@ function poke_hub_shortcode_pokedle($atts) {
         'poke-hub-pokedle',
         POKE_HUB_URL . 'assets/js/poke-hub-pokedle.js',
         ['jquery'],
-        POKE_HUB_VERSION,
+        poke_hub_plugin_asset_version('assets/js/poke-hub-pokedle.js'),
         true
     );
 

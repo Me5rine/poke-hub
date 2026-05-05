@@ -3097,7 +3097,69 @@ function poke_hub_collections_apply_synthetic_go_background_pool(array $rows, st
 }
 
 /**
- * Tri d’affichage harmonisé : génération -> dex -> nom -> base/costume/méga -> forme.
+ * Catégorie « logique » d’une ligne de pool pour le tri (miroir des heuristiques utilisées avant pour {@see pokehub_pokemon_select_category_rank}).
+ *
+ * @param array<string, mixed> $row
+ */
+function poke_hub_collections_row_display_category_for_sort(array $row): string {
+    $cat  = sanitize_key((string) ($row['form_category'] ?? ''));
+    $slug = strtolower(trim((string) ($row['form_slug'] ?? '')));
+    if ($cat !== '') {
+        return $cat;
+    }
+    if (!empty($row['synthetic_gigantamax']) || strpos($slug, 'gigantamax') !== false || strpos($slug, 'gigamax') !== false) {
+        return 'gigantamax';
+    }
+    if (!empty($row['synthetic_dynamax']) || strpos($slug, 'dynamax') !== false) {
+        return 'dynamax';
+    }
+    if (strpos($slug, 'mega') !== false || strpos($slug, 'primal') !== false) {
+        return 'mega';
+    }
+    if (strpos($slug, 'costume') !== false || strpos($slug, 'clone') !== false || !empty($row['is_event_costumed'])) {
+        return 'costume';
+    }
+
+    return '';
+}
+
+/**
+ * Rang d’affichage Collections uniquement :
+ * — forme normale (= palier sélecteurs 0) ;
+ * — **costumes / clones** en premier après la base (`50`, avant tout le bloc « comme sélecteurs ») ;
+ * — puis **{@see pokehub_pokemon_select_category_rank()}** (+100,) pour retrouver régional ↔ méga ↔ Gigamax ↔ Dynamax comme avant, si l’espèce les mélange.
+ * Les catégories `switch_form`, `switch_battle`, `visual` restent rangées comme le groupe régional/special si le helper renvoie 6 (« autres »).
+ *
+ * @param array<string, mixed> $row
+ */
+function poke_hub_collections_display_variant_sort_rank(array $row): int {
+    $cat = poke_hub_collections_row_display_category_for_sort($row);
+    /** @var int $rank */
+
+    if ($cat === '' || in_array($cat, ['normal', 'base', 'default', 'standard'], true)) {
+        $rank = 0;
+    } elseif (in_array($cat, ['costume', 'clone'], true) || !empty($row['is_event_costumed'])) {
+        $rank = 50;
+    } elseif (!function_exists('pokehub_pokemon_select_category_rank')) {
+        $rank = 220;
+    } else {
+        $sel = pokehub_pokemon_select_category_rank($cat);
+        if ($sel === 2) {
+            $rank = 50;
+        } else {
+            if ($sel >= 6 && in_array($cat, ['switch_form', 'switch_battle', 'visual', 'gender'], true)) {
+                $sel = 1;
+            }
+            $rank = 100 + $sel * 20;
+        }
+    }
+
+    /** @var int */
+    return (int) apply_filters('poke_hub_collections_display_variant_sort_rank', $rank, $row, $cat);
+}
+
+/**
+ * Tri d’affichage harmonisé : génération → dex → (Zarbi) → base → costumes → entrelacement type sélecteurs (régional, …, Dynamax…) → fonds/sources → nom/forme/id.
  *
  * @param array $rows
  * @return array
@@ -3106,26 +3168,6 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
     usort(
         $rows,
         static function (array $a, array $b): int {
-            $resolveCategory = static function (array $row): string {
-                $cat  = sanitize_key((string) ($row['form_category'] ?? ''));
-                $slug = strtolower(trim((string) ($row['form_slug'] ?? '')));
-                if ($cat !== '') {
-                    return $cat;
-                }
-                if (!empty($row['synthetic_gigantamax']) || strpos($slug, 'gigantamax') !== false || strpos($slug, 'gigamax') !== false) {
-                    return 'gigantamax';
-                }
-                if (!empty($row['synthetic_dynamax']) || strpos($slug, 'dynamax') !== false) {
-                    return 'dynamax';
-                }
-                if (strpos($slug, 'mega') !== false || strpos($slug, 'primal') !== false) {
-                    return 'mega';
-                }
-                if (strpos($slug, 'costume') !== false || strpos($slug, 'clone') !== false || !empty($row['is_event_costumed'])) {
-                    return 'costume';
-                }
-                return '';
-            };
             $isUnownLikeRow = static function (array $row): bool {
                 $slug = strtolower(trim((string) ($row['slug'] ?? '')));
                 $name = strtolower(trim((string) (($row['name_fr'] ?? '') !== '' ? $row['name_fr'] : ($row['name_en'] ?? ''))));
@@ -3189,12 +3231,8 @@ function poke_hub_collections_sort_pool_display(array $rows): array {
                 }
             }
 
-            $rankA = function_exists('pokehub_pokemon_select_category_rank')
-                ? pokehub_pokemon_select_category_rank($resolveCategory($a))
-                : 3;
-            $rankB = function_exists('pokehub_pokemon_select_category_rank')
-                ? pokehub_pokemon_select_category_rank($resolveCategory($b))
-                : 3;
+            $rankA = poke_hub_collections_display_variant_sort_rank($a);
+            $rankB = poke_hub_collections_display_variant_sort_rank($b);
             if ($rankA !== $rankB) {
                 return $rankA <=> $rankB;
             }
@@ -3485,6 +3523,67 @@ function poke_hub_collections_get_generation_progress(array $pool, array $items)
     }
 
     return $out;
+}
+
+/**
+ * Totaux progression (possédés / pour échange / manquants) sur un pool Collections.
+ *
+ * @param array<int, array<string, mixed>> $pool
+ * @param array<int, string>              $items pokemon_id => statut
+ * @return array{ total: int, owned: int, for_trade: int, missing: int, percent_owned: float }
+ */
+function poke_hub_collections_compute_progress_totals(array $pool, array $items): array {
+    $total     = 0;
+    $owned     = 0;
+    $for_trade = 0;
+    $missing   = 0;
+    foreach ($pool as $p) {
+        if (! is_array($p)) {
+            continue;
+        }
+        $total++;
+        $st = poke_hub_collections_resolved_status_for_row($p, $items);
+        if ($st === 'owned') {
+            $owned++;
+        } elseif ($st === 'for_trade') {
+            $for_trade++;
+        } else {
+            $missing++;
+        }
+    }
+
+    $percent = $total > 0 ? round(100 * $owned / $total, 1) : 0.0;
+
+    return [
+        'total'         => $total,
+        'owned'         => $owned,
+        'for_trade'     => $for_trade,
+        'missing'       => $missing,
+        'percent_owned' => $percent,
+    ];
+}
+
+/**
+ * URL front de vue d'une collection via la page configurée ({@see poke_hub_page_collections}) + jeton share.
+ *
+ * @param array<string, mixed> $collection Ligne avec share_token ; la page doit être publiée.
+ */
+function poke_hub_collections_public_view_url(array $collection): string {
+    $page_id = (int) get_option('poke_hub_page_collections', 0);
+    if ($page_id <= 0) {
+        return '';
+    }
+    if (get_post_status($page_id) !== 'publish') {
+        return '';
+    }
+
+    $base = get_permalink($page_id);
+    $tok  = preg_replace('/[^a-zA-Z0-9]/', '', (string) ($collection['share_token'] ?? ''));
+    if (! $base || $tok === '') {
+        return '';
+    }
+
+    return rtrim((string) $base, '/') . '/' . $tok;
 }
 
 /**
@@ -5403,6 +5502,40 @@ function poke_hub_collections_delete(int $collection_id, int $user_id = 0, ?stri
     }
     $r = $wpdb->delete($collections_table, ['id' => $collection_id], ['%d']);
 
+    if ($r === false) {
+        return ['success' => false, 'message' => __('Could not delete.', 'poke-hub')];
+    }
+
+    return ['success' => true, 'message' => __('Collection deleted.', 'poke-hub')];
+}
+
+/**
+ * Suppression par un administrateur (gestion du site), sans être propriétaire.
+ *
+ * @param int $collection_id
+ * @return array{ success: bool, message: string }
+ */
+function poke_hub_collections_admin_force_delete(int $collection_id): array {
+    if (! current_user_can('manage_options')) {
+        return ['success' => false, 'message' => __('Insufficient permissions.', 'poke-hub')];
+    }
+
+    $collection_id = (int) $collection_id;
+    if ($collection_id <= 0) {
+        return ['success' => false, 'message' => __('Invalid collection.', 'poke-hub')];
+    }
+
+    global $wpdb;
+    $collections_table = pokehub_get_table('collections');
+    $items_table       = pokehub_get_table('collection_items');
+    if (! $collections_table) {
+        return ['success' => false, 'message' => __('Technical error.', 'poke-hub')];
+    }
+
+    if ($items_table) {
+        $wpdb->delete($items_table, ['collection_id' => $collection_id], ['%d']);
+    }
+    $r = $wpdb->delete($collections_table, ['id' => $collection_id], ['%d']);
     if ($r === false) {
         return ['success' => false, 'message' => __('Could not delete.', 'poke-hub')];
     }

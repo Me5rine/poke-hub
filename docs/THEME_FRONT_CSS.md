@@ -7,7 +7,7 @@ Ce document est la **référence** pour le chargement du CSS public Poké HUB : 
 | Où ? | Contenu | Quand c’est utilisé |
 |------|---------|----------------------|
 | **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules : chaque fichier `parts/*.css` est enqueued **séparément** via `functions.php` (ordre `01-…` → `16-…`, version `filemtime` par fichier), puis `poke-hub-late-overrides.css` en **dernière** couche. Le fichier **`poke-hub-front.css`** garde les `@import` des `parts/` comme **index lisible / référence** et pour **`add_editor_style()`** ; en front navigateur ce fichier n’est **plus** enqueue (évite dépend cache des `@import`). | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
-| **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; **`poke-hub-type-icons.css`** (icônes types en SVG — voir tableau *Ce qui reste* ci‑dessous) ; parfois un **filet** optionnel `poke-hub-collections-cascade-late.css`. | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris), **sauf** les feuilles **admin** et l’enqueue **explicite** des icônes de types en admin (voir tableau). |
+| **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; **`poke-hub-type-icons.css`** (icônes types en SVG — voir tableau *Ce qui reste* ci‑dessous). | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris), **sauf** les feuilles **admin** et l’enqueue **explicite** des icônes de types en admin (voir tableau). |
 
 **Filtre WordPress** : `poke_hub_load_default_plugin_front_css`
 
@@ -25,7 +25,7 @@ flowchart LR
   end
   subgraph plugin["Plugin poke-hub"]
     E[admin-unified, metaboxes, …]
-    F[global-colors + poke-hub-type-icons admin explicite + optionnel cascade-late]
+    F[global-colors + poke-hub-type-icons admin explicite]
   end
   G["Filtre poke_hub_load_default_plugin_front_css = false"] --> H["Pack front module = thème seulement"]
   G --> I["Déqueue des handles listés côté plugin"]
@@ -52,7 +52,6 @@ flowchart LR
 | `global-colors.css` | Variables notices / couleurs partagées (admin + besoins Gutenberg) ; **toujours** pertinent. |
 | `poke-hub-type-icons.css` | Icônes de **types** Pokémon (SVG inline, `currentColor`, classes `pokehub-type-icon--admin-list` / `--admin-preview`, cellule liste `.pokehub-type-icon-list-cell`). **Admin** : chargé **systématiquement** sur les écrans du plugin via `poke_hub_enqueue_admin_unified_styles()` dans `poke-hub.php` (chemin explicite), **sans dépendre** du filtre `poke_hub_load_default_plugin_front_css`. **Front** : enregistré sur `init` par `poke_hub_register_bundled_front_style()` dans `includes/functions/pokehub-pokemon-type-icon.php` **uniquement** si le filtre vaut `true` et le fichier est lisible. En production Me5rine (`false`), le thème reprend les mêmes règles dans `css/poke-hub/parts/02-type-icons.css` — **garder les deux fichiers alignés** si vous modifiez les styles. |
 | `admin-unified.css`, `pokehub-metaboxes-admin.css` | Administration uniquement. |
-| `poke-hub-collections-cascade-late.css` | **Optionnel** : filet de secours (cascade) pour Collections **hors** bloc recherche GO in-game (liste collections, section avancée `<details>`, filtre tuiles, layout nom de tuile, etc.) ; enfilé par le module quand le filtre `poke_hub_enqueue_collections_cascade_late` vaut `true` (défaut), **hors** logique `poke_hub_enqueue_bundled_front_style` — il n’est **pas** dans la liste `poke_hub_get_plugin_front_style_handles()` afin d’exister aussi lorsque le lot front « packagé » est désactivé. **Le bloc copy-paste GO** est stylé dans le thème : `parts/13-collections-front.css`. Désactiver la feuille : `add_filter( 'poke_hub_enqueue_collections_cascade_late', '__return_false' );` |
 | Fichiers `poke-hub-*-front.css` historiques | S’ils sont **absents** du dépôt, les modules n’enquent rien de ce côté ; le thème fournit l’équivalent. |
 
 Code : `includes/functions/pokehub-front-styles-bridge.php` (helpers, liste des handles, déqueue).
@@ -64,8 +63,10 @@ Code : `includes/functions/pokehub-front-styles-bridge.php` (helpers, liste des 
 1. **Thème parent** (Hello Elementor) — handles tels que `hello-elementor`, `hello-elementor-theme-style`, etc.
 2. **Me5rine Lab** — handle `me5rine-child-style` (fichier servi via `style-handler.php` d’après `style.css` : intégrations, formulaires, tableaux, dashboard, profils, menu, **responsive** `css/responsive.css`, **um** `css/um-responsive.css`). **Aucun** import Poké HUB dans ce `style.css`.
 3. **Poké HUB** — enqueued **après** `me5rine-child-style` (priorité `100000` dans le `functions.php` du thème) :
-   - `me5rine-poke-hub-part-<nom>` → un handle par fichier dans `css/poke-hub/parts/*.css` (tri naturel `01-…` … `16-…`, dépendances en chaîne, `?ver=` = `filemtime` du fichier) ;
-   - `me5rine-poke-hub-late` → `css/poke-hub/poke-hub-late-overrides.css` dépend du **dernier** `part` (correctifs de cascade, ex. Collections vs `dashboard.css` / responsive).
+   - `me5rine-poke-hub-part-<nom>` → un handle par fichier dans `css/poke-hub/parts/*.css` (**`glob` + tri naturel** : tout nouveau `*.css` dans ce dossier est chargé **sans modifier le PHP** ; `?ver=` = `filemtime` via `me5rine_child_theme_asset_version()`).
+   - `me5rine-poke-hub-late` → `css/poke-hub/poke-hub-late-overrides.css` dépend du **dernier** `part` (correctifs de cascade : Collections vs `dashboard.css` / responsive, liste collections, `<details>` avancé, tuiles filtrées JS, bannière reset `[hidden]` vs `forms.css`, etc.) ; même principe de version par fichier.
+
+**Helpers thème** (dépôt me5rine-lab, `functions.php`) : `me5rine_child_theme_asset_version( $chemin_relatif )` pour tout autre `wp_enqueue_*` pointant vers le thème enfant ; `me5rine_child_theme_editor_style_url()` pour `add_editor_style` avec `?ver=`. **Plugin** : `poke_hub_plugin_asset_version()` pour les fichiers sous `POKE_HUB_PATH`. Détail pratique : `css/poke-hub/README.md` dans le thème.
 
 Commentaires détaillés : en-tête de `style.css` du thème enfant.
 

@@ -386,7 +386,7 @@ function poke_hub_shop_avatar_item_form_assets(string $hook): void {
         'pokehub-shop-avatar-item-form-events',
         POKE_HUB_SHOP_ITEMS_URL . 'admin/js/shop-avatar-item-form-events.js',
         ['jquery', 'select2'],
-        defined('POKE_HUB_VERSION') ? POKE_HUB_VERSION : '1.0',
+        poke_hub_plugin_asset_version('modules/shop-items/admin/js/shop-avatar-item-form-events.js'),
         true
     );
     wp_localize_script(

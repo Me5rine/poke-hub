@@ -139,7 +139,7 @@ add_action('init', function() {
             'pokehub-community-day-editor-select2',
             POKE_HUB_BLOCKS_URL . 'blocks/community-day/editor-select2.js',
             ['jquery', 'pokehub-select2-editor'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('modules/blocks/blocks/community-day/editor-select2.js'),
             true
         );
         wp_localize_script(
@@ -200,7 +200,7 @@ add_action('init', function() {
             'pokehub-events-quests',
             POKE_HUB_URL . 'assets/js/pokehub-events-quests.js',
             ['jquery'],
-            POKE_HUB_VERSION,
+            poke_hub_plugin_asset_version('assets/js/pokehub-events-quests.js'),
             true
         );
 

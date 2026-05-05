@@ -128,9 +128,9 @@ Le bloc **Include in grid** (*chaîne source anglaise* dans les fichiers de trad
 
 ## Ordre des lignes dans la grille et variantes
 
-Quand plusieurs entrées du pool concernent une même famille (national dex ou même espèce sous plusieurs formes), l’ordre d’affichage est défini dans **`poke_hub_collections_sort_pool_display()`** (`modules/collections/functions/collections-helpers.php`), en lien avec **`pokehub_pokemon_select_category_rank()`** (`includes/functions/pokemon-public-helpers.php`) pour résoudre une **catégorie de forme** à partir de `form_category`, du slug, ou de drapeaux synthétiques (Gigamax, Dynamax, costume, fond GO, etc.).
+Quand plusieurs entrées du pool concernent une même famille (national dex ou même espèce sous plusieurs formes), l’ordre d’affichage est défini dans **`poke_hub_collections_sort_pool_display()`** (`modules/collections/functions/collections-helpers.php`). La catégorie métier utilisée pour le rang est **`poke_hub_collections_row_display_category_for_sort()`**, puis **`poke_hub_collections_display_variant_sort_rank()`** (filtre WordPress **`poke_hub_collections_display_variant_sort_rank`**). Ce rang **collections** diffère du tri générique des sélecteurs (`pokehub_pokemon_select_category_rank` dans **`pokemon-public-helpers.php`**) : même logique « catégorie dérivée », mais avec **costumes avant formes régionales** pour la même lignée Pokédex (ex. Raichu de base puis costumés, puis Raichu d’Alola).
 
-Ordre de tri (résumé) : **génération** ascendante ; **n° de Pokédex** ; **cas spéciaux Zarbi / Unown** (même espèce `#201`) : ordre forcé **A → Z**, puis **`!`**, puis **`?`** (y compris slugs GM du type `unown-exclamation-point`, `unown-question-mark`, ou équivalents `zarbi-*`) ; **rang de catégorie de variante** ; pour les lignes avec **fonds GO** synthétiques, regroupement cohérent avec la ligne source ; puis nom / libellé de forme / id pour un ordre stable.
+Ordre de tri (résumé) : **génération** ascendante ; **n° de Pokédex** ; **cas spéciaux Zarbi / Unown** (même espèce `#201`) : ordre forcé **A → Z**, puis **`!`**, puis **`?`** (y compris slugs GM du type `unown-exclamation-point`, `unown-question-mark`, ou équivalents `zarbi-*`) ; **rang collections** : normale puis **costumes / clones**, puis même entrelacement que **`pokehub_pokemon_select_category_rank()`** (**régional** / variantes assimilées, puis **Méga** → **Gigamax** → **Dynamax** → reste) avec un décalage numérique après les costumes (`poke_hub_collections_display_variant_sort_rank`) ; pour les lignes avec **fonds GO** synthétiques, regroupement avec la ligne source ; puis nom / libellé de forme / id pour un ordre stable.
 
 ## Pool SQL : lignes « family », tous les Pokémon vs une entrée par espèce
 
@@ -139,6 +139,7 @@ Le pool est construit dans **`poke_hub_collections_get_pool()`**. Comportements 
 - **`one_per_species` désactivé (« toutes les formes »)**  
   - Les slugs se terminant par **`-family`** sont **exclusivement réservés** au mode « une entrée par espèce » (regroupement). En **« toutes les formes », une ligne `*-family` ne doit pas apparaître** ; les entrées utilisables sont la **forme normale** (`slug` sans cette terminaison) et les variantes (méga, costume, fusion, etc.).  
   - D’autres filtres (ex. lignes `-normal` redondantes) ne s’appliquent que lorsqu’une **autre forme réelle** existe pour le même n° Pokédex (évite une base générique alors que des suffixes `-…` sont présents).
+  - **Motifs `visual` prolongeant un slug commun** : pour éviter une double carte « Zarbi motif / base », le WHERE **retire** la ligne sans suffixe lorsqu’il existe des lignes **`fv.category = 'visual'`** du même № dont le **`slug`** prolonge celui-ci (`CASTFORM`-like en apparence). **Morphéo / Castform (n° 351)** : la forme **`castform`** est une carte à part entière — exceptions par **`poke_hub_collections_visual_variant_base_stub_keep_dex_numbers()`** (`collections-helpers.php`) ; filtres WordPress **`poke_hub_collections_visual_variant_base_stub_keep_dex_numbers`** (№ Dex). Voir aussi [docs/collections/CHANGELOG.md](./collections/CHANGELOG.md) § *2026-05-05*.
 
 - **`one_per_species` activé**  
   - Logique de **famille par espèce** (slugs `-family`, `is_default`, formes incluses selon options : régional, méga, costume, Dynamax synthétique, etc.). Les variantes **`fusion` / `special`** (ex. plusieurs formes « mécaniquement » distinctes) restent des entrées séparées quand les options les autorisent ; la ligne famille seule peut être masquée si ces formes explicites existent déjà (évite triple affichage type Giratina).
@@ -150,6 +151,16 @@ Le pool est construit dans **`poke_hub_collections_get_pool()`**. Comportements 
 - **Cohérence données** : garde SQL optionnel contre un slug improbable **`dynamax` + `gigantamax`** sur une même ligne (données importées corrompues).
 
 Référence code : **`modules/collections/functions/collections-helpers.php`** (filtres `WHERE`, `poke_hub_collections_maybe_mark_*_synthetic_base_row`, `poke_hub_collections_apply_*_synthetic_*`, `poke_hub_collections_sort_pool_display`).
+
+## Administration WordPress (liste des collections enregistrées)
+
+Écran **Poké HUB → Collections** (`page=poke-hub-collections`) : tableau des lignes **`pokehub_collections`** avec propriétaire (compte WordPress ou **anonyme** + IP / préfixe de clé anonyme), type de liste, progression (ratio identique au front), visibilité, jeton de partage, lien **Voir** construit comme sur le front. Filtres (tous / comptes / anonymes), recherche par nom, suppression admin (unitaire ou en masse).
+
+- **Helpers** : `poke_hub_collections_public_view_url()`, `poke_hub_collections_compute_progress_totals()`, `poke_hub_collections_admin_force_delete()` — `collections-helpers.php`.
+- **UI** : `modules/collections/admin/collections-admin.php` ; chargé depuis `collections.php` si `is_admin()`.
+- Le slug **`poke-hub-collections`** doit figurer dans **`poke_hub_admin_pages()`** (`poke-hub.php`) pour le parent de menu Poké HUB.
+
+Détails et contexte Morphéo : [docs/collections/CHANGELOG.md](./collections/CHANGELOG.md).
 
 **Distinction** : le module **collections** garde une logique métier propre aux slugs `-family` ci-dessus. **Hors collections**, les sélecteurs (blocs, événements, heures vedette, REST, etc.) et les affichages de lignées excluent ces placeholders ; l’import PASS 3 évite d’attacher les évolutions aux seules lignes famille quand une autre fiche existe — synthèse **[pokemon/GAME_MASTER_IMPORT.md](./pokemon/GAME_MASTER_IMPORT.md)** (§ *PASS 3*, *Hors import*).
 
@@ -202,7 +213,8 @@ Côté JS (`pogoGroupPrefix`), le préfixe d’un groupe régional utilise d’a
 ## Fichiers principaux
 
 - `modules/collections/collections.php` — bootstrap du module.
-- `modules/collections/functions/collections-helpers.php` — pool, CRUD collections/items.
+- `modules/collections/functions/collections-helpers.php` — pool, CRUD collections/items, helpers progression / URL publique / suppression admin.
+- `modules/collections/admin/collections-admin.php` — liste d’administration des collections (`manage_options`).
 - `modules/collections/public/collections-shortcode.php` — shortcodes `[poke_hub_collections]` et `[poke_hub_collection_view]`.
 - `modules/collections/public/collections-rest.php` — API REST (pool, CRUD, items).
 - Styles front : **dans le thème** Me5rine, `css/poke-hub/parts/13-collections-front.css` et `14-collections-theme.css` (importés par `poke-hub-front.css` ; priorité d’ordre : voir [THEME_FRONT_CSS.md](./THEME_FRONT_CSS.md)). En mode plugin pur (`poke_hub_load_default_plugin_front_css` = true), le fichier `assets/css/poke-hub-collections-front.css` s’enfile s’il est présent. `modules/collections/assets/js/collections-front.js` — front.
