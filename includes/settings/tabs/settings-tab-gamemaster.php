@@ -32,8 +32,6 @@ $gm_import_options = is_array( $gm_import_options ) ? $gm_import_options : [];
 
 $gm_import_types_from_bulbapedia = ! empty( $gm_import_options['import_types_from_bulbapedia'] );
 
-$gm_variant_registry_slug_aliases_lines = (string) get_option( 'poke_hub_gm_variant_registry_slug_aliases_lines', '' );
-
 /**
  * Upload du latest.json vers S3 à l'aide du SDK AWS installé via Composer dans le plugin.
  *
@@ -332,12 +330,6 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
     if ( isset( $_POST['gm_local_path'] ) ) {
         $gm_local_path = trim( sanitize_text_field( wp_unslash( $_POST['gm_local_path'] ) ) );
         update_option( 'poke_hub_gm_local_path', $gm_local_path );
-    }
-
-    if ( isset( $_POST['poke_hub_gm_variant_registry_slug_aliases_lines'] ) ) {
-        $aliases_lines = sanitize_textarea_field( wp_unslash( $_POST['poke_hub_gm_variant_registry_slug_aliases_lines'] ) );
-        update_option( 'poke_hub_gm_variant_registry_slug_aliases_lines', $aliases_lines, false );
-        $gm_variant_registry_slug_aliases_lines = $aliases_lines;
     }
 
     $action       = sanitize_text_field( $_POST['poke_hub_gm_submit'] ); // save / save_import
@@ -851,35 +843,6 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
                 </label>
                 <p class="description" style="margin:6px 0 0;">
                     <?php esc_html_e( 'May slow down the import because it fetches external pages.', 'poke-hub' ); ?>
-                </p>
-            </td>
-        </tr>
-
-        <tr>
-            <th scope="row">
-                <label for="poke_hub_gm_variant_registry_slug_aliases_lines"><?php esc_html_e( 'Variant registry slug aliases', 'poke-hub' ); ?></label>
-            </th>
-            <td>
-                <textarea
-                    id="poke_hub_gm_variant_registry_slug_aliases_lines"
-                    name="poke_hub_gm_variant_registry_slug_aliases_lines"
-                    class="large-text code"
-                    rows="6"
-                    cols="48"
-                    spellcheck="false"
-                ><?php echo esc_textarea( $gm_variant_registry_slug_aliases_lines ); ?></textarea>
-                <p class="description" style="margin:6px 0 0;">
-                    <?php
-                    esc_html_e(
-                        'Optional: merge several Game Master form slugs into one row in pokemon_form_variants during import.',
-                        'poke-hub'
-                    );
-                    ?>
-                    <?php esc_html_e( ' One mapping per line: slug-from-gm=>shared-registry-slug, or slug-from-gm shared-registry-slug. Lines starting with # are ignored. Pokémon slugs and extra.form_slug stay granular (different costumes keep distinct URLs); form_variant_id and extra.variant_form_slug use the registry slug.', 'poke-hub' ); ?>
-                    <?php
-                    echo ' ';
-                    esc_html_e( 'Hooks: poke_hub_gm_variant_registry_slug, poke_hub_gm_variant_registry_slug_aliases_map.', 'poke-hub' );
-                    ?>
                 </p>
             </td>
         </tr>

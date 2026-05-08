@@ -434,6 +434,9 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     if (function_exists('pokehub_install_tables_for_modules')) {
         pokehub_install_tables_for_modules(['pokemon'], ['skip_allow_filter' => true, 'try_require_db_class' => true]);
     }
+    if (function_exists('poke_hub_ensure_background_exists_only_with_costume_column')) {
+        poke_hub_ensure_background_exists_only_with_costume_column();
+    }
     global $wpdb;
     $table = pokehub_get_table('pokemon_backgrounds');
     $links_table = pokehub_get_table('pokemon_background_pokemon_links');
@@ -487,6 +490,10 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     $pokemon_ids_shadow       = $read_post_id_list( 'pokemon_ids_shadow' );
     $pokemon_ids_dynamax      = $read_post_id_list( 'pokemon_ids_dynamax' );
     $pokemon_ids_gigantamax   = $read_post_id_list( 'pokemon_ids_gigantamax' );
+    $exclusive_pairing_base_ids = $read_post_id_list( 'exclusive_pairing_base_ids' );
+    $pokemon_only_with_this_background_base_ids = $read_post_id_list( 'pokemon_only_with_this_background_base_ids' );
+    $background_costume_only_base_ids           = $read_post_id_list( 'background_costume_only_base_ids' );
+    $exists_only_with_costume = !empty($_POST['exists_only_with_costume']) ? 1 : 0;
 
     // Validation
     if ($name_en === '') {
@@ -513,15 +520,16 @@ function poke_hub_pokemon_handle_backgrounds_form() {
     ];
 
     $data = [
-        'slug'            => $slug,
-        'title'          => $title,
-        'name_en'        => $name_en,
-        'name_fr'        => $name_fr,
-        'background_type' => $background_type,
-        'image_url'      => $image_url,
-        'extra'          => wp_json_encode($extra),
+        'slug'                     => $slug,
+        'title'                    => $title,
+        'name_en'                  => $name_en,
+        'name_fr'                  => $name_fr,
+        'background_type'          => $background_type,
+        'exists_only_with_costume' => $exists_only_with_costume,
+        'image_url'                => $image_url,
+        'extra'                    => wp_json_encode($extra),
     ];
-    $format = ['%s', '%s', '%s', '%s', '%s', '%s', '%s'];
+    $format = ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s'];
 
     if ($action === 'add_background') {
         $wpdb->insert($table, $data, $format);
@@ -553,7 +561,10 @@ function poke_hub_pokemon_handle_backgrounds_form() {
                 $shiny_locked_ids,
                 $pokemon_ids_shadow,
                 $pokemon_ids_dynamax,
-                $pokemon_ids_gigantamax
+                $pokemon_ids_gigantamax,
+                $exclusive_pairing_base_ids,
+                $pokemon_only_with_this_background_base_ids,
+                $background_costume_only_base_ids
             );
         }
 
@@ -596,7 +607,10 @@ function poke_hub_pokemon_handle_backgrounds_form() {
             $shiny_locked_ids,
             $pokemon_ids_shadow,
             $pokemon_ids_dynamax,
-            $pokemon_ids_gigantamax
+            $pokemon_ids_gigantamax,
+            $exclusive_pairing_base_ids,
+            $pokemon_only_with_this_background_base_ids,
+            $background_costume_only_base_ids
         );
     }
 

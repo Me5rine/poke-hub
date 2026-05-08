@@ -44,10 +44,12 @@ Les variables suivantes concernent **l’alignement sous le header du site** (ty
 |----------|------|
 | `--pokehub-elementor-header-offset` | Hauteur réservée pour le header global du site (**valeurs de référence** dans Me5rine : environ **129px** bureau, **123px** `max-width: 1024px`, **95px** `max-width: 767px` — à ajuster dans le thème si le header réel diffère). |
 | `--pokehub-adminbar-offset` | **0px** par défaut ; **32px** / **46px** (`max-width: 782px`) sur `body.admin-bar`. |
-| `--pokehub-sticky-tools-current-height` | Définie en **JavaScript** sur `.pokehub-collection-view-wrap` (hauteur en pixels du conteneur `.pokehub-collection-sticky-tools`). Sert au `top` **`sticky`** de **Jump to generation** en mode `.pokehub-collection--compact`. |
-| `--pokehub-collection-header-sticky-height` | Référence visuelle résiduelle dans le fichier thème pour la zone titre (à ne pas confondre avec `--pokehub-sticky-tools-current-height`, qui est mise à jour au fil du responsive). |
+| `--pokehub-collection-fixed-toolbar-height` | Définie en **JavaScript** sur `.pokehub-collection-view-wrap` lorsque la barre **`[data-collection-fixed-toolbar]`** est affichée : hauteur en pixels de cette barre (tuiles + panneau déplié éventuel). Sert au calage du layout / scroll ; retombée à `0px` lorsque la barre fixe est masquée. |
+| `--pokehub-collection-header-sticky-height` | Référence résiduelle possible dans le thème pour la zone titre (à ne pas confondre avec `--pokehub-collection-fixed-toolbar-height`). |
 
-**Mode compact (.pokehub-collection--compact)** — styles dans **`parts/13-collections-front.css`** : hors mode compact, `.pokehub-collection-sticky-tools` reste dans le flux (pas de collage sticky forcé hors ce que donne aussi le bloc header enveloppé) ; avec la classe **`pokehub-collection--compact`** appliquée depuis `collections-front.js`, le bloc d’outils devient **`position: sticky`**, **`top: calc(...)`**, et la grille **`.pokehub-collection-compact-nav`** s’affiche. Les blocs désactivés en mode mono‑panneau utilisent **`[data-compact-section].is-compact-hidden { display: none; }`** (les sections portent ces attributs côté `collections-shortcode.php`). `.pokehub-collection-generation-jump` n’est **`sticky`** sous les outils que **lorsque** le wrap porte **`pokehub-collection--compact`** (sinon bloc dans le flux, avec marges dédiées).
+**Barre d’outils fixe au scroll** — styles dans **`parts/13-collections-front.css`** : lorsque `.pokehub-collection-view-wrap` porte **`pokehub-collection--fixed-toolbar`**, la pile **`.pokehub-collection-toolbar-stack`** peut être épinglée (`pokehub-toolbar-stack--pinned`) et la barre **`[data-collection-fixed-toolbar]`** reste sous le header du site. Les tuiles flux / fixe utilisent **`[data-flow-tiles-host]`** et **`[data-fixed-tiles-host]`** ; l’aire de contenu ouverte est **`[data-fixed-expand-inner]`** (ou le corps du tiroir **`[data-toolbar-menu-body]`** selon le breakpoint). **Jump to generation** : ruban horizontal défilant avec flèches uniquement en **`max-width: 1024px`** ; au-delà, grille comme le panneau dans le flux (y compris le panneau ouvert dans `.pokehub-collection-fixed-expand`).
+
+**Empilement (`z-index`) et menu tiroir** : **`.pokehub-collection-toolbar-stack`** combine un **`z-index`** modéré (variable **`--pokehub-collection-toolbar-stack-z`**, typiquement **9** pour rester **sous** le header global du thème, ex. `z-index: 10`) et **`isolation: isolate`**. Tout descendant y est donc cantonné à ce **contexte d’empilement** : le menu **`.pokehub-collections-drawer--toolbar`** (`[data-toolbar-menu-drawer]`) doit être rendu **en dehors** de cette pile dans le HTML (voir **`collections-shortcode.php`** et **COLLECTIONS_HEADERS.md**). Les règles **`.pokehub-collections-drawer`** du thème (`position: fixed`, **`z-index: 100000`**, plein viewport) s’appliquent alors correctement au-dessus du contenu de la page.
 
 **Personnalisation dans le thème** : éditer `parts/14-collections-theme.css` (déjà importé par `poke-hub-front.css`) ou surcharger en CSS dans une couche chargée **après** `poke-hub-late-overrides` si besoin.
 
@@ -138,8 +140,8 @@ Classes dédiées :
 - `.pokehub-collection-status-filter-label` — libellé d’une case.
 - `.pokehub-collection-filter-status` — case à cocher pilotée par JS (`data-filter-status`).
 - `.pokehub-collection-status-filters-note` — aide *Click a tile to cycle status* sous la ligne de cases.
-- `.pokehub-collection-generation-jump` / `.pokehub-collection-generation-jump-links` — ancres rapides par génération (sibling du bloc `.pokehub-collection-sticky-tools`).
-- `.pokehub-collection-compact-nav` / `.pokehub-collection-compact-nav-btn` — raccourcis visibles en **`.pokehub-collection--compact`**.
+- `.pokehub-collection-generation-jump` / `.pokehub-collection-generation-jump-links` — ancres rapides par génération ou région ; rendues **dans** le slot **`[data-collection-toolbar-slot="generations"]`** lorsqu’il existe.
+- **`[data-flow-tiles-host]`**, **`[data-fixed-tiles-host]`**, **`[data-fixed-tile-key]`**, `.pokehub-collection-fixed-tile-btn` — tuiles de navigation vers les panneaux (`initCollectionFixedToolbar`, `collections-front.js`).
 
 - `.pokehub-collection-filter-empty-hint` — message si aucun statut n’est coché.
 

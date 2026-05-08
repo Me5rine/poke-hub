@@ -506,8 +506,84 @@ function poke_hub_pokemon_get_all_variant_groups(): array {
 /** @var string Nom d’option : form_slug dont l’import ne doit pas recréer la ligne après suppression admin. */
 const POKE_HUB_GM_SUPPRESSED_FORM_SLUG_OPTION = 'poke_hub_gm_suppressed_form_slugs';
 
-/** @var string Texte brut des alias slug variante GM → registre canonique (une ou plusieurs lignes, voir parsing). */
-const POKE_HUB_GM_VARIANT_REGISTRY_SLUG_ALIASES_LINES_OPTION = 'poke_hub_gm_variant_registry_slug_aliases_lines';
+/** @var string Option : slug granular « ancien registre GM » → slug registre de remplacement (admin). */
+const POKE_HUB_FORM_VARIANT_REGISTRY_ROUTING_OPTION = 'poke_hub_form_variant_registry_routing';
+
+/**
+ * Routage slug supprimé / fusionné → slug cible utilisé lors des imports Game Master suivants.
+ *
+ * @return array<string,string>
+ */
+function poke_hub_get_form_variant_registry_routing_map(): array {
+    if (!function_exists('get_option')) {
+        return [];
+    }
+    $raw = get_option(POKE_HUB_FORM_VARIANT_REGISTRY_ROUTING_OPTION, []);
+    $out = [];
+    if (!is_array($raw)) {
+        return [];
+    }
+    foreach ($raw as $from => $to) {
+        $sf = sanitize_title((string) $from);
+        $st = sanitize_title((string) $to);
+        if ($sf !== '' && $st !== '' && $sf !== $st) {
+            $out[$sf] = $st;
+        }
+    }
+    /** @var array<string,string> $filtered */
+    $filtered = apply_filters('poke_hub_form_variant_registry_routing_map', $out);
+    $normalized = [];
+    foreach ((array) $filtered as $k => $v) {
+        $gk = sanitize_title((string) $k);
+        $gv = sanitize_title((string) $v);
+        if ($gk !== '' && $gv !== '' && $gk !== $gv) {
+            $normalized[$gk] = $gv;
+        }
+    }
+    ksort($normalized);
+
+    return $normalized;
+}
+
+/**
+ * @param array<string,string> $map
+ */
+function poke_hub_save_form_variant_registry_routing_map(array $map): void {
+    ksort($map);
+    if (!function_exists('update_option')) {
+        return;
+    }
+    update_option(POKE_HUB_FORM_VARIANT_REGISTRY_ROUTING_OPTION, $map, false);
+}
+
+/**
+ * @param array<string,string> $current à fusionner ; tableau vide recharge l’état depuis la base.
+ */
+function poke_hub_record_form_variant_routing_pair(string $from_slug, string $to_slug, array $current = []): void {
+    $from_slug = sanitize_title($from_slug);
+    $to_slug   = sanitize_title($to_slug);
+    if ($from_slug === '' || $to_slug === '' || $from_slug === $to_slug) {
+        return;
+    }
+    if ($current === []) {
+        $current = poke_hub_get_form_variant_registry_routing_map();
+    }
+    $current[$from_slug] = $to_slug;
+    poke_hub_save_form_variant_registry_routing_map($current);
+}
+
+/**
+ * Retire un routage (slug granular source).
+ */
+function poke_hub_clear_form_variant_routing_slug(string $from_slug): void {
+    $from_slug = sanitize_title($from_slug);
+    if ($from_slug === '') {
+        return;
+    }
+    $map = poke_hub_get_form_variant_registry_routing_map();
+    unset($map[$from_slug]);
+    poke_hub_save_form_variant_registry_routing_map($map);
+}
 
 /**
  * Slugs suppression stockés en base sans filtre (évite boucle lors des filtres apply_filters).
@@ -581,41 +657,8 @@ function poke_hub_unsuppress_form_slug_for_gm_auto_create(string $form_slug): vo
 }
 
 /**
- * Parse le texte d’alias (Réglages Game Master) vers un tableau sanitizé granular => canonique.
- *
- * Lignes reconnues (une paire par ligne ; ignorer les lignes vides ou commençant par #):
- * - `slug-granulaire=>slug-canonical`
- * - `slug-granulaire slug-canonical` (deux premiers jetons whitespace)
- *
- * @return array<string,string>
- */
-function poke_hub_parse_gm_variant_registry_slug_aliases_lines(string $text): array {
-    $out = [];
-    foreach (preg_split("/\r\n|\r|\n/", $text) as $raw_line) {
-        $line = trim((string) $raw_line);
-        if ($line === '' || strpos($line, '#') === 0) {
-            continue;
-        }
-        $gran = '';
-        $canon = '';
-        if (strpos($line, '=>') !== false) {
-            $parts = explode('=>', $line, 2);
-            $gran  = sanitize_title(trim((string) ($parts[0] ?? '')));
-            $canon = sanitize_title(trim((string) ($parts[1] ?? '')));
-        } elseif (preg_match('/^(\S+)\s+(\S+)/', $line, $m)) {
-            $gran  = sanitize_title($m[1]);
-            $canon = sanitize_title($m[2]);
-        }
-        if ($gran !== '' && $canon !== '' && $gran !== $canon) {
-            $out[$gran] = $canon;
-        }
-    }
-
-    return $out;
-}
-
-/**
- * Carte effective slug GM (granulaire) → slug de la ligne pokemon_form_variants (registre).
+ * Carte effective slug GM (granulaire) → slug registry `pokemon_form_variants.form_slug`.
+ * Source : défauts (ex. Méga X/Y→ Méga), routages **Replace variant** en admin ; le filtre {@see 'poke_hub_gm_variant_registry_slug_aliases_map'} complète ou surcharge cette base.
  *
  * @return array<string,string>
  */
@@ -623,13 +666,35 @@ function poke_hub_get_gm_variant_registry_slug_aliases_map(): array {
     static $revision = '';
     static $cached   = [];
 
-    $text = function_exists('get_option')
-        ? (string) get_option(POKE_HUB_GM_VARIANT_REGISTRY_SLUG_ALIASES_LINES_OPTION, '')
-        : '';
+    /** @var array<string,string> $routing_normalized */
+    $routing_normalized = function_exists('poke_hub_get_form_variant_registry_routing_map')
+        ? poke_hub_get_form_variant_registry_routing_map()
+        : [];
+    /** @var array<string,string> $default_aliases */
+    $default_aliases = apply_filters(
+        'poke_hub_gm_variant_registry_slug_default_aliases_map',
+        [
+            'mega-x' => 'mega',
+            'mega-y' => 'mega',
+        ]
+    );
+    $defaults_normalized = [];
+    foreach ((array) $default_aliases as $dk => $dv) {
+        $gk = sanitize_title((string) $dk);
+        $gv = sanitize_title((string) $dv);
+        if ($gk !== '' && $gv !== '' && $gk !== $gv) {
+            $defaults_normalized[$gk] = $gv;
+        }
+    }
+    ksort($defaults_normalized);
+    $revision_payload = wp_json_encode(
+        ['d' => $defaults_normalized, 'r' => $routing_normalized]
+    );
+    $new_rev          = md5(is_string($revision_payload) ? $revision_payload : '');
 
-    $new_rev = md5($text);
     if ($new_rev !== $revision) {
-        $parsed = poke_hub_parse_gm_variant_registry_slug_aliases_lines($text);
+        /** @var array<string,string> $parsed Routage après défaut ; une clef commune est écrasée par le routage admin. */
+        $parsed = array_merge($defaults_normalized, $routing_normalized);
         /** @var array<string,string> $filtered */
         $filtered   = apply_filters('poke_hub_gm_variant_registry_slug_aliases_map', $parsed);
         $normalized = [];
@@ -666,9 +731,10 @@ function poke_hub_resolve_gm_variant_registry_slug(
         return '';
     }
 
-    $map       = poke_hub_get_gm_variant_registry_slug_aliases_map();
-    $resolved  = isset($map[$granular_slug]) ? $map[$granular_slug] : $granular_slug;
-    $resolved  = sanitize_title((string) $resolved);
+    $map      = poke_hub_get_gm_variant_registry_slug_aliases_map();
+    $resolved = isset($map[$granular_slug]) ? (string) $map[$granular_slug] : $granular_slug;
+
+    $resolved = sanitize_title((string) $resolved);
     if ($resolved === '') {
         return $granular_slug;
     }
@@ -697,8 +763,9 @@ function poke_hub_resolve_gm_variant_registry_slug(
  * @param array  $extra_data  Données additionnelles stockées dans extra (fusionnées avec l’existant)
  * @param int    $variant_id  Si > 0 (édition admin), charge la ligne par id pour permettre de changer form_slug sans créer une nouvelle ligne.
  * @param bool   $enforce_suppressed_slug_guard Si faux (sauvegarde admin), autorise INSERT même si ce slug est dans la liste post-suppression.
- * @param string|null $gm_import_granular_slug_for_suppress Import GM uniquement : slug granular (tel que normalisé depuis le GM)
- *                                                           pour tester la liste des slugs supprimés, si différent du form_slug registre après alias.
+ * @param string|null $gm_import_granular_slug_for_suppress Import GM : slug granular (GM) ; conservé pour compat API / extra.
+ *                                                           La garde « slugs supprimés » ne teste que le slug registre ($form_slug), pas ce paramètre,
+ *                                                           pour permettre les alias (ex. flying-02→flying) après suppression d’anciennes lignes granulaires.
  *
  * Si `extra.manual_variant_label` est vrai pour une ligne existante, la colonne label n’est pas remplacée par ce paramètre (import GM).
  *
@@ -769,11 +836,8 @@ function poke_hub_pokemon_upsert_form_variant(
         }
     }
 
-    $suppress_check_slug = $form_slug;
-    if ($gm_import_granular_slug_for_suppress !== null && $gm_import_granular_slug_for_suppress !== '') {
-        $suppress_check_slug = sanitize_title(trim($gm_import_granular_slug_for_suppress));
-    }
-    $suppress_slug = $enforce_suppressed_slug_guard && !$row && in_array($suppress_check_slug, poke_hub_get_gm_suppressed_form_slugs(), true);
+    // Ne comparer qu’au slug de la ligne registre : une entrée supprimée « flying-02 » ne doit pas empêcher l’INSERT de « flying » (alias).
+    $suppress_slug = $enforce_suppressed_slug_guard && !$row && in_array($form_slug, poke_hub_get_gm_suppressed_form_slugs(), true);
     if ($suppress_slug) {
         return 0;
     }

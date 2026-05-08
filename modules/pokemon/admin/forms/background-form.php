@@ -26,6 +26,12 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
     if (function_exists('poke_hub_ensure_background_pokemon_link_unique_index')) {
         poke_hub_ensure_background_pokemon_link_unique_index();
     }
+    if (function_exists('poke_hub_ensure_background_link_exclusive_pairing_column')) {
+        poke_hub_ensure_background_link_exclusive_pairing_column();
+    }
+    if (function_exists('poke_hub_ensure_background_exists_only_with_costume_column')) {
+        poke_hub_ensure_background_exists_only_with_costume_column();
+    }
 
     global $wpdb;
 
@@ -37,6 +43,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
     $name_en = '';
     $slug = '';
     $background_type = defined('POKE_HUB_BACKGROUND_TYPE_SPECIAL') ? POKE_HUB_BACKGROUND_TYPE_SPECIAL : 'special';
+    $exists_only_with_costume = false;
     $image_url = '';
     $current_events = [];
     $current_pokemon_ids = [];
@@ -45,6 +52,9 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
     $current_shadow_ids = [];
     $current_dynamax_ids = [];
     $current_gigantamax_ids = [];
+    $current_exclusive_pairing_base_ids = [];
+    $current_pokemon_only_with_bg_base_ids = [];
+    $current_background_costume_only_base_ids = [];
 
     if ($is_edit) {
         $title = isset($edit_row->title) ? (string) $edit_row->title : '';
@@ -54,6 +64,7 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         if (isset($edit_row->background_type) && (string) $edit_row->background_type !== '') {
             $background_type = (string) $edit_row->background_type;
         }
+        $exists_only_with_costume = isset($edit_row->exists_only_with_costume) && (int) $edit_row->exists_only_with_costume === 1;
 
         // Événements associés (plusieurs par fond)
         if (function_exists('poke_hub_get_background_events')) {
@@ -72,7 +83,11 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
         if ($links_table) {
             $link_rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT pokemon_id, is_shiny_locked, link_kind FROM {$links_table} WHERE background_id = %d",
+                    "SELECT pokemon_id, is_shiny_locked, link_kind,
+                            COALESCE(exclusive_pairing, 0) AS exclusive_pairing,
+                            COALESCE(pokemon_only_with_this_background, 0) AS pokemon_only_with_this_background,
+                            COALESCE(background_costume_only, 0) AS background_costume_only
+                     FROM {$links_table} WHERE background_id = %d",
                     (int) $edit_row->id
                 )
             );
@@ -92,6 +107,15 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                             $current_shiny_locked_ids[] = $pid;
                         } else {
                             $current_shiny_active_ids[] = $pid;
+                        }
+                        if (!empty($ln->exclusive_pairing) && (int) $ln->exclusive_pairing === 1) {
+                            $current_exclusive_pairing_base_ids[] = $pid;
+                        }
+                        if (!empty($ln->pokemon_only_with_this_background) && (int) $ln->pokemon_only_with_this_background === 1) {
+                            $current_pokemon_only_with_bg_base_ids[] = $pid;
+                        }
+                        if (!empty($ln->background_costume_only) && (int) $ln->background_costume_only === 1) {
+                            $current_background_costume_only_base_ids[] = $pid;
                         }
                     } elseif ($k === $link_sh) {
                         $current_shadow_ids[] = $pid;
@@ -137,7 +161,10 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                             $current_shiny_locked_ids,
                             $current_dynamax_ids,
                             $current_gigantamax_ids,
-                            $current_shadow_ids
+                            $current_shadow_ids,
+                            $current_exclusive_pairing_base_ids,
+                            $current_pokemon_only_with_bg_base_ids,
+                            $current_background_costume_only_base_ids
                         )
                     ),
                     static function ( int $x ): bool {
@@ -226,6 +253,17 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                                 <?php endforeach; ?>
                             </select>
                             <p class="description"><?php esc_html_e('Location or special (event/theme).', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin-lab-form-row" style="margin-top: 0.75em;">
+                    <div class="admin-lab-form-col" style="flex: 1;">
+                        <div class="admin-lab-form-group">
+                            <label style="display: flex; align-items: flex-start; gap: 8px;">
+                                <input type="checkbox" name="exists_only_with_costume" value="1" <?php checked($exists_only_with_costume); ?> style="margin-top: 3px;" />
+                                <span><?php esc_html_e('This background only exists in a costumed Pokémon context', 'poke-hub'); ?></span>
+                            </label>
+                            <p class="description"><?php esc_html_e('Check when this asset is not used as a generic location/theme backdrop—only with costumed (event) Pokémon. Reciprocal of marking a Pokémon as only existing with a GO background.', 'poke-hub'); ?></p>
                         </div>
                     </div>
                 </div>
@@ -357,6 +395,85 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
                         </div>
                     </div>
                 </div>
+                <div class="admin-lab-form-row" style="margin-top: 1em;">
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
+                        <div class="admin-lab-form-group">
+                            <label for="exclusive_pairing_base_ids"><?php esc_html_e('Exclusive pairing (classic Pokémon)', 'poke-hub'); ?></label>
+                            <select name="exclusive_pairing_base_ids[]" id="exclusive_pairing_base_ids" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                                <?php if (!empty($all_pokemon)) : ?>
+                                    <?php foreach ($all_pokemon as $pokemon) : ?>
+                                        <?php
+                                        $p_id = (int) $pokemon->id;
+                                        $p_dex = (int) $pokemon->dex_number;
+                                        $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                        $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                        ?>
+                                        <option value="<?php echo $p_id; ?>"
+                                                data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                                data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                                data-label="<?php echo esc_attr($label); ?>"
+                                                <?php selected(in_array($p_id, $current_exclusive_pairing_base_ids, true)); ?>>
+                                            <?php echo $label; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Mark Pokémon for whom this background asset does not exist without that Pokémon (event illustration tied to one species). Must be a subset of classic lists above; pairs with the Pokémon checkbox « only exists with a GO background ».', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin-lab-form-row" style="margin-top: 1em;">
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
+                        <div class="admin-lab-form-group">
+                            <label for="pokemon_only_with_this_background_base_ids"><?php esc_html_e('Only exists with this background (classic Pokémon)', 'poke-hub'); ?></label>
+                            <select name="pokemon_only_with_this_background_base_ids[]" id="pokemon_only_with_this_background_base_ids" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                                <?php if (!empty($all_pokemon)) : ?>
+                                    <?php foreach ($all_pokemon as $pokemon) : ?>
+                                        <?php
+                                        $p_id = (int) $pokemon->id;
+                                        $p_dex = (int) $pokemon->dex_number;
+                                        $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                        $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                        ?>
+                                        <option value="<?php echo $p_id; ?>"
+                                                data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                                data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                                data-label="<?php echo esc_attr($label); ?>"
+                                                <?php selected(in_array($p_id, $current_pokemon_only_with_bg_base_ids, true)); ?>>
+                                            <?php echo $label; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Stored on the link row: this species only appears in-game with this background asset. Same flag as the Pokémon form checkbox, editable from either screen.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                    <div class="admin-lab-form-col" style="flex: 1; min-width: 0;">
+                        <div class="admin-lab-form-group">
+                            <label for="background_costume_only_base_ids"><?php esc_html_e('Costume-only pairing (classic Pokémon)', 'poke-hub'); ?></label>
+                            <select name="background_costume_only_base_ids[]" id="background_costume_only_base_ids" class="pokehub-pokemon-select" multiple="multiple" style="width:100%;">
+                                <?php if (!empty($all_pokemon)) : ?>
+                                    <?php foreach ($all_pokemon as $pokemon) : ?>
+                                        <?php
+                                        $p_id = (int) $pokemon->id;
+                                        $p_dex = (int) $pokemon->dex_number;
+                                        $p_name = !empty($pokemon->name_fr) ? $pokemon->name_fr : $pokemon->name_en;
+                                        $label = sprintf('#%03d %s', $p_dex, esc_html($p_name));
+                                        ?>
+                                        <option value="<?php echo $p_id; ?>"
+                                                data-name-fr="<?php echo esc_attr(!empty($pokemon->name_fr) ? $pokemon->name_fr : ''); ?>"
+                                                data-name-en="<?php echo esc_attr(!empty($pokemon->name_en) ? $pokemon->name_en : ''); ?>"
+                                                data-label="<?php echo esc_attr($label); ?>"
+                                                <?php selected(in_array($p_id, $current_background_costume_only_base_ids, true)); ?>>
+                                            <?php echo $label; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Per-link complement to « exists only with costume » on the background: mark classic rows where this pairing is costume-only.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
                 <h4 style="margin-top:1.25em;"><?php esc_html_e('Variant displays (Dynamax / Gigantamax / Shadow)', 'poke-hub'); ?></h4>
                 <p class="description" style="margin-bottom:10px;"><?php esc_html_e('Filtered Pokédex lists. First row: Dynamax and Gigantamax side by side. Second row: Shadow (obscur) on full width.', 'poke-hub'); ?></p>
                 <style>
@@ -471,6 +588,9 @@ function poke_hub_pokemon_backgrounds_edit_form($edit_row = null) {
             var s2 = { allowClear: true, width: '100%', matcher: matcherFn };
             $('#pokemon_ids_shiny_active').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Pokémon (shiny active)...', 'poke-hub')); ?>' }, s2));
             $('#shiny_locked_ids').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Pokémon (shiny locked)...', 'poke-hub')); ?>' }, s2));
+            $('#exclusive_pairing_base_ids').select2($.extend({ placeholder: '<?php echo esc_js(__('Exclusive pairing (subset of classic)…', 'poke-hub')); ?>' }, s2));
+            $('#pokemon_only_with_this_background_base_ids').select2($.extend({ placeholder: '<?php echo esc_js(__('Only with this background (classic)…', 'poke-hub')); ?>' }, s2));
+            $('#background_costume_only_base_ids').select2($.extend({ placeholder: '<?php echo esc_js(__('Costume-only pairing (classic)…', 'poke-hub')); ?>' }, s2));
             $('#pokemon_ids_dynamax').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Dynamax Pokémon...', 'poke-hub')); ?>' }, s2));
             $('#pokemon_ids_gigantamax').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Gigantamax Pokémon...', 'poke-hub')); ?>' }, s2));
             $('#pokemon_ids_shadow').select2($.extend({ placeholder: '<?php echo esc_js(__('Search Shadow Pokémon...', 'poke-hub')); ?>' }, s2));

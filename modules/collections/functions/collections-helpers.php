@@ -128,6 +128,15 @@ function poke_hub_collections_get_owner_key_from_cookie(string $share_token): st
 }
 
 /**
+ * Indique si une ligne collection est publique (colonne SQL is_public = 1).
+ *
+ * @param array<string,mixed> $row
+ */
+function poke_hub_collections_row_is_public(array $row): bool {
+    return array_key_exists('is_public', $row) && (int) $row['is_public'] === 1;
+}
+
+/**
  * Génère un jeton aléatoire unique pour le partage (alphanumérique, 14 caractères).
  *
  * @return string
@@ -178,6 +187,7 @@ function poke_hub_collections_get_categories(): array {
         'purified'        => __('Purified', 'poke-hub'),
         'gigantamax'     => __('Gigantamax', 'poke-hub'),
         'dynamax'        => __('Dynamax', 'poke-hub'),
+        'mega'           => __('Mega & Primal', 'poke-hub'),
         'legendary_mythical_ultra' => __('Legendary, Mythical & Ultra Beasts (preset)', 'poke-hub'),
         'custom'         => __('Custom list', 'poke-hub'),
     ];
@@ -193,6 +203,7 @@ function poke_hub_collections_get_specific_categories(): array {
     return [
         'gigantamax',
         'dynamax',
+        'mega',
         'costume',
         'costume_shiny',
         'shadow',
@@ -234,7 +245,7 @@ function poke_hub_collections_settings_hidden_control_keys(string $category): ar
         $h[] = 'include_baby_pokemon';
         $h[] = 'pool_option_baby';
         $h[] = 'pool_option_special_all';
-    } elseif (in_array($cat, [ 'gigantamax', 'dynamax' ], true)) {
+    } elseif (in_array($cat, [ 'gigantamax', 'dynamax', 'mega' ], true)) {
         $h[] = 'include_baby_pokemon';
         $h[] = 'pool_option_baby';
     } elseif (in_array($cat, [ 'costume', 'costume_shiny' ], true)) {
@@ -254,6 +265,9 @@ function poke_hub_collections_settings_hidden_control_keys(string $category): ar
     }
     if ($cat === 'dynamax') {
         $h[] = 'include_dynamax';
+    }
+    if ($cat === 'mega') {
+        $h[] = 'include_mega';
     }
 
     return array_values(array_unique(apply_filters('poke_hub_collections_settings_hidden_control_keys', $h, $cat)));
@@ -315,7 +329,8 @@ function poke_hub_collections_visual_variant_base_stub_keep_dex_numbers(): array
  * SQL : aucune ligne « significative » du même № ne prolonge le slug avec un tiret (Kyurem, Giratina…).
  * N’inclut pas : costumes / clones, ni variantes régionales (Raichu d’Alola ne doit pas faire disparaître Raichu de base…).
  *
- * Les motifs régionaux sont alignés sur {@see poke_hub_collections_regional_form_variant_slug_tokens()} et le bloc regional_row_match.
+ * Régional GO ≠ forme régionale jeu : exclusions basées sur slug Alola/Galar (variantes différentes, souvent monde entier).
+ * Spawn géographique : {@see poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex} et extra.regional sur la ligne p.
  */
 function poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex(string $pokemon_table, string $form_variants_table, string $p_alias): string {
     $p_alias = preg_match('/^[a-z0-9_]+$/i', $p_alias) ? $p_alias : 'p';
@@ -340,7 +355,10 @@ function poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex(string $po
               )
           )
           AND NOT (
-              LOWER(TRIM(COALESCE(fv_blk.category, \'\'))) = \'regional\'
+              (
+                  p_hyp_ext.extra IS NOT NULL
+                  AND p_hyp_ext.extra LIKE \'%"regional":{"is_regional":true%\'
+              )
               OR (
                   fv_blk.form_slug IS NOT NULL AND TRIM(fv_blk.form_slug) <> \'\'
                   AND LOWER(TRIM(fv_blk.form_slug)) IN (\'alola\', \'alolan\', \'galar\', \'galarian\', \'hisui\', \'hisuian\', \'paldea\', \'paldean\')
@@ -350,13 +368,6 @@ function poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex(string $po
               )
               OR (
                   fv_blk.form_slug IS NOT NULL AND LOWER(fv_blk.form_slug) REGEXP \'[-_](alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean)([._-].*)?$\'
-              )
-              OR (
-                  fv_blk.extra IS NOT NULL AND fv_blk.extra != \'\'
-                  AND LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(fv_blk.extra, \'$.form_type\')), \'\'))) = \'regional\'
-              )
-              OR (
-                  fv_blk.extra IS NOT NULL AND fv_blk.extra LIKE \'%"form_type":"regional"%\'
               )
               OR (
                   p_hyp_ext.slug IS NOT NULL AND TRIM(p_hyp_ext.slug) <> \'\'
@@ -745,7 +756,146 @@ function poke_hub_collections_default_options(): array {
  * @return string[]
  */
 function poke_hub_collections_pool_show_only_allowed(): array {
-    return ['', 'final', 'baby', 'special_all', 'legendary', 'mythical', 'ultra_beast', 'special_attacks'];
+    return [
+        '',
+        'final',
+        'baby',
+        'special_all',
+        'legendary',
+        'mythical',
+        'ultra_beast',
+        'special_attacks',
+        'costume_events',
+        'mega_only',
+        'gigamax_only',
+        'backgrounds_only',
+    ];
+}
+
+/**
+ * Restrictions « pool_show_only » autorisées une fois la catégorie de liste connue
+ * (les listes « spécifiques » mono-type n’utilisent pas les filtres Légendaire / bébés, etc.).
+ *
+ * @return string[]
+ */
+function poke_hub_collections_pool_show_only_allowed_for_saved_category(string $category): array {
+    $category = sanitize_key($category);
+    if ($category === 'legendary_mythical_ultra') {
+        return [''];
+    }
+    if (poke_hub_collections_category_is_specific($category)) {
+        // backgrounds_only : lignes synthétiques GO non injectées pour les catégories spécifiques → option inutile / pool vide.
+        return array_merge(
+            [''],
+            ['costume_events', 'mega_only', 'gigamax_only']
+        );
+    }
+
+    return poke_hub_collections_pool_show_only_allowed();
+}
+
+/**
+ * Listes mono-type ou pool restreint ({@see poke_hub_collections_normalize_pool_show_only}) :
+ * pas de repli / injection PHP des lignes *-family* « switch battle » hors SQL, ni de collapse Aegislash / Mimikyu / Morpeko
+ * (sinon cartes costumes disparaissent au profit d’un *-family*, ou famille injectée alors que la requête cible Méga/Giga/etc.).
+ *
+ * @param array<string, mixed> $opts Options pool (pour `pool_show_only`)
+ */
+function poke_hub_collections_pool_suppress_switch_battle_placeholder_pipeline(string $category, array $opts): bool {
+    if (poke_hub_collections_category_is_specific($category)) {
+        return true;
+    }
+
+    return poke_hub_collections_normalize_pool_show_only($opts) !== '';
+}
+
+/**
+ * true si extra JSON indique un costumé / variante « événement » (flag ou template GO *_copy).
+ */
+function poke_hub_collections_pool_row_extra_has_event_costume_signal(string $extra): bool {
+    if ($extra === '') {
+        return false;
+    }
+    if (strpos($extra, '"is_event_costumed":true') !== false || strpos($extra, '"is_event_costumed": true') !== false) {
+        return true;
+    }
+
+    return (bool) preg_match('/"template_id"\s*:\s*"[^"]*_copy[^"]*"/i', $extra);
+}
+
+/**
+ * Pour les fiches « uniquement avec fond », assure background_image_url lorsque les tuiles synthétiques sont désactivées.
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_collections_pool_fill_background_image_for_exists_only_rows(array $rows, string $category, array $opts): array {
+    if ($rows === []) {
+        return $rows;
+    }
+    $only_shiny_active = in_array($category, ['shiny', 'costume_shiny', 'background_shiny', 'background_shiny_special', 'background_shiny_places'], true)
+        || ($category === 'custom' && !empty($opts['only_shiny']));
+    foreach ($rows as &$row) {
+        if (empty($row['exists_only_with_go_background_pool'])) {
+            continue;
+        }
+        if (!empty($row['synthetic_go_background'])) {
+            continue;
+        }
+        $u = isset($row['background_image_url']) ? trim((string) $row['background_image_url']) : '';
+        if ($u !== '') {
+            continue;
+        }
+        if (!function_exists('poke_hub_collections_get_background_image_url_for_pool_row')) {
+            continue;
+        }
+        $row['background_image_url'] = poke_hub_collections_get_background_image_url_for_pool_row($row, $category, $only_shiny_active);
+    }
+    unset($row);
+
+    return $rows;
+}
+
+/**
+ * Ligne correspondant au filtre « costume / événements uniquement » (clone Copy, ou signaux événement dans extra déjà projetés sur la ligne).
+ */
+function poke_hub_collections_row_matches_pool_costume_events_only(array $row): bool {
+    $fc = strtolower(trim((string) ($row['form_category'] ?? '')));
+    if ($fc === 'clone') {
+        return true;
+    }
+
+    return ! empty($row['is_event_costumed_pool']);
+}
+
+/**
+ * Méga / Primo (catégorie `mega` ou indices dans slug).
+ */
+function poke_hub_collections_row_is_pool_mega_form_variant(array $row): bool {
+    $fc = strtolower(trim((string) ($row['form_category'] ?? '')));
+    if (in_array($fc, ['mega', 'primal'], true)) {
+        return true;
+    }
+    $slug   = strtolower(trim((string) ($row['form_slug'] ?? '')));
+    $slug_p = strtolower(trim((string) ($row['slug'] ?? '')));
+    $hay    = $slug !== '' ? $slug : $slug_p;
+    if ($hay === '') {
+        return false;
+    }
+    if (strpos($hay, 'primal') !== false) {
+        return true;
+    }
+
+    return (bool) preg_match('/(^|[^a-z])mega([^a-z]|$)/', $hay);
+}
+
+function poke_hub_collections_row_is_pool_gigantamax_form(array $row): bool {
+    if (! empty($row['synthetic_gigantamax'])) {
+        return true;
+    }
+
+    return function_exists('poke_hub_collections_gigantamax_row_is_real_form')
+        && poke_hub_collections_gigantamax_row_is_real_form($row);
 }
 
 /**
@@ -756,7 +906,13 @@ function poke_hub_collections_pool_show_only_allowed(): array {
 function poke_hub_collections_normalize_pool_show_only(array $opts): string {
     $raw = isset($opts['pool_show_only']) ? (string) $opts['pool_show_only'] : '';
     $raw = sanitize_key($raw);
-    if (in_array($raw, ['final', 'baby', 'special_all', 'legendary', 'mythical', 'ultra_beast', 'special_attacks'], true)) {
+    $allowed = array_filter(
+        poke_hub_collections_pool_show_only_allowed(),
+        static function ($v) {
+            return $v !== '';
+        }
+    );
+    if (in_array($raw, $allowed, true)) {
         return $raw;
     }
     if (!empty($opts['only_final_evolution'])) {
@@ -1255,13 +1411,13 @@ function poke_hub_collections_row_passes_pool_release_filter(array $row, string 
 function poke_hub_collections_pogo_regional_slug_suffixes(): array {
     return [
         'alola', 'alolan', 'galar', 'galarian', 'paldea', 'paldean', 'hisui', 'hisuian',
-        'mega', 'megax', 'primal', 'gigantamax', 'gigamax', 'dynamax',
+        'mega', 'primal', 'gigantamax', 'gigamax', 'dynamax',
     ];
 }
 
 /**
- * Slugs de variante (table pokemon_form_variants.form_slug) correspondant à des formes régionales GO.
- * Aligné sur {@see poke_hub_pokemon_guess_form_type_from_gm()} (ALOLA, GALAR, HISUI, PALDEA) et noms d’import courants.
+ * Slugs de variantes « type jeu » (Alola/Galar/Hisui/Paldea).
+ * Pour le pool collections « régionaux GO » (zones pays), ces jetons ne sont plus utilisés : voir régional_row_match (extra Pokémon).
  *
  * @return list<string> slugs en minuscules
  */
@@ -1340,13 +1496,12 @@ function poke_hub_collections_pogo_strip_regional_collapsed(string $s): string {
 
 /**
  * Clé de groupe de recherche GO pour les formes régionales (ligne « alola& », « galar& », etc.).
- * Basé sur le slug (pas sur la catégorie seule) pour ne pas mélanger avec des noms d’espèce
- * (ex. pas de « mega » dans le nom d’une espèce reclassée à tort en Méga côté JS).
+ * Slug espèce+forme (Alola/Galar…) et, pour les régionaux « GO » sans ce suffixe, extra.regional.is_regional sur la ligne Pokémon.
+ * La catégorie pokemon_form_variants n’est pas utilisée (variante partagée type couleur).
  *
  * @return string '' | 'alola' | 'galar' | 'paldea' | 'hisui' | 'other'
  */
 function poke_hub_collections_pogo_regional_key_from_row( array $row ): string {
-    $cat  = strtolower( trim( (string) ( $row['form_category'] ?? '' ) ) );
     $slug = strtolower( trim( (string) ( $row['form_slug'] ?? '' ) . ' ' . (string) ( $row['slug'] ?? '' ) ) );
     if ( $slug === '' ) {
         return '';
@@ -1363,7 +1518,8 @@ function poke_hub_collections_pogo_regional_key_from_row( array $row ): string {
     if ( false !== strpos( $slug, 'hisui' ) || false !== strpos( $slug, 'hisuian' ) ) {
         return 'hisui';
     }
-    if ( $cat === 'regional' ) {
+    $extra = isset( $row['extra'] ) ? (string) $row['extra'] : '';
+    if ( $extra !== '' && strpos( $extra, '"regional":{"is_regional":true' ) !== false ) {
         return 'other';
     }
 
@@ -1625,10 +1781,15 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     }
     $opts = poke_hub_collections_derive_gender_symbol_option($opts);
     $pool_show_only = poke_hub_collections_normalize_pool_show_only($opts);
+    $suppress_switch_battle_placeholders = poke_hub_collections_pool_suppress_switch_battle_placeholder_pipeline($category, $opts);
     $opts['only_final_evolution']      = ($pool_show_only === 'final');
     $opts['only_special_species_pool'] = ($pool_show_only === 'special_all');
     if (array_key_exists('exclude_mega', $options) && !array_key_exists('include_mega', $options)) {
         $opts['include_mega'] = empty($options['exclude_mega']);
+    }
+    if ($category === 'mega') {
+        /* Liste Méga Primo : le filtre de dates doit accepter release.normal OU release.mega (comme une liste catalogue « normale » avec Méga incluses), pas release.mega seul — sinon tout disparaît si la clé mega est vide. */
+        $opts['include_mega'] = true;
     }
     $where = ['1 = 1'];
 
@@ -1670,6 +1831,19 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             break;
         case 'dynamax':
             $where[] = "(fv.category = 'dynamax' OR fv.form_slug LIKE '%dynamax%' OR fv.form_slug = 'normal')";
+            break;
+        case 'mega':
+            $where[] = "(
+                LOWER(TRIM(COALESCE(fv.category, ''))) IN ('mega', 'primal')
+                OR (
+                    fv.form_slug IS NOT NULL AND TRIM(fv.form_slug) <> ''
+                    AND (
+                        LOWER(TRIM(fv.form_slug)) = 'mega'
+                        OR LOWER(TRIM(fv.form_slug)) LIKE 'mega-%'
+                        OR LOWER(TRIM(fv.form_slug)) LIKE 'primal%'
+                    )
+                )
+            )";
             break;
         case 'background':
             $links_table = pokehub_get_table('pokemon_background_pokemon_links');
@@ -1793,31 +1967,13 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         )
     )";
 
-    $tok_reg   = poke_hub_collections_regional_form_variant_slug_tokens();
-    $in_ph_reg = implode(',', array_fill(0, count($tok_reg), '%s'));
-    $re_reg1   = '^(alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean)(-[0-9]+)?$';
-    $re_reg2   = '[-_](alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean)([._-].*)?$';
-    $re_p_slug = '[-_](alola|alolan|galar|galarian|paldea|paldean|hisui|hisuian)(_[0-9]+)?$';
+    // Régional GO uniquement (disponibilité par pays / zones), aligné sur l’import Game Master :
+    // extra.regional.is_regional sur la ligne pokemon. Pas les formes Alola/Galar/etc. — elles sont « régionales »
+    // dans les jeux de la série mais en général pas verrouillées géographiquement dans GO.
+    $like_p_extra_regional = '%' . $wpdb->esc_like('"regional":{"is_regional":true') . '%';
     $regional_row_match = $wpdb->prepare(
-        "(
-  (
-    fv.id IS NOT NULL
-    AND (
-      LOWER(TRIM(COALESCE(fv.category, ''))) = 'regional'
-      OR (fv.form_slug IS NOT NULL AND TRIM(fv.form_slug) != '' AND LOWER(TRIM(fv.form_slug)) IN ({$in_ph_reg}))
-      OR (fv.form_slug IS NOT NULL AND LOWER(fv.form_slug) REGEXP %s)
-      OR (fv.form_slug IS NOT NULL AND LOWER(fv.form_slug) REGEXP %s)
-      OR (fv.extra IS NOT NULL AND fv.extra != '' AND LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(fv.extra, '$.form_type')), ''))) = 'regional')
-    )
-  )
-  OR (fv.extra IS NOT NULL AND fv.extra LIKE %s)
-  OR (
-    p.slug IS NOT NULL
-    AND TRIM(p.slug) != ''
-    AND LOWER(p.slug) REGEXP %s
-  )
-)",
-        array_merge($tok_reg, [ $re_reg1, $re_reg2, '%"form_type":"regional"%', $re_p_slug ] )
+        '(p.extra IS NOT NULL AND TRIM(COALESCE(p.extra, \'\')) != \'\' AND p.extra LIKE %s)',
+        $like_p_extra_regional
     );
     if ( $regional_row_match === false ) {
         $regional_row_match = '(0)';
@@ -1922,7 +2078,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             $one_per_disjuncts[] = "({$regional_row_match})";
         }
         if ( !empty($opts['include_mega']) ) {
-            $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('mega', 'megax', 'primal'))";
+            $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('mega', 'primal'))";
         }
         if ( !empty($opts['include_gigantamax']) ) {
             $one_per_disjuncts[] = "(
@@ -1959,6 +2115,58 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         $one_per_disjuncts[] = "(
             LOWER(TRIM(COALESCE(p.slug, ''))) LIKE 'nidoran-%'
             AND LOWER(TRIM(COALESCE(p.slug, ''))) NOT LIKE '%-family'
+        )";
+
+        /* Familles *-family* avec binôme ♀♂ en slugs ({tige}+{tige-female}, {tige-male}+{tige-female}, {tige-male}+{tige}) :
+         * sans cette disjonction, seule la ligne *-family* ou is_default passe le filtre « une entrée / espèce ». */
+        $one_per_disjuncts[] = "(
+            EXISTS (
+                SELECT 1 FROM {$pt} p_bin_fam_row
+                WHERE p_bin_fam_row.dex_number = p.dex_number
+                  AND TRIM(IFNULL(p_bin_fam_row.slug, '')) != ''
+                  AND LOWER(TRIM(p_bin_fam_row.slug)) REGEXP '-family\$'
+            )
+            AND p.slug IS NOT NULL
+            AND TRIM(p.slug) != ''
+            AND (
+                LOWER(TRIM(p.slug)) REGEXP '-female\$'
+                OR LOWER(TRIM(p.slug)) REGEXP '-male\$'
+                OR (
+                    LOWER(TRIM(p.slug)) NOT REGEXP '-family\$'
+                    AND LOWER(TRIM(p.slug)) NOT REGEXP '-male\$'
+                    AND LOWER(TRIM(p.slug)) NOT REGEXP '-female\$'
+                    AND (
+                        (
+                            EXISTS (
+                                SELECT 1 FROM {$pt} p_bf_x
+                                WHERE p_bf_x.dex_number = p.dex_number
+                                  AND p_bf_x.slug IS NOT NULL AND TRIM(p_bf_x.slug) != ''
+                                  AND LOWER(TRIM(p_bf_x.slug)) = CONCAT(LOWER(TRIM(p.slug)), '-female')
+                            )
+                            AND NOT EXISTS (
+                                SELECT 1 FROM {$pt} p_bmx_y
+                                WHERE p_bmx_y.dex_number = p.dex_number
+                                  AND p_bmx_y.slug IS NOT NULL AND TRIM(p_bmx_y.slug) != ''
+                                  AND LOWER(TRIM(p_bmx_y.slug)) = CONCAT(LOWER(TRIM(p.slug)), '-male')
+                            )
+                        )
+                        OR (
+                            EXISTS (
+                                SELECT 1 FROM {$pt} p_bmy_z
+                                WHERE p_bmy_z.dex_number = p.dex_number
+                                  AND p_bmy_z.slug IS NOT NULL AND TRIM(p_bmy_z.slug) != ''
+                                  AND LOWER(TRIM(p_bmy_z.slug)) = CONCAT(LOWER(TRIM(p.slug)), '-male')
+                            )
+                            AND NOT EXISTS (
+                                SELECT 1 FROM {$pt} p_bfy_w
+                                WHERE p_bfy_w.dex_number = p.dex_number
+                                  AND p_bfy_w.slug IS NOT NULL AND TRIM(p_bfy_w.slug) != ''
+                                  AND LOWER(TRIM(p_bfy_w.slug)) = CONCAT(LOWER(TRIM(p.slug)), '-female')
+                            )
+                        )
+                    )
+                )
+            )
         )";
 
         // Forces « nature » (Inc./Toth.) : souvent special/switch_form en base, ou bien normal + slug suffixé (ex. *-incarnate) — sans ça seule *-family* reste.
@@ -2136,19 +2344,34 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         if (!empty($opts['include_costumes'])) {
             // rien
         } elseif (empty($opts['include_costumes'])) {
+            $pool_links_sem_table = pokehub_get_table('pokemon_background_pokemon_links');
+            $exists_only_link_clause = '(0)';
+            if (!empty($pool_links_sem_table)) {
+                $exists_only_link_clause = "EXISTS (
+                    SELECT 1 FROM {$pool_links_sem_table} l_ex
+                    WHERE l_ex.pokemon_id = p.id
+                      AND (l_ex.link_kind = 'base' OR l_ex.link_kind = '' OR l_ex.link_kind IS NULL)
+                      AND COALESCE(l_ex.pokemon_only_with_this_background, 0) = 1
+                )";
+            }
             // Exclure costumés + Copy clone (variante + flag extra + template_id type *_COPY_*).
-            // Mêmes règles que la catégorie « costume » / option include_costumes.
+            // Exception : liaison base avec pokemon_only_with_this_background — sinon disparition des deux filtres (costume / fond).
             $where[] = "(
-                LOWER(TRIM(COALESCE(fv.category, ''))) NOT IN ('costume', 'clone')
-                AND (p.extra IS NULL OR p.extra = '' OR (
-                    INSTR(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.template_id')), '')), '_copy') = 0
-                    AND p.extra NOT LIKE '%\"is_event_costumed\":true%'
-                    AND p.extra NOT LIKE '%\"is_event_costumed\": true%'
-                ))
+                (
+                    LOWER(TRIM(COALESCE(fv.category, ''))) NOT IN ('costume', 'clone')
+                    AND (p.extra IS NULL OR p.extra = '' OR (
+                        INSTR(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.template_id')), '')), '_copy') = 0
+                        AND p.extra NOT LIKE '%\"is_event_costumed\":true%'
+                        AND p.extra NOT LIKE '%\"is_event_costumed\": true%'
+                    ))
+                )
+                OR (
+                    {$exists_only_link_clause}
+                )
             )";
         }
         if (empty($opts['include_mega'])) {
-            $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category NOT IN ('mega', 'megax', 'primal'))";
+            $where[] = "(fv.category IS NULL OR fv.category = '' OR fv.category NOT IN ('mega', 'primal'))";
         }
         if (empty($opts['include_gigantamax'])) {
             $where[] = "(fv.category IS NULL OR fv.category = '' OR (fv.category != 'gigantamax' AND fv.form_slug NOT LIKE '%gigantamax%'))";
@@ -2198,6 +2421,10 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         case 'dynamax':
             $release_context = 'dynamax';
             break;
+        case 'mega':
+            // Comme le catalogue « général » avec Méga : normal et/ou mega dans extra.release (include_mega forcé plus haut).
+            $release_context = 'normal';
+            break;
         case 'perfect_4':
         case 'costume':
         case 'background':
@@ -2218,12 +2445,23 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         ? "COALESCE(g.generation_number, 999) ASC,"
         : "p.generation_id ASC,";
 
+    $pool_links_sem = pokehub_get_table('pokemon_background_pokemon_links');
+    $sem_select     = ', 0 AS exists_only_link_semantics';
+    if (!empty($pool_links_sem)) {
+        $sem_select = ", EXISTS (
+            SELECT 1 FROM {$pool_links_sem} l_pool_sem
+            WHERE l_pool_sem.pokemon_id = p.id
+              AND (l_pool_sem.link_kind = 'base' OR l_pool_sem.link_kind = '' OR l_pool_sem.link_kind IS NULL)
+              AND COALESCE(l_pool_sem.pokemon_only_with_this_background, 0) = 1
+        ) AS exists_only_link_semantics";
+    }
+
     $sql = "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
                    TRIM(BOTH ' ' FROM COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.form_proto')), '')) AS gm_form_proto,
                    COALESCE(fv.label, fv.form_slug, '') AS form_label,
                    COALESCE(fv.form_slug, '') AS form_slug,
                    COALESCE(fv.category, 'normal') AS form_category,
-                   {$gen_select}
+                   {$gen_select}{$sem_select}
             FROM {$pokemon_table} p
             LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
             {$gen_join}
@@ -2254,6 +2492,10 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         } else {
             $row['species_special_group'] = '';
         }
+        $extra_raw = isset($row['extra']) && is_string($row['extra']) ? $row['extra'] : '';
+        $row['is_event_costumed_pool'] = poke_hub_collections_pool_row_extra_has_event_costume_signal($extra_raw);
+        $row['exists_only_with_go_background_pool'] = !empty($row['exists_only_link_semantics']) && (int) $row['exists_only_link_semantics'] === 1;
+        unset($row['exists_only_link_semantics']);
         unset($row['extra']);
         $filtered[] = $row;
     }
@@ -2340,6 +2582,33 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                     }
                 )
             );
+        } elseif ($pool_show_only === 'costume_events') {
+            $results = array_values(
+                array_filter(
+                    $results,
+                    static function (array $row) {
+                        return poke_hub_collections_row_matches_pool_costume_events_only($row);
+                    }
+                )
+            );
+        } elseif ($pool_show_only === 'mega_only') {
+            $results = array_values(
+                array_filter(
+                    $results,
+                    static function (array $row) {
+                        return poke_hub_collections_row_is_pool_mega_form_variant($row);
+                    }
+                )
+            );
+        } elseif ($pool_show_only === 'gigamax_only') {
+            $results = array_values(
+                array_filter(
+                    $results,
+                    static function (array $row) {
+                        return poke_hub_collections_row_is_pool_gigantamax_form($row);
+                    }
+                )
+            );
         }
         // special_attacks : pas encore de signal fiable sur les lignes pool — aucun filtre additionnel.
     }
@@ -2399,15 +2668,21 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 
     if ($results !== []) {
         if (empty($opts['one_per_species'])) {
-            $results = poke_hub_collections_collapse_switch_battle_style_species_for_all_forms_pool($results);
+            if (! $suppress_switch_battle_placeholders) {
+                $results = poke_hub_collections_collapse_switch_battle_style_species_for_all_forms_pool($results);
+            }
         } else {
             $results = poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool($results);
         }
         $results = poke_hub_collections_collapse_exclusive_binary_sex_pair_rows($results, $opts);
-        $results = poke_hub_collections_append_switch_battle_family_anchor_rows($results);
+        if (! $suppress_switch_battle_placeholders) {
+            $results = poke_hub_collections_append_switch_battle_family_anchor_rows($results);
+        }
     }
     if (! empty($opts['one_per_species'])) {
-        $results = poke_hub_collections_append_switch_form_family_placeholder_one_per_species(is_array($results) ? $results : []);
+        if (! $suppress_switch_battle_placeholders) {
+            $results = poke_hub_collections_append_switch_form_family_placeholder_one_per_species(is_array($results) ? $results : []);
+        }
         $results = poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists($results);
     }
 
@@ -2415,8 +2690,24 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         $results = poke_hub_collections_apply_sex_collector_pool($results, $opts);
     }
 
+    if ($results !== []) {
+        // Familles slug *-family* + *-male* / *-female* : aligner sur le comportement « dimorphisme » en collection.
+        $results = poke_hub_collections_normalize_slug_exclusive_binary_family_dimorphism_rows($results, $opts);
+    }
+
     if (!empty($opts['include_backgrounds']) && $results !== []) {
         $results = poke_hub_collections_apply_synthetic_go_background_pool($results, $category, $opts);
+    }
+
+    if ($results !== [] && $pool_show_only === 'backgrounds_only') {
+        $results = array_values(
+            array_filter(
+                $results,
+                static function (array $row) {
+                    return ! empty($row['synthetic_go_background']);
+                }
+            )
+        );
     }
 
     if ($category === 'custom' && !empty($opts['only_shiny']) && function_exists('pokehub_pokemon_can_be_shiny') && $results !== []) {
@@ -2454,6 +2745,10 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             }
         }
         unset( $r );
+    }
+
+    if ($results !== []) {
+        $results = poke_hub_collections_pool_fill_background_image_for_exists_only_rows($results, $category, $opts);
     }
 
     if ( $results !== [] ) {
@@ -3583,6 +3878,11 @@ function poke_hub_collections_public_view_url(array $collection): string {
         return '';
     }
 
+    // Permaliens « simples » (?p=ID / ?page_id=ID) : impossible d’appendre /TOKEN ; utiliser ?c= (voir shortcodes).
+    if (strpos((string) $base, '?') !== false) {
+        return add_query_arg('c', $tok, $base);
+    }
+
     return rtrim((string) $base, '/') . '/' . $tok;
 }
 
@@ -3789,6 +4089,16 @@ function poke_hub_collections_options_align_with_category(array $options, string
         $options['only_special_species_pool'] = false;
     }
 
+    $ps = isset($options['pool_show_only']) ? (string) $options['pool_show_only'] : '';
+    if ($ps !== '' && ! in_array($ps, poke_hub_collections_pool_show_only_allowed_for_saved_category($category), true)) {
+        $options['pool_show_only']            = '';
+        $options['only_final_evolution']      = false;
+        $options['only_special_species_pool'] = false;
+    } else {
+        $options['only_final_evolution']      = ($ps === 'final');
+        $options['only_special_species_pool'] = ($ps === 'special_all');
+    }
+
     return poke_hub_collections_derive_gender_symbol_option($options);
 }
 
@@ -3945,6 +4255,348 @@ function poke_hub_collections_exclusive_binary_sex_axis_from_row(array $row): ?s
     }
 
     return null;
+}
+
+/**
+ * Conserver la fiche slug « nu » *{base}* quand elle forme avec **une seule** forme suffixée *-{base}-male* ou *-{base}-female*
+ * (import inversé : nu = ♂ avec *-female*, ou nu = ♀ avec *-male*). Si les deux suffixes existent sans la même logique trio,
+ * la ligne nue reste traitée comme doublon famille (voir {@see poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists()}).
+ */
+function poke_hub_collections_family_bare_base_kept_for_binary_gender_slug_pair(array $rows, int $dex, string $base_slug_lc): bool {
+    $base_slug_lc = strtolower(trim($base_slug_lc));
+    if ($base_slug_lc === '') {
+        return false;
+    }
+    $has_female_suffix = false;
+    $has_male_suffix   = false;
+    foreach ($rows as $row) {
+        if (! is_array($row)) {
+            continue;
+        }
+        if ((int) ($row['dex_number'] ?? 0) !== $dex) {
+            continue;
+        }
+        $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+        if ($slug === $base_slug_lc . '-female') {
+            $has_female_suffix = true;
+        }
+        if ($slug === $base_slug_lc . '-male') {
+            $has_male_suffix = true;
+        }
+    }
+
+    return ($has_female_suffix !== $has_male_suffix) && ($has_female_suffix || $has_male_suffix);
+}
+
+/**
+ * @param list<array{idx:int,row:array<string,mixed>}> $items Une espèce (~un dex dans le pool)
+ * @return array{male: array{idx: int, row: array<string, mixed>}, female: array{idx: int, row: array<string, mixed>}, family_idxs: array<int,int>}|null
+ */
+function poke_hub_collections_detect_slug_binary_family_plan_from_dex_items(array $items): ?array {
+    $family_idx_list   = [];
+    $female_by_stem    = [];
+    $male_exp_by_stem  = [];
+    /** @var array<string, array{idx:int,row:array<string,mixed>}> $bare_slug_row */
+    $bare_slug_row     = [];
+
+    foreach ($items as $it) {
+        $row = $it['row'];
+        $idx = (int) $it['idx'];
+        if (!empty($row['synthetic_gigantamax']) || !empty($row['synthetic_dynamax'])
+            || !empty($row['synthetic_go_background']) || !empty($row['synthetic_sex_collector'])) {
+            continue;
+        }
+        $slug_lc = strtolower(trim((string) ($row['slug'] ?? '')));
+        if ($slug_lc === '') {
+            return null;
+        }
+        if (preg_match('/-family$/', $slug_lc)) {
+            $family_idx_list[] = $idx;
+
+            continue;
+        }
+        if (preg_match('/^(.+)-female$/', $slug_lc, $mf)) {
+            $stem = strtolower(trim((string) $mf[1]));
+            if ($stem !== '') {
+                $female_by_stem[$stem][] = ['idx' => $idx, 'row' => $row];
+            }
+
+            continue;
+        }
+        if (preg_match('/^(.+)-male$/', $slug_lc, $mm)) {
+            $stem = strtolower(trim((string) $mm[1]));
+            if ($stem !== '') {
+                $male_exp_by_stem[$stem][] = ['idx' => $idx, 'row' => $row];
+            }
+
+            continue;
+        }
+        if (! isset($bare_slug_row[$slug_lc])) {
+            $bare_slug_row[$slug_lc] = ['idx' => $idx, 'row' => $row];
+
+            continue;
+        }
+
+        return null;
+    }
+
+    $unique_families = array_values(array_unique(array_map('intval', $family_idx_list)));
+    if (count($unique_families) > 1) {
+        return null;
+    }
+
+    /** @var list<string> $stem_keys */
+    $stem_keys = array_values(array_unique(array_merge(
+        array_keys($female_by_stem),
+        array_keys($male_exp_by_stem),
+        array_keys($bare_slug_row)
+    )));
+
+    /** @var list<array{stem:string,male:array{idx:int,row:array<string,mixed>},female:array{idx:int,row:array<string,mixed>},family_idxs:array<int,int>}> $candidates */
+    $candidates = [];
+    foreach ($stem_keys as $stem) {
+        $stem = strtolower(trim((string) $stem));
+        if ($stem === '') {
+            continue;
+        }
+        $nfc = isset($female_by_stem[$stem]) ? count($female_by_stem[$stem]) : 0;
+        $nmc = isset($male_exp_by_stem[$stem]) ? count($male_exp_by_stem[$stem]) : 0;
+        $has_bare = isset($bare_slug_row[$stem]);
+
+        if ($nfc > 1 || $nmc > 1) {
+            continue;
+        }
+        if ($has_bare && $nfc >= 1 && $nmc >= 1) {
+            continue;
+        }
+
+        /** @var array{idx:int,row:array<string,mixed>}|null $male_pick */
+        $male_pick   = null;
+        /** @var array{idx:int,row:array<string,mixed>}|null $female_pick */
+        $female_pick = null;
+
+        if ($nfc === 1 && $nmc === 1 && ! $has_bare) {
+            $male_pick   = $male_exp_by_stem[$stem][0];
+            $female_pick = $female_by_stem[$stem][0];
+        } elseif ($nfc === 1 && $nmc === 0 && $has_bare) {
+            $male_pick   = $bare_slug_row[$stem];
+            $female_pick = $female_by_stem[$stem][0];
+        } elseif ($nfc === 0 && $nmc === 1 && $has_bare) {
+            $male_pick   = $male_exp_by_stem[$stem][0];
+            $female_pick = $bare_slug_row[$stem];
+        } else {
+            continue;
+        }
+
+        $candidates[] = [
+            'stem'         => $stem,
+            'male'         => $male_pick,
+            'female'       => $female_pick,
+            'family_idxs'  => $unique_families,
+        ];
+    }
+
+    if (count($candidates) !== 1) {
+        return null;
+    }
+
+    /** @var array{stem:string,male:array{idx:int,row:array<string,mixed>},female:array{idx:int,row:array<string,mixed>},family_idxs:array<int,int>} $plan */
+    $plan           = $candidates[0];
+    $male_idx_pick  = (int) $plan['male']['idx'];
+    $female_idx_pick = (int) $plan['female']['idx'];
+    foreach ($family_idx_list as $fi) {
+        if ((int) $fi === $male_idx_pick || (int) $fi === $female_idx_pick) {
+            return null;
+        }
+    }
+
+    $allowed_lookup = [$male_idx_pick => true, $female_idx_pick => true];
+    foreach ($unique_families as $fi2) {
+        $allowed_lookup[(int) $fi2] = true;
+    }
+
+    foreach ($items as $it2) {
+        $r = $it2['row'];
+        $ix = (int) $it2['idx'];
+        if (!empty($r['synthetic_gigantamax']) || !empty($r['synthetic_dynamax'])
+            || !empty($r['synthetic_go_background']) || !empty($r['synthetic_sex_collector'])) {
+            continue;
+        }
+        if (empty($allowed_lookup[$ix])) {
+            return null;
+        }
+    }
+
+    return [
+        'male'        => $plan['male'],
+        'female'      => $plan['female'],
+        'family_idxs' => $unique_families,
+    ];
+}
+
+/**
+ * Retire en fin de libellé les mentions explicites de sexe (fiches *-male* / *-female* affichées comme « Espèce ♂ »).
+ */
+function poke_hub_collections_strip_trailing_sex_word_from_pokemon_name(string $name): string {
+    $name = trim($name);
+    if ($name === '') {
+        return '';
+    }
+    $prev = '';
+    while ($prev !== $name) {
+        $prev = $name;
+        $name = (string) preg_replace(
+            '/(?:\s*[·•\-–—]\s*)?(?:\(|（)?\s*(?:mâles?|males?|♂|femelles?|females?|♀|masculin(?:e)?|féminin(?:e)?|feminin(?:e)?)\s*(?:\)|）)?$/iu',
+            '',
+            $name
+        );
+        $name = trim($name);
+    }
+
+    return $name;
+}
+
+/**
+ * @return array{name_fr: string, name_en: string}
+ */
+function poke_hub_collections_slug_binary_pair_canonical_species_names(array $male_row, array $female_row): array {
+    $fr_m = trim((string) ($male_row['name_fr'] ?? ''));
+    $fr_f = trim((string) ($female_row['name_fr'] ?? ''));
+    $en_m = trim((string) ($male_row['name_en'] ?? ''));
+    $en_f = trim((string) ($female_row['name_en'] ?? ''));
+
+    $fr = poke_hub_collections_strip_trailing_sex_word_from_pokemon_name($fr_m);
+    if ($fr === '') {
+        $fr = poke_hub_collections_strip_trailing_sex_word_from_pokemon_name($fr_f);
+    }
+    if ($fr === '') {
+        $fr = $fr_m !== '' ? $fr_m : $fr_f;
+    }
+
+    $en = poke_hub_collections_strip_trailing_sex_word_from_pokemon_name($en_m);
+    if ($en === '') {
+        $en = poke_hub_collections_strip_trailing_sex_word_from_pokemon_name($en_f);
+    }
+    if ($en === '') {
+        $en = $en_m !== '' ? $en_m : $en_f;
+    }
+
+    return ['name_fr' => $fr, 'name_en' => $en];
+}
+
+/**
+ * Glyph affichée à partir du slug ; si la fiche est « nue », le slot du couple (**male** / **female**) tranche ♀ / ♂.
+ */
+function poke_hub_collections_slug_binary_infer_gender_display_glyph(array $row, string $slot): string {
+    $slug_lc = strtolower(trim((string) ($row['slug'] ?? '')));
+    if (preg_match('/-female$/', $slug_lc)) {
+        return '♀';
+    }
+    if (preg_match('/-male$/', $slug_lc)) {
+        return '♂';
+    }
+
+    return strtolower(trim($slot)) === 'female' ? '♀' : '♂';
+}
+
+/**
+ * Familles *-family* + formes binaires : ne réagit pas comme une carte agrégée classique.
+ * - Trios permis : *tige* + *tige-female* ; *tige-male* + *tige-female* ; *tige-male* + *tige* (nu souvent ♀ si import « inversé »).
+ * - On **n’affiche jamais** la ligne *-family*.
+ * - On garde **toujours** les deux fiches ♂ / ♀ (même nom d’espèce + symbole, indépendamment de **include_gender** et **one_per_species**).
+ *
+ * Ne s’applique que si les seules lignes réelles du dex sont ce couple (+ optionnel **une** ligne *-family*).
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @param array<string, mixed>             $opts Options collection (conservées pour filtre ; pas de branche UX ici).
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_collections_normalize_slug_exclusive_binary_family_dimorphism_rows(array $rows, array $opts): array {
+    if ($rows === [] || (function_exists('apply_filters')
+        && apply_filters('poke_hub_collections_skip_slug_family_binary_dimorphism_normalize', false, $rows, $opts))) {
+        return $rows;
+    }
+
+    $by_dex = [];
+    foreach ($rows as $idx => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $dex = (int) ($row['dex_number'] ?? 0);
+        if ($dex <= 0) {
+            continue;
+        }
+        if (!isset($by_dex[$dex])) {
+            $by_dex[$dex] = [];
+        }
+        $by_dex[$dex][] = ['idx' => (int) $idx, 'row' => $row];
+    }
+
+    /** @var array<int, array{male: array{idx: int, row: array<string, mixed>}, female: array{idx: int, row: array<string, mixed>}, family_idxs: int[]}> $plans_by_dex */
+    $plans_by_dex = [];
+
+    foreach ($by_dex as $dex => $items) {
+        $plan_for_dex = poke_hub_collections_detect_slug_binary_family_plan_from_dex_items($items);
+        if ($plan_for_dex === null) {
+            continue;
+        }
+        $plans_by_dex[$dex] = $plan_for_dex;
+    }
+
+    if ($plans_by_dex === []) {
+        return $rows;
+    }
+
+    /** @var array<int, bool> $discard_idx */
+    $discard_idx = [];
+    /** @var array<int, array<string, mixed>> $row_touchups index pool → champs à fusionner */
+    $row_touchups = [];
+
+    foreach ($plans_by_dex as $plan) {
+        $male_it        = $plan['male'];
+        $female_it      = $plan['female'];
+        $male_row       = $male_it['row'];
+        $female_row     = $female_it['row'];
+        $male_idx       = (int) $male_it['idx'];
+        $female_idx     = (int) $female_it['idx'];
+
+        foreach ($plan['family_idxs'] as $fix) {
+            $discard_idx[(int) $fix] = true;
+        }
+
+        $names = poke_hub_collections_slug_binary_pair_canonical_species_names($male_row, $female_row);
+        $row_touchups[$male_idx] = array_merge($names, [
+            'gender_display'           => poke_hub_collections_slug_binary_infer_gender_display_glyph($male_row, 'male'),
+            'slug_binary_sex_display' => true,
+        ]);
+        $row_touchups[$female_idx] = array_merge($names, [
+            'gender_display'           => poke_hub_collections_slug_binary_infer_gender_display_glyph($female_row, 'female'),
+            'slug_binary_sex_display' => true,
+        ]);
+    }
+
+    if ($discard_idx === [] && $row_touchups === []) {
+        return $rows;
+    }
+
+    $out = [];
+    foreach ($rows as $idx => $row) {
+        if (!is_array($row)) {
+            $out[] = $row;
+            continue;
+        }
+        if (!empty($discard_idx[$idx])) {
+            continue;
+        }
+        if (!empty($row_touchups[$idx])) {
+            foreach ($row_touchups[$idx] as $k => $v) {
+                $row[$k] = $v;
+            }
+        }
+        $out[] = $row;
+    }
+
+    return array_values($out);
 }
 
 /**
@@ -4380,6 +5032,10 @@ function poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists(ar
         $want_base = $base_slug_lower_by_dex[ $dn ];
         $s         = strtolower(trim((string) ($row['slug'] ?? '')));
         if ($s === $want_base) {
+            if (poke_hub_collections_family_bare_base_kept_for_binary_gender_slug_pair($rows, $dn, $want_base)) {
+                $out[] = $row;
+            }
+
             continue;
         }
         $out[] = $row;
@@ -4448,6 +5104,20 @@ function poke_hub_collections_append_switch_form_family_placeholder_one_per_spec
     foreach ($dex_list as $dex_raw ) {
         $dex = (int) $dex_raw;
         if ($dex <= 0) {
+            continue;
+        }
+        /** Ne pas ajouter de *-family* pour un № absent du pool filtré (ex. liste Méga seule avec one_per_species). */
+        $has_any_pool_row_for_dex = false;
+        foreach ($rows as $rp) {
+            if (! is_array($rp)) {
+                continue;
+            }
+            if ((int) ($rp['dex_number'] ?? 0) === $dex) {
+                $has_any_pool_row_for_dex = true;
+                break;
+            }
+        }
+        if (! $has_any_pool_row_for_dex) {
             continue;
         }
         if (apply_filters('poke_hub_collections_skip_switch_form_family_placeholder_append', false, $dex, $rows)) {
@@ -5282,7 +5952,7 @@ function poke_hub_collections_get_by_share_token(string $token): ?array {
  * @param string $owner_key       Clé anonyme (cookie/header)
  */
 function poke_hub_collections_user_can_view(array $collection, int $current_user_id = 0, string $client_ip = '', string $owner_key = ''): bool {
-    if (!empty($collection['is_public'])) {
+    if (poke_hub_collections_row_is_public($collection)) {
         return true;
     }
     $col_uid = (int) ($collection['user_id'] ?? 0);

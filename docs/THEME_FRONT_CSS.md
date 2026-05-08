@@ -6,7 +6,7 @@ Ce document est la **référence** pour le chargement du CSS public Poké HUB : 
 
 | Où ? | Contenu | Quand c’est utilisé |
 |------|---------|----------------------|
-| **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules : chaque fichier `parts/*.css` est enqueued **séparément** via `functions.php` (ordre `01-…` → `16-…`, version `filemtime` par fichier), puis `poke-hub-late-overrides.css` en **dernière** couche. Le fichier **`poke-hub-front.css`** garde les `@import` des `parts/` comme **index lisible / référence** et pour **`add_editor_style()`** ; en front navigateur ce fichier n’est **plus** enqueue (évite dépend cache des `@import`). | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
+| **Thème enfant** `me5rine-lab/css/poke-hub/` | Tout le **CSS public** des modules : chaque fichier `parts/*.css` est enqueued **séparément** via `functions.php` (`glob` + tri naturel ; **tout nouveau `*.css` ajouté dans `parts/` est chargé automatiquement**, version = `filemtime` par fichier), puis `poke-hub-late-overrides.css` en **dernière** couche. Le fichier **`poke-hub-front.css`** garde les `@import` des `parts/` comme **index lisible / référence** et pour **`add_editor_style()`** ; en front navigateur ce fichier n’est **plus** enqueue (évite la dépendance cache des `@import`). | Toujours en prod sur Me5rine Lab : c’est la **seule** source de vérité visuelle front pour le « gros lot ». |
 | **Plugin** `poke-hub/assets/css/` | **Minimum** : surtout **admin** ; `global-colors.css` (notices, cohérence, besoins Gutenberg) ; **`poke-hub-type-icons.css`** (icônes types en SVG — voir tableau *Ce qui reste* ci‑dessous). | Le plugin **n’enfile plus** le pack `poke-hub-*-front` du dossier `assets/css/` quand le filtre ci‑dessous est à `false` (le thème a déjà tout repris), **sauf** les feuilles **admin** et l’enqueue **explicite** des icônes de types en admin (voir tableau). |
 
 **Filtre WordPress** : `poke_hub_load_default_plugin_front_css`
@@ -66,15 +66,30 @@ Code : `includes/functions/pokehub-front-styles-bridge.php` (helpers, liste des 
    - `me5rine-poke-hub-part-<nom>` → un handle par fichier dans `css/poke-hub/parts/*.css` (**`glob` + tri naturel** : tout nouveau `*.css` dans ce dossier est chargé **sans modifier le PHP** ; `?ver=` = `filemtime` via `me5rine_child_theme_asset_version()`).
    - `me5rine-poke-hub-late` → `css/poke-hub/poke-hub-late-overrides.css` dépend du **dernier** `part` (correctifs de cascade : Collections vs `dashboard.css` / responsive, liste collections, `<details>` avancé, tuiles filtrées JS, bannière reset `[hidden]` vs `forms.css`, etc.) ; même principe de version par fichier.
 
-**Helpers thème** (dépôt me5rine-lab, `functions.php`) : `me5rine_child_theme_asset_version( $chemin_relatif )` pour tout autre `wp_enqueue_*` pointant vers le thème enfant ; `me5rine_child_theme_editor_style_url()` pour `add_editor_style` avec `?ver=`. **Plugin** : `poke_hub_plugin_asset_version()` pour les fichiers sous `POKE_HUB_PATH`. Détail pratique : `css/poke-hub/README.md` dans le thème.
+Détail des helpers de versionnement : voir la section **Cache navigateur (`?ver=`)** plus bas, et le `css/poke-hub/README.md` dans le thème.
 
 Commentaires détaillés : en-tête de `style.css` du thème enfant.
 
 ### Éditeur (blocs)
 
-- `add_editor_style( 'css/poke-hub/poke-hub-front.css' );`
-- `add_editor_style( 'css/poke-hub/poke-hub-late-overrides.css' );`  
-  (après les styles éditeur existants, pour coller à l’ordre front.)
+- `add_editor_style( esc_url_raw( me5rine_child_theme_editor_style_url( 'css/poke-hub/poke-hub-front.css' ) ) );`
+- `add_editor_style( esc_url_raw( me5rine_child_theme_editor_style_url( 'css/poke-hub/poke-hub-late-overrides.css' ) ) );`
+
+`me5rine_child_theme_editor_style_url()` renvoie une URL absolue + `?ver=filemtime` (le wrapper natif `add_editor_style()` ne versionne pas un chemin relatif). Ordre identique au front.
+
+### Cache navigateur (`?ver=`)
+
+Les paramètres de version sont calculés à partir du `filemtime` du fichier sur le disque : **dès qu’un `.css` ou `.js` est modifié**, l’URL change et le navigateur (et un éventuel CDN qui respecte les query strings) recharge la nouvelle version sans dépendre du numéro de version du plugin.
+
+| Côté | Helper | Usage |
+|------|--------|-------|
+| Thème enfant | `me5rine_child_theme_asset_version( 'chemin/relatif/au/thème.css' )` | 4ᵉ argument `ver` de `wp_enqueue_style` / `wp_enqueue_script`. Pour les `parts/`, c’est déjà géré automatiquement dans `functions.php`. |
+| Thème enfant | `me5rine_child_theme_editor_style_url( 'chemin/relatif.css' )` | À encapsuler dans `add_editor_style()` (cf. ci-dessus). |
+| Plugin | `poke_hub_plugin_asset_version( 'chemin/relatif/depuis/POKE_HUB_PATH' )` | 4ᵉ argument `ver` pour tout `wp_enqueue_*` pointant sur un fichier du dépôt plugin. Utilisé par `poke_hub_enqueue_bundled_front_style()`, par `poke-hub.php` (admin unifié, type-icons, fallback raster, etc.) et par les modules pour leurs JS. Retombe sur `POKE_HUB_VERSION` si le fichier est absent. |
+
+**À faire pour tout nouveau JS/CSS plugin** : passer le **chemin relatif** au helper en 4ᵉ argument plutôt que `POKE_HUB_VERSION`. Pour les `parts/` du thème : aucune action — `glob()` les détecte. Pour un nouveau JS du thème : utiliser `me5rine_child_theme_asset_version()`.
+
+Si un cache **ignore** les query strings (Cloudflare avec règle `cache.cacheLevel: simplified`, plugin de cache mal configuré), il faut purger ou activer la prise en compte de `?ver=`.
 
 ### Surcharges « collections thème »
 

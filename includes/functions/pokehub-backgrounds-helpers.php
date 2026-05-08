@@ -262,6 +262,131 @@ function poke_hub_ensure_background_pokemon_link_unique_index(): void {
 }
 
 /**
+ * Colonne exists_only_with_costume sur pokemon_backgrounds (fond réservé au contexte costumé).
+ */
+function poke_hub_ensure_background_exists_only_with_costume_column(): void {
+    global $wpdb;
+    $table = pokehub_get_table( 'pokemon_backgrounds' );
+    if ( ! $table || ! $wpdb->dbname ) {
+        return;
+    }
+    if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+        return;
+    }
+    $col = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exists_only_with_costume' LIMIT 1",
+            $wpdb->dbname,
+            $table
+        )
+    );
+    if ( ! empty( $col ) ) {
+        return;
+    }
+    if ( function_exists( 'pokehub_install_tables_for_modules' ) ) {
+        pokehub_install_tables_for_modules( [ 'pokemon' ], [ 'skip_allow_filter' => true, 'try_require_db_class' => true ] );
+    }
+    $col = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exists_only_with_costume' LIMIT 1",
+            $wpdb->dbname,
+            $table
+        )
+    );
+    if ( ! empty( $col ) ) {
+        return;
+    }
+    $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `exists_only_with_costume` TINYINT(1) NOT NULL DEFAULT 0 AFTER `background_type`" );
+    $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `exists_only_with_costume` (`exists_only_with_costume`)" );
+}
+
+/**
+ * Colonne exclusive_pairing sur pokemon_background_pokemon_links (appariement fond ↔ Pokémon strict).
+ */
+function poke_hub_ensure_background_link_exclusive_pairing_column(): void {
+    global $wpdb;
+    $table = pokehub_get_table( 'pokemon_background_pokemon_links' );
+    if ( ! $table || ! $wpdb->dbname ) {
+        return;
+    }
+    if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+        return;
+    }
+    $col = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exclusive_pairing' LIMIT 1",
+            $wpdb->dbname,
+            $table
+        )
+    );
+    if ( ! empty( $col ) ) {
+        return;
+    }
+    if ( function_exists( 'pokehub_install_tables_for_modules' ) ) {
+        pokehub_install_tables_for_modules( [ 'pokemon' ], [ 'skip_allow_filter' => true, 'try_require_db_class' => true ] );
+    }
+    $col = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exclusive_pairing' LIMIT 1",
+            $wpdb->dbname,
+            $table
+        )
+    );
+    if ( ! empty( $col ) ) {
+        return;
+    }
+    $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `exclusive_pairing` TINYINT(1) NOT NULL DEFAULT 0 AFTER `link_kind`" );
+    $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `exclusive_pairing` (`exclusive_pairing`)" );
+}
+
+/**
+ * Au moins une liaison base indique « cette fiche n’existe qu’avec ce fond » (aligné sur la case Pokémon).
+ */
+function poke_hub_pokemon_any_base_link_pokemon_only_with_this_bg( int $pokemon_id ): bool {
+    global $wpdb;
+    if ( $pokemon_id <= 0 ) {
+        return false;
+    }
+    $t = pokehub_get_table( 'pokemon_background_pokemon_links' );
+    if ( ! $t ) {
+        return false;
+    }
+    $base = POKE_HUB_BG_LINK_BASE;
+    $n    = (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$t} WHERE pokemon_id = %d AND (link_kind = %s OR link_kind = '' OR link_kind IS NULL)
+             AND COALESCE(pokemon_only_with_this_background, 0) = 1 LIMIT 1",
+            $pokemon_id,
+            $base
+        )
+    );
+
+    return $n > 0;
+}
+
+/**
+ * Met à jour toutes les lignes link_kind = base pour ce Pokémon : même valeur que la case admin « uniquement avec un fond GO ».
+ */
+function poke_hub_sync_pokemon_only_with_background_links( int $pokemon_id, bool $enabled ): void {
+    global $wpdb;
+    $t = pokehub_get_table( 'pokemon_background_pokemon_links' );
+    if ( ! $t || $pokemon_id <= 0 ) {
+        return;
+    }
+    $base = POKE_HUB_BG_LINK_BASE;
+    $val  = $enabled ? 1 : 0;
+    $wpdb->query(
+        $wpdb->prepare(
+            "UPDATE {$t} SET pokemon_only_with_this_background = %d
+             WHERE pokemon_id = %d AND (link_kind = %s OR link_kind = '' OR link_kind IS NULL)",
+            $val,
+            $pokemon_id,
+            $base
+        )
+    );
+}
+
+/**
  * Enregistre les liens fond ↔ Pokémon (forme de base / obscur / dynamax / gigamax).
  *
  * @param int   $background_id
@@ -270,9 +395,13 @@ function poke_hub_ensure_background_pokemon_link_unique_index(): void {
  * @param int[] $pokemon_shadow
  * @param int[] $pokemon_dynamax
  * @param int[] $pokemon_gigantamax
+ * @param int[] $exclusive_pairing_base_ids IDs « classiques » pour lesquels cet asset de fond n’a pas de sens sans cette fiche (réduit aux IDs réellement liés en base).
+ * @param int[] $pokemon_only_with_this_background_base_ids Sous-ensemble des classiques : cette fiche Pokémon n’existe qu’avec ce fond (lien base).
+ * @param int[] $background_costume_only_base_ids Sous-ensemble des classiques : usage costumé obligatoire pour ce couple fond / Pokémon (lien base).
  */
-function poke_hub_save_background_pokemon_links( int $background_id, array $pokemon_shiny_active, array $pokemon_shiny_locked, array $pokemon_shadow, array $pokemon_dynamax, array $pokemon_gigantamax ): void {
+function poke_hub_save_background_pokemon_links( int $background_id, array $pokemon_shiny_active, array $pokemon_shiny_locked, array $pokemon_shadow, array $pokemon_dynamax, array $pokemon_gigantamax, array $exclusive_pairing_base_ids = [], array $pokemon_only_with_this_background_base_ids = [], array $background_costume_only_base_ids = [] ): void {
     poke_hub_ensure_background_pokemon_link_unique_index();
+    poke_hub_ensure_background_link_exclusive_pairing_column();
     global $wpdb;
     $links_table = pokehub_get_table( 'pokemon_background_pokemon_links' );
     if ( ! $links_table || $background_id <= 0 ) {
@@ -288,6 +417,21 @@ function poke_hub_save_background_pokemon_links( int $background_id, array $poke
     } ) );
     $base_ids     = array_values( array_unique( array_merge( $shiny_active, $shiny_locked ) ) );
     sort( $base_ids );
+    $sanitize_subset = static function ( array $ids ) use ( $base_ids ): array {
+        $ids = array_values(
+            array_filter(
+                array_unique( array_map( 'intval', $ids ) ),
+                static function ( int $x ): bool {
+                    return $x > 0;
+                }
+            )
+        );
+
+        return array_values( array_intersect( $ids, $base_ids ) );
+    };
+    $exclusive_pairing_base_ids                 = $sanitize_subset( $exclusive_pairing_base_ids );
+    $pokemon_only_with_this_background_base_ids = $sanitize_subset( $pokemon_only_with_this_background_base_ids );
+    $background_costume_only_base_ids           = $sanitize_subset( $background_costume_only_base_ids );
     $log_ins_fail = static function ( string $ctx, int $background_id, int $pid, string $kind = '' ) use ( $wpdb ): void {
         if ( $wpdb->last_error && defined( 'WP_DEBUG' ) && WP_DEBUG && function_exists( 'error_log' ) ) {
             $kind_s = $kind !== '' ? ( ', kind=' . $kind ) : '';
@@ -296,15 +440,21 @@ function poke_hub_save_background_pokemon_links( int $background_id, array $poke
     };
     foreach ( $base_ids as $pid ) {
         $is_lock = in_array( $pid, $shiny_locked, true ) ? 1 : 0;
-        $ok = $wpdb->insert(
+        $exc     = in_array( $pid, $exclusive_pairing_base_ids, true ) ? 1 : 0;
+        $only_bg = in_array( $pid, $pokemon_only_with_this_background_base_ids, true ) ? 1 : 0;
+        $cost_l  = in_array( $pid, $background_costume_only_base_ids, true ) ? 1 : 0;
+        $ok      = $wpdb->insert(
             $links_table,
             [
-                'background_id'   => $background_id,
-                'pokemon_id'      => $pid,
-                'is_shiny_locked' => $is_lock,
-                'link_kind'       => POKE_HUB_BG_LINK_BASE,
+                'background_id'                       => $background_id,
+                'pokemon_id'                          => $pid,
+                'is_shiny_locked'                     => $is_lock,
+                'link_kind'                           => POKE_HUB_BG_LINK_BASE,
+                'exclusive_pairing'                   => $exc,
+                'pokemon_only_with_this_background'   => $only_bg,
+                'background_costume_only'             => $cost_l,
             ],
-            [ '%d', '%d', '%d', '%s' ]
+            [ '%d', '%d', '%d', '%s', '%d', '%d', '%d' ]
         );
         if ( ! $ok ) {
             $log_ins_fail( 'base', $background_id, $pid, 'base' );

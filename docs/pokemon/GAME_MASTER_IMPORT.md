@@ -28,6 +28,44 @@ Import **non destructif** globalement : insert ou update selon présence des lig
 
 ---
 
+## Génération canonique et région d’origine GO
+
+### Génération (taxonomie `generations`)
+
+La génération importée reste la taxonomie canonique en **9 générations**:
+
+- `1..151` → Gen 1
+- `152..251` → Gen 2
+- `252..386` → Gen 3
+- `387..493` → Gen 4
+- `494..649` → Gen 5
+- `650..721` → Gen 6
+- `722..809` → Gen 7
+- `810..905` → Gen 8
+- `906..1026` → Gen 9
+
+Le bloc dex `899..905` (Hisui) reste donc en **Gen 8** côté taxonomie.
+
+### Région d’origine GO (`pokemon.origin_region_id` + `extra.origin_region_slug`)
+
+L’import remplit maintenant la région d’origine avec cette priorité :
+
+1. **Cas spécial GO par dex** via `poke_hub_pokemon_guess_go_origin_region_slug_by_dex()`  
+   (par défaut `899..905` => slug `hisui`).
+2. **Sinon**, fallback sur la région par défaut de la génération via  
+   `poke_hub_pokemon_get_default_origin_region_for_generation()` :
+   - première région liée dans `generation_regions` (ordre admin),
+   - sinon `generations.region_id` (rétrocompat).
+
+Conséquences :
+
+- `pokemon.origin_region_id` est alimenté (si une région est résolue),
+- `extra.origin_region_slug` est synchronisé,
+- `extra.games.pokemon_go.origin_region_slug` est synchronisé,
+- mêmes règles appliquées aux formes temporaires (Méga / Primo).
+
+---
+
 ## PASS 3 : table `pokemon_evolutions` et métadonnées `extra`
 
 ### Sync et résolution hors ligne `*-family`
@@ -62,6 +100,19 @@ Référence : `poke_hub_pokemon_sync_pokemon_evolutions` dans
 - Les variantes (suffixes au slug après la forme normalisée) ont en général `is_default = 0`.
 
 Référence code : fonction `poke_hub_pokemon_import_from_pokemon_settings()`.
+
+---
+
+## Slug ligne Pokémon (`poke_hub_pokemon_compose_pokemon_row_slug`)
+
+Lors du calcul du **slug** d’une fiche **`pokemon`** (base + partie forme après normalisation GM), **`poke_hub_pokemon_compose_pokemon_row_slug( $slug_base, $form_slug )`** (`pokemon-import-game-master-helpers.php`) évite une **concaténation doublée** lorsque **`$form_slug`** est déjà **préfixé** par **`$slug_base-`** en minuscules (cas typique **Zarbi / Unown** : le GM peut fournir un identifiant de forme du type **`unown-b`** alors que la base de slug est **`unown`**).
+
+- **Sans** cette garde : **`unown` + `-` + `unown-b`** → **`unown-unown-b`** (slug anormal pour les filtres affichés, collections, etc.).
+- **Avec** la garde : la fonction renvoie directement **`unown-b`** si le préfixe est déjà présent.
+
+Référence d’usage : **`pokemon-import-game-master.php`** (construction de la ligne à l’import) et **`poke_hub_pokemon_get_regional_countries_for_import`** / **`poke_hub_pokemon_should_be_regional_on_import`** (cohérence de slug lors des annexes métier régionaux).
+
+Les bases **déjà importées** avec l’ancien double préfixe ne sont **pas** corrigées automatiquement : prévoir **ré‑import Game Master** ciblé ou **migration SQL** si nécessaire en production.
 
 ---
 

@@ -246,7 +246,7 @@ If disabled, you will need to manually create pages with the shortcodes:
 - Pages creation: `modules/user-profiles/functions/user-profiles-pages.php`
 
 ### Assets
-- CSS: styles **Me5rine** dans le thème `me5rine-lab/css/poke-hub/poke-hub-front.css` (dossier `css/poke-hub/parts/`, notamment `16-user-profiles-friend-codes.css`). Avec le filtre `poke_hub_load_default_plugin_front_css` à false, le plugin ne double plus les enqueues (voir `includes/functions/pokehub-front-styles-bridge.php`)
+- CSS: styles **Me5rine** dans le thème `me5rine-lab/css/poke-hub/parts/` (notamment `16-user-profiles-friend-codes.css`) ; chaque `parts/*.css` est enqueued individuellement par le thème (`?ver=filemtime`). Avec le filtre `poke_hub_load_default_plugin_front_css` à false, le plugin ne double plus les enqueues (voir `includes/functions/pokehub-front-styles-bridge.php`)
 - JavaScript: `assets/js/user-profiles-friend-codes.js` (centralized in main plugin assets)
 - JavaScript (Ultimate Member): `assets/js/poke-hub-user-profiles-um.js`
 

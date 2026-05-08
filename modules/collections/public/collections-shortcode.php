@@ -305,7 +305,7 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                     <div class="pokehub-collections-options-additive" id="pokehub-collection-options-additive">
                                         <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-gender', true, __('Include sexual dimorphism', 'poke-hub'), ['data-collections-control' => 'include_gender']); ?>
                                         <?php poke_hub_collections_render_setting_switch('pokehub-collection-both-sexes-collector', false, __('Include male and female', 'poke-hub'), ['data-collections-control' => 'include_both_sexes_collector']); ?>
-                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-regional-forms', true, __('Include regional forms', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
+                                        <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-regional-forms', true, __('Include geography-locked spawns (GO regionals)', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
                                         <div class="pokehub-collections-pool-special-species" role="group" aria-label="<?php esc_attr_e('Legendary, Mythical, Ultra Beasts', 'poke-hub'); ?>">
                                             <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-legendary', true, __('Include Legendary', 'poke-hub')); ?>
                                             <?php poke_hub_collections_render_setting_switch('pokehub-collection-include-mythical', true, __('Include Mythical', 'poke-hub')); ?>
@@ -330,13 +330,17 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                         <label for="pokehub-collection-pool-show-only" class="me5rine-lab-form-label"><?php esc_html_e('Pool restriction', 'poke-hub'); ?></label>
                                         <select id="pokehub-collection-pool-show-only" class="me5rine-lab-form-select">
                                             <option value=""><?php esc_html_e('No extra restriction', 'poke-hub'); ?></option>
-                                            <option value="final"><?php esc_html_e('Only final evolutions (Pokémon that do not evolve further in GO)', 'poke-hub'); ?></option>
-                                            <option value="baby" data-collections-control="pool_option_baby"><?php esc_html_e('Only baby Pokémon', 'poke-hub'); ?></option>
-                                            <option value="special_all" data-collections-control="pool_option_special_all"><?php esc_html_e('Only Legendary, Mythical & Ultra Beasts', 'poke-hub'); ?></option>
-                                            <option value="legendary"><?php esc_html_e('Only Legendary', 'poke-hub'); ?></option>
-                                            <option value="mythical"><?php esc_html_e('Only Mythical', 'poke-hub'); ?></option>
-                                            <option value="ultra_beast"><?php esc_html_e('Only Ultra Beast', 'poke-hub'); ?></option>
-                                            <option value="special_attacks"><?php esc_html_e('Only Pokémon with special attacks', 'poke-hub'); ?></option>
+                                            <option value="final" data-pokehub-pool-standard="1"><?php esc_html_e('Only final evolutions (Pokémon that do not evolve further in GO)', 'poke-hub'); ?></option>
+                                            <option value="baby" data-pokehub-pool-standard="1" data-collections-control="pool_option_baby"><?php esc_html_e('Only baby Pokémon', 'poke-hub'); ?></option>
+                                            <option value="special_all" data-pokehub-pool-standard="1" data-collections-control="pool_option_special_all"><?php esc_html_e('Only Legendary, Mythical & Ultra Beasts', 'poke-hub'); ?></option>
+                                            <option value="legendary" data-pokehub-pool-standard="1"><?php esc_html_e('Only Legendary', 'poke-hub'); ?></option>
+                                            <option value="mythical" data-pokehub-pool-standard="1"><?php esc_html_e('Only Mythical', 'poke-hub'); ?></option>
+                                            <option value="ultra_beast" data-pokehub-pool-standard="1"><?php esc_html_e('Only Ultra Beast', 'poke-hub'); ?></option>
+                                            <option value="special_attacks" data-pokehub-pool-standard="1"><?php esc_html_e('Only Pokémon with special attacks', 'poke-hub'); ?></option>
+                                            <option value="costume_events"><?php esc_html_e('Only event & costumed Pokémon (events, Copy…)', 'poke-hub'); ?></option>
+                                            <option value="mega_only"><?php esc_html_e('Mega evolutions only', 'poke-hub'); ?></option>
+                                            <option value="gigamax_only"><?php esc_html_e('Gigantamax only', 'poke-hub'); ?></option>
+                                            <option value="backgrounds_only" data-pokehub-pool-hide-specific="1"><?php esc_html_e('Pokémon GO background tiles only', 'poke-hub'); ?></option>
                                         </select>
                                         <p class="me5rine-lab-form-description"><?php esc_html_e('Filtering by special attacks will apply fully once attack data is wired to the pool.', 'poke-hub'); ?></p>
                                     </div>
@@ -606,7 +610,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
          data-share-url="<?php echo esc_url($canonical_url); ?>"
          data-edit-name="<?php echo esc_attr($collection['name']); ?>"
          data-edit-options="<?php echo esc_attr(wp_json_encode($opts)); ?>"
-         data-edit-is-public="<?php echo !empty($collection['is_public']) ? '1' : '0'; ?>"
+         data-edit-is-public="<?php echo poke_hub_collections_row_is_public($collection) ? '1' : '0'; ?>"
          data-pokehub-aria-progress="<?php echo esc_attr(__('Progress: %1$d out of %2$d Pokémon owned', 'poke-hub')); ?>"
          data-pokehub-aria-jump="<?php echo esc_attr(__('Jump to %1$s — %2$d of %3$d owned in this collection', 'poke-hub')); ?>"
          data-pokehub-aria-summary="<?php echo esc_attr(__('Show Pokémon for %1$s — %2$d of %3$d owned', 'poke-hub')); ?>">
@@ -720,7 +724,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         </div>
         <?php endif; ?>
 
-        <?php if ($total > 0) : ?>
         <div class="pokehub-collection-toolbar-tools">
             <div class="pokehub-collection-toolbar-tiles" data-flow-tiles-host role="tablist" aria-label="<?php esc_attr_e('Jump to toolbar sections', 'poke-hub'); ?>"></div>
             <div class="pokehub-collection-toolbar-slot" data-collection-toolbar-slot="filters">
@@ -862,7 +865,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
             </div>
         <?php endif; ?>
         </div>
-        <?php endif; ?>
 
         <?php if ($total === 0) : ?>
             <p class="pokehub-collection-empty-pool me5rine-lab-form-message me5rine-lab-form-message-warning">
@@ -897,7 +899,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
 
         </div><?php /* .pokehub-collection-toolbar-stack */ ?>
 
-        <?php if ($total > 0) : ?>
         <div class="pokehub-collections-drawer pokehub-collections-drawer--toolbar" data-toolbar-menu-drawer role="dialog" aria-label="<?php esc_attr_e('Collection toolbar menu', 'poke-hub'); ?>" aria-hidden="true">
             <div class="pokehub-collections-drawer-backdrop" data-toolbar-menu-backdrop></div>
             <div class="pokehub-collections-drawer-panel">
@@ -908,7 +909,6 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 <div class="pokehub-collections-drawer-body" data-toolbar-menu-body></div>
             </div>
         </div>
-        <?php endif; ?>
 
         <div class="pokehub-collection-tiles" data-pool="<?php echo esc_attr(wp_json_encode($pool)); ?>" data-items="<?php echo esc_attr(wp_json_encode($items_resolved)); ?>">
             <?php foreach ($pool_by_gen as $gen_key => $gen_pool) : ?>
@@ -1020,9 +1020,11 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                                     <?php
                                     $g_sym  = (string) ($p['gender_display'] ?? '');
                                     $is_sex = ! empty($p['synthetic_sex_collector']);
+                            $slug_bin_g = ! empty($p['slug_binary_sex_display']);
                             $show_g_sym = $g_sym !== ''
                                 && (
-                                    ( $is_sex && ( ! empty($opts['include_both_sexes_collector']) || ! empty($opts['include_gender']) ) )
+                                    $slug_bin_g
+                                    || ( $is_sex && ( ! empty($opts['include_both_sexes_collector']) || ! empty($opts['include_gender']) ) )
                                     || ( ! $is_sex && ! empty($opts['include_gender']) )
                                 );
                                     if ( $show_g_sym ) :
@@ -1078,7 +1080,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         }
                         poke_hub_collections_render_visibility_share_section(
                             'pokehub-edit-collection-public',
-                            !empty($collection['is_public']),
+                            poke_hub_collections_row_is_public($collection),
                             $edit_linked_account_b,
                             $edit_share_notice_b
                         );
@@ -1096,7 +1098,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                             <?php poke_hub_collections_render_setting_switch('pokehub-edit-both-sexes-collector', !empty($opts['include_both_sexes_collector']), __('Include male and female', 'poke-hub'), ['data-collections-control' => 'include_both_sexes_collector']); ?>
                             <?php endif; ?>
                             <?php if (!in_array('include_regional_forms', $edit_settings_hidden, true)) : ?>
-                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-regional-forms', !isset($opts['include_regional_forms']) || !empty($opts['include_regional_forms']), __('Include regional forms', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
+                            <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-regional-forms', !isset($opts['include_regional_forms']) || !empty($opts['include_regional_forms']), __('Include geography-locked spawns (GO regionals)', 'poke-hub'), ['data-collections-control' => 'include_regional_forms']); ?>
                             <?php endif; ?>
                             <div class="pokehub-collections-pool-special-species" role="group" aria-label="<?php esc_attr_e('Legendary, Mythical, Ultra Beasts', 'poke-hub'); ?>">
                                 <?php poke_hub_collections_render_setting_switch('pokehub-edit-include-legendary', !isset($opts['include_legendary_pokemon']) || !empty($opts['include_legendary_pokemon']), __('Include Legendary', 'poke-hub')); ?>
@@ -1129,7 +1131,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                             <?php endif; ?>
                         </fieldset>
                         <?php endif; ?>
-                        <?php if (!$is_specific_category && $collection_category !== 'legendary_mythical_ultra') : ?>
+                        <?php if ($collection_category !== 'legendary_mythical_ultra') : ?>
                         <fieldset>
                             <legend class="me5rine-lab-form-label"><?php esc_html_e('Include only', 'poke-hub'); ?></legend>
                             <p class="me5rine-lab-form-hint" style="margin-top:0;"><?php esc_html_e('Restrict which Pokémon appear in the pool (one choice).', 'poke-hub'); ?></p>
@@ -1137,6 +1139,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                                 <label for="pokehub-edit-pool-show-only" class="me5rine-lab-form-label"><?php esc_html_e('Pool restriction', 'poke-hub'); ?></label>
                                 <select id="pokehub-edit-pool-show-only" class="me5rine-lab-form-select">
                                     <option value="" <?php selected($pool_show_only_edit, ''); ?>><?php esc_html_e('No extra restriction', 'poke-hub'); ?></option>
+                                    <?php if (!$is_specific_category) : ?>
                                     <option value="final" <?php selected($pool_show_only_edit, 'final'); ?>><?php esc_html_e('Only final evolutions (Pokémon that do not evolve further in GO)', 'poke-hub'); ?></option>
                                     <?php if (!in_array('pool_option_baby', $edit_settings_hidden, true)) : ?>
                                     <option value="baby" data-collections-control="pool_option_baby" <?php selected($pool_show_only_edit, 'baby'); ?>><?php esc_html_e('Only baby Pokémon', 'poke-hub'); ?></option>
@@ -1148,8 +1151,17 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                                     <option value="mythical" <?php selected($pool_show_only_edit, 'mythical'); ?>><?php esc_html_e('Only Mythical', 'poke-hub'); ?></option>
                                     <option value="ultra_beast" <?php selected($pool_show_only_edit, 'ultra_beast'); ?>><?php esc_html_e('Only Ultra Beast', 'poke-hub'); ?></option>
                                     <option value="special_attacks" <?php selected($pool_show_only_edit, 'special_attacks'); ?>><?php esc_html_e('Only Pokémon with special attacks', 'poke-hub'); ?></option>
+                                    <?php endif; ?>
+                                    <option value="costume_events" <?php selected($pool_show_only_edit, 'costume_events'); ?>><?php esc_html_e('Only event & costumed Pokémon (events, Copy…)', 'poke-hub'); ?></option>
+                                    <option value="mega_only" <?php selected($pool_show_only_edit, 'mega_only'); ?>><?php esc_html_e('Mega evolutions only', 'poke-hub'); ?></option>
+                                    <option value="gigamax_only" <?php selected($pool_show_only_edit, 'gigamax_only'); ?>><?php esc_html_e('Gigantamax only', 'poke-hub'); ?></option>
+                                    <?php if (!$is_specific_category) : ?>
+                                    <option value="backgrounds_only" <?php selected($pool_show_only_edit, 'backgrounds_only'); ?>><?php esc_html_e('Pokémon GO background tiles only', 'poke-hub'); ?></option>
+                                    <?php endif; ?>
                                 </select>
+                                <?php if (!$is_specific_category) : ?>
                                 <p class="me5rine-lab-form-description"><?php esc_html_e('Filtering by special attacks will apply fully once attack data is wired to the pool.', 'poke-hub'); ?></p>
+                                <?php endif; ?>
                             </div>
                         </fieldset>
                         <?php endif; ?>

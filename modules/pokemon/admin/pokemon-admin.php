@@ -93,6 +93,18 @@ function poke_hub_pokemon_screen_options() {
         );
     }
 
+    $replace_action = isset($_GET['action']) ? sanitize_key((string) $_GET['action']) : '';
+    if ($current_section === 'forms' && $replace_action === 'replace') {
+        add_screen_option(
+            'per_page',
+            [
+                'label'   => __('Import routings per page', 'poke-hub'),
+                'default' => 20,
+                'option'  => 'poke_hub_variant_routing_per_page',
+            ]
+        );
+    }
+
     // Tu pourras ajouter un screen option "forms/items/weathers" plus tard si besoin.
 }
 
@@ -100,7 +112,9 @@ function poke_hub_pokemon_screen_options() {
  * Sauvegarde des options "per page".
  */
 function poke_hub_set_pokemon_screen_option($status, $option, $value) {
-    if ($option === 'poke_hub_pokemon_per_page' || $option === 'poke_hub_pokemon_attacks_per_page') {
+    if ($option === 'poke_hub_pokemon_per_page'
+        || $option === 'poke_hub_pokemon_attacks_per_page'
+        || $option === 'poke_hub_variant_routing_per_page') {
         return (int) $value;
     }
     return $status;
@@ -124,8 +138,8 @@ function poke_hub_pokemon_manage_columns($columns) {
         $columns = $table->get_columns();
     }
 
-    if ($current_section === 'forms' && class_exists('Poke_Hub_Pokemon_Form_Variants_List_Table')) {
-        $table   = new Poke_Hub_Pokemon_Form_Variants_List_Table();
+    if ($current_section === 'forms' && class_exists('Poke_Hub_Pokemon_Forms_List_Table')) {
+        $table   = new Poke_Hub_Pokemon_Forms_List_Table();
         $columns = $table->get_columns();
     }
 
@@ -172,9 +186,14 @@ function poke_hub_pokemon_admin_ui() {
     $section_label = poke_hub_pokemon_get_section_label($current_tab);
 
     /**
-     * MODE ADD / EDIT
+     * MODE ADD / EDIT / REPLACE (forms uniquement pour replace)
      */
-    if (in_array($action, ['add', 'edit'], true)) {
+    $section_edit_actions = ['add', 'edit'];
+    if ($current_tab === 'forms') {
+        $section_edit_actions[] = 'replace';
+    }
+
+    if (in_array($action, $section_edit_actions, true)) {
         switch ($current_tab) {
             case 'pokemon':
                 global $wpdb;
@@ -446,6 +465,13 @@ function poke_hub_pokemon_admin_ui() {
                 return;
 
             case 'forms':
+                if ($action === 'replace') {
+                    if (function_exists('poke_hub_pokemon_render_form_variant_replace_screen')) {
+                        poke_hub_pokemon_render_form_variant_replace_screen();
+                    }
+                    break;
+                }
+
                 global $wpdb;
                 $edit_row = null;
 
@@ -813,6 +839,12 @@ function poke_hub_pokemon_admin_ui() {
             </a>
         <?php endif; ?>
 
+        <?php if ($current_tab === 'forms') : ?>
+            <a href="<?php echo esc_url( add_query_arg( [ 'page' => 'poke-hub-pokemon', 'ph_section' => 'forms', 'action' => 'replace' ], admin_url( 'admin.php' ) ) ); ?>" class="page-title-action">
+                <?php esc_html_e( 'Replace variant', 'poke-hub' ); ?>
+            </a>
+        <?php endif; ?>
+
         <hr class="wp-header-end" />
 
         <h2 class="nav-tab-wrapper">
@@ -1000,7 +1032,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
         );
     }
     
-    if ($section !== 'pokemon' && $section !== 'backgrounds' && $section !== 'biomes' && $section !== 'generations') {
+    if ($section !== 'pokemon' && $section !== 'backgrounds' && $section !== 'biomes' && $section !== 'generations' && $section !== 'forms') {
         return;
     }
 
@@ -1039,6 +1071,7 @@ function poke_hub_pokemon_admin_enqueue_assets($hook) {
             'selectLure'         => __('Select lure (optional)', 'poke-hub'),
             'selectTargetPokemon' => __('Select target Pokémon', 'poke-hub'),
             'searchGameRegions'   => __('Search regions by name…', 'poke-hub'),
+            'searchFormVariant'    => __('Search variant…', 'poke-hub'),
         ]
     );
 }

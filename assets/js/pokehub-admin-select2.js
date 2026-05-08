@@ -1038,5 +1038,30 @@ jQuery(function($) {
             matcher: typeof pokehubMultilingualMatcher !== 'undefined' ? pokehubMultilingualMatcher : undefined
         });
     });
+
+    /** Registre des variantes (remplacement GM, fiche Pokémon, filtre liste) — recherche sur le libellé affiché */
+    $('select.pokehub-variant-select-search').each(function() {
+        var $select = $(this);
+        if (!$select.length || typeof $.fn.select2 === 'undefined' || $select.data('select2')) {
+            return;
+        }
+        var ph = '';
+        if (typeof pokehubSelect2Strings !== 'undefined' && pokehubSelect2Strings.searchFormVariant) {
+            ph = pokehubSelect2Strings.searchFormVariant;
+        }
+        if (!ph) {
+            ph = 'Search variant…';
+        }
+        var allowClr =
+            !$select.prop('required') &&
+            !$select.hasClass('pokehub-variant-select-filter') &&
+            !$select.hasClass('pokehub-variant-select-disallow-clear');
+        $select.select2({
+            width: '100%',
+            placeholder: ph,
+            allowClear: allowClr,
+            matcher: typeof pokehubMultilingualMatcher !== 'undefined' ? pokehubMultilingualMatcher : undefined
+        });
+    });
 });
 

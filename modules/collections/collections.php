@@ -86,7 +86,7 @@ function poke_hub_collections_enqueue_front_assets() {
             'includeGender'   => __('Include sexual dimorphism', 'poke-hub'),
             'includeBothSexes' => __('Include male and female', 'poke-hub'),
             'onePerSpecies'   => __('Show only one entry per species', 'poke-hub'),
-            'includeRegionalForms' => __('Include regional forms', 'poke-hub'),
+            'includeRegionalForms' => __('Include geography-locked spawns (GO regionals)', 'poke-hub'),
             'includeCostumes' => __('Include costumed Pokémon', 'poke-hub'),
             'includeSpecialAttacks' => __('Include special attacks', 'poke-hub'),
             'notLoggedInWarning' => __('You are not logged in. This collection will be stored locally on this device.', 'poke-hub'),
@@ -162,6 +162,7 @@ function poke_hub_collections_enqueue_front_assets() {
             'pogoGroupFond_gigamax' => __('Gigantamax + background', 'poke-hub'),
             'pogoGroupFond_gigamaxDex' => __('G-Max + BG #', 'poke-hub'),
             'collectionDefaultNameLegendaryMythicalUltra' => __('Legendary, Mythical & Ultra Beasts', 'poke-hub'),
+            'collectionDefaultNameMega'                 => __('Mega & Primal', 'poke-hub'),
         ],
     ]);
 }

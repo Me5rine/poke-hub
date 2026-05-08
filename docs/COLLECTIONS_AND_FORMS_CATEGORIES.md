@@ -14,7 +14,7 @@ Les **formes** sont des variantes globales (un registre partagé). Chaque forme 
 - un **form_slug** (ex. `armored`, `fall-2019`, `halloween_2020`),
 - un **label** (nom affiché),
 - une **category** (type de forme), choisie dans la liste ci‑dessous ; l’**import Game Master** propose une valeur initiale (`poke_hub_pokemon_guess_form_type_from_gm`) que vous pouvez affiner à la main.
-- des **noms FR / EN** optionnels dans **`extra.names`** (`fr`, `en`) — saisis dans l’admin **Formes** ; le **label** sert de repli si une langue manque. Ces noms alimentent notamment les **préfixes** des phrases de recherche Pokémon GO du module Collections (`pogo_group_prefix_fr` / `pogo_group_prefix_en` sur le pool), selon la langue choisie par l’utilisateur sur le bloc GO. Voir **docs/COLLECTIONS_MODULE.md** (*Phrases GO : données serveur et langue*).
+- des **noms FR / EN** optionnels dans **`extra.names`** (`fr`, `en`) — saisis dans l’admin **Formes** ; le **label** sert de repli si une langue manque. Ces noms alimentent notamment les **préfixes** `pogo_group_prefix_fr` / `pogo_group_prefix_en` sur le pool pour les variantes dont le filtre dépend des données ; les autres filtres GO (chromatique, événement, fonds, sexe, contexte chanceux/bébés, etc.) sont assemblés côté client — voir **docs/COLLECTIONS_MODULE.md** (*Phrases GO : données serveur et langue*).
 
 ### Valeurs de type de forme (menu déroulant)
 

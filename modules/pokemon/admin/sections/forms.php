@@ -11,6 +11,7 @@ if (!class_exists('WP_List_Table')) {
 
 // Formulaire add/edit
 require_once POKE_HUB_POKEMON_PATH . '/admin/forms/form-form.php';
+require_once POKE_HUB_POKEMON_PATH . '/admin/forms/form-variant-replace.php';
 
 /**
  * Liste des formes globales (pokemon_form_variants).
@@ -32,6 +33,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'label'            => __('Label', 'poke-hub'),
             'category'         => __('Form type', 'poke-hub'),
             'group_key'        => __('Group key', 'poke-hub'),
+            'pokemon_count'    => __('Pokémon', 'poke-hub'),
             'events'           => __('Events', 'poke-hub'),
         ];
     }
@@ -42,6 +44,7 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'label'            => ['label', true],
             'category'         => ['category', true],
             'group_key'        => ['group_key', true],
+            'pokemon_count'    => ['pokemon_count', false],
         ];
     }
 
@@ -76,10 +79,21 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
             'poke_hub_delete_form_' . (int) $item->id
         );
 
+        $replace_url = add_query_arg(
+            [
+                'page'                 => 'poke-hub-pokemon',
+                'ph_section'           => 'forms',
+                'action'               => 'replace',
+                'replace_source_id'    => (int) $item->id,
+            ],
+            admin_url('admin.php')
+        );
+
         $title = esc_html($item->form_slug);
 
         $actions = [
             'edit'   => sprintf('<a href="%s">%s</a>', esc_url($edit_url), esc_html__('Edit', 'poke-hub')),
+            'replace' => sprintf('<a href="%s">%s</a>', esc_url($replace_url), esc_html__('Replace…', 'poke-hub')),
             'delete' => sprintf(
                 '<a href="%s" class="submitdelete" onclick="return confirm(\'%s\');">%s</a>',
                 esc_url($delete_url),
@@ -107,6 +121,11 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
     public function column_group_key($item) {
         // La colonne s'appelle 'group' dans la table (mot réservé MySQL)
         return esc_html(isset($item->group) ? $item->group : ($item->group_key ?? '—'));
+    }
+
+    public function column_pokemon_count($item) {
+        $n = isset($item->pokemon_count) ? (int) $item->pokemon_count : 0;
+        return esc_html(number_format_i18n($n));
     }
 
     public function column_events($item) {
@@ -231,55 +250,63 @@ class Poke_Hub_Pokemon_Forms_List_Table extends WP_List_Table {
         $current_page = $this->get_pagenum();
         $offset       = ($current_page - 1) * $per_page;
 
-        // Tri
-        $orderby = isset($_GET['orderby']) ? sanitize_key($_GET['orderby']) : 'form_slug';
-        $order   = isset($_GET['order']) ? strtoupper(sanitize_text_field($_GET['order'])) : 'ASC';
+        // Tri (fragments whitelistés pour fv / alias pokemon_count).
+        $orderby_key = isset($_GET['orderby']) ? sanitize_key((string) $_GET['orderby']) : 'form_slug';
+        $order       = isset($_GET['order']) ? strtoupper(sanitize_text_field(wp_unslash((string) $_GET['order']))) : 'ASC';
         if (!in_array($order, ['ASC', 'DESC'], true)) {
             $order = 'ASC';
         }
 
         $allowed_orderby = [
-            'form_slug',
-            'label',
-            'category',
-            '`group`',
+            'form_slug'     => 'fv.form_slug',
+            'group_key'     => 'fv.`group`',
+            'label'         => 'fv.label',
+            'category'      => 'fv.category',
+            'pokemon_count' => 'pokemon_count',
         ];
-        if (!in_array($orderby, $allowed_orderby, true)) {
-            $orderby = 'form_slug';
+        if (!isset($allowed_orderby[$orderby_key])) {
+            $orderby_key = 'form_slug';
         }
+        $orderby_sql = $allowed_orderby[$orderby_key];
+
+        $ptable = pokehub_get_table('pokemon');
+        $count_select = $ptable
+            ? '(SELECT COUNT(*) FROM ' . $ptable . ' p WHERE p.form_variant_id = fv.id) AS pokemon_count'
+            : 'CAST(0 AS UNSIGNED) AS pokemon_count';
 
         // Recherche
-        $search = isset($_REQUEST['s']) ? wp_unslash(trim($_REQUEST['s'])) : '';
+        $search = isset($_REQUEST['s']) ? wp_unslash(trim((string) $_REQUEST['s'])) : '';
         $where  = 'WHERE 1=1';
         $params = [];
 
         if ($search !== '') {
             // Recherche dans les champs principaux
             // MySQL LIKE est généralement insensible à la casse selon la collation
-            // Note: la colonne s'appelle `group` (avec backticks car mot réservé MySQL), pas group_key
+            // Note: la colonne s'appelle `group` dans la base (mot réservé MySQL), pas group_key
             $like = '%' . $wpdb->esc_like($search) . '%';
-            $where   .= ' AND (form_slug LIKE %s OR label LIKE %s OR category LIKE %s OR `group` LIKE %s';
+            $where   .= ' AND (fv.form_slug LIKE %s OR fv.label LIKE %s OR fv.category LIKE %s OR fv.`group` LIKE %s';
             $params[] = $like;
             $params[] = $like;
             $params[] = $like;
             $params[] = $like;
-            
+
             // Recherche aussi dans le champ extra (JSON) - recherche simple dans tout le JSON
-            // Cela permettra de trouver les traductions dans extra->names->fr et extra->names->en
-            $where   .= ' OR extra LIKE %s';
+            $where   .= ' OR fv.extra LIKE %s';
             $params[] = $like;
-            
+
             $where .= ')';
         }
 
         // Total items
-        $sql_count   = "SELECT COUNT(*) FROM {$table} {$where}";
+        $sql_count   = "SELECT COUNT(*) FROM {$table} AS fv {$where}";
         $total_items = $params
             ? (int) $wpdb->get_var($wpdb->prepare($sql_count, $params))
             : (int) $wpdb->get_var($sql_count);
 
-        // Items - sélectionner explicitement toutes les colonnes disponibles
-        $sql_items = "SELECT id, form_slug, label, category, `group`, extra FROM {$table} {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+        // Items (+ nombre de lignes pokemon par variant)
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- clauses ORDER/WHERE contrôlées par whitelist uniquement.
+        $sql_items = "SELECT fv.id, fv.form_slug, fv.label, fv.category, fv.`group`, fv.extra, {$count_select} FROM {$table} AS fv {$where} ORDER BY {$orderby_sql} {$order} LIMIT %d OFFSET %d";
+
         $params_items   = $params;
         $params_items[] = $per_page;
         $params_items[] = $offset;
@@ -641,6 +668,10 @@ function poke_hub_pokemon_admin_forms_screen() {
     // Bulk actions
     $list_table->process_bulk_action();
     $list_table->prepare_items();
+
+    if (function_exists('poke_hub_pokemon_form_variant_replace_notice_html')) {
+        echo poke_hub_pokemon_form_variant_replace_notice_html();
+    }
 
     // Notices (basées sur ph_msg)
     if (!empty($_GET['ph_msg'])) {

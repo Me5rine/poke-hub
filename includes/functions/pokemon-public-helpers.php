@@ -1210,6 +1210,314 @@ function poke_hub_pokemon_get_gender_profile(int $pokemon_id): array {
 }
 
 /**
+ * Liste des slugs (minuscules) pour un n° Pokédex (import *-family* / *-male* / *-female* / nu).
+ *
+ * @return list<string>
+ */
+function poke_hub_pokemon_binary_sex_family_slugs_for_dex(int $dex_number): array {
+    static $cache = [];
+    $dex_number = (int) $dex_number;
+    if ($dex_number <= 0) {
+        return [];
+    }
+    if (isset($cache[$dex_number])) {
+        return $cache[$dex_number];
+    }
+
+    global $wpdb;
+    if (!function_exists('pokehub_get_table') || !isset($wpdb) || !is_object($wpdb)) {
+        $cache[$dex_number] = [];
+
+        return [];
+    }
+
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        $cache[$dex_number] = [];
+
+        return [];
+    }
+
+    $col = $wpdb->get_col(
+        $wpdb->prepare(
+            "SELECT DISTINCT LOWER(TRIM(slug)) FROM {$table}
+             WHERE dex_number = %d AND slug IS NOT NULL AND TRIM(slug) != ''",
+            $dex_number
+        )
+    );
+    if (!is_array($col)) {
+        $col = [];
+    }
+    $cache[$dex_number] = array_values(array_filter(array_map('strval', $col)));
+
+    return $cache[$dex_number];
+}
+
+/**
+ * Extrait la tige (sans -family / -male / -female) depuis un slug de fiche.
+ */
+function poke_hub_pokemon_binary_sex_family_stem_from_slug_lc(string $slug_lc): ?string {
+    $slug_lc = strtolower(trim($slug_lc));
+    if ($slug_lc === '') {
+        return null;
+    }
+    if (preg_match('/^(.+)-family$/', $slug_lc, $m)) {
+        return strtolower(trim((string) ($m[1] ?? ''))) ?: null;
+    }
+    if (preg_match('/^(.+)-female$/', $slug_lc, $m)) {
+        return strtolower(trim((string) ($m[1] ?? ''))) ?: null;
+    }
+    if (preg_match('/^(.+)-male$/', $slug_lc, $m)) {
+        return strtolower(trim((string) ($m[1] ?? ''))) ?: null;
+    }
+
+    return $slug_lc;
+}
+
+/**
+ * true si le même n° a une famille sexe binaire (*-family* + binôme comme les collections).
+ */
+function poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs(array $slugs_lc): bool {
+    /** @var array<string, array{bare?:bool,male?:bool,female?:bool}> $stem_sig */
+    $stem_sig = [];
+    foreach ($slugs_lc as $raw) {
+        $s = strtolower(trim((string) $raw));
+        if ($s === '' || preg_match('/-family$/', $s)) {
+            continue;
+        }
+        if (preg_match('/^(.+)-female$/', $s, $mf)) {
+            $stem = strtolower(trim((string) ($mf[1] ?? '')));
+            if ($stem !== '') {
+                $stem_sig[$stem]['female'] = true;
+            }
+
+            continue;
+        }
+        if (preg_match('/^(.+)-male$/', $s, $mm)) {
+            $stem = strtolower(trim((string) ($mm[1] ?? '')));
+            if ($stem !== '') {
+                $stem_sig[$stem]['male'] = true;
+            }
+
+            continue;
+        }
+        $stem_sig[$s]['bare'] = true;
+    }
+
+    foreach ($stem_sig as $stem => $flags) {
+        $has_b = !empty($flags['bare']);
+        $has_f = !empty($flags['female']);
+        $has_m = !empty($flags['male']);
+        if ($has_m && $has_f && !$has_b) {
+            return true;
+        }
+        if ($has_b && $has_f && !$has_m) {
+            return true;
+        }
+        if ($has_b && $has_m && !$has_f) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Slug à utiliser dans la construction de clé de fichier pour une colonne d’aperçu admin ♂/♀ (familles sexe).
+ *
+ * @param list<string> $slugs_lc
+ */
+function poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column(string $stem, string $gender, array $slugs_lc): string {
+    $stem = strtolower(trim($stem));
+    $gender = strtolower(trim($gender));
+    $has_b = in_array($stem, $slugs_lc, true);
+    $has_f = in_array($stem . '-female', $slugs_lc, true);
+    $has_m = in_array($stem . '-male', $slugs_lc, true);
+
+    if ($gender === 'male') {
+        if ($has_m) {
+            return $stem . '-male';
+        }
+
+        return $stem;
+    }
+
+    if ($gender === 'female') {
+        if ($has_f) {
+            return $stem . '-female';
+        }
+
+        return $stem;
+    }
+
+    return $stem;
+}
+
+/**
+ * Genre fichier sprite (-male / -suffixe) pour une fiche Pokémon : familles *-family* + binômes slug sans dimorphisme Pokédex.
+ *
+ * @return 'male'|'female'|null
+ */
+function poke_hub_pokemon_binary_sex_family_infer_asset_gender(int $pokemon_id): ?string {
+    static $memo = [];
+
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0) {
+        return null;
+    }
+    if (array_key_exists($pokemon_id, $memo)) {
+        return $memo[$pokemon_id];
+    }
+
+    $memo[$pokemon_id] = null;
+
+    if (!function_exists('pokehub_get_table')) {
+        return null;
+    }
+
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return null;
+    }
+
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        return null;
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT slug, dex_number FROM {$table} WHERE id = %d LIMIT 1",
+            $pokemon_id
+        ),
+        ARRAY_A
+    );
+    if (!is_array($row)) {
+        return null;
+    }
+
+    $slug_lc = strtolower(trim((string) ($row['slug'] ?? '')));
+    $dex = (int) ($row['dex_number'] ?? 0);
+    if ($slug_lc === '' || $dex <= 0) {
+        return null;
+    }
+
+    if (preg_match('/-female$/', $slug_lc) || preg_match('/-male$/', $slug_lc)) {
+        return null;
+    }
+
+    $slugs_lc = poke_hub_pokemon_binary_sex_family_slugs_for_dex($dex);
+    $stem = poke_hub_pokemon_binary_sex_family_stem_from_slug_lc($slug_lc);
+    if ($stem === null || $stem === '') {
+        return null;
+    }
+
+    $has_b = in_array($stem, $slugs_lc, true);
+    $has_f = in_array($stem . '-female', $slugs_lc, true);
+    $has_m = in_array($stem . '-male', $slugs_lc, true);
+    $has_fam = in_array($stem . '-family', $slugs_lc, true);
+
+    // Carte famille : même fichier conventionnel que la forme ♂ (assets souvent *-male*).
+    if (preg_match('/-family$/', $slug_lc)) {
+        if ($has_fam && poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($slugs_lc)) {
+            $memo[$pokemon_id] = 'male';
+
+            return 'male';
+        }
+
+        return null;
+    }
+
+    // Nu : jumelage avec une seule forme suffixée → genre fichier opposé à la forme explicite absente.
+    if (!$has_f && !$has_m && !$has_b) {
+        return null;
+    }
+    if ($has_b && $has_f && !$has_m) {
+        $memo[$pokemon_id] = 'male';
+
+        return 'male';
+    }
+    if ($has_b && $has_m && !$has_f) {
+        $memo[$pokemon_id] = 'female';
+
+        return 'female';
+    }
+
+    return null;
+}
+
+/**
+ * Ligne d’aide sous le champ slug (admin) pour les familles sexe binaire.
+ */
+function poke_hub_pokemon_binary_sex_family_admin_slug_asset_hint(int $pokemon_id): string {
+    $pokemon_id = (int) $pokemon_id;
+    if ($pokemon_id <= 0 || !function_exists('poke_hub_pokemon_binary_sex_family_infer_asset_gender')) {
+        return '';
+    }
+
+    global $wpdb;
+    if (!isset($wpdb) || !is_object($wpdb) || !function_exists('pokehub_get_table')) {
+        return '';
+    }
+
+    $table = pokehub_get_table('pokemon');
+    if (!$table) {
+        return '';
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT slug, dex_number FROM {$table} WHERE id = %d LIMIT 1",
+            $pokemon_id
+        ),
+        ARRAY_A
+    );
+    if (!is_array($row)) {
+        return '';
+    }
+
+    $dex = (int) ($row['dex_number'] ?? 0);
+    if ($dex <= 0) {
+        return '';
+    }
+
+    $slugs_lc = poke_hub_pokemon_binary_sex_family_slugs_for_dex($dex);
+    if ($slugs_lc === [] || !poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($slugs_lc)) {
+        return '';
+    }
+
+    $stem = poke_hub_pokemon_binary_sex_family_stem_from_slug_lc(strtolower(trim((string) ($row['slug'] ?? ''))));
+    if ($stem === null || $stem === '') {
+        return '';
+    }
+
+    $male_slug = poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column($stem, 'male', $slugs_lc);
+    $fem_slug = poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column($stem, 'female', $slugs_lc);
+
+    $infer = poke_hub_pokemon_binary_sex_family_infer_asset_gender($pokemon_id);
+    $suffix_note = '';
+    if ($infer === 'male') {
+        $suffix_note = __('Les sprites suivent la convention mâle (suffixe −male sur le nom de fichier si besoin).', 'poke-hub');
+    } elseif ($infer === 'female') {
+        $suffix_note = __('Les sprites suivent la convention femelle (suffixe −female sur le nom de fichier si besoin).', 'poke-hub');
+    }
+
+    $parts = [
+        sprintf(
+            /* translators: 1: slug male preview 2: slug female preview */
+            __('Famille à sexes sur le même n° Pokédex : l’aperçu utilise les clés de fichier %1$s / %2$s lorsque les variantes existent.', 'poke-hub'),
+            '<code>' . esc_html($male_slug) . '</code>',
+            '<code>' . esc_html($fem_slug) . '</code>'
+        ),
+    ];
+    if ($suffix_note !== '') {
+        $parts[] = $suffix_note;
+    }
+
+    return implode(' ', $parts);
+}
+
+/**
  * Genre à utiliser pour les sprites (et tout appelant qui s’aligne sur la même règle).
  *
  * @param int               $pokemon_id    ID du Pokémon en base.
@@ -1217,23 +1525,29 @@ function poke_hub_pokemon_get_gender_profile(int $pokemon_id): array {
  * @return string|null male, female, ou null (pas de suffixe genre sur le fichier).
  */
 function poke_hub_pokemon_determine_gender($pokemon_id, $forced_gender = null) {
+    if (!empty($forced_gender) && in_array($forced_gender, ['male', 'female'], true)) {
+        return $forced_gender;
+    }
+
     $pokemon_id = (int) $pokemon_id;
     if ($pokemon_id <= 0) {
         return null;
     }
-    
-    // Si un genre est forcé, l'utiliser
-    if (!empty($forced_gender) && in_array($forced_gender, ['male', 'female'], true)) {
-        return $forced_gender;
-    }
-    
+
     if (function_exists('poke_hub_pokemon_get_gender_profile')) {
         $profile = poke_hub_pokemon_get_gender_profile($pokemon_id);
         if (!empty($profile['default_gender']) && in_array($profile['default_gender'], ['male', 'female'], true)) {
             return $profile['default_gender'];
         }
     }
-    
+
+    if (function_exists('poke_hub_pokemon_binary_sex_family_infer_asset_gender')) {
+        $infer = poke_hub_pokemon_binary_sex_family_infer_asset_gender($pokemon_id);
+        if ($infer !== null && in_array($infer, ['male', 'female'], true)) {
+            return $infer;
+        }
+    }
+
     return null;
 }
 
@@ -1465,7 +1779,7 @@ function pokehub_pokemon_select_category_rank(string $category): int {
     if (in_array($category, ['costume', 'costumed', 'clone'], true)) {
         return 2;
     }
-    if (in_array($category, ['mega', 'megax', 'primal'], true)) {
+    if (in_array($category, ['mega', 'primal'], true)) {
         return 3;
     }
     if ($category === 'gigantamax') {

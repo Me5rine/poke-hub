@@ -201,6 +201,22 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         ? (int) $edit_row->buddy_walked_mega_energy_award
         : (int) ($go_buddy['buddy_mega_energy_award'] ?? 0);
 
+    // Costume : méga via l’espèce de base (détails résolus à l’affichage / import GM)
+    $mega_evolution_via_base_species = ! empty($extra['mega_evolution_via_base_species']);
+
+    // Fiche Méga / Primo uniquement : coûts (extra.temp_evolution ; temp_evo_id préservé côté serveur ou défaut selon variante)
+    $extra_temp_evolution   = is_array($extra['temp_evolution'] ?? null) ? $extra['temp_evolution'] : [];
+    $extra_temp_energy_cost = isset($extra_temp_evolution['energy_cost']) ? (string) (int) $extra_temp_evolution['energy_cost'] : '';
+    if ($extra_temp_energy_cost === '0') {
+        $extra_temp_energy_cost = '';
+    }
+    $extra_temp_energy_sub  = isset($extra_temp_evolution['energy_cost_subsequent'])
+        ? (string) (int) $extra_temp_evolution['energy_cost_subsequent']
+        : '';
+    if ($extra_temp_energy_sub === '0') {
+        $extra_temp_energy_sub = '';
+    }
+
     $attack_probability = $is_edit
         ? (float) $edit_row->attack_probability
         : (float) ($go_encounter['attack_probability'] ?? 0.0);
@@ -312,6 +328,17 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
     if ($selected_form_is_costume) {
         $is_event_costumed = true;
     }
+
+    /** @var bool Indique que cette fiche n’existe en jeu qu’avec au moins un fond GO lié (donnée sur pokemon_background_pokemon_links, pas dans extra). */
+    $exists_only_with_go_background = $is_edit && !empty($edit_row->id) && function_exists('poke_hub_pokemon_any_base_link_pokemon_only_with_this_bg')
+        ? poke_hub_pokemon_any_base_link_pokemon_only_with_this_bg((int) $edit_row->id)
+        : false;
+
+    $selected_variant_category_lc = '';
+    if ($form_variant_id > 0 && isset($form_variant_labels[$form_variant_id]['category'])) {
+        $selected_variant_category_lc = strtolower(trim((string) $form_variant_labels[$form_variant_id]['category']));
+    }
+    $selected_form_is_mega_or_primal = in_array($selected_variant_category_lc, ['mega', 'primal'], true);
 
     // Événements associés au Pokémon (quand marqué événement/costumé)
     $current_pokemon_events = [];
@@ -674,6 +701,16 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
             </div>
 
+            <div id="pokehub-exists-only-bg-wrap" class="admin-lab-form-section">
+                <div class="admin-lab-form-group">
+                    <label style="display: flex; align-items: flex-start; gap: 8px;">
+                        <input type="checkbox" name="exists_only_with_go_background" value="1" <?php checked($exists_only_with_go_background); ?> style="margin-top: 3px;" />
+                        <span><?php esc_html_e('This Pokémon only exists with a linked GO background', 'poke-hub'); ?></span>
+                    </label>
+                    <p class="description"><?php esc_html_e('Use when there is no valid standalone sprite for this entry (costume, Gigantamax, normal form…): it only appears together with a GO background. Collections will keep this Pokémon visible when filtering costumes or backgrounds would otherwise hide the only possible representation. Pair with Backgrounds → exclusive pairing when relevant.', 'poke-hub'); ?></p>
+                </div>
+            </div>
+
             <!-- Event Association (visible lorsque le Pokémon est marqué événement/costumé) -->
             <div id="pokehub-pokemon-event-association-wrap" class="admin-lab-form-section" style="display:<?php echo $is_event_costumed ? 'block' : 'none'; ?>;">
                 <h3><?php esc_html_e('Event Association', 'poke-hub'); ?></h3>
@@ -712,6 +749,19 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <label for="slug"><?php esc_html_e('Slug', 'poke-hub'); ?></label>
                         <input type="text" name="slug" id="slug" value="<?php echo esc_attr($slug); ?>" />
                         <p class="description"><?php esc_html_e('Used in URLs, must be unique.', 'poke-hub'); ?></p>
+                        <?php
+                        if ($is_edit && isset($edit_row->id) && function_exists('poke_hub_pokemon_binary_sex_family_admin_slug_asset_hint')) {
+                            $slug_asset_hint = poke_hub_pokemon_binary_sex_family_admin_slug_asset_hint((int) $edit_row->id);
+                            if ($slug_asset_hint !== '') {
+                                echo '<p class="description">' . wp_kses(
+                                    $slug_asset_hint,
+                                    [
+                                        'code' => [],
+                                    ]
+                                ) . '</p>';
+                            }
+                        }
+                        ?>
                     </div>
                 </div>
             </div>
@@ -720,12 +770,15 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <div class="admin-lab-form-col-50">
                     <div class="admin-lab-form-group">
                         <label for="form_variant_id"><?php esc_html_e('Form / variant', 'poke-hub'); ?></label>
-                        <select name="form_variant_id" id="form_variant_id">
+                        <select name="form_variant_id" id="form_variant_id" class="pokehub-variant-select-search pokehub-variant-select-disallow-clear">
                             <option value="0"><?php esc_html_e('Default form (no variant)', 'poke-hub'); ?></option>
                             <?php if (!empty($form_variant_labels)) : ?>
                                 <?php foreach ($form_variant_labels as $variant_id => $data) : ?>
                                     <option value="<?php echo (int) $variant_id; ?>" <?php selected($form_variant_id, (int) $variant_id); ?>>
-                                        <?php echo esc_html($data['label']); ?>
+                                        <?php
+                                        $slug = isset($data['form_slug']) ? (string) $data['form_slug'] : '';
+                                        echo esc_html($slug !== '' ? $data['label'] . ' — ' . $slug : $data['label']);
+                                        ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -764,6 +817,14 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         <?php
         $show_sprite_preview = (function_exists('poke_hub_pokemon_get_image_sources') || function_exists('poke_hub_pokemon_get_image_url'))
             && (($slug !== '') || ($dex_number > 0));
+        $dex_for_bin_preview = (int) $dex_number;
+        $bin_slugs_preview = ($dex_for_bin_preview > 0 && function_exists('poke_hub_pokemon_binary_sex_family_slugs_for_dex'))
+            ? poke_hub_pokemon_binary_sex_family_slugs_for_dex($dex_for_bin_preview)
+            : [];
+        $show_binary_sex_family_sprite_preview = $dex_for_bin_preview > 0
+            && function_exists('poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs')
+            && poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($bin_slugs_preview);
+
         if ($show_sprite_preview) :
             $preview_pokemon = (object) [
                 'id'         => ($is_edit && isset($edit_row->id)) ? (int) $edit_row->id : 0,
@@ -775,32 +836,68 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         <div class="admin-lab-form-section pokehub-pokemon-sprite-preview-section">
             <h2><?php esc_html_e('Sprite preview', 'poke-hub'); ?></h2>
             <p class="description">
-                <?php esc_html_e('Preview of sprites from your configured Pokémon asset base URL: normal and shiny. If gender dimorphism is enabled, male and female variants are shown.', 'poke-hub'); ?>
+                <?php
+                if ($show_binary_sex_family_sprite_preview && !$has_gender_dimorphism) {
+                    esc_html_e('Même règle que le front pour les familles à sexes : un slug sans −male/−female peut cibler les fichiers −male ou −female selon les autres fiches du même n° national.', 'poke-hub');
+                } else {
+                    esc_html_e('Preview of sprites from your configured Pokémon asset base URL: normal and shiny. If gender dimorphism is enabled, male and female variants are shown.', 'poke-hub');
+                }
+                ?>
             </p>
             <div class="pokehub-pokemon-sprite-preview-grid" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
                 <?php
                 $preview_cells = [];
 
-                if ($has_gender_dimorphism) {
-                    $src_normal_male = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false, 'gender' => 'male']);
+                $show_quad_sprites = $has_gender_dimorphism || $show_binary_sex_family_sprite_preview;
+
+                if ($show_quad_sprites) {
+                    $pv_male_obj = $preview_pokemon;
+                    $pv_fem_obj  = $preview_pokemon;
+                    if (!$has_gender_dimorphism && $show_binary_sex_family_sprite_preview) {
+                        $stem_pv = strtolower(trim((string) $slug));
+                        if (function_exists('poke_hub_pokemon_binary_sex_family_stem_from_slug_lc')) {
+                            $st = poke_hub_pokemon_binary_sex_family_stem_from_slug_lc($stem_pv);
+                            if ($st !== null && $st !== '') {
+                                $stem_pv = $st;
+                            }
+                        }
+                        $male_slug_pv = function_exists('poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column')
+                            ? poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column($stem_pv, 'male', $bin_slugs_preview)
+                            : $stem_pv;
+                        $fem_slug_pv = function_exists('poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column')
+                            ? poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column($stem_pv, 'female', $bin_slugs_preview)
+                            : $stem_pv;
+                        $pv_male_obj = (object) [
+                            'id'         => 0,
+                            'slug'       => $male_slug_pv,
+                            'dex_number' => $dex_for_bin_preview,
+                        ];
+                        $pv_fem_obj = (object) [
+                            'id'         => 0,
+                            'slug'       => $fem_slug_pv,
+                            'dex_number' => $dex_for_bin_preview,
+                        ];
+                    }
+
+                    $src_normal_male = poke_hub_pokemon_get_sprite_display_sources($pv_male_obj, ['shiny' => false, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Normal (male)', 'poke-hub'),
                         'src'   => $src_normal_male['src'],
                         'fallback' => $src_normal_male['fallback'],
                     ];
-                    $src_normal_female = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false, 'gender' => 'female']);
+                    $src_normal_female = poke_hub_pokemon_get_sprite_display_sources($pv_fem_obj, ['shiny' => false, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Normal (female)', 'poke-hub'),
                         'src'   => $src_normal_female['src'],
                         'fallback' => $src_normal_female['fallback'],
                     ];
-                    $src_shiny_male = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => true, 'gender' => 'male']);
+                    $src_shiny_male = poke_hub_pokemon_get_sprite_display_sources($pv_male_obj, ['shiny' => true, 'gender' => 'male']);
                     $preview_cells[] = [
                         'label' => __('Shiny (male)', 'poke-hub'),
                         'src'   => $src_shiny_male['src'],
                         'fallback' => $src_shiny_male['fallback'],
                     ];
-                    $src_shiny_female = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => true, 'gender' => 'female']);
+                    $src_shiny_female = poke_hub_pokemon_get_sprite_display_sources($pv_fem_obj, ['shiny' => true, 'gender' => 'female']);
                     $preview_cells[] = [
                         'label' => __('Shiny (female)', 'poke-hub'),
                         'src'   => $src_shiny_female['src'],
@@ -1073,6 +1170,42 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                     </div>
                 </div>
             </div>
+
+            <?php if ($selected_form_is_mega_or_primal) : ?>
+                <div class="admin-lab-form-group">
+                    <h4 style="margin: 1em 0 0.5em;"><?php esc_html_e('Mega evolution (GO)', 'poke-hub'); ?></h4>
+                    <p class="description"><?php esc_html_e('Mega / Primal energy costs for this form (Pokémon GO).', 'poke-hub'); ?></p>
+                    <div class="admin-lab-form-row">
+                        <div class="admin-lab-form-col-50">
+                            <div class="admin-lab-form-group">
+                                <label for="mega_go_energy_cost_first"><?php esc_html_e('First evolution energy cost', 'poke-hub'); ?></label>
+                                <input type="number" min="0" name="mega_go_energy_cost_first" id="mega_go_energy_cost_first"
+                                       style="max-width: 180px;"
+                                       value="<?php echo esc_attr($extra_temp_energy_cost); ?>" />
+                            </div>
+                        </div>
+                        <div class="admin-lab-form-col-50">
+                            <div class="admin-lab-form-group">
+                                <label for="mega_go_energy_cost_subsequent"><?php esc_html_e('Subsequent evolution energy cost', 'poke-hub'); ?></label>
+                                <input type="number" min="0" name="mega_go_energy_cost_subsequent" id="mega_go_energy_cost_subsequent"
+                                       style="max-width: 180px;"
+                                       value="<?php echo esc_attr($extra_temp_energy_sub); ?>" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($selected_form_is_costume) : ?>
+                <div class="admin-lab-form-group">
+                    <h4 style="margin: 1em 0 0.5em;"><?php esc_html_e('Costume — mega evolution', 'poke-hub'); ?></h4>
+                    <label style="display: flex; align-items: flex-start; gap: 8px;">
+                        <input type="checkbox" name="mega_evolution_via_base_species" value="1" <?php checked($mega_evolution_via_base_species); ?> />
+                        <span><?php esc_html_e('Can mega-evolve using the base species mega form', 'poke-hub'); ?></span>
+                    </label>
+                    <p class="description"><?php esc_html_e('Details (targets, energy) are resolved at display time.', 'poke-hub'); ?></p>
+                </div>
+            <?php endif; ?>
 
             <div class="admin-lab-form-row">
                 <div class="admin-lab-form-col-50">

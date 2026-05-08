@@ -448,7 +448,7 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
             <label class="screen-reader-text" for="filter_form_variant_id">
                 <?php _e('Filter by form', 'poke-hub'); ?>
             </label>
-            <select name="filter_form_variant_id" id="filter_form_variant_id">
+            <select name="filter_form_variant_id" id="filter_form_variant_id" class="pokehub-variant-select-search pokehub-variant-select-filter">
                 <option value="0"><?php _e('All forms', 'poke-hub'); ?></option>
                 <?php foreach ($forms as $form_row) : ?>
                     <?php
@@ -2085,6 +2085,17 @@ function poke_hub_pokemon_handle_pokemon_form() {
         ? (int) $_POST['buddy_mega_energy_award']
         : 0;
 
+    $variant_category_lc_save = strtolower(trim((string) $variant_category));
+
+    $mega_go_energy_cost_first_form = isset($_POST['mega_go_energy_cost_first'])
+        && wp_unslash((string) $_POST['mega_go_energy_cost_first']) !== ''
+        ? (int) $_POST['mega_go_energy_cost_first']
+        : 0;
+    $mega_go_energy_cost_subsequent_form = isset($_POST['mega_go_energy_cost_subsequent'])
+        && wp_unslash((string) $_POST['mega_go_energy_cost_subsequent']) !== ''
+        ? (int) $_POST['mega_go_energy_cost_subsequent']
+        : 0;
+
     $attack_probability = isset($_POST['attack_probability'])
         ? (float) str_replace(',', '.', $_POST['attack_probability'])
         : 0.0;
@@ -2360,10 +2371,59 @@ function poke_hub_pokemon_handle_pokemon_form() {
     $extra['is_event_costumed']  = (bool) $is_event_costumed;
     $extra['has_gmax_form']      = (bool) $has_gmax_form;
     $extra['is_baby']            = (bool) $is_baby;
+    unset($extra['exists_only_with_go_background'], $extra['costume_only_with_linked_background']);
     if ($species_special_group === '') {
         unset($extra['species_special_group']);
     } else {
         $extra['species_special_group'] = $species_special_group;
+    }
+
+    // Costume uniquement : drapeau méga vers l’espèce de base (cibles / coûts : affichage ou import GM)
+    if ($variant_category_lc_save === 'costume') {
+        if (!empty($_POST['mega_evolution_via_base_species'])) {
+            $extra['mega_evolution_via_base_species'] = true;
+        } else {
+            unset($extra['mega_evolution_via_base_species']);
+        }
+    } elseif (!in_array($variant_category_lc_save, ['clone'], true)) {
+        unset($extra['mega_evolution_via_base_species']);
+    }
+
+    // Variante Méga / Primo : coûts extra.temp_evolution (temp_evo_id conservé depuis l’existing ou défaut depuis la forme)
+    if (in_array($variant_category_lc_save, ['mega', 'primal'], true)) {
+        $preserved_teid = '';
+        if (isset($extra['temp_evolution']) && is_array($extra['temp_evolution'])) {
+            $preserved_teid = isset($extra['temp_evolution']['temp_evo_id'])
+                ? trim((string) $extra['temp_evolution']['temp_evo_id'])
+                : '';
+        }
+        if ($preserved_teid === '') {
+            if ($variant_category_lc_save === 'primal') {
+                $preserved_teid = 'TEMP_EVOLUTION_PRIMAL';
+            } else {
+                $fs = strtolower(trim((string) $variant_form_slug));
+                if ($fs === 'mega-x' || (strlen($fs) >= 7 && substr($fs, -7) === '-mega-x')) {
+                    $preserved_teid = 'TEMP_EVOLUTION_MEGA_X';
+                } elseif ($fs === 'mega-y' || (strlen($fs) >= 7 && substr($fs, -7) === '-mega-y')) {
+                    $preserved_teid = 'TEMP_EVOLUTION_MEGA_Y';
+                } else {
+                    $preserved_teid = 'TEMP_EVOLUTION_MEGA';
+                }
+            }
+        }
+
+        $has_energy = ($mega_go_energy_cost_first_form > 0 || $mega_go_energy_cost_subsequent_form > 0);
+        if ($has_energy || $preserved_teid !== '') {
+            $extra['temp_evolution'] = [
+                'temp_evo_id'            => $preserved_teid,
+                'energy_cost'            => $mega_go_energy_cost_first_form,
+                'energy_cost_subsequent' => $mega_go_energy_cost_subsequent_form,
+            ];
+        } else {
+            unset($extra['temp_evolution']);
+        }
+    } else {
+        unset($extra['temp_evolution']);
     }
 
     // ---------- Bloc par jeu : Pokémon GO ----------
@@ -2476,6 +2536,11 @@ function poke_hub_pokemon_handle_pokemon_form() {
         }
     }
 
+    // Liaisons fond « classiques » : flag uniquement en base (pokemon_background_pokemon_links), pas dans extra.
+    if ($is_update && $id > 0 && function_exists('poke_hub_sync_pokemon_only_with_background_links')) {
+        poke_hub_sync_pokemon_only_with_background_links((int) $id, !empty($_POST['exists_only_with_go_background']));
+    }
+
     // ---------- Data communs ----------
 
     $extra_json = null;
@@ -2572,7 +2637,24 @@ function poke_hub_pokemon_handle_pokemon_form() {
             poke_hub_pokemon_sync_pokemon_biome_links($pokemon_id, $pokemon_biome_ids);
         }
 
-        wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
+        $redirect_args = ['ph_msg' => 'saved'];
+        if ($pokemon_id > 0 && !empty($_POST['exists_only_with_go_background'])) {
+            $links_table_warn = pokehub_get_table('pokemon_background_pokemon_links');
+            $n_bg             = 0;
+            if ($links_table_warn) {
+                $n_bg = (int) $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$links_table_warn} WHERE pokemon_id = %d",
+                        $pokemon_id
+                    )
+                );
+            }
+            if ($n_bg === 0) {
+                $redirect_args['ph_warn'] = 'costume_needs_background_link';
+            }
+        }
+
+        wp_redirect(add_query_arg($redirect_args, $redirect_base));
         exit;
     }
 
@@ -2647,7 +2729,24 @@ function poke_hub_pokemon_handle_pokemon_form() {
         poke_hub_pokemon_sync_pokemon_biome_links($id, $pokemon_biome_ids);
     }
 
-    wp_redirect(add_query_arg('ph_msg', 'updated', $redirect_base));
+    $redirect_args = ['ph_msg' => 'updated'];
+    if ($id > 0 && !empty($_POST['exists_only_with_go_background'])) {
+        $links_table_warn = pokehub_get_table('pokemon_background_pokemon_links');
+        $n_bg             = 0;
+        if ($links_table_warn) {
+            $n_bg = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$links_table_warn} WHERE pokemon_id = %d",
+                    $id
+                )
+            );
+        }
+        if ($n_bg === 0) {
+            $redirect_args['ph_warn'] = 'costume_needs_background_link';
+        }
+    }
+
+    wp_redirect(add_query_arg($redirect_args, $redirect_base));
     exit;
 }
 add_action('admin_init', 'poke_hub_pokemon_handle_pokemon_form');
@@ -2676,6 +2775,12 @@ function poke_hub_pokemon_admin_pokemon_screen() {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Unable to duplicate this Pokémon.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_id') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Invalid Pokémon ID.', 'poke-hub') . '</p></div>';
+        }
+    }
+    if (!empty($_GET['ph_warn'])) {
+        $warn = sanitize_key(wp_unslash((string) $_GET['ph_warn']));
+        if ($warn === 'costume_needs_background_link') {
+            echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__('This Pokémon is marked as only existing with a GO background, but no background link was found. Link it under Pokémon → Backgrounds.', 'poke-hub') . '</p></div>';
         }
     }
     ?>

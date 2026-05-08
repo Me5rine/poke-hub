@@ -74,6 +74,12 @@ Les fiches **déjà en base** avec une génération erronée ne sont pas recalcu
 - Pas d'update si la valeur n'a pas changé.
 - Si `extra` est invalide : ligne ignorée (pas d'écrasement).
 
+## Formulaire admin Pokémon (édition manuelle)
+
+- Le formulaire admin (`modules/pokemon/admin/sections/pokemon.php`) part de `extra` existant puis fusionne, mais avec une règle explicite pour les noms i18n : via `poke_hub_pokemon_gm_merge_extra_names_with_existing(..., false)`, une **chaîne vide envoyée dans le formulaire** pour une langue existante est traitée comme une **suppression volontaire** (on ne réinjecte plus l’ancienne valeur de `extra['names']` pour cette langue).
+- Les langues absentes du formulaire (clés présentes uniquement dans `extra['names']`) restent conservées.
+- Après `UPDATE`, l’auto-fetch Bulbapedia (`poke_hub_pokemon_auto_fetch_translations`) est appelé en mode admin avec remplissage limité : il ne complète que les **clés manquantes** et ne réécrit pas une clé déjà présente, y compris si sa valeur est vide (effacement volontaire).
+
 ### Bulk Fetch Bulbapedia
 
 - Cible les lignes ayant au moins une langue manquante parmi `fr,de,it,es,ja,ko` (hors mode force).
@@ -112,6 +118,14 @@ Avant **`DELETE`** sur **`pokemon`**, l’admin appelle **`poke_hub_pokemon_dele
 - **`pokemon_evolutions`** : suppression des lignes où **`base_pokemon_id`** ou **`target_pokemon_id`** figure dans cet ensemble.
 
 Cela vaut pour la **suppression unitaire** et la **suppression groupée** depuis la liste Pokémon (`modules/pokemon/admin/sections/pokemon.php`). Sans ce nettoyage, un **truncate ou vidage massif de `pokemon`** sans purge des liaisons peut laisser des **orphans** (types ou évolutions pointant vers d’anciens IDs réattribués) et produire des affichages erronés en front jusqu’à un réimport ou une purge manuelle des tables concernées.
+
+## Duplication admin des fiches Pokémon
+
+Lors d’un clone (`action=clone`, `poke_hub_pokemon_duplicate_pokemon`) :
+
+- Les drapeaux SQL **`has_shadow`** et **`has_purified`** sont réinitialisés à `0`, avec les coûts de purification (`shadow_purification_stardust`, `shadow_purification_candy`) remis à `0`.
+- Le JSON `extra` est ajusté (`poke_hub_pokemon_clone_adjust_extra_after_copy`) : suppression de `extra['has_gmax_form']`, remise à `false/0` des informations `shadow` (racine et bloc GO quand présent), nettoyage des clés `shadow_move` / `purified_move`.
+- Les liaisons d’attaques clonées excluent le rôle **`gmax`** pour éviter de réactiver implicitement l’état Gigamax sur la copie.
 
 ## Points d'attention
 

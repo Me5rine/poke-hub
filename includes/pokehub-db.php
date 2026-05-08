@@ -512,6 +512,7 @@ class Pokehub_DB {
             name_fr VARCHAR(191) NOT NULL DEFAULT '',
             title VARCHAR(255) NOT NULL DEFAULT '',
             background_type VARCHAR(50) NOT NULL DEFAULT 'special',
+            exists_only_with_costume TINYINT(1) NOT NULL DEFAULT 0,
             image_url TEXT NULL,
             event_id BIGINT(20) UNSIGNED NULL DEFAULT NULL,
             event_type VARCHAR(50) NOT NULL DEFAULT '', -- 'local_event', 'remote_event', 'special_event' (libellés logiques)
@@ -523,6 +524,7 @@ class Pokehub_DB {
             KEY name_en (name_en(191)),
             KEY name_fr (name_fr(191)),
             KEY background_type (background_type),
+            KEY exists_only_with_costume (exists_only_with_costume),
             KEY event_id (event_id),
             KEY event_type (event_type)
         ) {$charset_collate};";
@@ -535,10 +537,16 @@ class Pokehub_DB {
             pokemon_id BIGINT(20) UNSIGNED NOT NULL,
             is_shiny_locked TINYINT(1) NOT NULL DEFAULT 0,
             link_kind VARCHAR(20) NOT NULL DEFAULT 'base',
+            exclusive_pairing TINYINT(1) NOT NULL DEFAULT 0,
+            pokemon_only_with_this_background TINYINT(1) NOT NULL DEFAULT 0,
+            background_costume_only TINYINT(1) NOT NULL DEFAULT 0,
             PRIMARY KEY (id),
             KEY background_id (background_id),
             KEY pokemon_id (pokemon_id),
             KEY link_kind (link_kind),
+            KEY exclusive_pairing (exclusive_pairing),
+            KEY pokemon_only_with_this_background (pokemon_only_with_this_background),
+            KEY background_costume_only (background_costume_only),
             UNIQUE KEY background_pokemon_kind (background_id, pokemon_id, link_kind)
         ) {$charset_collate};";
 
@@ -627,6 +635,9 @@ class Pokehub_DB {
         dbDelta($sql_biome_pokemon_links);
 
         $this->migratePokemonBackgroundLinksAddLinkKind( $background_pokemon_links );
+        $this->migratePokemonBackgroundLinksAddExclusivePairing( $background_pokemon_links );
+        $this->migratePokemonBackgroundLinksAddSemanticsColumns( $background_pokemon_links );
+        $this->migratePokemonBackgroundsAddExistsOnlyWithCostume( $backgrounds_table );
 
         // Migration : copier event_id/event_type des backgrounds vers pokemon_background_events (une seule fois)
         $migrated = get_option('pokehub_background_events_migrated', false);
@@ -737,6 +748,89 @@ class Pokehub_DB {
             return;
         }
         poke_hub_ensure_background_pokemon_link_unique_index();
+    }
+
+    /**
+     * Liaison fond ↔ Pokémon : appariement exclusif (asset uniquement avec ce Pokémon / réciproque côté fiche).
+     */
+    private function migratePokemonBackgroundLinksAddExclusivePairing( string $table ): void {
+        global $wpdb;
+        if ( $table === '' ) {
+            return;
+        }
+        if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+            return;
+        }
+        $col = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exclusive_pairing'",
+                $wpdb->dbname,
+                $table
+            )
+        );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `exclusive_pairing` TINYINT(1) NOT NULL DEFAULT 0 AFTER `link_kind`" );
+            $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `exclusive_pairing` (`exclusive_pairing`)" );
+        }
+    }
+
+    /**
+     * Jonction fond ↔ Pokémon : colonnes liées uniquement aux lignes link_kind « base » (sémantique partagée fiche Pokémon / fond).
+     */
+    private function migratePokemonBackgroundLinksAddSemanticsColumns( string $table ): void {
+        global $wpdb;
+        if ( $table === '' ) {
+            return;
+        }
+        if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+            return;
+        }
+        $pair = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'pokemon_only_with_this_background'",
+                $wpdb->dbname,
+                $table
+            )
+        );
+        if ( empty( $pair ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `pokemon_only_with_this_background` TINYINT(1) NOT NULL DEFAULT 0 AFTER `exclusive_pairing`" );
+            $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `pokemon_only_with_this_background` (`pokemon_only_with_this_background`)" );
+        }
+        $cost = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'background_costume_only'",
+                $wpdb->dbname,
+                $table
+            )
+        );
+        if ( empty( $cost ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `background_costume_only` TINYINT(1) NOT NULL DEFAULT 0 AFTER `pokemon_only_with_this_background`" );
+            $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `background_costume_only` (`background_costume_only`)" );
+        }
+    }
+
+    /**
+     * Table pokemon_backgrounds : fond n’existant qu’en contexte costumé (réciproque côté Pokémon « uniquement avec fond »).
+     */
+    private function migratePokemonBackgroundsAddExistsOnlyWithCostume( string $table ): void {
+        global $wpdb;
+        if ( $table === '' ) {
+            return;
+        }
+        if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $table ) ) {
+            return;
+        }
+        $col = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'exists_only_with_costume'",
+                $wpdb->dbname,
+                $table
+            )
+        );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `exists_only_with_costume` TINYINT(1) NOT NULL DEFAULT 0 AFTER `background_type`" );
+            $wpdb->query( "ALTER TABLE `{$table}` ADD KEY `exists_only_with_costume` (`exists_only_with_costume`)" );
+        }
     }
     
     /**

@@ -13,6 +13,7 @@ Ce document décrit surtout les méthodes d’initialisation Select2 héritées 
 7. [Configuration des options](#configuration-des-options)
 8. [Empêcher l'initialisation sur certains selects](#empêcher-linitialisation-sur-certains-selects)
 9. [Poké HUB — Types d’événement (module Events)](#pokehub-select2-event-types)
+10. [Poké HUB — Générations (régions jeu)](#pokehub-select2-generations-regions)
 
 ---
 
@@ -546,6 +547,23 @@ Ce cas **ne** repose **pas** sur la classe `.admin-lab-select2` (script Me5rine 
 | Ancien code | Plus d’`wp_add_inline_script('select2', …)` uniquement pour le filtre : tout est centralisé dans le JS du plugin |
 
 Documentation complète (comportement, obsolète, `PokeHubSpecialEvents`, `wp.media`) : **[events/README.md](./events/README.md#event-type-select2-admin)**.
+
+---
+
+<a id="pokehub-select2-generations-regions"></a>
+
+## Poké HUB — Générations (régions jeu)
+
+Le multiselect des régions sur l’onglet **Pokémon → Générations** est initialisé côté plugin Poké HUB (pas via `.admin-lab-select2`).
+
+| Élément | Fichier / remarque |
+|--------|---------------------|
+| Enqueue (admin) | `modules/pokemon/admin/pokemon-admin.php` — Select2 **4.1.0-rc.0** + `assets/js/pokehub-admin-select2.js` sur sections `pokemon`, `backgrounds`, `biomes`, `generations` |
+| Champ ciblé | `#gen_regions` avec classe `pokehub-generation-game-regions-select` dans `modules/pokemon/admin/forms/generation-form.php` |
+| Recherche multilingue | matcher `pokehubMultilingualMatcher` (recherche dans texte + `data-name-fr` + `data-name-en`) |
+| UX | `multiple`, `closeOnSelect: false`, `width: '100%'`, placeholder via `data-placeholder` (fallback i18n `pokehubSelect2Strings.searchGameRegions`) |
+
+Objectif métier : sélectionner plusieurs régions « jeu » par génération (ex. Galar + Hisui) avec recherche FR/EN.
 
 ---
 

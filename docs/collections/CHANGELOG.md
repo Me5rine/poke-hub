@@ -4,7 +4,29 @@ Ce fichier recense des **évolutions ponctuelles** du module Collections (correc
 
 ---
 
-## 2026-05-05
+## 2026-05-08
+
+### Vue collection — menu tiroir barre d’outils (DOM, empilement, scroll)
+
+**Implémentation** : **`[data-toolbar-menu-drawer]`** est sorti de **`.pokehub-collection-toolbar-stack`** et placé comme frère (après la pile, avant **`.pokehub-collection-tiles`**) dans **`collections-shortcode.php`**, pour éviter que **`isolation` + `z-index`** de la pile ne piègent le drawer en `fixed` derrière le header. **`collections-front.js`** : **`document.body.style.overflow = 'hidden'`** pendant l’ouverture du menu (`is-open`), rétabli à la fermeture si le tiroir était ouvert.
+
+**Mise à jour doc** : [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) (§ *Vue détail : structure DOM*), [COLLECTIONS_HEADERS.md](../../modules/collections/COLLECTIONS_HEADERS.md), [COLLECTIONS_THEME_CSS.md](../../modules/collections/COLLECTIONS_THEME_CSS.md) (empilement / `--pokehub-collection-toolbar-stack-z`), [POKEHUB_CSS_CLASSES.md](../POKEHUB_CSS_CLASSES.md) (variante **`pokehub-collections-drawer--toolbar`**). Côté thème Me5rine Lab : **`css/poke-hub/README.md`** (ligne **`parts/13-collections-front.css`**, rappel menu plein viewport).
+
+---
+
+### Documentation — phrases de recherche GO (préfixes, fonds, contexte)
+
+**Mise à jour** : [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) — § *Phrases GO : données serveur et langue* (table des préfixes FR/EN, fonds lieu/spécial via `synthetic_go_background_background_type`, préfixes de contexte **chanceux** / **œufs uniquement**, ordre des groupes, passes de dédoublonnage) ; correction de l’ancienne formulation « une seule entrée par dex sur tous les groupes » (comportement réel : regroupements + dédup par groupe et règles parent/sexe). Index [README.md](./README.md), [README.md principal](../README.md) et [COLLECTIONS_AND_FORMS_CATEGORIES.md](../COLLECTIONS_AND_FORMS_CATEGORIES.md) : renvois alignés.
+
+---
+
+### Documentation collections — alignement sur la barre d’outils actuelle
+
+**Contexte** : la doc décrivait encore le mode « compact » (`pokehub-collection--compact`), `.pokehub-collection-sticky-tools` et `--pokehub-sticky-tools-current-height`, absents du comportement actuel.
+
+**Mise à jour** : [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) (structure DOM, barre **`[data-collection-fixed-toolbar]`**, tuiles **`[data-flow-tiles-host]`** / **`[data-fixed-tiles-host]`**, expand, drawer), [COLLECTIONS_THEME_CSS.md](../../modules/collections/COLLECTIONS_THEME_CSS.md) (variable **`--pokehub-collection-fixed-toolbar-height`**, jump génération ≤1024px), [COLLECTIONS_HEADERS.md](../../modules/collections/COLLECTIONS_HEADERS.md), [POKEHUB_CSS_CLASSES.md](../POKEHUB_CSS_CLASSES.md), index [README.md](./README.md). Côté thème Me5rine Lab : `css/poke-hub/README.md` (tableau des fichiers `parts/`), ligne sur `13-collections-front.css`.
+
+---
 
 ### Forme normale Morphéo (slug `castform`) absente du pool « toutes les formes »
 
@@ -53,6 +75,15 @@ Ce n’est **pas** une régression du regroupement `*-family*` : Morphéo n’es
 - **`poke_hub_collections_admin_force_delete( $collection_id )`** — suppression admin.
 
 **Attention** : une collection **privée anonyme** peut rester **inaccessible sans cookie** créateur même si l’URL est ouverte par un administrateur ; le lien sert avant tout au **référencement** et au partage.
+
+---
+
+### Documentation — stockage anonyme, tri pool, Zarbi/Unown
+
+- **[COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md)** : § **Stockage** réécrite (collections **`user_id = 0`** en base après création REST ; clé propriétaire / cookie ; distinction localStorage vs source de vérité serveur) ; § **Schéma** — colonnes **`share_token`**, **`anonymous_ip`**, **`anonymous_owner_key`** (migration `poke_hub_collections_maybe_add_anonymous_owner_key_column`), **`is_public`** ; § **Ordre des lignes** — slugs **`unown-*`** attendus, lien vers import GM ; pas de mention obsolète « sticky / compact » dans le pied de page (référence **barre fixe / drawer**).
+- **Tri pool** (`poke_hub_collections_display_variant_sort_rank`, filtre **`poke_hub_collections_display_variant_sort_rank`**) : forme normale → **costumes** → puis équivalent **`pokehub_pokemon_select_category_rank()`** avec paliers collections (dont regroupement `switch_*` / `visual` / `gender` avec le groupe régional) pour garder **l’interclassement** méga / gigamax / dynamax comme les sélecteurs ; documenté dans [COLLECTIONS_MODULE.md](../COLLECTIONS_MODULE.md) § *Ordre des lignes*.
+- **Slugs Zarbi** : **`poke_hub_pokemon_compose_pokemon_row_slug()`** documenté dans [GAME_MASTER_IMPORT.md](../pokemon/GAME_MASTER_IMPORT.md) § *Slug ligne Pokémon*.
+- **[README.md](../README.md)** : entrées **Collections** et fiche COLLECTIONS_MODULE alignées sur ce comportement.
 
 ---
 

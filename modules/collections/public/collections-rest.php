@@ -172,7 +172,7 @@ add_action('rest_api_init', function () {
                 if (!poke_hub_collections_can_edit_anonymous($id, $ip, $owner_key)) {
                     return new WP_REST_Response(['error' => 'Forbidden'], 403);
                 }
-            } elseif (empty($col['is_public']) && (int) $col['user_id'] !== $user_id) {
+            } elseif (!poke_hub_collections_row_is_public($col) && (int) $col['user_id'] !== $user_id) {
                 return new WP_REST_Response(['error' => 'Forbidden'], 403);
             }
             unset($col['anonymous_ip']);

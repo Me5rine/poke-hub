@@ -1757,6 +1757,58 @@ function poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( array $data ): array {
 }
 
 /**
+ * Normalise une entrée tempEvoOverrides du Game Master (clés synonymes selon versions du GM).
+ *
+ * - temporaryEvolution (GM récent) remplit aussi tempEvoId si cette clé manquait.
+ * Les coûts d’énergie restent sur temporaryEvolutionEnergyCost*.
+ *
+ * @param array<string, mixed> $row
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_normalize_temp_evo_override_row( array $row ): array {
+    $tid = isset( $row['tempEvoId'] ) ? trim( (string) $row['tempEvoId'] ) : '';
+    if ( $tid === '' && isset( $row['temporaryEvolution'] ) ) {
+        $tid = trim( (string) $row['temporaryEvolution'] );
+        if ( $tid !== '' ) {
+            $row['tempEvoId'] = $tid;
+        }
+    }
+
+    return $row;
+}
+
+/**
+ * Extrait depuis tempEvoOverrides les coûts Méga / Primo pour exposition dans games.pokemon_go.
+ *
+ * @param array<int, mixed> $overrides Liste brute depuis pokemonSettings.tempEvoOverrides
+ * @return list<array{temp_evo_id:string, energy_first:int, energy_subsequent:int}>
+ */
+function poke_hub_pokemon_gm_collect_mega_temp_evolution_energy_payload( array $overrides ): array {
+    /** @var list<array{temp_evo_id:string, energy_first:int, energy_subsequent:int}> $out */
+    $out = [];
+    foreach ( $overrides as $raw ) {
+        if ( ! is_array( $raw ) ) {
+            continue;
+        }
+        $row = poke_hub_pokemon_gm_normalize_temp_evo_override_row( $raw );
+        $tid = isset( $row['tempEvoId'] ) ? trim( (string) $row['tempEvoId'] ) : '';
+        if ( $tid === '' ) {
+            continue;
+        }
+        if ( ! function_exists( 'poke_hub_pokemon_is_temp_evo_mega' ) || ! poke_hub_pokemon_is_temp_evo_mega( $tid ) ) {
+            continue;
+        }
+        $out[] = [
+            'temp_evo_id'           => $tid,
+            'energy_first'           => isset( $row['temporaryEvolutionEnergyCost'] ) ? (int) $row['temporaryEvolutionEnergyCost'] : 0,
+            'energy_subsequent'      => isset( $row['temporaryEvolutionEnergyCostSubsequent'] ) ? (int) $row['temporaryEvolutionEnergyCostSubsequent'] : 0,
+        ];
+    }
+
+    return $out;
+}
+
+/**
  * Transforme un tempEvoId Niantic en form_slug interne.
  *
  * Exemples :
@@ -1950,10 +2002,24 @@ function poke_hub_pokemon_get_regional_countries_for_import($template_id, $form_
     // The slug exact matching in section 0 handles all these cases
     // No need for pokemon_id_proto-based detection anymore
 
-    // 3) VIVILLON PATTERNS - Check FIRST (before pokemon_id_proto matching)
+    // 3) VIVILLON PATTERNS — uniquement pour la lignée Lépidonille / Pérégrain / Prismillon.
+    // Sinon un form_slug qui coïncide avec un motif (ex. "sun", "river") faussement marque
+    // d'autres Pokémon comme régionaux (Minior, etc.).
+    $vivillon_form_slug = $form_slug;
+    if (empty($countries) && $vivillon_form_slug !== '') {
+        $vivillon_lineage_protos = apply_filters(
+            'poke_hub_pokemon_vivillon_lineage_id_protos',
+            ['SCATTERBUG', 'SPEWPA', 'VIVILLON']
+        );
+        $vivillon_lineage_protos = array_map('strtoupper', array_map('strval', (array) $vivillon_lineage_protos));
+        if (!in_array(strtoupper((string) $pokemon_id_proto), $vivillon_lineage_protos, true)) {
+            $vivillon_form_slug = '';
+        }
+    }
+
     // Extract pattern from form_slug if it's in format "pokemon-pattern" (e.g., "vivillon-continental", "scatterbug-archipelago")
-    if (empty($countries) && !empty($form_slug)) {
-        $form_slug_lower = strtolower((string) $form_slug);
+    if (empty($countries) && $vivillon_form_slug !== '') {
+        $form_slug_lower = strtolower((string) $vivillon_form_slug);
         $pattern_from_slug = '';
         
         // Check if form_slug contains a dash and extract pattern (e.g., "vivillon-continental" -> "continental")
@@ -2111,4 +2177,293 @@ function poke_hub_pokemon_should_be_regional_on_import($template_id, $form_slug,
         $form_slug,
         $pokemon_id_proto
     );
+}
+
+/**
+ * Duplique les liens types (slot conservé) depuis une fiche Pokémon vers une autre.
+ */
+function poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( int $source_id, int $target_id ): void {
+    if ( ! function_exists( 'pokehub_get_table' ) || ! function_exists( 'poke_hub_pokemon_sync_pokemon_types_links' ) ) {
+        return;
+    }
+    global $wpdb;
+
+    $source_id = (int) $source_id;
+    $target_id = (int) $target_id;
+    if ( $source_id <= 0 || $target_id <= 0 ) {
+        return;
+    }
+
+    $link_table = pokehub_get_table( 'pokemon_type_links' );
+    if ( ! $link_table ) {
+        return;
+    }
+
+    $rows = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT type_id FROM {$link_table} WHERE pokemon_id = %d ORDER BY slot ASC",
+            $source_id
+        )
+    );
+    if ( ! is_array( $rows ) || $rows === [] ) {
+        return;
+    }
+
+    $type_ids = [];
+    foreach ( $rows as $r ) {
+        $tid = isset( $r->type_id ) ? (int) $r->type_id : 0;
+        if ( $tid > 0 ) {
+            $type_ids[] = $tid;
+        }
+    }
+
+    poke_hub_pokemon_sync_pokemon_types_links( $target_id, $type_ids, true );
+}
+
+/**
+ * Copie les liens Pokémon ↔ attaques (tous rôles présents en base sur la source).
+ */
+function poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( int $source_id, int $target_id, array $tables ): void {
+    global $wpdb;
+
+    $source_id = (int) $source_id;
+    $target_id = (int) $target_id;
+    if ( $source_id <= 0 || $target_id <= 0 ) {
+        return;
+    }
+
+    $link_table = ! empty( $tables['pokemon_attack_links'] )
+        ? $tables['pokemon_attack_links']
+        : ( function_exists( 'pokehub_get_table' ) ? pokehub_get_table( 'pokemon_attack_links' ) : '' );
+    if ( ! $link_table ) {
+        return;
+    }
+
+    $wpdb->delete( $link_table, [ 'pokemon_id' => $target_id ], [ '%d' ] );
+
+    $rows = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT attack_id, role, is_legacy, is_event, is_elite_tm, extra FROM {$link_table} WHERE pokemon_id = %d",
+            $source_id
+        ),
+        ARRAY_A
+    );
+    if ( ! is_array( $rows ) || $rows === [] ) {
+        return;
+    }
+
+    foreach ( $rows as $r ) {
+        $wpdb->insert(
+            $link_table,
+            [
+                'pokemon_id'   => $target_id,
+                'attack_id'    => (int) ( $r['attack_id'] ?? 0 ),
+                'role'         => (string) ( $r['role'] ?? '' ),
+                'is_legacy'    => (int) ( $r['is_legacy'] ?? 0 ),
+                'is_event'     => (int) ( $r['is_event'] ?? 0 ),
+                'is_elite_tm'  => (int) ( $r['is_elite_tm'] ?? 0 ),
+                'extra'        => isset( $r['extra'] ) ? (string) $r['extra'] : '',
+            ],
+            [ '%d', '%d', '%s', '%d', '%d', '%d', '%s' ]
+        );
+    }
+}
+
+/**
+ * Après import GM : pour certaines espèces (binôme sexe GO sans lignes dédiées dans le GM),
+ * crée *-family*, la fiche normale ♂ et *-female* avec les **mêmes stats / types / attaques** que la fiche source.
+ *
+ * Cas initial : Hippopotas / Hippowdon — collections attendent la même structure que les autres familles sexuées.
+ *
+ * @param array<string, string> $tables
+ * @param array<string, mixed>  $stats
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables, array $stats ): array {
+    global $wpdb;
+
+    $pokemon_table = ! empty( $tables['pokemon'] ) ? $tables['pokemon'] : pokehub_get_table( 'pokemon' );
+    if ( ! $pokemon_table || ! function_exists( 'poke_hub_pokemon_gm_id_to_slug' ) ) {
+        return $stats;
+    }
+
+    /** @var list<string> $protos */
+    $protos = apply_filters(
+        'poke_hub_pokemon_gm_binary_sex_family_clone_protos',
+        [ 'HIPPOPOTAS', 'HIPPOWDON' ]
+    );
+    if ( ! is_array( $protos ) || $protos === [] ) {
+        return $stats;
+    }
+
+    foreach ( $protos as $proto ) {
+        $proto = strtoupper( trim( (string) $proto ) );
+        if ( $proto === '' ) {
+            continue;
+        }
+
+        $base_slug = poke_hub_pokemon_gm_id_to_slug( $proto );
+        if ( $base_slug === '' ) {
+            continue;
+        }
+
+        $base_row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                $base_slug
+            ),
+            ARRAY_A
+        );
+        if ( ! is_array( $base_row ) || empty( $base_row['id'] ) ) {
+            continue;
+        }
+
+        $base_slug_lc = strtolower( trim( (string) ( $base_row['slug'] ?? '' ) ) );
+        if ( $base_slug_lc === '' || preg_match( '/-family$/', $base_slug_lc ) || preg_match( '/-female$/', $base_slug_lc ) || preg_match( '/-male$/', $base_slug_lc ) ) {
+            continue;
+        }
+
+        $base_id = (int) $base_row['id'];
+
+        $family_slug = $base_slug_lc . '-family';
+        $female_slug = $base_slug_lc . '-female';
+
+        $family_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                $family_slug
+            )
+        );
+        $female_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                $female_slug
+            )
+        );
+
+        /**
+         * @param array<string, mixed> $seed
+         */
+        $insert_clone = static function ( array $seed, string $slug, int $is_default, string $role ) use ( $wpdb, $pokemon_table, $tables, $base_id, &$stats ) {
+            unset( $seed['id'] );
+            $seed['slug']       = $slug;
+            $seed['is_default'] = $is_default;
+
+            $extra_raw = isset( $seed['extra'] ) ? (string) $seed['extra'] : '';
+            $extra_dec = json_decode( $extra_raw, true );
+            if ( ! is_array( $extra_dec ) ) {
+                $extra_dec = [];
+            }
+            $extra_dec['poke_hub_gm_binary_sex_family_clone'] = [
+                'role'              => $role,
+                'source_pokemon_id' => $base_id,
+            ];
+            if ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+                $seed['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw );
+            } else {
+                $seed['extra'] = wp_json_encode( $extra_dec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+            }
+
+            $format = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $seed );
+            $ok     = $wpdb->insert( $pokemon_table, $seed, $format );
+            if ( ! $ok ) {
+                return 0;
+            }
+            $new_id = (int) $wpdb->insert_id;
+            if ( $new_id > 0 ) {
+                $stats['pokemon_inserted_count'] = (int) ( $stats['pokemon_inserted_count'] ?? 0 ) + 1;
+                poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $base_id, $new_id );
+                poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $base_id, $new_id, $tables );
+            }
+
+            return $new_id;
+        };
+
+        /**
+         * @param int $pid
+         */
+        $sync_clone_from_base = static function ( int $pid ) use ( $wpdb, $pokemon_table, $base_row, $tables, $base_id ) {
+            if ( $pid <= 0 ) {
+                return;
+            }
+            $sync_cols = [
+                'dex_number',
+                'form_variant_id',
+                'generation_id',
+                'origin_region_id',
+                'base_atk',
+                'base_def',
+                'base_sta',
+                'is_tradable',
+                'is_transferable',
+                'has_shadow',
+                'has_purified',
+                'shadow_purification_stardust',
+                'shadow_purification_candy',
+                'buddy_walked_mega_energy_award',
+                'dodge_probability',
+                'attack_probability',
+                'name_en',
+                'name_fr',
+            ];
+            $upd = [];
+            foreach ( $sync_cols as $col ) {
+                if ( array_key_exists( $col, $base_row ) ) {
+                    $upd[ $col ] = $base_row[ $col ];
+                }
+            }
+            $slug_target = (string) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT slug FROM {$pokemon_table} WHERE id = %d LIMIT 1",
+                    $pid
+                )
+            );
+            $slug_tl = strtolower( trim( $slug_target ) );
+            $clone_role = preg_match( '/-family$/', $slug_tl ) ? 'family' : 'female';
+            $extra_raw_base = isset( $base_row['extra'] ) ? (string) $base_row['extra'] : '';
+            $extra_dec      = json_decode( $extra_raw_base, true );
+            if ( ! is_array( $extra_dec ) ) {
+                $extra_dec = [];
+            }
+            $extra_dec['poke_hub_gm_binary_sex_family_clone'] = [
+                'role'              => $clone_role,
+                'source_pokemon_id' => $base_id,
+            ];
+            if ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+                $upd['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw_base );
+            } else {
+                $upd['extra'] = wp_json_encode( $extra_dec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+            }
+            if ( $upd === [] ) {
+                return;
+            }
+            $wpdb->update( $pokemon_table, $upd, [ 'id' => $pid ], poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $upd ), [ '%d' ] );
+            poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $base_id, $pid );
+            poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $base_id, $pid, $tables );
+        };
+
+        if ( $family_id <= 0 ) {
+            $family_id = $insert_clone( $base_row, $family_slug, 1, 'family' );
+        } else {
+            $sync_clone_from_base( $family_id );
+        }
+
+        if ( $female_id <= 0 ) {
+            $female_id = $insert_clone( $base_row, $female_slug, 0, 'female' );
+        } else {
+            $sync_clone_from_base( $female_id );
+        }
+
+        if ( $family_id > 0 && $female_id > 0 && $base_id > 0 ) {
+            $wpdb->update(
+                $pokemon_table,
+                [ 'is_default' => 0 ],
+                [ 'id' => $base_id ],
+                [ '%d' ],
+                [ '%d' ]
+            );
+        }
+    }
+
+    return $stats;
 }

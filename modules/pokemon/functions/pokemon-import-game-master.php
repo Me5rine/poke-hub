@@ -65,6 +65,9 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
     // Forme brute Niantic
     $form_proto   = $settings['form'] ?? '';
+    $form_proto_u = ( $form_proto !== '' && $form_proto !== 'UNSET' && $form_proto !== 'FORM_UNSET' )
+        ? strtoupper( (string) $form_proto )
+        : '';
 
     // Si l'espèce possède une forme NORMAL explicite (ex: Palkia/Dialga),
     // l'entrée sans forme représente la "famille" (placeholder de regroupement).
@@ -357,6 +360,15 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         ],
     ];
 
+    // Coûts d’énergie Méga / Primo : 1ère évolution temporaire vs suivantes (voir tempEvoOverrides dans le GM).
+    if ( ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] )
+        && function_exists( 'poke_hub_pokemon_gm_collect_mega_temp_evolution_energy_payload' ) ) {
+        $mega_energy_payload = poke_hub_pokemon_gm_collect_mega_temp_evolution_energy_payload( $settings['tempEvoOverrides'] );
+        if ( ! empty( $mega_energy_payload ) ) {
+            $game_go['mega_temp_evolution_energy'] = $mega_energy_payload;
+        }
+    }
+
     $go_origin_region_slug = '';
     if ( function_exists( 'poke_hub_pokemon_guess_go_origin_region_slug_by_dex' ) ) {
         $go_origin_region_slug = poke_hub_pokemon_guess_go_origin_region_slug_by_dex( (int) $dex_number );
@@ -454,9 +466,70 @@ function poke_hub_pokemon_import_from_pokemon_settings(
         $extra['gm_skeleton'] = true;
     }
 
-    // === TEMP EVO START : on stocke aussi les tempEvoOverrides dans la forme de base ===
+    // === TEMP EVO START : overrides normalisées (temporaryEvolution → tempEvoId) ; costume/clone → cible Méga canonique espèce ===
     if ( ! empty( $settings['tempEvoOverrides'] ) && is_array( $settings['tempEvoOverrides'] ) ) {
-        $extra['temp_evo_overrides'] = $settings['tempEvoOverrides'];
+        $normalized_temp_evo_ov = [];
+        foreach ( $settings['tempEvoOverrides'] as $raw_te ) {
+            if ( ! is_array( $raw_te ) ) {
+                continue;
+            }
+            $normalized_temp_evo_ov[] = function_exists( 'poke_hub_pokemon_gm_normalize_temp_evo_override_row' )
+                ? poke_hub_pokemon_gm_normalize_temp_evo_override_row( $raw_te )
+                : $raw_te;
+        }
+        if ( ! empty( $normalized_temp_evo_ov ) ) {
+            $extra['temp_evo_overrides'] = $normalized_temp_evo_ov;
+        }
+
+        $cat_l               = strtolower( trim( (string) $variant_category ) );
+        $copy_template       = is_string( $template_id ) && stripos( $template_id, '_COPY' ) !== false;
+        $gm_flag_costume_row = false;
+        if ( $form_proto_u !== '' && ! empty( $form_costume_index[ (string) $pokemon_id_proto ][ $form_proto_u ] ) ) {
+            $gm_flag_costume_row = true;
+        }
+        $derived_costume_clone = (
+            in_array( $cat_l, [ 'costume', 'clone' ], true )
+            || $copy_template
+            || $gm_flag_costume_row
+        );
+
+        if ( $derived_costume_clone ) {
+            $mega_target_slugs = [];
+            foreach ( $normalized_temp_evo_ov as $nev ) {
+                $teid = isset( $nev['tempEvoId'] ) ? trim( (string) $nev['tempEvoId'] ) : '';
+                if ( $teid === ''
+                    || ( ! function_exists( 'poke_hub_pokemon_is_temp_evo_mega' ) || ! poke_hub_pokemon_is_temp_evo_mega( $teid ) ) ) {
+                    continue;
+                }
+                $tf_slug  = poke_hub_pokemon_temp_evo_id_to_form_slug( $teid );
+                $parts_m  = explode( '-', $tf_slug );
+                $prefix_m = $parts_m[0] ?? '';
+                $suffix_m = $parts_m[1] ?? '';
+                if ( $prefix_m !== '' ) {
+                    $mega_target_slugs[] = $suffix_m !== ''
+                        ? $prefix_m . '-' . $slug_base . '-' . $suffix_m
+                        : $prefix_m . '-' . $slug_base;
+                }
+            }
+            $mega_target_slugs = array_values( array_unique( array_filter( $mega_target_slugs ) ) );
+            if ( ! empty( $mega_target_slugs ) ) {
+                $extra['mega_evolution_via_base_species'] = true;
+                $extra['mega_target_slugs']                = $mega_target_slugs;
+                foreach ( $normalized_temp_evo_ov as $nev ) {
+                    $teid = isset( $nev['tempEvoId'] ) ? trim( (string) $nev['tempEvoId'] ) : '';
+                    if ( $teid === ''
+                        || ( ! function_exists( 'poke_hub_pokemon_is_temp_evo_mega' ) || ! poke_hub_pokemon_is_temp_evo_mega( $teid ) ) ) {
+                        continue;
+                    }
+                    $extra['mega_energy'] = [
+                        'temp_evo_id'     => $teid,
+                        'first'           => (int) ( $nev['temporaryEvolutionEnergyCost'] ?? 0 ),
+                        'subsequent'      => (int) ( $nev['temporaryEvolutionEnergyCostSubsequent'] ?? 0 ),
+                    ];
+                    break;
+                }
+            }
+        }
     }
     if ( function_exists( 'poke_hub_pokemon_extract_form_change_rules' ) ) {
         $form_change_rules = poke_hub_pokemon_extract_form_change_rules( $settings );
@@ -985,6 +1058,10 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 continue;
             }
 
+            $temp_evo = function_exists( 'poke_hub_pokemon_gm_normalize_temp_evo_override_row' )
+                ? poke_hub_pokemon_gm_normalize_temp_evo_override_row( $temp_evo )
+                : $temp_evo;
+
             $temp_evo_id = (string) ( $temp_evo['tempEvoId'] ?? '' );
             if ( $temp_evo_id === '' ) {
                 continue;
@@ -992,6 +1069,27 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
             $temp_form_slug  = poke_hub_pokemon_temp_evo_id_to_form_slug( $temp_evo_id );
             $temp_form_label = poke_hub_pokemon_temp_evo_id_to_label( $temp_evo_id );
+
+            // Slug registre (partagé : mega-x/mega-y → mega via alias / défaut ; primal inchangé)
+            $mega_registry_slug = $temp_form_slug;
+            if ( function_exists( 'poke_hub_resolve_gm_variant_registry_slug' ) ) {
+                $resolved_mega = poke_hub_resolve_gm_variant_registry_slug(
+                    $temp_form_slug,
+                    (string) $pokemon_id_proto,
+                    (string) $template_id,
+                    '',
+                    array_merge(
+                        $settings,
+                        [
+                            '__temp_evolution_granular_slug' => $temp_form_slug,
+                            '__temp_evo_id'                   => $temp_evo_id,
+                        ]
+                    )
+                );
+                if ( $resolved_mega !== '' ) {
+                    $mega_registry_slug = $resolved_mega;
+                }
+            }
 
             // Construction du slug global : mega-charizard-x, primal-kyogre, etc.
             $parts  = explode( '-', $temp_form_slug );
@@ -1018,17 +1116,17 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                 $mega_variant_category = 'mega';
             }
 
-            // Upsert variant (form_slug = mega, mega-x, primal, ...)
+            // Upsert variant (registre : slug partagé ; slug Pokémon / extra.form_slug restent granulaires)
             $mega_variant_id = 0;
             if ( function_exists( 'poke_hub_pokemon_get_form_variant_by_slug' ) ) {
-                $existing_mega_variant = poke_hub_pokemon_get_form_variant_by_slug( $temp_form_slug );
+                $existing_mega_variant = poke_hub_pokemon_get_form_variant_by_slug( $mega_registry_slug );
                 if ( is_array( $existing_mega_variant ) && ! empty( $existing_mega_variant['id'] ) ) {
                     $mega_variant_id = (int) $existing_mega_variant['id'];
                 }
             }
             if ( function_exists( 'poke_hub_pokemon_upsert_form_variant' ) ) {
                 $mega_variant_id = (int) poke_hub_pokemon_upsert_form_variant(
-                    $temp_form_slug,
+                    $mega_registry_slug,
                     $temp_form_label,
                     $mega_variant_category,
                     '',
@@ -1037,11 +1135,13 @@ function poke_hub_pokemon_import_from_pokemon_settings(
                         'temp_evo_id'      => $temp_evo_id,
                         'template_id'      => $template_id,
                     ],
-                    $mega_variant_id
+                    $mega_variant_id,
+                    true,
+                    $temp_form_slug
                 );
             }
 
-            $mega_variant_row = poke_hub_pokemon_get_form_variant_by_slug( $temp_form_slug );
+            $mega_variant_row = poke_hub_pokemon_get_form_variant_by_slug( $mega_registry_slug );
             if ( is_array( $mega_variant_row ) ) {
                 $mega_variant_category = $mega_variant_row['category'] ?? $mega_variant_category;
                 $mega_variant_group    = $mega_variant_row['group'] ?? '';
@@ -1112,7 +1212,7 @@ function poke_hub_pokemon_import_from_pokemon_settings(
 
                 'origin_region_slug' => $stored_origin_region_slug,
 
-                'variant_form_slug'  => $temp_form_slug,
+                'variant_form_slug'  => $mega_registry_slug,
                 'variant_id'         => $mega_variant_id,
                 'variant_category'   => $mega_variant_category,
                 'variant_group'      => $mega_variant_group,
@@ -2305,6 +2405,8 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             continue;
         }
     }
+
+    $stats = poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( $tables, $stats );
 
     $stats = poke_hub_pokemon_gm_import_spawn_gender_skeleton_pokemon_pass(
         $decoded,

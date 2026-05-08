@@ -1529,8 +1529,6 @@ poke-hub/
 ├── RAPPORT_AUDIT_CODE.md           # Rapport d'audit du code
 └── uninstall.php                    # Script de désinstallation
 ```
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-read_file
 
 ### Constantes disponibles
 
@@ -1538,7 +1536,7 @@ read_file
 
 - `POKE_HUB_PATH` : Chemin absolu du plugin
 - `POKE_HUB_URL` : URL du plugin
-- `POKE_HUB_VERSION` : Version du plugin (récupérée depuis l'en-tête)
+- `POKE_HUB_VERSION` : Version du plugin (récupérée depuis l'en-tête). **À éviter** comme paramètre `ver` dans `wp_enqueue_*` pour les fichiers du dépôt : préférer `poke_hub_plugin_asset_version( 'chemin/relatif/depuis/POKE_HUB_PATH' )` (basé sur `filemtime`) — voir [THEME_FRONT_CSS.md](docs/THEME_FRONT_CSS.md) (*Cache navigateur*).
 - `POKE_HUB_MODULES_DIR` : Chemin absolu du dossier des modules
 - `POKE_HUB_INCLUDES_DIR` : Chemin absolu du dossier des includes
 - `POKE_HUB_HOOKS_DIR` : Chemin absolu du dossier des hooks personnalisés (`wp-content/uploads/poke-hub`)
