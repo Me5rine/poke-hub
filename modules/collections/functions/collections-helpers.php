@@ -1791,6 +1791,18 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         /* Liste Méga Primo : le filtre de dates doit accepter release.normal OU release.mega (comme une liste catalogue « normale » avec Méga incluses), pas release.mega seul — sinon tout disparaît si la clé mega est vide. */
         $opts['include_mega'] = true;
     }
+    $pool_links_sem_table = pokehub_get_table('pokemon_background_pokemon_links');
+    $has_bg_link_sem_col = false;
+    if (!empty($pool_links_sem_table) && !empty($wpdb->dbname)) {
+        $sem_col = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'pokemon_only_with_this_background' LIMIT 1",
+                $wpdb->dbname,
+                $pool_links_sem_table
+            )
+        );
+        $has_bg_link_sem_col = !empty($sem_col);
+    }
     $where = ['1 = 1'];
 
     // Filtre par catégorie
@@ -2344,9 +2356,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         if (!empty($opts['include_costumes'])) {
             // rien
         } elseif (empty($opts['include_costumes'])) {
-            $pool_links_sem_table = pokehub_get_table('pokemon_background_pokemon_links');
             $exists_only_link_clause = '(0)';
-            if (!empty($pool_links_sem_table)) {
+            if ($has_bg_link_sem_col && !empty($pool_links_sem_table)) {
                 $exists_only_link_clause = "EXISTS (
                     SELECT 1 FROM {$pool_links_sem_table} l_ex
                     WHERE l_ex.pokemon_id = p.id
@@ -2445,11 +2456,10 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         ? "COALESCE(g.generation_number, 999) ASC,"
         : "p.generation_id ASC,";
 
-    $pool_links_sem = pokehub_get_table('pokemon_background_pokemon_links');
     $sem_select     = ', 0 AS exists_only_link_semantics';
-    if (!empty($pool_links_sem)) {
+    if ($has_bg_link_sem_col && !empty($pool_links_sem_table)) {
         $sem_select = ", EXISTS (
-            SELECT 1 FROM {$pool_links_sem} l_pool_sem
+            SELECT 1 FROM {$pool_links_sem_table} l_pool_sem
             WHERE l_pool_sem.pokemon_id = p.id
               AND (l_pool_sem.link_kind = 'base' OR l_pool_sem.link_kind = '' OR l_pool_sem.link_kind IS NULL)
               AND COALESCE(l_pool_sem.pokemon_only_with_this_background, 0) = 1
