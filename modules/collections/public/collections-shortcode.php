@@ -236,8 +236,11 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         $col_items_resolved = function_exists('poke_hub_collections_resolved_items_map')
                             ? poke_hub_collections_resolved_items_map($col_items, is_array($col_pool) ? $col_pool : [])
                             : $col_items;
+                        $col_for_trade_as_owned = function_exists('poke_hub_collections_for_trade_counts_as_owned_from_options')
+                            ? poke_hub_collections_for_trade_counts_as_owned_from_options($col_opts)
+                            : true;
                         $col_owned = is_array($col_items_resolved)
-                            ? count(array_filter($col_items_resolved, function ($s) { return $s === 'owned'; }))
+                            ? count(array_filter($col_items_resolved, function ($s) use ($col_for_trade_as_owned) { return $s === 'owned' || ($col_for_trade_as_owned && $s === 'for_trade'); }))
                             : 0;
                         $col_total = is_array($col_pool) ? count($col_pool) : 0;
                         $col_pct = ($col_total > 0) ? (int) min(100, round(($col_owned / $col_total) * 100)) : 0;
@@ -352,6 +355,7 @@ add_shortcode('poke_hub_collections', function ($atts) {
                                     <?php poke_hub_collections_render_setting_switch('pokehub-collection-group-by-generation', true, __('Group by generation', 'poke-hub')); ?>
                                     <?php poke_hub_collections_render_setting_switch('pokehub-collection-generations-collapsed', false, __('Collapse generations by default', 'poke-hub')); ?>
                                     <?php poke_hub_collections_render_setting_switch('pokehub-collection-add-selectors', false, __('Add selectors to add Pokémon', 'poke-hub')); ?>
+                                    <?php poke_hub_collections_render_setting_switch('pokehub-collection-for-trade-counts-as-owned', true, __('Count “For trade” as “Owned” for progress', 'poke-hub')); ?>
                                 </fieldset>
                             </div>
                         </details>
@@ -418,7 +422,7 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
     if ($local && $slug !== '' && (strpos($slug, 'local-') === 0 || $slug !== '')) {
         ob_start();
         ?>
-        <div class="pokehub-collection-view-wrap me5rine-lab-dashboard" data-local="1" data-collection-slug="<?php echo esc_attr($slug); ?>" data-can-edit="1">
+        <div class="pokehub-collection-view-wrap me5rine-lab-dashboard" data-local="1" data-collection-slug="<?php echo esc_attr($slug); ?>" data-can-edit="1" data-for-trade-counts-as-owned="1">
             <header class="me5rine-lab-dashboard-header pokehub-collection-view-header pokehub-collection-view-header--no-cover">
                 <div class="pokehub-collection-header-inner pokehub-collection-header-inner--local">
                     <div class="pokehub-collection-view-header-left">
@@ -452,6 +456,9 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                 <div class="pokehub-collection-toolbar-section-head pokehub-collection-toolbar-section-head--compact-mobile" role="presentation">
                     <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="pokehub-status-filters-heading-local-<?php echo esc_attr($slug); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Show/Hide Pokémon', 'poke-hub'); ?></span></h3>
                     <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint"><?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?></p>
+                    <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint pokehub-collection-for-trade-rule-hint">
+                        <?php esc_html_e('In this collection, “For trade” is counted as “Owned” for progress. You can turn this off in the collection settings.', 'poke-hub'); ?>
+                    </p>
                 </div>
                 <div class="pokehub-collection-status-filters-tiles-row" role="presentation">
                     <label class="pokehub-collection-status-filter-chip pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="owned" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <span class="pokehub-collection-status-filter-chip-label"><?php esc_html_e('Owned', 'poke-hub'); ?></span></label>
@@ -556,7 +563,10 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
         }
         unset($p_img);
     }
-    $gen_progress = $pool ? poke_hub_collections_get_generation_progress($pool, $items) : [];
+    $for_trade_counts_as_owned = function_exists('poke_hub_collections_for_trade_counts_as_owned_from_options')
+        ? poke_hub_collections_for_trade_counts_as_owned_from_options($opts)
+        : true;
+    $gen_progress = $pool ? poke_hub_collections_get_generation_progress($pool, $items, $for_trade_counts_as_owned) : [];
     $items_resolved = function_exists('poke_hub_collections_resolved_items_map')
         ? poke_hub_collections_resolved_items_map($items, is_array($pool) ? $pool : [])
         : $items;
@@ -611,11 +621,12 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
          data-edit-name="<?php echo esc_attr($collection['name']); ?>"
          data-edit-options="<?php echo esc_attr(wp_json_encode($opts)); ?>"
          data-edit-is-public="<?php echo poke_hub_collections_row_is_public($collection) ? '1' : '0'; ?>"
+         data-for-trade-counts-as-owned="<?php echo $for_trade_counts_as_owned ? '1' : '0'; ?>"
          data-pokehub-aria-progress="<?php echo esc_attr(__('Progress: %1$d out of %2$d Pokémon owned', 'poke-hub')); ?>"
          data-pokehub-aria-jump="<?php echo esc_attr(__('Jump to %1$s — %2$d of %3$d owned in this collection', 'poke-hub')); ?>"
          data-pokehub-aria-summary="<?php echo esc_attr(__('Show Pokémon for %1$s — %2$d of %3$d owned', 'poke-hub')); ?>">
         <?php
-        $owned = count(array_filter($items_resolved, function ($s) { return $s === 'owned'; }));
+        $owned = count(array_filter($items_resolved, function ($s) use ($for_trade_counts_as_owned) { return $s === 'owned' || ($for_trade_counts_as_owned && $s === 'for_trade'); }));
         $total = count($pool);
         $progress_aria = sprintf(
             /* translators: 1: owned count, 2: total count */
@@ -734,6 +745,13 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                         <div class="pokehub-collection-toolbar-section-head pokehub-collection-toolbar-section-head--compact-mobile" role="presentation">
                             <h3 class="pokehub-collection-toolbar-section-title pokehub-collection-toolbar-title-responsive" id="<?php echo esc_attr($pokehub_filters_heading_id); ?>"><span class="pokehub-toolbar-title pokehub-toolbar-title--full"><?php esc_html_e('Include in grid', 'poke-hub'); ?></span><span class="pokehub-toolbar-title pokehub-toolbar-title--compact"><?php esc_html_e('Show/Hide Pokémon', 'poke-hub'); ?></span></h3>
                             <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint"><?php esc_html_e('Click a tile to cycle status.', 'poke-hub'); ?></p>
+                            <p class="pokehub-collection-toolbar-section-hint me5rine-lab-form-hint pokehub-collection-for-trade-rule-hint">
+                                <?php
+                                echo $for_trade_counts_as_owned
+                                    ? esc_html__('In this collection, “For trade” is counted as “Owned” for progress. You can turn this off in the collection settings.', 'poke-hub')
+                                    : esc_html__('In this collection, “For trade” is not counted as “Owned”. You can change this in the collection settings.', 'poke-hub');
+                                ?>
+                            </p>
                         </div>
                         <div class="pokehub-collection-status-filters-tiles-row" role="presentation">
                             <label class="pokehub-collection-status-filter-chip pokehub-collection-status-filter-label"><input type="checkbox" class="pokehub-collection-filter-status" data-filter-status="owned" checked /> <span class="pokehub-collection-legend-dot pokehub-legend-owned" aria-hidden="true"></span> <span class="pokehub-collection-status-filter-chip-label"><?php esc_html_e('Owned', 'poke-hub'); ?></span></label>
@@ -1172,6 +1190,11 @@ add_shortcode('poke_hub_collection_view', function ($atts) {
                             <?php poke_hub_collections_render_setting_switch('pokehub-edit-group-by-generation', !empty($opts['group_by_generation']), __('Group by generation', 'poke-hub')); ?>
                             <?php poke_hub_collections_render_setting_switch('pokehub-edit-generations-collapsed', !empty($opts['generations_collapsed']), __('Collapse generations by default', 'poke-hub')); ?>
                             <?php poke_hub_collections_render_setting_switch('pokehub-edit-add-selectors', in_array($opts['display_mode'] ?? 'tiles', ['select', 'tiles_select'], true), __('Add selectors to add Pokémon', 'poke-hub')); ?>
+                            <?php poke_hub_collections_render_setting_switch(
+                                'pokehub-edit-for-trade-counts-as-owned',
+                                function_exists('poke_hub_collections_for_trade_counts_as_owned_from_options') ? poke_hub_collections_for_trade_counts_as_owned_from_options($opts) : true,
+                                __('Count “For trade” as “Owned” for progress', 'poke-hub')
+                            ); ?>
                         </fieldset>
                 </div>
                 <div class="pokehub-collections-drawer-footer">

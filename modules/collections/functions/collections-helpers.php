@@ -688,6 +688,8 @@ function poke_hub_collections_default_options(): array {
         'one_per_species'        => false,
         'group_by_generation'   => true,
         'generations_collapsed'  => false,
+        /* true = progression / compteurs : « for_trade » compte aussi comme « owned » pour cette collection. */
+        'for_trade_counts_as_owned' => true,
         'display_mode'          => 'tiles',
         'public'                => false,
         'card_background_image_url' => '',
@@ -748,6 +750,19 @@ function poke_hub_collections_default_options(): array {
             'content_type' => '',
         ],
     ];
+}
+
+/**
+ * Règle de progression Collections pour une ligne d’options (par collection).
+ * true  => "for_trade" compte aussi comme "owned"
+ * false => "for_trade" reste séparé du compteur "owned"
+ *
+ * @param array<string,mixed> $opts Options fusionnées ou brutes ; les clés manquantes suivent les défauts.
+ */
+function poke_hub_collections_for_trade_counts_as_owned_from_options(array $opts): bool {
+    $merged = array_merge(poke_hub_collections_default_options(), $opts);
+
+    return ! empty($merged['for_trade_counts_as_owned']);
 }
 
 /**
@@ -3803,9 +3818,10 @@ function poke_hub_collections_group_pool_by_generation(array $pool): array {
  *
  * @param array $pool  Pool complet (poke_hub_collections_get_pool)
  * @param array $items  pokemon_id => status
+ * @param bool  $for_trade_counts_as_owned Si faux, « for_trade » n’augmente pas le compteur « owned ».
  * @return array [ libellé_générations => [ 'owned' => int, 'for_trade' => int, 'total' => int ], ... ]
  */
-function poke_hub_collections_get_generation_progress(array $pool, array $items): array {
+function poke_hub_collections_get_generation_progress(array $pool, array $items, bool $for_trade_counts_as_owned = true): array {
     $by_gen = poke_hub_collections_group_pool_by_generation($pool);
     $out    = [];
     foreach ($by_gen as $label => $gen_pool) {
@@ -3818,6 +3834,9 @@ function poke_hub_collections_get_generation_progress(array $pool, array $items)
                 $owned++;
             } elseif ($st === 'for_trade') {
                 $for_trade++;
+                if ($for_trade_counts_as_owned) {
+                    $owned++;
+                }
             }
         }
         $out[ $label ] = [
@@ -3835,9 +3854,10 @@ function poke_hub_collections_get_generation_progress(array $pool, array $items)
  *
  * @param array<int, array<string, mixed>> $pool
  * @param array<int, string>              $items pokemon_id => statut
+ * @param bool                            $for_trade_counts_as_owned Si faux, « for_trade » n’augmente pas « owned ».
  * @return array{ total: int, owned: int, for_trade: int, missing: int, percent_owned: float }
  */
-function poke_hub_collections_compute_progress_totals(array $pool, array $items): array {
+function poke_hub_collections_compute_progress_totals(array $pool, array $items, bool $for_trade_counts_as_owned = true): array {
     $total     = 0;
     $owned     = 0;
     $for_trade = 0;
@@ -3852,6 +3872,9 @@ function poke_hub_collections_compute_progress_totals(array $pool, array $items)
             $owned++;
         } elseif ($st === 'for_trade') {
             $for_trade++;
+            if ($for_trade_counts_as_owned) {
+                $owned++;
+            }
         } else {
             $missing++;
         }
@@ -4056,6 +4079,7 @@ function poke_hub_collections_sanitize_options(array $options): array {
         'only_special_species_pool',
         'include_both_sexes_collector',
         'only_shiny',
+        'for_trade_counts_as_owned',
     ];
     foreach ($bool_keys as $k) {
         if (array_key_exists($k, $options)) {

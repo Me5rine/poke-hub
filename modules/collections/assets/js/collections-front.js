@@ -304,7 +304,43 @@
         return 'missing';
     }
 
-    function pokehubGenerationProgressFromPool(pool, items) {
+    function pokehubForTradeCountsAsOwnedFromOpts(options) {
+        var o = options && typeof options === 'object' ? options : {};
+        return o.for_trade_counts_as_owned !== false;
+    }
+
+    /** @param {Element|null|undefined} wrap .pokehub-collection-view-wrap */
+    function pokehubForTradeCountsAsOwnedFromWrap(wrap) {
+        if (!wrap || !wrap.getAttribute) return true;
+        return wrap.getAttribute('data-for-trade-counts-as-owned') !== '0';
+    }
+
+    /**
+     * Met à jour data-for-trade-counts-as-owned et le texte de légende (.pokehub-collection-for-trade-rule-hint).
+     * @param {Element|null|undefined} wrap
+     * @param {object} [options]
+     */
+    function pokehubSyncForTradeOwnedRuleUI(wrap, options) {
+        if (!wrap || !wrap.querySelectorAll) return;
+        var on = pokehubForTradeCountsAsOwnedFromOpts(options);
+        wrap.setAttribute('data-for-trade-counts-as-owned', on ? '1' : '0');
+        var i18n = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
+        var text = on
+            ? (i18n.forTradeProgressLegendCounted || '')
+            : (i18n.forTradeProgressLegendSeparate || '');
+        wrap.querySelectorAll('.pokehub-collection-for-trade-rule-hint').forEach(function (el) {
+            el.textContent = text;
+        });
+    }
+
+    /** @param {Element|null|undefined} wrap ascendant collection view (attribut data-for-trade-counts-as-owned). */
+    function pokehubStatusCountsAsOwned(status, wrap) {
+        var includeForTrade = pokehubForTradeCountsAsOwnedFromWrap(wrap);
+        return status === 'owned' || (includeForTrade && status === 'for_trade');
+    }
+
+    /** @param {Element|null|undefined} wrap */
+    function pokehubGenerationProgressFromPool(pool, items, wrap) {
         var map = {};
         var i18n = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
         pool.forEach(function (p) {
@@ -315,8 +351,12 @@
             }
             map[label].total++;
             var st = pokehubResolvedStatusForRow(p, items);
-            if (st === 'owned') map[label].owned++;
-            else if (st === 'for_trade') map[label].for_trade++;
+            if (st === 'for_trade') {
+                map[label].for_trade++;
+            }
+            if (pokehubStatusCountsAsOwned(st, wrap)) {
+                map[label].owned++;
+            }
         });
         return map;
     }
@@ -437,10 +477,10 @@
         } catch (e0) {}
         if (!pool.length) return;
 
-        var genProg = pokehubGenerationProgressFromPool(pool, items);
+        var genProg = pokehubGenerationProgressFromPool(pool, items, viewWrap);
         var ownedAll = 0;
         pool.forEach(function (p) {
-            if (pokehubResolvedStatusForRow(p, items) === 'owned') ownedAll++;
+            if (pokehubStatusCountsAsOwned(pokehubResolvedStatusForRow(p, items), viewWrap)) ownedAll++;
         });
         var totalPool = pool.length;
 
@@ -559,7 +599,14 @@
             });
             tiles.forEach(function (tile) {
                 var st = statusKey(tile);
-                var on = show.hasOwnProperty(st) ? !!show[st] : true;
+                var on;
+                if (st === 'for_trade') {
+                    on = !!show.for_trade || (!!show.owned && pokehubStatusCountsAsOwned('for_trade', wrap));
+                } else if (st === 'owned') {
+                    on = !!show.owned;
+                } else {
+                    on = show.hasOwnProperty(st) ? !!show[st] : true;
+                }
                 if (on) {
                     tile.classList.remove(POKEHUB_TILE_FILTERED_OUT);
                 } else {
@@ -786,6 +833,7 @@
                 generations_collapsed: getCheckedOrDefault('pokehub-collection-generations-collapsed', false),
                 display_mode: addSelectorsEl && addSelectorsEl.checked ? 'tiles_select' : 'tiles',
                 show_gender_symbols: cBool('include_gender', 'pokehub-collection-include-gender', true) || cBool('include_both_sexes_collector', 'pokehub-collection-both-sexes-collector', false),
+                for_trade_counts_as_owned: getCheckedOrDefault('pokehub-collection-for-trade-counts-as-owned', true),
             },
         };
     }
@@ -970,6 +1018,7 @@
         if (col) {
             var titleEl = localWrap.querySelector('.pokehub-collection-local-title');
             if (titleEl) titleEl.textContent = col.name;
+            pokehubSyncForTradeOwnedRuleUI(localWrap, col.options);
             var applyLocalFilters = bindCollectionStatusFilters(localWrap);
             var localResetBlock = localWrap.querySelector('.pokehub-collections-reset-inline');
             var localResetLaunch = localWrap.querySelector('.pokehub-collections-btn-reset-launch');
@@ -989,7 +1038,7 @@
                 if (!col._localPool) return;
                 var owned = 0;
                 col._localPool.forEach(function (p) {
-                    if (localResolveItemStatus(p, items) === 'owned') {
+                    if (pokehubStatusCountsAsOwned(localResolveItemStatus(p, items), localWrap)) {
                         owned++;
                     }
                 });
@@ -1276,6 +1325,9 @@
                 options.pool_show_only = poolShowSpec && poolShowSpec.value ? poolShowSpec.value : '';
             }
             options.include_national_dex = document.getElementById('pokehub-edit-include-national') ? document.getElementById('pokehub-edit-include-national').checked : true;
+            options.for_trade_counts_as_owned = document.getElementById('pokehub-edit-for-trade-counts-as-owned')
+                ? document.getElementById('pokehub-edit-for-trade-counts-as-owned').checked
+                : pokehubForTradeCountsAsOwnedFromOpts(currentOptions);
             fetch(pokeHubCollections.restUrl + 'collections/' + collectionId, {
                 method: 'PATCH',
                 headers: buildRestHeaders({

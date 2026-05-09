@@ -207,7 +207,10 @@ class Poke_Hub_Collections_Admin_List_Table extends WP_List_Table {
         $cat     = sanitize_key((string) ($item['category'] ?? 'custom'));
         $pool  = poke_hub_collections_get_pool($cat, $options);
         $items = poke_hub_collections_get_items($id);
-        $t     = poke_hub_collections_compute_progress_totals($pool, $items);
+        $ft_as_owned = function_exists('poke_hub_collections_for_trade_counts_as_owned_from_options')
+            ? poke_hub_collections_for_trade_counts_as_owned_from_options($options)
+            : true;
+        $t     = poke_hub_collections_compute_progress_totals($pool, $items, $ft_as_owned);
         $total = (int) $t['total'];
         $own   = (int) $t['owned'];
         $ft    = (int) $t['for_trade'];

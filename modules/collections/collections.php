@@ -95,6 +95,8 @@ function poke_hub_collections_enqueue_front_assets() {
             'save'            => __('Create collection', 'poke-hub'),
             'owned'           => __('Owned', 'poke-hub'),
             'forTrade'        => __('For trade', 'poke-hub'),
+            'forTradeProgressLegendCounted' => __('In this collection, "For trade" is counted as "Owned" for progress. You can turn this off in the collection settings.', 'poke-hub'),
+            'forTradeProgressLegendSeparate' => __('In this collection, "For trade" is not counted as "Owned". You can change this in the collection settings.', 'poke-hub'),
             'missing'         => __('Missing', 'poke-hub'),
             'share'           => __('Share', 'poke-hub'),
             'shareLink'       => __('Link', 'poke-hub'),
