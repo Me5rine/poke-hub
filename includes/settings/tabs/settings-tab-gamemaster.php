@@ -12,11 +12,17 @@ if ( ! current_user_can( 'manage_options' ) ) {
 $messages        = [];
 $importer_loaded = false;
 
+// Remplie pendant l’upload (S3) puis figée après les POST via {@see poke_hub_gm_local_latest_json_path()}.
+$gm_local_path   = '';
+
+$gm_import_status_for_reset = get_option( 'poke_hub_gm_import_status', [] );
+$gm_import_status_for_reset = is_array( $gm_import_status_for_reset ) ? $gm_import_status_for_reset : [];
+$gm_reset_import_running    = in_array( (string) ( $gm_import_status_for_reset['state'] ?? '' ), [ 'running', 'queued' ], true );
+
 // Options Game Master
 $gm_s3_bucket  = get_option( 'poke_hub_gm_s3_bucket', '' );
 $gm_s3_prefix  = get_option( 'poke_hub_gm_s3_prefix', 'gamemaster' );
 $gm_s3_region  = get_option( 'poke_hub_gm_s3_region', 'eu-west-3' );
-$gm_local_path = get_option( 'poke_hub_gm_local_path', '' );
 
 $last_mtime   = (int) get_option( 'poke_hub_gm_last_mtime', 0 );
 $last_run     = (string) get_option( 'poke_hub_gm_last_run', '' );
@@ -139,20 +145,69 @@ if ( ! function_exists( 'poke_hub_gm_upload_to_s3' ) ) {
 }
 
 /**
- * 1) Traitement UPLOAD JSON (upload + copie locale + S3 optionnel)
+ * 0) Reset local : vider les tables importées depuis le Game Master (environnement `local` uniquement)
  */
-if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
+if ( ! empty( $_POST['poke_hub_gm_local_reset'] ) && function_exists( 'poke_hub_truncate_gm_imported_pokemon_tables' ) ) {
 
-    check_admin_referer( 'poke_hub_gm_upload', 'poke_hub_gm_upload_nonce' );
+	check_admin_referer( 'poke_hub_gm_local_reset', 'poke_hub_gm_local_reset_nonce' );
+
+	if ( ! function_exists( 'poke_hub_allow_gm_imported_data_local_reset' ) || ! poke_hub_allow_gm_imported_data_local_reset() ) {
+		$messages[] = [
+			'type' => 'error',
+			'text' => __( 'This reset is only available when WordPress environment type is “local” (see WP_ENVIRONMENT_TYPE in wp-config.php).', 'poke-hub' ),
+		];
+	} elseif ( $gm_reset_import_running ) {
+		$messages[] = [
+			'type' => 'error',
+			'text' => __( 'Cannot reset while a Game Master import is running or queued.', 'poke-hub' ),
+		];
+	} else {
+		$confirm = isset( $_POST['poke_hub_gm_local_reset_confirm'] ) ? sanitize_text_field( wp_unslash( $_POST['poke_hub_gm_local_reset_confirm'] ) ) : '';
+		if ( $confirm !== 'RESET' ) {
+			$messages[] = [
+				'type' => 'error',
+				'text' => __( 'Confirmation failed: type RESET in the confirmation field.', 'poke-hub' ),
+			];
+		} else {
+			$result = poke_hub_truncate_gm_imported_pokemon_tables();
+			if ( is_wp_error( $result ) ) {
+				$messages[] = [
+					'type' => 'error',
+					'text' => $result->get_error_message(),
+				];
+			} else {
+				$messages[] = [
+					'type' => 'success',
+					'text' => __( 'Local Pokédex data from Game Master imports was removed. You can run a fresh import.', 'poke-hub' ),
+				];
+			}
+		}
+	}
+}
+
+/**
+ * 1) Traitement UPLOAD JSON (upload + copie locale + S3 optionnel)
+ *
+ * On ne déclenche PAS sur name/value du bouton submit : avec multipart/form-data,
+ * certains navigateurs ou intermédiaires peuvent ne pas poster le bouton comme attendu.
+ * Le champ caché poke_hub_gm_upload_requested garantit que la soumission du formulaire
+ * Upload est bien reconnue côté PHP.
+ */
+$gm_upload_post_requested = isset( $_POST['poke_hub_gm_upload_requested'] )
+	&& (string) wp_unslash( (string) $_POST['poke_hub_gm_upload_requested'] ) === '1';
+
+if ( $gm_upload_post_requested ) {
+
+	check_admin_referer( 'poke_hub_gm_upload', 'poke_hub_gm_upload_nonce' );
 
     $upload_file = $_FILES['gm_upload_file'] ?? null;
     $upload_error = is_array( $upload_file ) ? (int) ( $upload_file['error'] ?? UPLOAD_ERR_NO_FILE ) : UPLOAD_ERR_NO_FILE;
 
     $upload_error_messages = [
-        UPLOAD_ERR_INI_SIZE   => __( 'Upload failed: the JSON file is larger than the server limit (upload_max_filesize).', 'poke-hub' ),
+        UPLOAD_ERR_INI_SIZE   => __( 'Upload failed: the JSON file is larger than the server limit (upload_max_filesize).', 'poke-hub' ) . ' ' . __( 'Increase upload_max_filesize and post_max_size in php.ini (WAMP menu → PHP → php.ini).', 'poke-hub' ),
         UPLOAD_ERR_FORM_SIZE  => __( 'Upload failed: the JSON file is larger than the form limit.', 'poke-hub' ),
         UPLOAD_ERR_PARTIAL    => __( 'Upload failed: the JSON file was only partially uploaded.', 'poke-hub' ),
-        UPLOAD_ERR_NO_FILE    => __( 'No file selected for upload.', 'poke-hub' ),
+        UPLOAD_ERR_NO_FILE    => __( 'No file selected for upload. Choose a JSON file next to « Game Master – Upload », then click « Upload JSON & update local copy » (Import now does not upload files).', 'poke-hub' ),
         UPLOAD_ERR_NO_TMP_DIR => __( 'Upload failed: missing temporary folder on server.', 'poke-hub' ),
         UPLOAD_ERR_CANT_WRITE => __( 'Upload failed: cannot write uploaded file to disk.', 'poke-hub' ),
         UPLOAD_ERR_EXTENSION  => __( 'Upload failed: blocked by a PHP extension.', 'poke-hub' ),
@@ -189,8 +244,34 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
             } else {
                 // 1) Copie locale
                 $upload_dir = wp_upload_dir();
+                $upload_basedir = isset( $upload_dir['basedir'] ) ? (string) $upload_dir['basedir'] : '';
+                $upload_err     = isset( $upload_dir['error'] ) ? (string) $upload_dir['error'] : '';
 
-                $gm_dir = trailingslashit( $upload_dir['basedir'] ) . 'poke-hub/gamemaster/';
+                if ( '' !== $upload_err ) {
+                    $messages[] = [
+                        'type' => 'error',
+                        'text' => sprintf(
+                            /* translators: %s = WP error message for uploads dir */
+                            __( 'WordPress uploads directory error: %s', 'poke-hub' ),
+                            $upload_err
+                        ),
+                    ];
+                } elseif ( '' === $upload_basedir || ! is_dir( $upload_basedir ) ) {
+                    $messages[] = [
+                        'type' => 'error',
+                        'text' => __( 'WordPress uploads folder is missing or invalid (basedir empty). Check Réglages → Médias or constants UPLOADS / FTP in wp-config.php.', 'poke-hub' ),
+                    ];
+                } elseif ( ! wp_is_writable( $upload_basedir ) ) {
+                    $messages[] = [
+                        'type' => 'error',
+                        'text' => sprintf(
+                            /* translators: %s = filesystem path */
+                            __( 'Uploads folder is not writable by PHP: %s (fix permissions under wp-content/uploads on WAMP).', 'poke-hub' ),
+                            esc_html( $upload_basedir )
+                        ),
+                    ];
+                } else {
+                $gm_dir = trailingslashit( $upload_basedir ) . 'poke-hub/gamemaster/';
                 if ( ! wp_mkdir_p( $gm_dir ) ) {
                     $messages[] = [
                         'type' => 'error',
@@ -219,7 +300,7 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
                             ),
                         ];
                     } else {
-                        update_option( 'poke_hub_gm_local_path', $local_file );
+						/* Chemin d’installation uniquement ({@see poke_hub_gm_local_latest_json_path()}) ; pas d’option en base. */
                         $gm_local_path = $local_file;
 
                         $current_mtime = (int) @filemtime( $local_file );
@@ -255,6 +336,7 @@ if ( ! empty( $_POST['poke_hub_gm_upload_action'] ) ) {
                         ];
                     }
                 }
+                } // end uploads dir writable / valid
 
                 // 2) S3 optionnel
                 if ( $gm_s3_bucket !== '' && ! empty( $gm_local_path ) && file_exists( $gm_local_path ) ) {
@@ -327,12 +409,7 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
 
     // On laisse la possibilité de mettre à jour le chemin manuellement si besoin,
     // même si ce champ n'est plus affiché dans le formulaire.
-    if ( isset( $_POST['gm_local_path'] ) ) {
-        $gm_local_path = trim( sanitize_text_field( wp_unslash( $_POST['gm_local_path'] ) ) );
-        update_option( 'poke_hub_gm_local_path', $gm_local_path );
-    }
-
-    $action       = sanitize_text_field( $_POST['poke_hub_gm_submit'] ); // save / save_import
+    $action       = sanitize_text_field( wp_unslash( $_POST['poke_hub_gm_submit'] ?? '' ) ); // save / save_import
     $force_import = ! empty( $_POST['gm_force_import'] );
 
     // Options import (checkboxes)
@@ -353,24 +430,22 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
 
     if ( 'save_import' === $action ) {
 
-        $path = $gm_local_path;
+        $path = function_exists( 'poke_hub_gm_local_latest_json_path' )
+            ? poke_hub_gm_local_latest_json_path()
+            : '';
 
         if ( '' === $path ) {
             $messages[] = [
                 'type' => 'error',
-                'text' => __( 'No local Game Master file path defined.', 'poke-hub' ),
+                'text' => __( 'No local Game Master file path defined. Use the section « Game Master – Upload & Archive » above: choose the JSON file, then click « Upload JSON & update local copy » before running Import now.', 'poke-hub' ),
             ];
         } else {
-            // Si le chemin n’est pas absolu, on le normalise depuis wp-content
-            if ( ! preg_match( '#^(/|[A-Za-z]:\\\\)#', $path ) ) {
-                $path = WP_CONTENT_DIR . '/' . ltrim( $path, '/' );
-            }
-
             if ( ! file_exists( $path ) ) {
                 $messages[] = [
                     'type' => 'error',
                     'text' => sprintf(
-                        __( 'Game Master file not found: %s', 'poke-hub' ),
+                        /* translators: %s = absolute path under this WP uploads folder */
+                        __( 'Game Master file not found: %s. Upload the JSON with « Upload JSON & update local copy » (file is saved under uploads for this WordPress installation).', 'poke-hub' ),
                         esc_html( $path )
                     ),
                 ];
@@ -443,6 +518,13 @@ if ( ! empty( $_POST['poke_hub_gm_submit'] ) ) {
     }
 }
 
+// Toujours le chemin du PE site ({@see wp_upload_dir()}), pas une option périmère après clone BDD.
+if ( function_exists( 'poke_hub_gm_local_latest_json_path' ) ) {
+	$gm_local_path = poke_hub_gm_local_latest_json_path();
+} else {
+	$gm_local_path = '';
+}
+
 // Préparer un éventuel lien public vers le fichier local (si placé dans uploads)
 $gm_local_url = '';
 if ( $gm_local_path && file_exists( $gm_local_path ) ) {
@@ -487,8 +569,14 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     </div>
 <?php endif; ?>
 
+<?php
+$poke_hub_gm_form_action = function_exists( 'poke_hub_admin_tools_url' )
+	? poke_hub_admin_tools_url( 'gamemaster' )
+	: add_query_arg( [ 'page' => 'poke-hub-tools', 'tab' => 'gamemaster' ], admin_url( 'admin.php' ) );
+?>
+
 <!-- 1) SETTINGS : S3 bucket / prefix / region -->
-<form method="post" action="" style="margin-top:20px;">
+<form method="post" action="<?php echo esc_url( $poke_hub_gm_form_action ); ?>" style="margin-top:20px;">
     <?php wp_nonce_field( 'poke_hub_gm_settings', 'poke_hub_gm_nonce' ); ?>
     <h2><?php esc_html_e( 'Game Master – Settings', 'poke-hub' ); ?></h2>
 
@@ -544,9 +632,11 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
 </form>
 
 <!-- 2) UPLOAD : choix du fichier + upload -->
-<form method="post" action="" enctype="multipart/form-data" style="margin-top:30px;">
+<form method="post" action="<?php echo esc_url( $poke_hub_gm_form_action ); ?>" enctype="multipart/form-data" style="margin-top:30px;">
     <?php wp_nonce_field( 'poke_hub_gm_upload', 'poke_hub_gm_upload_nonce' ); ?>
+    <input type="hidden" name="poke_hub_gm_upload_requested" value="1" />
     <h2><?php esc_html_e( 'Game Master – Upload & Archive', 'poke-hub' ); ?></h2>
+    <p class="description"><?php esc_html_e( 'This step uploads the JSON to uploads/poke-hub/gamemaster/latest.json on the server. It is required before « Import now » (import reads that file — it never uploads your browser file).', 'poke-hub' ); ?></p>
 
     <table class="form-table" role="presentation">
         <tr>
@@ -579,20 +669,19 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
     </table>
 
     <p class="submit">
-        <button type="submit"
-                name="poke_hub_gm_upload_action"
-                value="upload"
-                class="button button-secondary">
+        <?php /* Pas de name sur le bouton : le déclencheur serveur est poke_hub_gm_upload_requested */ ?>
+        <button type="submit" class="button button-secondary">
             <?php esc_html_e( 'Upload JSON & update local copy', 'poke-hub' ); ?>
         </button>
     </p>
 </form>
 
 <!-- 3) IMPORT : force import + options + status/progress + bouton Import now -->
-<form method="post" action="" style="margin-top:30px;">
+<form method="post" action="<?php echo esc_url( $poke_hub_gm_form_action ); ?>" style="margin-top:30px;">
     <?php wp_nonce_field( 'poke_hub_gm_settings', 'poke_hub_gm_nonce' ); ?>
 
     <h2><?php esc_html_e( 'Game Master import / sync', 'poke-hub' ); ?></h2>
+    <p class="description"><?php esc_html_e( 'Runs the importer on the file path stored locally (updated by Upload above).', 'poke-hub' ); ?></p>
 
     <?php
     $status = get_option( 'poke_hub_gm_import_status', [] );
@@ -965,3 +1054,45 @@ define( 'POKE_HUB_GM_AWS_SECRET', 'your-secret' );</code></pre>
         </button>
     </p>
 </form>
+
+<?php if ( function_exists( 'poke_hub_allow_gm_imported_data_local_reset' ) && poke_hub_allow_gm_imported_data_local_reset() ) : ?>
+    <hr style="margin:32px 0;" />
+    <form method="post" action="<?php echo esc_url( $poke_hub_gm_form_action ); ?>" style="margin-top:20px;">
+        <?php wp_nonce_field( 'poke_hub_gm_local_reset', 'poke_hub_gm_local_reset_nonce' ); ?>
+        <h2><?php esc_html_e( 'Local dev — Reset Game Master data', 'poke-hub' ); ?></h2>
+        <div class="notice notice-warning inline" style="margin:12px 0;padding:12px;">
+            <p>
+                <?php esc_html_e( 'This deletes all Pokémon, moves, types, generations, evolution rows, variant registry entries, type matchup links, and related junction tables populated by Game Master imports on this WordPress database. Editorial content that references Pokémon IDs may become inconsistent.', 'poke-hub' ); ?>
+            </p>
+            <p>
+                <?php esc_html_e( 'This button is shown only when the site environment type is local. Set WP_ENVIRONMENT_TYPE to local in wp-config.php on your machine.', 'poke-hub' ); ?>
+            </p>
+        </div>
+        <table class="form-table" role="presentation">
+            <tr>
+                <th scope="row">
+                    <label for="poke_hub_gm_local_reset_confirm"><?php esc_html_e( 'Confirmation', 'poke-hub' ); ?></label>
+                </th>
+                <td>
+                    <input type="text"
+                           class="regular-text"
+                           id="poke_hub_gm_local_reset_confirm"
+                           name="poke_hub_gm_local_reset_confirm"
+                           autocomplete="off"
+                           placeholder="<?php esc_attr_e( 'Type RESET to confirm', 'poke-hub' ); ?>" />
+                    <p class="description"><?php esc_html_e( 'Type RESET (uppercase) to enable the destructive action.', 'poke-hub' ); ?></p>
+                </td>
+            </tr>
+        </table>
+        <p class="submit">
+            <button type="submit"
+                    name="poke_hub_gm_local_reset"
+                    value="1"
+                    class="button button-secondary"
+                    style="border-color:#b32d2e;color:#b32d2e;"
+                    <?php disabled( $gm_reset_import_running ); ?>>
+                <?php esc_html_e( 'Truncate Game Master Pokédex tables', 'poke-hub' ); ?>
+            </button>
+        </p>
+    </form>
+<?php endif; ?>

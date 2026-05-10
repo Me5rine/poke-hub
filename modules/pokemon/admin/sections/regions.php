@@ -305,6 +305,10 @@ function poke_hub_pokemon_handle_regions_delete() {
     $table = pokehub_get_table('pokemon_regions');
     $wpdb->delete($table, ['id' => $id], ['%d']);
 
+    if ( function_exists( 'poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush' ) ) {
+        poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush();
+    }
+
     $redirect = add_query_arg(
         [
             'page'       => 'poke-hub-pokemon',
@@ -350,6 +354,11 @@ function poke_hub_pokemon_handle_regions_form() {
         return;
     }
 
+    $regions_table_migrate = pokehub_get_table( 'regions' );
+    if ( $regions_table_migrate !== '' && class_exists( 'Pokehub_DB' ) ) {
+        Pokehub_DB::getInstance()->migrateRegionsPokemonRegionalFormColumns( $regions_table_migrate );
+    }
+
     global $wpdb;
 
     $redirect_base = add_query_arg(
@@ -375,6 +384,20 @@ function poke_hub_pokemon_handle_regions_form() {
     $slug       = isset($_POST['slug']) ? sanitize_title($_POST['slug']) : '';
     $sort_order = isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0;
 
+    $pr_form_name_en = isset($_POST['pokemon_regional_form_name_en']) ? sanitize_text_field(wp_unslash($_POST['pokemon_regional_form_name_en'])) : '';
+    $pr_form_name_fr = isset($_POST['pokemon_regional_form_name_fr']) ? sanitize_text_field(wp_unslash($_POST['pokemon_regional_form_name_fr'])) : '';
+    $pr_form_slug    = isset($_POST['pokemon_regional_form_slug']) ? sanitize_title(wp_unslash($_POST['pokemon_regional_form_slug'])) : '';
+    if ($pr_form_slug === '' && $pr_form_name_en !== '') {
+        $pr_form_slug = sanitize_title($pr_form_name_en);
+    }
+    $aliases_raw = isset($_POST['pokemon_regional_form_slug_aliases']) ? sanitize_textarea_field(wp_unslash($_POST['pokemon_regional_form_slug_aliases'])) : '';
+    $alias_list  = array_filter(array_unique(array_map(static function ($x) {
+        return sanitize_title(trim($x));
+    }, preg_split('/[,;\n\r]+/', $aliases_raw))));
+    $aliases_json = $alias_list !== []
+        ? wp_json_encode(array_values($alias_list), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        : '';
+
     // Au moins un nom requis
     if ($name_en === '' && $name_fr === '') {
         wp_redirect(add_query_arg('ph_msg', 'missing_name', $redirect_base));
@@ -390,15 +413,23 @@ function poke_hub_pokemon_handle_regions_form() {
     $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_region' ? 0 : $id, 'slug', 'id', 'region');
 
     $data = [
-        'name_en'    => $name_en,
-        'name_fr'    => $name_fr,
-        'slug'       => $slug,
-        'sort_order' => $sort_order,
+        'name_en'                             => $name_en,
+        'name_fr'                             => $name_fr,
+        'slug'                                => $slug,
+        'sort_order'                          => $sort_order,
+        'pokemon_regional_form_name_en'       => $pr_form_name_en,
+        'pokemon_regional_form_name_fr'       => $pr_form_name_fr,
+        'pokemon_regional_form_slug'          => $pr_form_slug,
+        'pokemon_regional_form_slug_aliases' => $aliases_json,
     ];
-    $format = ['%s', '%s', '%s', '%d'];
+    $format = ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s'];
 
     if ($action === 'add_region') {
         $wpdb->insert($table, $data, $format);
+
+        if (function_exists('poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush')) {
+            poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush();
+        }
 
         wp_redirect(add_query_arg('ph_msg', 'saved', $redirect_base));
         exit;
@@ -411,6 +442,10 @@ function poke_hub_pokemon_handle_regions_form() {
     }
 
     $wpdb->update($table, $data, ['id' => $id], $format, ['%d']);
+
+    if (function_exists('poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush')) {
+        poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush();
+    }
 
     $redirect = add_query_arg(
         [

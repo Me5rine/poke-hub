@@ -525,17 +525,17 @@ class Poke_Hub_Pokemon_List_Table extends WP_List_Table {
                    value="<?php echo esc_attr($this->filters['variant_group']); ?>"
                    placeholder="<?php esc_attr_e('Variant group', 'poke-hub'); ?>" />
 
-            <!-- Filtre régional (basé sur extra.regional.is_regional) -->
+            <!-- Filtre spawn géographique (extra.regional.is_regional Pokémon GO) -->
             <label class="screen-reader-text" for="filter_regional">
-                <?php _e('Filter by regional', 'poke-hub'); ?>
+                <?php _e('Filter by geographical spawn (GO)', 'poke-hub'); ?>
             </label>
             <select name="filter_regional" id="filter_regional">
-                <option value=""><?php _e('All (regional or not)', 'poke-hub'); ?></option>
+                <option value=""><?php _e('All spawn types', 'poke-hub'); ?></option>
                 <option value="1" <?php selected($this->filters['regional'], '1'); ?>>
-                    <?php _e('Regional only', 'poke-hub'); ?>
+                    <?php _e('Spawn regional (map only)', 'poke-hub'); ?>
                 </option>
                 <option value="0" <?php selected($this->filters['regional'], '0'); ?>>
-                    <?php _e('Non-regional only', 'poke-hub'); ?>
+                    <?php _e('Worldwide spawn', 'poke-hub'); ?>
                 </option>
             </select>
 
@@ -2165,7 +2165,7 @@ function poke_hub_pokemon_handle_pokemon_form() {
         $regional_countries = array_filter($regional_countries); // Remove empty values
     }
     
-    // Geographic regions (multiselect or textarea fallback)
+    // Geographical spawn regions (multiselect or textarea fallback)
     $regional_region_slugs = [];
     if (isset($_POST['regional_regions']) && is_array($_POST['regional_regions'])) {
         // From multiselect

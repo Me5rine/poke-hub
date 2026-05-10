@@ -21,7 +21,9 @@ Chaque collection a une **catégorie** qui définit ce qu’on suit :
 
 | Catégorie (slug)        | Description                          |
 |-------------------------|--------------------------------------|
-| `perfect_4`              | Pokémon 4* (parfaits)                |
+| `all_pokemon`           | Catalogue Pokémon configurable (filtres 4★ via options) ; `POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON` |
+| `pogo_geo_exclusive`    | Dispo régionale Pokémon GO (`extra.regional.is_regional`) ; `POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE` |
+| `babies_only`           | Bébés uniquement ; `POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY` |
 | `shiny`                 | Chromatiques                         |
 | `costume`               | Pokémon costumés                     |
 | `costume_shiny`         | Costumés chromatiques                |
@@ -38,6 +40,8 @@ Chaque collection a une **catégorie** qui définit ce qu’on suit :
 | `dynamax`               | Dynamax (et variantes shiny/100 %)  |
 | `legendary_mythical_ultra` | Liste préparamétrée Légendaire, Fabuleux et Ultra-chimères |
 | `custom`                | Liste personnalisée (tous ou filtre) |
+
+**Migration** : au chargement (`init` priorité 4), `poke_hub_collections_maybe_migrate_category_slugs_canonical()` réécrit une fois en base les anciens slugs `national`, `perfect_4`, `go_regional`, `baby_only` vers les slugs ci-dessus (option `poke_hub_collections_category_slugs_canonical_v1`). Pas d’alias à l’exécution : `poke_hub_collections_normalize_storage_category_slug()` applique uniquement `sanitize_key()`.
 
 Les catégories **spécifiques** (Gigantamax, Dynamax, Costume, Shadow, Purified, Fonds, etc.) affichent **uniquement** ce type : les options « inclure Méga / Gigantamax / Dynamax / costumes » ne sont pas proposées (paramètres adaptatifs). Voir la section *Catégories spécifiques* ci-dessous.
 

@@ -597,7 +597,9 @@ function poke_hub_pokemon_get_form_variant_by_slug( $form_slug ) {
 }
 
 /**
- * Normalise un proto de forme en slug de forme, **sans** mapping en dur.
+ * Normalise un proto de forme en slug de forme.
+ *
+ * Ajustement Spinda : suffixe numérique pur (00, 01, …) GM → numérotation jeu 1, 2, …
  *
  * - Forme vide / UNSET / FORM_UNSET → '' (forme de base)
  * - Sinon :
@@ -633,6 +635,19 @@ function poke_hub_pokemon_normalize_form_proto( $pokemon_id_proto, $form_proto, 
 
     $suffix = strtolower( $suffix );
     $suffix = str_replace( '__', '_', $suffix );
+
+    // Spinda (GO Game Master) : motifs *_00 / *_01… indexés depuis 0 côté Niantic ; en jeu ils correspondent à 1, 2…
+    if ( strtoupper( $pokemon_id_proto ) === 'SPINDA' && $suffix !== '' ) {
+        $digits = '';
+        if ( preg_match( '/^[0-9]+$/', $suffix ) === 1 ) {
+            $digits = $suffix;
+        } elseif ( preg_match( '/^form[_-]([0-9]+)$/i', $suffix, $m ) === 1 ) {
+            $digits = $m[1];
+        }
+        if ( $digits !== '' ) {
+            $suffix = (string) ( (int) $digits + 1 );
+        }
+    }
 
     // Certaines espèces utilisent "normal" comme vraie forme (ex: Deoxys, Palkia)
     // quand le GM expose formChange. Dans ce cas, on garde explicitement "normal".
@@ -2271,7 +2286,7 @@ function poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( int $source_i
 
 /**
  * Après import GM : pour certaines espèces (binôme sexe GO sans lignes dédiées dans le GM),
- * crée *-family*, la fiche normale ♂ et *-female* avec les **mêmes stats / types / attaques** que la fiche source.
+ * assure *-family*, la fiche « nue » (♂) et *-female* avec les **mêmes stats / types / attaques** qu’un modèle choisi parmi lignes déjà présentes.
  *
  * Cas initial : Hippopotas / Hippowdon — collections attendent la même structure que les autres familles sexuées.
  *
@@ -2303,30 +2318,33 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
         }
 
         $base_slug = poke_hub_pokemon_gm_id_to_slug( $proto );
-        if ( $base_slug === '' ) {
+        if ( $base_slug === '' || preg_match( '/(?:-family|-female|-male)$/', $base_slug ) ) {
             continue;
         }
 
-        $base_row = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
-                $base_slug
-            ),
-            ARRAY_A
-        );
-        if ( ! is_array( $base_row ) || empty( $base_row['id'] ) ) {
+        $family_slug = $base_slug . '-family';
+        $female_slug = $base_slug . '-female';
+
+        // Modèle de copie : fiche nue d’abord, sinon *-family*, sinon *-female* (après GM il peut n’exister que *-family*).
+        $seed_row = null;
+        foreach ( [ $base_slug, $family_slug, $female_slug ] as $try_slug ) {
+            $candidate = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                    $try_slug
+                ),
+                ARRAY_A
+            );
+            if ( is_array( $candidate ) && ! empty( $candidate['id'] ) ) {
+                $seed_row = $candidate;
+                break;
+            }
+        }
+        if ( ! is_array( $seed_row ) || empty( $seed_row['id'] ) ) {
             continue;
         }
 
-        $base_slug_lc = strtolower( trim( (string) ( $base_row['slug'] ?? '' ) ) );
-        if ( $base_slug_lc === '' || preg_match( '/-family$/', $base_slug_lc ) || preg_match( '/-female$/', $base_slug_lc ) || preg_match( '/-male$/', $base_slug_lc ) ) {
-            continue;
-        }
-
-        $base_id = (int) $base_row['id'];
-
-        $family_slug = $base_slug_lc . '-family';
-        $female_slug = $base_slug_lc . '-female';
+        $seed_id = (int) $seed_row['id'];
 
         $family_id = (int) $wpdb->get_var(
             $wpdb->prepare(
@@ -2344,7 +2362,7 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
         /**
          * @param array<string, mixed> $seed
          */
-        $insert_clone = static function ( array $seed, string $slug, int $is_default, string $role ) use ( $wpdb, $pokemon_table, $tables, $base_id, &$stats ) {
+        $insert_clone = static function ( array $seed, string $slug, int $is_default, string $role ) use ( $wpdb, $pokemon_table, $tables, $seed_id, &$stats ) {
             unset( $seed['id'] );
             $seed['slug']       = $slug;
             $seed['is_default'] = $is_default;
@@ -2356,7 +2374,7 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
             }
             $extra_dec['poke_hub_gm_binary_sex_family_clone'] = [
                 'role'              => $role,
-                'source_pokemon_id' => $base_id,
+                'source_pokemon_id' => $seed_id,
             ];
             if ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
                 $seed['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw );
@@ -2372,8 +2390,8 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
             $new_id = (int) $wpdb->insert_id;
             if ( $new_id > 0 ) {
                 $stats['pokemon_inserted_count'] = (int) ( $stats['pokemon_inserted_count'] ?? 0 ) + 1;
-                poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $base_id, $new_id );
-                poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $base_id, $new_id, $tables );
+                poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $seed_id, $new_id );
+                poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $seed_id, $new_id, $tables );
             }
 
             return $new_id;
@@ -2382,8 +2400,9 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
         /**
          * @param int $pid
          */
-        $sync_clone_from_base = static function ( int $pid ) use ( $wpdb, $pokemon_table, $base_row, $tables, $base_id ) {
-            if ( $pid <= 0 ) {
+        $sync_clone_from_base = static function ( int $pid ) use ( $wpdb, $pokemon_table, $seed_row, $tables, $seed_id ) {
+            if ( $pid <= 0 || $pid === $seed_id ) {
+                // Éviter duplicate_attack_links sur soi-même : la fonction DELETE les liens de la cible avant copie.
                 return;
             }
             $sync_cols = [
@@ -2408,8 +2427,8 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
             ];
             $upd = [];
             foreach ( $sync_cols as $col ) {
-                if ( array_key_exists( $col, $base_row ) ) {
-                    $upd[ $col ] = $base_row[ $col ];
+                if ( array_key_exists( $col, $seed_row ) ) {
+                    $upd[ $col ] = $seed_row[ $col ];
                 }
             }
             $slug_target = (string) $wpdb->get_var(
@@ -2420,17 +2439,17 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
             );
             $slug_tl = strtolower( trim( $slug_target ) );
             $clone_role = preg_match( '/-family$/', $slug_tl ) ? 'family' : 'female';
-            $extra_raw_base = isset( $base_row['extra'] ) ? (string) $base_row['extra'] : '';
-            $extra_dec      = json_decode( $extra_raw_base, true );
+            $extra_raw_seed = isset( $seed_row['extra'] ) ? (string) $seed_row['extra'] : '';
+            $extra_dec      = json_decode( $extra_raw_seed, true );
             if ( ! is_array( $extra_dec ) ) {
                 $extra_dec = [];
             }
             $extra_dec['poke_hub_gm_binary_sex_family_clone'] = [
                 'role'              => $clone_role,
-                'source_pokemon_id' => $base_id,
+                'source_pokemon_id' => $seed_id,
             ];
             if ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
-                $upd['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw_base );
+                $upd['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw_seed );
             } else {
                 $upd['extra'] = wp_json_encode( $extra_dec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
             }
@@ -2438,30 +2457,174 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
                 return;
             }
             $wpdb->update( $pokemon_table, $upd, [ 'id' => $pid ], poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $upd ), [ '%d' ] );
-            poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $base_id, $pid );
-            poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $base_id, $pid, $tables );
+            poke_hub_pokemon_gm_duplicate_pokemon_type_links_clone( $seed_id, $pid );
+            poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( $seed_id, $pid, $tables );
         };
 
         if ( $family_id <= 0 ) {
-            $family_id = $insert_clone( $base_row, $family_slug, 1, 'family' );
+            $family_id = $insert_clone( $seed_row, $family_slug, 1, 'family' );
         } else {
             $sync_clone_from_base( $family_id );
         }
 
         if ( $female_id <= 0 ) {
-            $female_id = $insert_clone( $base_row, $female_slug, 0, 'female' );
+            $female_id = $insert_clone( $seed_row, $female_slug, 0, 'female' );
         } else {
             $sync_clone_from_base( $female_id );
         }
 
-        if ( $family_id > 0 && $female_id > 0 && $base_id > 0 ) {
+        // La fiche « nue » ({slug}) ne doit pas être is_default lorsque famille + ♀ sont en place (*-family* reste défaut métier GM).
+        $bare_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$pokemon_table} WHERE slug = %s LIMIT 1",
+                $base_slug
+            )
+        );
+        if ( $family_id > 0 && $female_id > 0 && $bare_id > 0 ) {
             $wpdb->update(
                 $pokemon_table,
                 [ 'is_default' => 0 ],
-                [ 'id' => $base_id ],
+                [ 'id' => $bare_id ],
                 [ '%d' ],
                 [ '%d' ]
             );
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * Crée {stem}-family pour les branches régionales à plusieurs sous-formes déjà en base
+ * (ex. tauros-paldea-aqua/blaze/combat → tauros-paldea-family).
+ *
+ * Complète le GM : les protos région jeu sont hors mécanisme *-family* type Dialga / Palkia.
+ *
+ * @param array<string, string> $tables
+ * @param array<string, mixed>  $stats
+ * @return array<string, mixed>
+ */
+function poke_hub_pokemon_gm_import_regional_multi_form_family_placeholder_pass( array $tables, array $stats ): array {
+    global $wpdb;
+
+    $pokemon_table = ! empty( $tables['pokemon'] ) ? $tables['pokemon'] : pokehub_get_table( 'pokemon' );
+    if ( ! $pokemon_table
+        || ! function_exists( 'poke_hub_pokemon_slug_regional_multi_form_branch_stem' )
+        || ! function_exists( 'poke_hub_pokemon_gm_wpdb_format_for_pokemon_row' )
+        || ! function_exists( 'poke_hub_pokemon_regional_game_form_tokens_regex_fragment' )
+    ) {
+        return $stats;
+    }
+
+    $tok = poke_hub_pokemon_regional_game_form_tokens_regex_fragment();
+    /* Constante motifs : évite prepare() qui peut échapper la REGEXP MySQL */
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- motif figé poke_hub_token.
+    $rows = $wpdb->get_results(
+        "SELECT id, dex_number, slug FROM {$pokemon_table}
+         WHERE slug IS NOT NULL AND TRIM(slug) <> ''
+           AND LOWER(TRIM(slug)) REGEXP '(^|[-_])(" . $tok . ")([-_]|$)'",
+        ARRAY_A
+    );
+    if ( ! is_array( $rows ) || $rows === [] ) {
+        return $stats;
+    }
+
+    /** @var array<string, array<string, int>> $slug_to_id dex|stem => slug => id */
+    $groups = [];
+
+    foreach ( $rows as $pr ) {
+        if ( ! is_array( $pr ) ) {
+            continue;
+        }
+        $dex = (int) ( $pr['dex_number'] ?? 0 );
+        $pid = (int) ( $pr['id'] ?? 0 );
+        $slug = strtolower( trim( (string) ( $pr['slug'] ?? '' ) ) );
+        if ( $dex <= 0 || $pid <= 0 || $slug === '' ) {
+            continue;
+        }
+        $stem = poke_hub_pokemon_slug_regional_multi_form_branch_stem( $slug );
+        if ( $stem !== null ) {
+            $gk            = $dex . '|' . $stem;
+            $groups[ $gk ][ $slug ] = $pid;
+        }
+        if ( function_exists( 'poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem' ) ) {
+            $pf = poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem( $slug );
+            if ( $pf !== null ) {
+                $gk                = $dex . '|' . $pf;
+                $groups[ $gk ][ $slug ] = $pid;
+            }
+        }
+    }
+
+    foreach ( $groups as $gk => $slug_map ) {
+        // Une seule ligne variante régionale (ex. tauros-paldea-combat) suffit pour créer
+        // {stem}-family : sinon en « une entrée par espèce » le repli peut retomber sur la forme nue.
+        $parts = explode( '|', $gk, 2 );
+        $dex   = isset( $parts[0] ) ? (int) $parts[0] : 0;
+        $stem  = isset( $parts[1] ) ? (string) $parts[1] : '';
+        if ( $dex <= 0 || $stem === '' ) {
+            continue;
+        }
+
+        $fam_slug = $stem . '-family';
+        if ( isset( $slug_map[ $fam_slug ] ) ) {
+            continue;
+        }
+
+        $seed_id = 0;
+        ksort( $slug_map );
+        foreach ( $slug_map as $s => $sid ) {
+            if ( $s === $fam_slug || substr( $s, -7 ) === '-family' ) {
+                continue;
+            }
+            $sid = (int) $sid;
+            if ( $sid > 0 ) {
+                $seed_id = $sid;
+                break;
+            }
+        }
+        if ( $seed_id <= 0 ) {
+            continue;
+        }
+
+        $seed_row = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$pokemon_table} WHERE id = %d LIMIT 1", $seed_id ),
+            ARRAY_A
+        );
+        if ( ! is_array( $seed_row ) || empty( $seed_row['id'] ) ) {
+            continue;
+        }
+
+        unset( $seed_row['id'] );
+        $seed_row['slug']       = $fam_slug;
+        $seed_row['is_default'] = 0;
+
+        $extra_raw = isset( $seed_row['extra'] ) ? (string) $seed_row['extra'] : '';
+        $extra_dec = json_decode( $extra_raw, true );
+        if ( ! is_array( $extra_dec ) ) {
+            $extra_dec = [];
+        }
+        $extra_dec['poke_hub_gm_regional_branch_family_placeholder'] = [
+            'stem'              => $stem,
+            'source_pokemon_id' => $seed_id,
+        ];
+        if ( function_exists( 'poke_hub_pokemon_encode_extra_json' ) ) {
+            $seed_row['extra'] = poke_hub_pokemon_encode_extra_json( $extra_dec, $extra_raw );
+        } else {
+            $seed_row['extra'] = wp_json_encode( $extra_dec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+        }
+
+        $format = poke_hub_pokemon_gm_wpdb_format_for_pokemon_row( $seed_row );
+        $ok     = $wpdb->insert( $pokemon_table, $seed_row, $format );
+        if ( ! $ok ) {
+            continue;
+        }
+        $stats['pokemon_inserted_count'] = (int) ( $stats['pokemon_inserted_count'] ?? 0 ) + 1;
+        if ( ! isset( $stats['pokemon_inserted_sample'] ) || ! is_array( $stats['pokemon_inserted_sample'] ) ) {
+            $stats['pokemon_inserted_sample'] = [];
+        }
+        if ( count( $stats['pokemon_inserted_sample'] ) < 50 ) {
+            $stats['pokemon_inserted_sample'][] = 'regional-family:' . $fam_slug;
         }
     }
 

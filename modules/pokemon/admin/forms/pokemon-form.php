@@ -1334,9 +1334,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </div>
         </div>
 
-        <!-- Section: Regional Availability (biomes + geographic regionality) -->
+        <!-- Section: Geographical GO availability (biomes + spawn regions) -->
         <div class="admin-lab-form-section">
-            <h2><?php esc_html_e('Regional availability', 'poke-hub'); ?></h2>
+            <h2><?php esc_html_e('Geographical availability (GO)', 'poke-hub'); ?></h2>
 
             <h3><?php esc_html_e('Biomes', 'poke-hub'); ?></h3>
             <div class="admin-lab-form-group" style="max-width: 640px;">
@@ -1364,7 +1364,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <p class="description" id="pokehub-pokemon-biomes-desc"><?php esc_html_e('Wild biomes where this species can appear (Pokémon GO). You can select several.', 'poke-hub'); ?></p>
             </div>
 
-            <h3 style="margin-top: 1.75em; padding-top: 1.25em; border-top: 1px solid #c3c4c7;"><?php esc_html_e('Regional', 'poke-hub'); ?></h3>
+            <h3 style="margin-top: 1.75em; padding-top: 1.25em; border-top: 1px solid #c3c4c7;"><?php esc_html_e('Spawn regional (map)', 'poke-hub'); ?></h3>
 
             <div class="admin-lab-form-row">
                 <div class="admin-lab-form-col-50">
@@ -1385,7 +1385,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             </div>
 
             <div class="admin-lab-form-group">
-                <label for="regional_description"><?php esc_html_e('Regional description', 'poke-hub'); ?></label>
+                <label for="regional_description"><?php esc_html_e('Geographical regional description', 'poke-hub'); ?></label>
                 <textarea name="regional_description" id="regional_description" rows="3" style="width: 100%;"><?php echo esc_textarea($regional['description'] ?? ''); ?></textarea>
                 <p class="description"><?php esc_html_e('Example: Available only in North America, etc.', 'poke-hub'); ?></p>
             </div>
@@ -1474,7 +1474,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 </div>
                 <div class="admin-lab-form-col-50">
                     <div class="admin-lab-form-group">
-                        <label for="regional_regions"><?php esc_html_e('Geographic Regions', 'poke-hub'); ?></label>
+                        <label for="regional_regions"><?php esc_html_e('Geographical spawn regions', 'poke-hub'); ?></label>
                         <?php if (!empty($regions_list)) : ?>
                             <select name="regional_regions[]" id="regional_regions" multiple="multiple" style="width: 100%; min-height: 150px;">
                                 <?php foreach ($regions_list as $region) : ?>
@@ -1501,7 +1501,7 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                             </p>
                         <?php endif; ?>
                         <p class="description">
-                            <?php esc_html_e('Select geographic regions where this regional Pokémon is available.', 'poke-hub'); ?>
+                            <?php esc_html_e('Select geographical spawn regions where this Pokémon is available on the map (GO).', 'poke-hub'); ?>
                         </p>
                     </div>
                 </div>

@@ -144,7 +144,7 @@ function poke_hub_pokemon_admin_regional_regions_screen() {
         }
     }
     
-    echo '<p>' . esc_html__('Manage geographic regions (Europe, Asia, etc.) and their associated countries. These regions are used for regional Pokémon mappings.', 'poke-hub') . '</p>';
+    echo '<p>' . esc_html__('Manage geographical spawn groups (Europe, Asia, hemispheres, etc.) and associated countries. Used for Pokémon GO regional availability on the map — not the same as “regional form” (Alola / Paldea) in the Regions → Pokémon regional form fields.', 'poke-hub') . '</p>';
     
     ?>
     <form method="get">

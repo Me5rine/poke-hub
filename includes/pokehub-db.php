@@ -218,6 +218,10 @@ class Pokehub_DB {
             name_fr VARCHAR(100) NOT NULL DEFAULT '',
 
             sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            pokemon_regional_form_name_en VARCHAR(120) NOT NULL DEFAULT '' COMMENT 'Label formes Pokémon (Hisui…)',
+            pokemon_regional_form_name_fr VARCHAR(120) NOT NULL DEFAULT '',
+            pokemon_regional_form_slug VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Jeton principal espèce-/form_slug (paldea)',
+            pokemon_regional_form_slug_aliases LONGTEXT NULL COMMENT 'JSON list alternate tokens [alolan]',
             extra LONGTEXT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug)
@@ -600,6 +604,10 @@ class Pokehub_DB {
         dbDelta($sql_pokemon);
         dbDelta($sql_types);
         dbDelta($sql_regions);
+        $this->migrateRegionsPokemonRegionalFormColumns( $regions_table );
+        if ( function_exists( 'poke_hub_regions_ensure_core_regional_game_regions' ) ) {
+            poke_hub_regions_ensure_core_regional_game_regions();
+        }
         dbDelta($sql_gens);
         if ($generation_regions_table) {
             dbDelta($sql_generation_regions);
@@ -700,6 +708,52 @@ class Pokehub_DB {
         
         if ($regions_count === 0 && $mappings_count === 0) {
             $this->seedRegionalData();
+        }
+    }
+
+    /**
+     * Colonnes région « formes Pokémon » (jetons slug pour Alola / Paldea / …) sur wp_pokehub_regions.
+     *
+     * Appelée depuis {@see Pokehub_DB::createTables()} mais aussi depuis l’admin : la table peut exister sans
+     * ces colonnes, auquel cas l’installation « tables manquantes » ne passe pas et la sauvegarde échoue.
+     */
+    public function migrateRegionsPokemonRegionalFormColumns( string $regions_table ): void {
+        global $wpdb;
+        if ( $regions_table === '' ) {
+            return;
+        }
+        if ( function_exists( 'pokehub_table_exists' ) && ! pokehub_table_exists( $regions_table ) ) {
+            return;
+        }
+        $db = $wpdb->dbname;
+        if ( $db === '' || $db === null ) {
+            return;
+        }
+
+        $needs = static function ( string $col ) use ( $wpdb, $db, $regions_table ): bool {
+            $found = $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s LIMIT 1',
+                    $db,
+                    $regions_table,
+                    $col
+                )
+            );
+
+            return empty( $found );
+        };
+
+        if ( $needs( 'pokemon_regional_form_name_en' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_name_en` VARCHAR(120) NOT NULL DEFAULT '' COMMENT 'Label formes Pokémon' AFTER `sort_order`" );
+        }
+        if ( $needs( 'pokemon_regional_form_name_fr' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_name_fr` VARCHAR(120) NOT NULL DEFAULT '' AFTER `pokemon_regional_form_name_en`" );
+        }
+        if ( $needs( 'pokemon_regional_form_slug' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_slug` VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Jeton principal slug espèce' AFTER `pokemon_regional_form_name_fr`" );
+        }
+        if ( $needs( 'pokemon_regional_form_slug_aliases' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_slug_aliases` LONGTEXT NULL COMMENT 'JSON alias tokens' AFTER `pokemon_regional_form_slug`" );
         }
     }
 

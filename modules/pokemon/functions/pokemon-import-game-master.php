@@ -2068,6 +2068,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
         poke_hub_gm_progress( 'loaded', 15, 'Loaded JSON' );
     }
 
+    if ( function_exists( 'poke_hub_regions_ensure_core_regional_game_regions' ) ) {
+        poke_hub_regions_ensure_core_regional_game_regions();
+    }
+
     global $wpdb;
 
     $tables = [
@@ -2407,6 +2411,10 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
     }
 
     $stats = poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( $tables, $stats );
+
+    if ( function_exists( 'poke_hub_pokemon_gm_import_regional_multi_form_family_placeholder_pass' ) ) {
+        $stats = poke_hub_pokemon_gm_import_regional_multi_form_family_placeholder_pass( $tables, $stats );
+    }
 
     $stats = poke_hub_pokemon_gm_import_spawn_gender_skeleton_pokemon_pass(
         $decoded,

@@ -22,6 +22,10 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
     $current_name_fr = '';
     $current_name_en = '';
     $current_slug = '';
+    $current_pr_form_name_en = '';
+    $current_pr_form_name_fr = '';
+    $current_pr_form_slug      = '';
+    $current_pr_form_aliases   = '';
 
     if ($is_edit) {
         if (isset($edit_row->name_fr)) {
@@ -36,6 +40,12 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
             $current_name_fr = (string) $edit_row->name;
         }
         $current_slug = isset($edit_row->slug) ? sanitize_title((string) $edit_row->slug) : '';
+        $current_pr_form_name_en = isset($edit_row->pokemon_regional_form_name_en) ? (string) $edit_row->pokemon_regional_form_name_en : '';
+        $current_pr_form_name_fr = isset($edit_row->pokemon_regional_form_name_fr) ? (string) $edit_row->pokemon_regional_form_name_fr : '';
+        $current_pr_form_slug     = isset($edit_row->pokemon_regional_form_slug) ? sanitize_title((string) $edit_row->pokemon_regional_form_slug) : '';
+        $raw_aliases             = isset($edit_row->pokemon_regional_form_slug_aliases) ? (string) $edit_row->pokemon_regional_form_slug_aliases : '';
+        $alias_dec               = json_decode($raw_aliases, true);
+        $current_pr_form_aliases   = is_array($alias_dec) ? implode(', ', array_map('strval', $alias_dec)) : '';
     }
 
     $back_url = add_query_arg(
@@ -103,6 +113,45 @@ function poke_hub_pokemon_regions_edit_form($edit_row = null) {
                                    value="<?php echo esc_attr($is_edit ? (int) $edit_row->sort_order : '0'); ?>" 
                                    style="max-width: 150px;" />
                             <p class="description"><?php esc_html_e('Lower = appears first in lists.', 'poke-hub'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formes Pokémon régionales (segments slug / form_slug, ex. tauros-paldea) -->
+                <div class="admin-lab-form-section" style="margin-top:1.5em;padding-top:1em;border-top:1px solid #c3c4c7;">
+                    <h3><?php esc_html_e('Pokémon regional form (slug tokens)', 'poke-hub'); ?></h3>
+                    <p class="description">
+                        <?php esc_html_e('Used for species slugs (e.g. meowth-alola, tauros-paldea-aqua) and collection filters — not the « Geographical areas » screen (countries / map groups).', 'poke-hub'); ?>
+                    </p>
+                    <div class="admin-lab-form-row">
+                        <div class="admin-lab-form-col-50">
+                            <div class="admin-lab-form-group">
+                                <label for="pokemon_regional_form_name_fr"><?php esc_html_e('Form name (French)', 'poke-hub'); ?></label>
+                                <input type="text" id="pokemon_regional_form_name_fr" name="pokemon_regional_form_name_fr" value="<?php echo esc_attr($current_pr_form_name_fr); ?>" placeholder="<?php echo esc_attr__('e.g. Hisui', 'poke-hub'); ?>" />
+                            </div>
+                        </div>
+                        <div class="admin-lab-form-col-50">
+                            <div class="admin-lab-form-group">
+                                <label for="pokemon_regional_form_name_en"><?php esc_html_e('Form name (English)', 'poke-hub'); ?></label>
+                                <input type="text" id="pokemon_regional_form_name_en" name="pokemon_regional_form_name_en" value="<?php echo esc_attr($current_pr_form_name_en); ?>" placeholder="<?php echo esc_attr__('e.g. Hisuian', 'poke-hub'); ?>" />
+                                <p class="description"><?php esc_html_e('If the slug token is empty, it is derived from this field.', 'poke-hub'); ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="admin-lab-form-row">
+                        <div class="admin-lab-form-col">
+                            <div class="admin-lab-form-group">
+                                <label for="pokemon_regional_form_slug"><?php esc_html_e('Slug token', 'poke-hub'); ?></label>
+                                <input type="text" id="pokemon_regional_form_slug" name="pokemon_regional_form_slug" value="<?php echo esc_attr($current_pr_form_slug); ?>" autocapitalize="none" autocomplete="off" />
+                                <p class="description"><?php esc_html_e('Primary slug segment used in Pokémon rows (often same as region slug, e.g. paldea, hisui). Leave empty to auto-fill from English form name.', 'poke-hub'); ?></p>
+                            </div>
+                        </div>
+                        <div class="admin-lab-form-col">
+                            <div class="admin-lab-form-group">
+                                <label for="pokemon_regional_form_slug_aliases"><?php esc_html_e('Extra slug tokens', 'poke-hub'); ?></label>
+                                <textarea id="pokemon_regional_form_slug_aliases" name="pokemon_regional_form_slug_aliases" rows="3" cols="60" placeholder="<?php echo esc_attr__('alolan, galarian — comma-separated', 'poke-hub'); ?>"><?php echo esc_textarea($current_pr_form_aliases); ?></textarea>
+                                <p class="description"><?php esc_html_e('Alternate slug segments matching the Game Master or Bulbapedia (e.g. hisuian, paldean).', 'poke-hub'); ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>

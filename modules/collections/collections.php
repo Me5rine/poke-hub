@@ -32,6 +32,7 @@ if ( is_admin() ) {
 add_action('init', 'poke_hub_collections_maybe_add_share_token_column', 1);
 add_action('init', 'poke_hub_collections_maybe_add_anonymous_ip_column', 2);
 add_action('init', 'poke_hub_collections_maybe_add_anonymous_owner_key_column', 3);
+add_action('init', 'poke_hub_collections_maybe_migrate_category_slugs_canonical', 4);
 
 /**
  * Enqueue des assets front (appelé depuis le shortcode pour ne charger que sur les pages qui l'utilisent)
@@ -86,13 +87,19 @@ function poke_hub_collections_enqueue_front_assets() {
             'includeGender'   => __('Include sexual dimorphism', 'poke-hub'),
             'includeBothSexes' => __('Include male and female', 'poke-hub'),
             'onePerSpecies'   => __('Show only one entry per species', 'poke-hub'),
-            'includeRegionalForms' => __('Include geography-locked spawns (GO regionals)', 'poke-hub'),
+            'includeRegionalForms' => __('Include regional forms (Alola, Galar, Paldea, Hisui)', 'poke-hub'),
             'includeCostumes' => __('Include costumed Pokémon', 'poke-hub'),
             'includeSpecialAttacks' => __('Include special attacks', 'poke-hub'),
             'notLoggedInWarning' => __('You are not logged in. This collection will be stored locally on this device.', 'poke-hub'),
             'createAccountHint' => __('Create an account to save your collections.', 'poke-hub'),
             'cancel'          => __('Cancel', 'poke-hub'),
             'save'            => __('Create collection', 'poke-hub'),
+            'collectionDefaultNameLuckyDex' => __( 'Lucky National Dex', 'poke-hub' ),
+            'collectionDefaultNameShiny'    => __( 'My Shinies', 'poke-hub' ),
+            'collectionDefaultNameAllPokemon' => __( 'My full collection', 'poke-hub' ),
+            'collectionDefaultNameGoRegional' => __( 'Pokémon GO regionals', 'poke-hub' ),
+            'collectionDefaultNameBabies' => __( 'Baby Pokémon', 'poke-hub' ),
+            'collectionDefaultNameLucky'  => __( 'Lucky Pokémon', 'poke-hub' ),
             'owned'           => __('Owned', 'poke-hub'),
             'forTrade'        => __('For trade', 'poke-hub'),
             'forTradeProgressLegendCounted' => __('In this collection, "For trade" is counted as "Owned" for progress. You can turn this off in the collection settings.', 'poke-hub'),
@@ -103,6 +110,7 @@ function poke_hub_collections_enqueue_front_assets() {
             'shareImage'      => __('Image', 'poke-hub'),
             'anonymousBannerOne'   => __('A collection was created from this connection (this device). Do you want to add it to your account?', 'poke-hub'),
             'anonymousBannerMany' => __('%d collections were created from this connection. Do you want to add them to your account?', 'poke-hub'),
+            'unnamedCollection' => __('Untitled collection', 'poke-hub'),
             'generationOther'       => __('Other / unknown region', 'poke-hub'),
             'generationNumber'      => __('Generation %d', 'poke-hub'),
             'finished'              => __('Finished', 'poke-hub'),
@@ -165,6 +173,24 @@ function poke_hub_collections_enqueue_front_assets() {
             'pogoGroupFond_gigamaxDex' => __('G-Max + BG #', 'poke-hub'),
             'collectionDefaultNameLegendaryMythicalUltra' => __('Legendary, Mythical & Ultra Beasts', 'poke-hub'),
             'collectionDefaultNameMega'                 => __('Mega & Primal', 'poke-hub'),
+            'collectionDefaultNameFallback'           => __('My collection', 'poke-hub'),
+            'linkCopied'                              => __('Link copied to clipboard.', 'poke-hub'),
+            'copyLinkManually'                        => __('Copy this link:', 'poke-hub'),
+            'networkError'                            => __('Network error. Try again.', 'poke-hub'),
+            'genericError'                           => __('Something went wrong.', 'poke-hub'),
+            'deleteCollectionConfirm'                 => __('Delete the collection "%s"? This cannot be undone.', 'poke-hub'),
+            'loadPoolFailed'                          => __('Could not load the Pokémon list.', 'poke-hub'),
+            'localCollectionMissing'                  => __('This local collection could not be found.', 'poke-hub'),
+            'collectionNotFoundTitle'                 => __('Collection not found', 'poke-hub'),
+            'batchAddError'                           => __('Could not add Pokémon. Try again.', 'poke-hub'),
+            'shareDialogTitle'                       => __('Share collection', 'poke-hub'),
+            'shareDialogHint'                        => __('Anyone with the link can open this collection when it is public.', 'poke-hub'),
+            'copyShareLink'                           => __('Copy share link', 'poke-hub'),
+            'shareCoverHeading'                      => __('Cover image', 'poke-hub'),
+            'shareCoverAlt'                          => __('Collection cover image', 'poke-hub'),
+            'shareCoverEmpty'                        => __('No cover URL is set. Add one under Sharing & visibility in settings.', 'poke-hub'),
+            'dialogClose'                            => __('Close', 'poke-hub'),
+            'selectListPresetRequired'               => __('Please select a list preset.', 'poke-hub'),
         ],
     ]);
 }

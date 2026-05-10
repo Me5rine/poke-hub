@@ -1216,6 +1216,340 @@ function poke_hub_pokemon_resolve_origin_region_id($row, string $raw_extra = '')
 }
 
 /**
+ * Liste de secours si aucune ligne `regions.pokemon_regional_form_slug` n’est renseignée.
+ *
+ * @return list<string>
+ */
+function poke_hub_pokemon_regional_game_form_slug_tokens_default(): array {
+    return [ 'alola', 'alolan', 'galar', 'galarian', 'hisui', 'hisuian', 'paldea', 'paldean' ];
+}
+
+/**
+ * Valide un jeton pour slug / REGEXP (lettres/chiffres + tirets).
+ */
+function poke_hub_pokemon_regional_game_form_slug_sanitize_token( string $token ): string {
+    $token = strtolower( trim( $token ) );
+    $token = preg_replace( '/[^a-z0-9_-]+/', '', (string) $token );
+
+    return is_string( $token ) ? $token : '';
+}
+
+/**
+ * Vide le cache des jetons (après sauvegarde d’une région).
+ */
+function poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush(): void {
+    update_option(
+        'poke_hub_prf_slug_tokens_rev',
+        (int) get_option( 'poke_hub_prf_slug_tokens_rev', 0 ) + 1,
+        false
+    );
+}
+
+/**
+ * Jetons depuis `regions` (slug forme Pokémon + alias JSON + slug géographique si distinct) + filtre WP.
+ *
+ * @return list<string>
+ */
+function poke_hub_pokemon_regional_game_form_slug_tokens(): array {
+    $cache_ver = (int) get_option( 'poke_hub_prf_slug_tokens_rev', 0 );
+    $cache_key = 'prf_slug_tok_' . $cache_ver;
+    $hit       = wp_cache_get( $cache_key, 'poke_hub' );
+    if ( is_array( $hit ) ) {
+        /** @var list<string> */
+        return $hit;
+    }
+
+    /** @var list<string> $out */
+    $out = [];
+
+    global $wpdb;
+    $table = function_exists( 'pokehub_get_table' ) ? pokehub_get_table( 'regions' ) : '';
+    if ( $table && isset( $wpdb ) && $wpdb instanceof \wpdb ) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table fixe pokehub_regions.
+        $rows = $wpdb->get_results(
+            "SELECT slug,
+                    pokemon_regional_form_slug,
+                    pokemon_regional_form_slug_aliases
+             FROM `{$table}`",
+            ARRAY_A
+        );
+        if ( is_array( $rows ) ) {
+            foreach ( $rows as $r ) {
+                if ( ! is_array( $r ) ) {
+                    continue;
+                }
+
+                $region_slug = poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) ( $r['slug'] ?? '' ) );
+                $main        = poke_hub_pokemon_regional_game_form_slug_sanitize_token(
+                    (string) ( $r['pokemon_regional_form_slug'] ?? '' )
+                );
+
+                if ( $main !== '' ) {
+                    $out[] = $main;
+                    if ( $region_slug !== '' && $region_slug !== $main ) {
+                        $out[] = $region_slug;
+                    }
+                }
+
+                $raw_aliases = isset( $r['pokemon_regional_form_slug_aliases'] ) ? (string) $r['pokemon_regional_form_slug_aliases'] : '';
+                $decoded     = json_decode( $raw_aliases, true );
+                if ( is_array( $decoded ) ) {
+                    foreach ( $decoded as $a ) {
+                        $t = poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $a );
+                        if ( $t !== '' ) {
+                            $out[] = $t;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $out = array_values( array_unique( array_filter( $out ) ) );
+    sort( $out );
+
+    $merged = apply_filters(
+        'poke_hub_pokemon_regional_game_form_slug_tokens',
+        $out !== [] ? $out : poke_hub_pokemon_regional_game_form_slug_tokens_default(),
+        $out
+    );
+    $merged = is_array( $merged )
+        ? array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        static function ( $t ) {
+                            return poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $t );
+                        },
+                        $merged
+                    )
+                )
+            )
+        )
+        : poke_hub_pokemon_regional_game_form_slug_tokens_default();
+
+    if ( $merged === [] ) {
+        $merged = poke_hub_pokemon_regional_game_form_slug_tokens_default();
+    }
+
+    wp_cache_set( $cache_key, $merged, 'poke_hub', HOUR_IN_SECONDS );
+
+    return $merged;
+}
+
+/**
+ * Fragment `tok1|tok2` pour REGEXP MySQL / PHP (jetons contrôlés, pas de preg_quote).
+ *
+ * @return non-empty-string
+ */
+function poke_hub_pokemon_regional_game_form_tokens_regex_fragment(): string {
+    $tokens = poke_hub_pokemon_regional_game_form_slug_tokens();
+
+    return implode( '|', $tokens );
+}
+
+/**
+ * Indique si le slug contient un segment régional jeu (pas seulement en suffixe terminal).
+ *
+ * Ex. tauros-paldea-aqua, mr-mime-galar, meowth-alola.
+ */
+function poke_hub_pokemon_slug_matches_regional_game_form_variant( string $slug ): bool {
+    $slug = strtolower( trim( $slug ) );
+    if ( $slug === '' ) {
+        return false;
+    }
+
+    foreach ( poke_hub_pokemon_regional_game_form_slug_tokens() as $tok ) {
+        if ( $tok === '' ) {
+            continue;
+        }
+        if ( preg_match( '/(^|[-_])' . preg_quote( $tok, '/' ) . '([-_]|$)/', $slug ) ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Stem de branche régionale à plusieurs sous-formes (ex. tauros-paldea pour tauros-paldea-aqua).
+ *
+ * Pour un slug simple à deux segments (meowth-alola), renvoie null.
+ */
+function poke_hub_pokemon_slug_regional_multi_form_branch_stem( string $slug ): ?string {
+    $slug = strtolower( trim( $slug ) );
+    $tok  = poke_hub_pokemon_regional_game_form_tokens_regex_fragment();
+    if ( ! preg_match(
+        '/^(?P<prefix>[a-z0-9]+(?:-[a-z0-9]+)*)-(?P<reg>' . $tok . ')-(?P<rest>[a-z0-9]+(?:-[a-z0-9]+)*)$/',
+        $slug,
+        $m
+    ) ) {
+        return null;
+    }
+
+    return $m['prefix'] . '-' . $m['reg'];
+}
+
+/**
+ * Stem pour ligne agrégée {stem}-family (ex. tauros-paldea-family → tauros-paldea).
+ */
+function poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem( string $slug ): ?string {
+    $slug = strtolower( trim( $slug ) );
+    if ( $slug === '' || ! preg_match( '/^(.+)-family$/', $slug, $ma ) ) {
+        return null;
+    }
+    $pfx = $ma[1];
+    $tok = poke_hub_pokemon_regional_game_form_tokens_regex_fragment();
+    if ( ! preg_match(
+        '/^(?P<base>[a-z0-9]+(?:-[a-z0-9]+)*)-(?P<reg>' . $tok . ')$/',
+        $pfx
+    ) ) {
+        return null;
+    }
+
+    return $pfx;
+}
+
+/**
+ * Crée ou complète les régions « jeu » utilisées comme jetons de forme (slug espèce / form_slug).
+ * Idempotent : n’écrase pas des champs déjà renseignés manuellement.
+ *
+ * À appeler après migration des colonnes `pokemon_regional_form_*` et **avant** import Game Master.
+ */
+function poke_hub_regions_ensure_core_regional_game_regions(): void {
+    global $wpdb;
+    $table = pokehub_get_table( 'regions' );
+    if ( ! $table || ! isset( $wpdb ) || ! $wpdb instanceof \wpdb ) {
+        return;
+    }
+
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- nom de table canalisé pokehub_
+    $cols = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'pokemon_regional_form_slug'" );
+    if ( empty( $cols ) ) {
+        return;
+    }
+
+    /**
+     * slug → name (région), libellés forme affichage, jeton slug matching GM, alias supplémentaires.
+     *
+     * @var array<string, array{name_en:string,name_fr:string,form_name_en:string,form_name_fr:string,form_slug:string,aliases:list<string>,sort:int}>
+     */
+    $core = [
+        'alola'  => [
+            'name_en'       => 'Alola',
+            'name_fr'       => 'Alola',
+            'form_name_en'  => 'Alola',
+            'form_name_fr'  => 'Alola',
+            'form_slug'     => 'alola',
+            'aliases'       => [ 'alolan' ],
+            'sort'          => 15,
+        ],
+        'galar'  => [
+            'name_en'       => 'Galar',
+            'name_fr'       => 'Galar',
+            'form_name_en'  => 'Galarian',
+            'form_name_fr'  => 'Galar',
+            'form_slug'     => 'galar',
+            'aliases'       => [ 'galarian' ],
+            'sort'          => 25,
+        ],
+        'paldea' => [
+            'name_en'       => 'Paldea',
+            'name_fr'       => 'Paldea',
+            'form_name_en'  => 'Paldean',
+            'form_name_fr'  => 'Paldea',
+            'form_slug'     => 'paldea',
+            'aliases'       => [ 'paldean' ],
+            'sort'          => 35,
+        ],
+        'hisui'  => [
+            'name_en'       => 'Hisui',
+            'name_fr'       => 'Hisui',
+            'form_name_en'  => 'Hisuian',
+            'form_name_fr'  => 'Hisui',
+            'form_slug'     => 'hisui',
+            'aliases'       => [ 'hisuian' ],
+            'sort'          => 45,
+        ],
+    ];
+
+    $touched = false;
+
+    foreach ( $core as $slug => $cfg ) {
+        $slug = (string) $slug;
+        $id   = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM `{$table}` WHERE slug = %s LIMIT 1",
+                $slug
+            )
+        );
+
+        $aliases_json = wp_json_encode( $cfg['aliases'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+        if ( $id <= 0 ) {
+            $ok = $wpdb->insert(
+                $table,
+                [
+                    'slug'                                => $slug,
+                    'name_en'                             => $cfg['name_en'],
+                    'name_fr'                             => $cfg['name_fr'],
+                    'sort_order'                          => (int) $cfg['sort'],
+                    'pokemon_regional_form_name_en'       => $cfg['form_name_en'],
+                    'pokemon_regional_form_name_fr'       => $cfg['form_name_fr'],
+                    'pokemon_regional_form_slug'          => $cfg['form_slug'],
+                    'pokemon_regional_form_slug_aliases'   => $aliases_json,
+                    'extra'                               => '',
+                ],
+                [ '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ]
+            );
+            if ( $ok ) {
+                $touched = true;
+            }
+            continue;
+        }
+
+        $pr_slug = (string) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT pokemon_regional_form_slug FROM `{$table}` WHERE id = %d LIMIT 1",
+                $id
+            )
+        );
+        if ( trim( $pr_slug ) !== '' ) {
+            continue;
+        }
+
+        $wpdb->update(
+            $table,
+            [
+                'pokemon_regional_form_name_en'      => $cfg['form_name_en'],
+                'pokemon_regional_form_name_fr'      => $cfg['form_name_fr'],
+                'pokemon_regional_form_slug'         => $cfg['form_slug'],
+                'pokemon_regional_form_slug_aliases' => $aliases_json,
+            ],
+            [ 'id' => $id ],
+            [ '%s', '%s', '%s', '%s' ],
+            [ '%d' ]
+        );
+        $touched = true;
+    }
+
+    if ( $touched && function_exists( 'poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush' ) ) {
+        poke_hub_pokemon_regional_game_form_slug_tokens_cache_flush();
+    }
+}
+
+add_action(
+    'admin_init',
+    static function (): void {
+        if ( ! function_exists( 'poke_hub_regions_ensure_core_regional_game_regions' ) ) {
+            return;
+        }
+        poke_hub_regions_ensure_core_regional_game_regions();
+    },
+    15
+);
+
+/**
  * NOTE: La fonction poke_hub_pokemon_get_scatterbug_patterns() a été déplacée
  * dans includes/functions/pokemon-public-helpers.php pour être disponible
  * même si le module Pokémon n'est pas actif.

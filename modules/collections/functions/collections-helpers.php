@@ -166,30 +166,97 @@ function poke_hub_collections_generate_share_token(): string {
 }
 
 /**
- * Catégories de collection disponibles (slug => label)
+ * Canonical slugs stored in `collections.category`. Search the codebase for these identifiers.
+ */
+const POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON        = 'all_pokemon';
+const POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE = 'pogo_geo_exclusive';
+const POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY        = 'babies_only';
+
+/**
+ * Migrates obsolete `collections.category` slugs once (no runtime alias layer).
+ */
+function poke_hub_collections_maybe_migrate_category_slugs_canonical(): void {
+    if (get_option('poke_hub_collections_category_slugs_canonical_v1')) {
+        return;
+    }
+    global $wpdb;
+    $table = pokehub_get_table('collections');
+    if (!$table || !preg_match('/^[a-z0-9_]+$/', $table)) {
+        return;
+    }
+    $map = [
+        'national'    => POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON,
+        'perfect_4'   => POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON,
+        'go_regional' => POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE,
+        'baby_only'   => POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY,
+    ];
+    foreach ($map as $old => $new) {
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$table} SET category = %s WHERE category = %s",
+            $new,
+            $old
+        ));
+    }
+    update_option('poke_hub_collections_category_slugs_canonical_v1', 1);
+}
+
+/**
+ * Collection categories (canonical slug => admin / list label). English source strings.
  *
  * @return array<string, string>
  */
 function poke_hub_collections_get_categories(): array {
     return [
-        'perfect_4'       => __('Pokémon 4* (perfect)', 'poke-hub'),
+        POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON => __('All Pokémon (configurable pool)', 'poke-hub'),
         'shiny'           => __('Shiny', 'poke-hub'),
         'costume'         => __('Costumed Pokémon', 'poke-hub'),
         'costume_shiny'   => __('Shiny costumed', 'poke-hub'),
-        'background'      => __('Pokémon avec fond d’arrière-plan (tous) — in-game : background', 'poke-hub'),
-        'background_special' => __('Fond spécial (special background)', 'poke-hub'),
-        'background_places'  => __('Fond de lieu (location background)', 'poke-hub'),
-        'background_shiny'=> __('Shiny avec fond d’arrière-plan (tous) — in-game : background', 'poke-hub'),
-        'background_shiny_special' => __('Shiny + fond spécial (special background)', 'poke-hub'),
-        'background_shiny_places'  => __('Shiny + fond de lieu (location background)', 'poke-hub'),
+        'background'      => __('Pokémon with GO background (all)', 'poke-hub'),
+        'background_special' => __('Special background', 'poke-hub'),
+        'background_places'  => __('Location background', 'poke-hub'),
+        'background_shiny'=> __('Shiny with GO background (all)', 'poke-hub'),
+        'background_shiny_special' => __('Shiny + special background', 'poke-hub'),
+        'background_shiny_places'  => __('Shiny + location background', 'poke-hub'),
         'lucky'           => __('Lucky', 'poke-hub'),
+        'lucky_dex'       => __('Lucky (National Dex)', 'poke-hub'),
+        POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE => __('Pokémon GO geo-exclusive spawns', 'poke-hub'),
+        POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY        => __('Baby Pokémon only', 'poke-hub'),
         'shadow'          => __('Shadow', 'poke-hub'),
         'purified'        => __('Purified', 'poke-hub'),
         'gigantamax'     => __('Gigantamax', 'poke-hub'),
         'dynamax'        => __('Dynamax', 'poke-hub'),
         'mega'           => __('Mega & Primal', 'poke-hub'),
-        'legendary_mythical_ultra' => __('Legendary, Mythical & Ultra Beasts (preset)', 'poke-hub'),
+        'legendary_mythical_ultra' => __('Legendary, Mythical & Ultra Beasts', 'poke-hub'),
         'custom'         => __('Custom list', 'poke-hub'),
+    ];
+}
+
+/**
+ * Normalizes stored or client-sent category slug (sanitized key only — use DB migration for legacy values).
+ */
+function poke_hub_collections_normalize_storage_category_slug(string $category): string {
+    return sanitize_key($category);
+}
+
+/**
+ * Creation wizard presets (display order — keys consumed by collections-front.js). English source strings.
+ *
+ * @return array<string, string>
+ */
+function poke_hub_collections_get_creation_ui_presets(): array {
+    return [
+        'all'                    => __('All Pokémon', 'poke-hub'),
+        'costumes'               => __('Costumes', 'poke-hub'),
+        'backgrounds'            => __('Backgrounds', 'poke-hub'),
+        'lucky'                  => __('Lucky / Lucky Dex', 'poke-hub'),
+        'shadow_purified'        => __('Shadow / Purified', 'poke-hub'),
+        'regional_go'            => __('Regional (Pokémon GO)', 'poke-hub'),
+        'gigantamax'             => __('Gigantamax', 'poke-hub'),
+        'dynamax'                => __('Dynamax', 'poke-hub'),
+        'mega_primal'            => __('Mega & Primal', 'poke-hub'),
+        'legendary_mythical_ultra' => __('Legendary, Mythical & Ultra Beasts', 'poke-hub'),
+        'babies'                 => __('Baby Pokémon only', 'poke-hub'),
+        'custom'                 => __('Custom list', 'poke-hub'),
     ];
 }
 
@@ -236,7 +303,7 @@ function poke_hub_collections_category_is_specific(string $category): bool {
  * @return list<string>
  */
 function poke_hub_collections_settings_hidden_control_keys(string $category): array {
-    $cat = sanitize_key($category);
+    $cat = poke_hub_collections_normalize_storage_category_slug(sanitize_key($category));
     if ($cat === '') {
         return [];
     }
@@ -279,7 +346,8 @@ function poke_hub_collections_settings_hidden_control_keys(string $category): ar
 function poke_hub_collections_settings_hidden_control_keys_map_for_ui(): array {
     $out = [];
     foreach (array_keys(poke_hub_collections_get_categories()) as $slug) {
-        $out[$slug] = poke_hub_collections_settings_hidden_control_keys((string) $slug);
+        /* Toutes les options de customisation restent affichées ; affinage par type de liste plus tard. */
+        $out[$slug] = [];
     }
 
     return $out;
@@ -326,6 +394,28 @@ function poke_hub_collections_visual_variant_base_stub_keep_dex_numbers(): array
 }
 
 /**
+ * Liste SQL `'a','b'` pour clause IN () sur pokemon_regional slug tokens (BDD régions jeu).
+ *
+ * @return string
+ */
+function poke_hub_collections_sql_regional_form_slug_in_list_sql(): string {
+    $toks = poke_hub_collections_regional_form_variant_slug_tokens();
+    if ( $toks === [] && function_exists( 'poke_hub_pokemon_regional_game_form_slug_tokens_default' ) ) {
+        $toks = poke_hub_pokemon_regional_game_form_slug_tokens_default();
+    }
+    $parts = [];
+    foreach ( $toks as $t ) {
+        $t = (string) $t;
+        if ( $t === '' ) {
+            continue;
+        }
+        $parts[] = "'" . esc_sql( $t ) . "'";
+    }
+
+    return implode( ',', $parts );
+}
+
+/**
  * SQL : aucune ligne « significative » du même № ne prolonge le slug avec un tiret (Kyurem, Giratina…).
  * N’inclut pas : costumes / clones, ni variantes régionales (Raichu d’Alola ne doit pas faire disparaître Raichu de base…).
  *
@@ -334,6 +424,8 @@ function poke_hub_collections_visual_variant_base_stub_keep_dex_numbers(): array
  */
 function poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex(string $pokemon_table, string $form_variants_table, string $p_alias): string {
     $p_alias = preg_match('/^[a-z0-9_]+$/i', $p_alias) ? $p_alias : 'p';
+    $reg_frag = implode( '|', poke_hub_collections_regional_form_variant_slug_tokens() );
+    $reg_in = poke_hub_collections_sql_regional_form_slug_in_list_sql();
 
     return '(NOT EXISTS (
         SELECT 1
@@ -361,17 +453,17 @@ function poke_hub_collections_sql_no_hyphen_extended_sibling_same_dex(string $po
               )
               OR (
                   fv_blk.form_slug IS NOT NULL AND TRIM(fv_blk.form_slug) <> \'\'
-                  AND LOWER(TRIM(fv_blk.form_slug)) IN (\'alola\', \'alolan\', \'galar\', \'galarian\', \'hisui\', \'hisuian\', \'paldea\', \'paldean\')
+                  AND LOWER(TRIM(fv_blk.form_slug)) IN (' . $reg_in . ')
               )
               OR (
-                  fv_blk.form_slug IS NOT NULL AND LOWER(fv_blk.form_slug) REGEXP \'^(alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean)(-[0-9]+)?$\'
+                  fv_blk.form_slug IS NOT NULL AND LOWER(fv_blk.form_slug) REGEXP \'^(' . $reg_frag . ')(-[0-9]+)?$\'
               )
               OR (
-                  fv_blk.form_slug IS NOT NULL AND LOWER(fv_blk.form_slug) REGEXP \'[-_](alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean)([._-].*)?$\'
+                  fv_blk.form_slug IS NOT NULL AND LOWER(fv_blk.form_slug) REGEXP \'[-_](' . $reg_frag . ')([._-].*)?$\'
               )
               OR (
                   p_hyp_ext.slug IS NOT NULL AND TRIM(p_hyp_ext.slug) <> \'\'
-                  AND LOWER(TRIM(p_hyp_ext.slug)) REGEXP \'[-_](alola|alolan|galar|galarian|paldea|paldean|hisui|hisuian)(_[0-9]+)?$\'
+                  AND LOWER(TRIM(p_hyp_ext.slug)) REGEXP \'(^|[-_])(' . $reg_frag . ')([-_]|$)\'
               )
               OR (
                   LOWER(TRIM(COALESCE(fv_blk.category, \'\'))) = \'visual\'
@@ -695,6 +787,10 @@ function poke_hub_collections_default_options(): array {
         'card_background_image_url' => '',
         /* Filtre pool : n’inclure que les espèces qui n’ont plus d’évolution en jeu */
         'only_final_evolution'  => false,
+        /* Ne garder que les fiches « premier stade » : jamais la cible d’une évolution enregistrée. */
+        'only_base_evolution_stage' => false,
+        /* Sous-ensemble pour la catégorie légendaires / fabuleux / chimères : all | legendary | mythical | ultra_beast */
+        'lmu_scope'             => 'all',
         /* Filtre pool : bébés (slug listé) — applicable si on n’est pas en « seulement finales ». */
         'include_baby_pokemon'  => true,
         /* Filtre pool : légendaires / fabuleux (mythical) / ultra-chimères (extra.species_special_group). */
@@ -794,8 +890,8 @@ function poke_hub_collections_pool_show_only_allowed(): array {
  * @return string[]
  */
 function poke_hub_collections_pool_show_only_allowed_for_saved_category(string $category): array {
-    $category = sanitize_key($category);
-    if ($category === 'legendary_mythical_ultra') {
+    $category = poke_hub_collections_normalize_storage_category_slug(sanitize_key($category));
+    if ($category === 'legendary_mythical_ultra' || $category === 'lucky_dex') {
         return [''];
     }
     if (poke_hub_collections_category_is_specific($category)) {
@@ -1419,27 +1515,106 @@ function poke_hub_collections_row_passes_pool_release_filter(array $row, string 
 }
 
 /**
+ * Clé `extra.release.*` utilisée pour {@see poke_hub_collections_row_passes_pool_release_filter()} selon la catégorie de liste.
+ */
+function poke_hub_collections_pool_release_context_for_category(string $category): string {
+    $category = poke_hub_collections_normalize_storage_category_slug(sanitize_key($category));
+    switch ($category) {
+        case 'shiny':
+        case 'costume_shiny':
+        case 'background_shiny':
+        case 'background_shiny_special':
+        case 'background_shiny_places':
+            return 'shiny';
+        case 'shadow':
+        case 'purified':
+            return 'shadow';
+        case 'gigantamax':
+            return 'gigantamax';
+        case 'dynamax':
+            return 'dynamax';
+        case 'mega':
+            return 'normal';
+        case POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON:
+        case POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE:
+        case POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY:
+        case 'costume':
+        case 'background':
+        case 'background_special':
+        case 'background_places':
+        case 'lucky':
+        case 'lucky_dex':
+        case 'legendary_mythical_ultra':
+        case 'custom':
+        default:
+            return 'normal';
+    }
+}
+
+/**
  * Derniers segments de slug reconnus comme variante (dernier token après « - »).
  *
  * @return list<string>
  */
 function poke_hub_collections_pogo_regional_slug_suffixes(): array {
-    return [
-        'alola', 'alolan', 'galar', 'galarian', 'paldea', 'paldean', 'hisui', 'hisuian',
-        'mega', 'primal', 'gigantamax', 'gigamax', 'dynamax',
-    ];
+    $regional = poke_hub_collections_regional_form_variant_slug_tokens();
+
+    return array_values(
+        array_unique(
+            array_merge(
+                $regional !== [] ? $regional : poke_hub_pokemon_regional_game_form_slug_tokens_default(),
+                [ 'mega', 'primal', 'gigantamax', 'gigamax', 'dynamax' ]
+            )
+        )
+    );
 }
 
 /**
- * Slugs de variantes « type jeu » (Alola/Galar/Hisui/Paldea).
- * Pour le pool collections « régionaux GO » (zones pays), ces jetons ne sont plus utilisés : voir régional_row_match (extra Pokémon).
+ * Slugs de variantes « type jeu » (Alola / Galar / Hisui / Paldea).
+ * Utilisés pour le filtre collections {@see poke_hub_collections_sql_regional_form_variant_row_match}.
  *
  * @return list<string> slugs en minuscules
  */
 function poke_hub_collections_regional_form_variant_slug_tokens(): array {
-    return [
-        'alola', 'alolan', 'galar', 'galarian', 'hisui', 'hisuian', 'paldea', 'paldean',
-    ];
+    if ( function_exists( 'poke_hub_pokemon_regional_game_form_slug_tokens' ) ) {
+        return poke_hub_pokemon_regional_game_form_slug_tokens();
+    }
+    if ( function_exists( 'poke_hub_pokemon_regional_game_form_slug_tokens_default' ) ) {
+        return poke_hub_pokemon_regional_game_form_slug_tokens_default();
+    }
+
+    return [ 'alola', 'alolan', 'galar', 'galarian', 'hisui', 'hisuian', 'paldea', 'paldean' ];
+}
+
+/**
+ * Prédicat SQL : ligne = forme régionale (variante d’origine Alola / Galar / Hisui / Paldea), d’après slug et form_slug.
+ * Distinct des « régionaux » Pokémon GO (disponibilité géographique, extra.regional.is_regional).
+ *
+ * @param string $p_alias  Alias table pokemon (ex. p)
+ * @param string $fv_alias Alias table form_variants (ex. fv)
+ */
+function poke_hub_collections_sql_regional_form_variant_row_match( string $p_alias = 'p', string $fv_alias = 'fv' ): string {
+    $p_alias  = preg_match( '/^[a-z0-9_]+$/i', $p_alias ) ? $p_alias : 'p';
+    $fv_alias = preg_match( '/^[a-z0-9_]+$/i', $fv_alias ) ? $fv_alias : 'fv';
+    $tok      = function_exists( 'poke_hub_pokemon_regional_game_form_tokens_regex_fragment' )
+        ? poke_hub_pokemon_regional_game_form_tokens_regex_fragment()
+        : implode( '|', poke_hub_collections_regional_form_variant_slug_tokens() );
+    $in_list  = poke_hub_collections_sql_regional_form_slug_in_list_sql();
+
+    return "(
+  (
+    {$p_alias}.slug IS NOT NULL AND TRIM({$p_alias}.slug) <> ''
+    AND LOWER(TRIM({$p_alias}.slug)) REGEXP '(^|[-_])({$tok})([-_]|$)'
+  )
+  OR (
+    {$fv_alias}.form_slug IS NOT NULL AND TRIM({$fv_alias}.form_slug) <> ''
+    AND (
+      LOWER(TRIM({$fv_alias}.form_slug)) IN ({$in_list})
+      OR LOWER(TRIM({$fv_alias}.form_slug)) REGEXP '^({$tok})(-[0-9]+)?$'
+      OR LOWER(TRIM({$fv_alias}.form_slug)) REGEXP '[-_]({$tok})([._-].*)?$'
+    )
+  )
+)";
 }
 
 /**
@@ -1510,11 +1685,10 @@ function poke_hub_collections_pogo_strip_regional_collapsed(string $s): string {
 }
 
 /**
- * Clé de groupe de recherche GO pour les formes régionales (ligne « alola& », « galar& », etc.).
- * Slug espèce+forme (Alola/Galar…) et, pour les régionaux « GO » sans ce suffixe, extra.regional.is_regional sur la ligne Pokémon.
- * La catégorie pokemon_form_variants n’est pas utilisée (variante partagée type couleur).
+ * Clé de groupe de recherche GO pour les formes régionales jeu (ligne « alola& », « galar& », etc.).
+ * Uniquement slug / form_slug (Alola, Galar, Paldea, Hisui) — pas le flag regional spawn Pokémon GO.
  *
- * @return string '' | 'alola' | 'galar' | 'paldea' | 'hisui' | 'other'
+ * @return string '' | 'alola' | 'galar' | 'paldea' | 'hisui'
  */
 function poke_hub_collections_pogo_regional_key_from_row( array $row ): string {
     $slug = strtolower( trim( (string) ( $row['form_slug'] ?? '' ) . ' ' . (string) ( $row['slug'] ?? '' ) ) );
@@ -1532,10 +1706,6 @@ function poke_hub_collections_pogo_regional_key_from_row( array $row ): string {
     }
     if ( false !== strpos( $slug, 'hisui' ) || false !== strpos( $slug, 'hisuian' ) ) {
         return 'hisui';
-    }
-    $extra = isset( $row['extra'] ) ? (string) $row['extra'] : '';
-    if ( $extra !== '' && strpos( $extra, '"regional":{"is_regional":true' ) !== false ) {
-        return 'other';
     }
 
     return '';
@@ -1782,6 +1952,7 @@ function poke_hub_collections_pool_row_strip_redundant_form_label( array $row ):
 function poke_hub_collections_get_pool(string $category, array $options = []): array {
     global $wpdb;
 
+    $category            = poke_hub_collections_normalize_storage_category_slug(sanitize_key($category));
     $pokemon_table       = pokehub_get_table('pokemon');
     $form_variants_table = pokehub_get_table('pokemon_form_variants');
     $generations_table   = pokehub_get_table('generations');
@@ -1794,18 +1965,18 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     if (array_key_exists('include_forms', $options)) {
         $opts = poke_hub_collections_merge_legacy_include_forms_option($opts);
     }
-    $opts = poke_hub_collections_derive_gender_symbol_option($opts);
+    if ( array_key_exists( 'exclude_mega', $options ) && ! array_key_exists( 'include_mega', $options ) ) {
+        $opts['include_mega'] = empty( $options['exclude_mega'] );
+    }
+    if ( $category === 'mega' ) {
+        /* Liste Méga Primo : le filtre de dates doit accepter release.normal OU release.mega (comme une liste catalogue « normale » avec Méga incluses), pas release.mega seul — sinon tout disparaît si la clé mega est vide. */
+        $opts['include_mega'] = true;
+    }
+    $opts = poke_hub_collections_options_align_with_category( $opts, sanitize_key( $category ) );
     $pool_show_only = poke_hub_collections_normalize_pool_show_only($opts);
     $suppress_switch_battle_placeholders = poke_hub_collections_pool_suppress_switch_battle_placeholder_pipeline($category, $opts);
     $opts['only_final_evolution']      = ($pool_show_only === 'final');
     $opts['only_special_species_pool'] = ($pool_show_only === 'special_all');
-    if (array_key_exists('exclude_mega', $options) && !array_key_exists('include_mega', $options)) {
-        $opts['include_mega'] = empty($options['exclude_mega']);
-    }
-    if ($category === 'mega') {
-        /* Liste Méga Primo : le filtre de dates doit accepter release.normal OU release.mega (comme une liste catalogue « normale » avec Méga incluses), pas release.mega seul — sinon tout disparaît si la clé mega est vide. */
-        $opts['include_mega'] = true;
-    }
     $pool_links_sem_table = pokehub_get_table('pokemon_background_pokemon_links');
     $has_bg_link_sem_col = false;
     if (!empty($pool_links_sem_table) && !empty($wpdb->dbname)) {
@@ -1857,7 +2028,21 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             )";
             break;
         case 'dynamax':
-            $where[] = "(fv.category = 'dynamax' OR fv.form_slug LIKE '%dynamax%' OR fv.form_slug = 'normal')";
+            // Pas de « Pokémon dynamax » séparé en base : ce sont les mêmes fiches qu’à l’habitude (formes basiques, etc.).
+            // Le critère principal est une sortie GO renseignée dans extra.release.dynamax ; le filtre métier (date effective)
+            // est appliqué ensuite via {@see poke_hub_collections_row_passes_pool_release_filter()} (contexte dynamax).
+            // Les OR fv.* restent un filet si le GM exposait un jour une variante explicite dynamax.
+            $where[] = "(
+                (
+                    p.extra IS NOT NULL AND p.extra != ''
+                    AND TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.extra, '$.release.dynamax')), '')) != ''
+                )
+                OR LOWER(TRIM(COALESCE(fv.category, ''))) = 'dynamax'
+                OR (
+                    fv.form_slug IS NOT NULL AND TRIM(fv.form_slug) <> ''
+                    AND LOWER(TRIM(fv.form_slug)) LIKE '%dynamax%'
+                )
+            )";
             break;
         case 'mega':
             $where[] = "(
@@ -1914,9 +2099,20 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
             }
             break;
         }
-        case 'perfect_4':
-        case 'shiny':
         case 'lucky':
+        case 'lucky_dex':
+            // Chanceux uniquement via échanges : hors pool si non échangeable en GO (GM settings.isTradable).
+            $where[] = 'COALESCE(p.is_tradable, 1) = 1';
+            break;
+        case POKE_HUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE:
+            $where[] = "(
+                p.extra IS NOT NULL AND p.extra != ''
+                AND p.extra LIKE '%\"regional\":{\"is_regional\":true%'
+            )";
+            break;
+        case POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY:
+        case POKE_HUB_COLLECTIONS_CAT_ALL_POKEMON:
+        case 'shiny':
         case 'legendary_mythical_ultra':
         case 'custom':
         default:
@@ -1994,17 +2190,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         )
     )";
 
-    // Régional GO uniquement (disponibilité par pays / zones), aligné sur l’import Game Master :
-    // extra.regional.is_regional sur la ligne pokemon. Pas les formes Alola/Galar/etc. — elles sont « régionales »
-    // dans les jeux de la série mais en général pas verrouillées géographiquement dans GO.
-    $like_p_extra_regional = '%' . $wpdb->esc_like('"regional":{"is_regional":true') . '%';
-    $regional_row_match = $wpdb->prepare(
-        '(p.extra IS NOT NULL AND TRIM(COALESCE(p.extra, \'\')) != \'\' AND p.extra LIKE %s)',
-        $like_p_extra_regional
-    );
-    if ( $regional_row_match === false ) {
-        $regional_row_match = '(0)';
-    }
+    // Formes régionales « jeu » (Alola / Galar / Paldea / Hisui) : suffixe slug ou form_slug — pas is_regional GO.
+    $regional_form_row_match = poke_hub_collections_sql_regional_form_variant_row_match( 'p', 'fv' );
 
     // Formes : « One entry per species » décoché (one_per_species = false) = même requête qu’ex-« Include all forms »
     // (lignes distinctes Unown, etc.). Coché = repli *-family* / fiche par défaut + filtre is_default plus bas.
@@ -2076,6 +2263,13 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         $forces_nature_dual_dexes = poke_hub_collections_forces_nature_dual_form_dex_numbers();
         $forces_dex_sql_list      = $forces_nature_dual_dexes !== [] ? implode(',', $forces_nature_dual_dexes) : '';
 
+        // Jetons Alola/Galar/Paldea/Hisui : les *-family* « branche régionale » (ex. tauros-paldea-family) ne doivent
+        // pas désactiver la fiche is_default nue (tauros). Seules les *-family* « plein dex » (kyurem-family…) gardent ce garde-fou.
+        $branch_fam_reg_tok              = function_exists( 'poke_hub_pokemon_regional_game_form_tokens_regex_fragment' )
+            ? poke_hub_pokemon_regional_game_form_tokens_regex_fragment()
+            : 'alola|galar|paldea|hisui';
+        $one_per_slug_non_reg_branch_fam = '-(' . $branch_fam_reg_tok . ')-family$';
+
         $one_per_slug                    = $wpdb->prepare(
             "(
   (p.slug IS NOT NULL AND LOWER(TRIM(p.slug)) REGEXP %s)
@@ -2084,7 +2278,9 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
       SELECT 1 FROM {$pt} AS pf
       WHERE pf.dex_number = p.dex_number
         AND pf.slug IS NOT NULL
+        AND TRIM(pf.slug) <> ''
         AND LOWER(TRIM(pf.slug)) REGEXP %s
+        AND LOWER(TRIM(pf.slug)) NOT REGEXP %s
     )
     AND p.is_default = 1
     AND (p.slug IS NULL OR p.slug = '' OR LOWER(TRIM(p.slug)) NOT REGEXP %s)
@@ -2093,6 +2289,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
 )",
             '-family$',
             '-family$',
+            $one_per_slug_non_reg_branch_fam,
             '-normal$'
         );
         if ( $one_per_slug === false ) {
@@ -2101,8 +2298,8 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
         // Toutes les disjonctions doivent être ici : une 2e clause AND sur is_default|méga ne suffisait pas
         // (les méga ne passent pas one_per_slug, elles n’arrivaient jamais à la 2e partie).
         $one_per_disjuncts = [ "({$one_per_slug})" ];
-        if ( !empty($opts['include_regional_forms']) && is_string( $regional_row_match ) && $regional_row_match !== '' && $regional_row_match !== '(0)' ) {
-            $one_per_disjuncts[] = "({$regional_row_match})";
+        if ( !empty($opts['include_regional_forms']) && $regional_form_row_match !== '' ) {
+            $one_per_disjuncts[] = "({$regional_form_row_match})";
         }
         if ( !empty($opts['include_mega']) ) {
             $one_per_disjuncts[] = "(LOWER(TRIM(COALESCE(fv.category, ''))) IN ('mega', 'primal'))";
@@ -2366,7 +2563,7 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     $is_specific = poke_hub_collections_category_is_specific($category);
     if (!$is_specific) {
         if (empty($opts['include_regional_forms'])) {
-            $where[] = "NOT ({$regional_row_match})";
+            $where[] = "NOT ({$regional_form_row_match})";
         }
         if (!empty($opts['include_costumes'])) {
             // rien
@@ -2424,45 +2621,14 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
     if ($evolution_table && !empty($opts['only_final_evolution'])) {
         $where[] = "p.id NOT IN (SELECT DISTINCT e.base_pokemon_id FROM {$evolution_table} e WHERE e.base_pokemon_id > 0)";
     }
+    if ($evolution_table && !empty($opts['only_base_evolution_stage'])) {
+        $where[] = "p.id NOT IN (SELECT DISTINCT e.target_pokemon_id FROM {$evolution_table} e WHERE e.target_pokemon_id > 0)";
+    }
 
     $where_sql = implode(' AND ', $where);
 
     // Contexte de date de sortie selon la catégorie (uniquement les Pokémon sortis dans GO)
-    $release_context = 'normal';
-    switch ($category) {
-        case 'shiny':
-        case 'costume_shiny':
-        case 'background_shiny':
-        case 'background_shiny_special':
-        case 'background_shiny_places':
-            $release_context = 'shiny';
-            break;
-        case 'shadow':
-        case 'purified':
-            $release_context = 'shadow';
-            break;
-        case 'gigantamax':
-            $release_context = 'gigantamax';
-            break;
-        case 'dynamax':
-            $release_context = 'dynamax';
-            break;
-        case 'mega':
-            // Comme le catalogue « général » avec Méga : normal et/ou mega dans extra.release (include_mega forcé plus haut).
-            $release_context = 'normal';
-            break;
-        case 'perfect_4':
-        case 'costume':
-        case 'background':
-        case 'background_special':
-        case 'background_places':
-        case 'lucky':
-        case 'legendary_mythical_ultra':
-        case 'custom':
-        default:
-            $release_context = 'normal';
-            break;
-    }
+    $release_context = poke_hub_collections_pool_release_context_for_category($category);
 
     $gen_sql     = poke_hub_collections_pool_generation_sql_parts();
     $gen_select  = $gen_sql['select_main'];
@@ -2680,6 +2846,32 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 }
             )
         );
+        $scope = isset($opts['lmu_scope']) ? sanitize_key((string) $opts['lmu_scope']) : 'all';
+        if (!in_array($scope, ['all', 'legendary', 'mythical', 'ultra_beast'], true)) {
+            $scope = 'all';
+        }
+        if ($scope !== 'all' && $results !== []) {
+            $want = $scope === 'ultra_beast' ? 'ultra_beast' : $scope;
+            $results = array_values(
+                array_filter(
+                    $results,
+                    static function (array $row) use ($want) {
+                        return (string) ($row['species_special_group'] ?? '') === $want;
+                    }
+                )
+            );
+        }
+    }
+
+    if ($category === POKE_HUB_COLLECTIONS_CAT_BABIES_ONLY && $results !== []) {
+        $results = array_values(
+            array_filter(
+                $results,
+                static function (array $row) {
+                    return poke_hub_collections_row_is_baby_pokemon($row);
+                }
+            )
+        );
     }
 
     if ($results !== []) {
@@ -2697,16 +2889,20 @@ function poke_hub_collections_get_pool(string $category, array $options = []): a
                 $results = poke_hub_collections_collapse_switch_battle_style_species_for_all_forms_pool($results);
             }
         } else {
-            $results = poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool($results);
+            $results = poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool($results, $category, $opts);
         }
         $results = poke_hub_collections_collapse_exclusive_binary_sex_pair_rows($results, $opts);
         if (! $suppress_switch_battle_placeholders) {
-            $results = poke_hub_collections_append_switch_battle_family_anchor_rows($results);
+            $results = poke_hub_collections_append_switch_battle_family_anchor_rows($results, $category, $opts);
         }
+        if ( ! empty( $opts['one_per_species'] ) && ! empty( $opts['include_regional_forms'] ) ) {
+            $results = poke_hub_collections_append_regional_branch_family_anchor_rows( $results, $category, $opts );
+        }
+        $results = poke_hub_collections_collapse_regional_branch_forms_for_one_per_species_pool( $results, $opts );
     }
     if (! empty($opts['one_per_species'])) {
         if (! $suppress_switch_battle_placeholders) {
-            $results = poke_hub_collections_append_switch_form_family_placeholder_one_per_species(is_array($results) ? $results : []);
+            $results = poke_hub_collections_append_switch_form_family_placeholder_one_per_species(is_array($results) ? $results : [], $category, $opts);
         }
         $results = poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists($results);
     }
@@ -4074,7 +4270,7 @@ function poke_hub_collections_sanitize_options(array $options): array {
         'include_national_dex', 'include_gender', 'include_regional_forms', 'include_costumes', 'include_mega',
         'include_gigantamax', 'include_dynamax', 'include_backgrounds', 'include_special_attacks',
         'one_per_species', 'group_by_generation', 'generations_collapsed', 'public',
-        'only_final_evolution', 'include_baby_pokemon',
+        'only_final_evolution', 'only_base_evolution_stage', 'include_baby_pokemon',
         'include_legendary_pokemon', 'include_mythical_pokemon', 'include_ultra_beast_pokemon',
         'only_special_species_pool',
         'include_both_sexes_collector',
@@ -4085,6 +4281,10 @@ function poke_hub_collections_sanitize_options(array $options): array {
         if (array_key_exists($k, $options)) {
             $options[$k] = (bool) $options[$k];
         }
+    }
+    if (isset($options['lmu_scope'])) {
+        $ls = sanitize_key((string) $options['lmu_scope']);
+        $options['lmu_scope'] = in_array($ls, ['all', 'legendary', 'mythical', 'ultra_beast'], true) ? $ls : 'all';
     }
     if (array_key_exists('pool_show_only', $options)) {
         $v = is_string($options['pool_show_only']) ? sanitize_key($options['pool_show_only']) : '';
@@ -4113,25 +4313,21 @@ function poke_hub_collections_sanitize_options(array $options): array {
  * @return array<string, mixed>
  */
 function poke_hub_collections_options_align_with_category(array $options, string $category): array {
-    $category = sanitize_key($category);
+    $category = poke_hub_collections_normalize_storage_category_slug(sanitize_key($category));
     if ($category !== 'custom') {
         $options['only_shiny'] = false;
     }
-    if ($category === 'legendary_mythical_ultra') {
-        $options['pool_show_only']            = '';
-        $options['only_final_evolution']      = false;
-        $options['only_special_species_pool'] = false;
+    if ($category !== 'legendary_mythical_ultra') {
+        $options['lmu_scope'] = 'all';
     }
 
     $ps = isset($options['pool_show_only']) ? (string) $options['pool_show_only'] : '';
     if ($ps !== '' && ! in_array($ps, poke_hub_collections_pool_show_only_allowed_for_saved_category($category), true)) {
-        $options['pool_show_only']            = '';
-        $options['only_final_evolution']      = false;
-        $options['only_special_species_pool'] = false;
-    } else {
-        $options['only_final_evolution']      = ($ps === 'final');
-        $options['only_special_species_pool'] = ($ps === 'special_all');
+        $options['pool_show_only'] = '';
     }
+    $norm_ps = poke_hub_collections_normalize_pool_show_only($options);
+    $options['only_final_evolution']      = ($norm_ps === 'final');
+    $options['only_special_species_pool'] = ($norm_ps === 'special_all');
 
     return poke_hub_collections_derive_gender_symbol_option($options);
 }
@@ -4858,9 +5054,11 @@ function poke_hub_collections_collapse_switch_battle_style_species_for_all_forms
  * ne passe encore les filtres du pool SQL.
  *
  * @param array<int, array<string, mixed>> $rows Résultat courant après filtres métier éventuels
+ * @param string                           $category Catégorie de liste (filtrage dates comme le pool principal).
+ * @param array<string, mixed>             $opts     Options pool (même tableau que {@see poke_hub_collections_get_pool()}).
  * @return array<int, array<string, mixed>>
  */
-function poke_hub_collections_append_switch_battle_family_anchor_rows(array $rows): array {
+function poke_hub_collections_append_switch_battle_family_anchor_rows(array $rows, string $category = '', array $opts = []): array {
     if (!function_exists('pokehub_get_table')) {
         return $rows;
     }
@@ -4998,6 +5196,14 @@ function poke_hub_collections_append_switch_battle_family_anchor_rows(array $row
             continue;
         }
 
+        if ($category !== '' && !poke_hub_collections_row_passes_pool_release_filter(
+            $row,
+            poke_hub_collections_pool_release_context_for_category($category),
+            $opts
+        )) {
+            continue;
+        }
+
         unset($row['extra']);
         if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
             $row['is_baby'] = poke_hub_pokemon_is_baby_from_row($row + [ 'extra' => '' ]);
@@ -5006,6 +5212,364 @@ function poke_hub_collections_append_switch_battle_family_anchor_rows(array $row
         }
         if (function_exists('poke_hub_pokemon_species_special_group_from_row')) {
             $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row($row);
+        } else {
+            $row['species_special_group'] = '';
+        }
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
+/**
+ * Pool collections : ID virtuel pour une ligne {stem}-family régionale absente en table `pokemon`.
+ *
+ * @param int $seed_id ID `pokemon` d’une variante source du groupe (branche régionale multi-segments).
+ */
+function poke_hub_collections_regional_branch_family_synthetic_pokemon_id( int $seed_id ): int {
+    return (int) ( 2080000000 + $seed_id );
+}
+
+/**
+ * @param int $pokemon_id ID possiblement issu de {@see poke_hub_collections_regional_branch_family_synthetic_pokemon_id()}.
+ */
+function poke_hub_collections_regional_branch_family_is_synthetic_pokemon_id( int $pokemon_id ): bool {
+    return $pokemon_id >= 2080000000 && $pokemon_id < 2100000000;
+}
+
+/**
+ * Construit une entrée agrégée {stem}-family copiée depuis une ligne variante présente dans le pool.
+ *
+ * @param array<string, mixed> $seed
+ * @return array<string, mixed>|null
+ */
+function poke_hub_collections_regional_branch_family_build_synthetic_row(
+    array $seed,
+    string $fam_slug_lc,
+    string $category,
+    array $opts
+): ?array {
+    $fam_slug_lc = strtolower( trim( $fam_slug_lc ) );
+    if ( $fam_slug_lc === '' ) {
+        return null;
+    }
+    $sid = (int) ( $seed['id'] ?? 0 );
+    if ( $sid <= 0
+        || ! empty( $seed['synthetic_regional_branch_family'] )
+        || poke_hub_collections_regional_branch_family_is_synthetic_pokemon_id( $sid )
+    ) {
+        return null;
+    }
+    if ( $category !== '' && function_exists( 'poke_hub_collections_row_passes_pool_release_filter' )
+        && ! poke_hub_collections_row_passes_pool_release_filter(
+            $seed,
+            poke_hub_collections_pool_release_context_for_category( $category ),
+            $opts
+        )
+    ) {
+        return null;
+    }
+
+    $row = $seed;
+    $row['id']                                 = poke_hub_collections_regional_branch_family_synthetic_pokemon_id( $sid );
+    $row['slug']                               = $fam_slug_lc;
+    $row['synthetic_regional_branch_family']    = true;
+    $row['synthetic_regional_branch_family_source_pokemon_id'] = $sid;
+
+    unset( $row['extra'] );
+    if ( function_exists( 'poke_hub_pokemon_is_baby_from_row' ) ) {
+        $row['is_baby'] = poke_hub_pokemon_is_baby_from_row( $row + [ 'extra' => '' ] );
+    } else {
+        $row['is_baby'] = false;
+    }
+    if ( function_exists( 'poke_hub_pokemon_species_special_group_from_row' ) ) {
+        $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row( $row );
+    } else {
+        $row['species_special_group'] = '';
+    }
+
+    return $row;
+}
+
+/**
+ * Mode « une entrée / espèce » + formes régionales : ne garder que {stem}-family parmi les sous-formes
+ * d’une même branche (ex. tauros-paldea-* → tauros-paldea-family lorsqu’elle est dans le pool).
+ * Repli : une seule variante conservée (slug minimal) si aucune *-family* n’est disponible.
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @param array<string, mixed>             $opts
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_collections_collapse_regional_branch_forms_for_one_per_species_pool( array $rows, array $opts ): array {
+    if ( $rows === [] || empty( $opts['one_per_species'] ) || empty( $opts['include_regional_forms'] ) ) {
+        return $rows;
+    }
+    if ( ! function_exists( 'poke_hub_pokemon_slug_regional_multi_form_branch_stem' )
+        || ! function_exists( 'poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem' )
+    ) {
+        return $rows;
+    }
+
+    /** @var array<string, list<int>> */
+    $groups = [];
+    foreach ( $rows as $idx => $row ) {
+        if ( ! is_array( $row ) ) {
+            continue;
+        }
+        $dex = (int) ( $row['dex_number'] ?? 0 );
+        if ( $dex <= 0 ) {
+            continue;
+        }
+        $slug = strtolower( trim( (string) ( $row['slug'] ?? '' ) ) );
+        if ( $slug === '' ) {
+            continue;
+        }
+        $stem = poke_hub_pokemon_slug_regional_multi_form_branch_stem( $slug );
+        if ( $stem === null ) {
+            $stem = poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem( $slug );
+        }
+        if ( $stem === null ) {
+            continue;
+        }
+        $groups[ $dex . '|' . $stem ][] = (int) $idx;
+    }
+
+    $remove = [];
+    foreach ( $groups as $_k => $idxs ) {
+        if ( count( $idxs ) < 2 ) {
+            continue;
+        }
+        $family_idx = null;
+        foreach ( $idxs as $idx ) {
+            $slug = strtolower( trim( (string) ( $rows[ $idx ]['slug'] ?? '' ) ) );
+            $stem = poke_hub_pokemon_slug_regional_multi_form_branch_stem( $slug )
+                ?? poke_hub_pokemon_slug_regional_multi_form_placeholder_family_stem( $slug );
+            if ( $stem !== null && $slug === $stem . '-family' ) {
+                $family_idx = $idx;
+                break;
+            }
+        }
+        if ( $family_idx === null ) {
+            if ( count( $idxs ) < 2 ) {
+                continue;
+            }
+            $keep_idx  = $idxs[0];
+            $keep_slug = strtolower( trim( (string) ( $rows[ $keep_idx ]['slug'] ?? '' ) ) );
+            foreach ( $idxs as $idx ) {
+                $slug = strtolower( trim( (string) ( $rows[ $idx ]['slug'] ?? '' ) ) );
+                if ( $slug !== '' && ( $keep_slug === '' || $slug < $keep_slug ) ) {
+                    $keep_slug = $slug;
+                    $keep_idx  = $idx;
+                }
+            }
+            $family_idx = $keep_idx;
+        }
+        foreach ( $idxs as $idx ) {
+            if ( $idx !== $family_idx ) {
+                $remove[ $idx ] = true;
+            }
+        }
+    }
+
+    if ( $remove === [] ) {
+        return $rows;
+    }
+
+    $out = [];
+    foreach ( $rows as $idx => $row ) {
+        if ( ! empty( $remove[ $idx ] ) ) {
+            continue;
+        }
+        $out[] = $row;
+    }
+
+    return array_values( $out );
+}
+
+/**
+ * Si le pool « une ligne / espèce » attend un {stem}-family régional (Tauros Paldea…) mais qu’il manque,
+ * l’ajouter depuis la base lorsqu’il existe (p.ex. créé par la passe import GM).
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @param string                           $category
+ * @param array<string, mixed>             $opts
+ * @return array<int, array<string, mixed>>
+ */
+function poke_hub_collections_append_regional_branch_family_anchor_rows( array $rows, string $category = '', array $opts = [] ): array {
+    if ( $rows === [] || empty( $opts['one_per_species'] ) || empty( $opts['include_regional_forms'] )
+        || ! function_exists( 'pokehub_get_table' )
+        || ! function_exists( 'poke_hub_pokemon_slug_regional_multi_form_branch_stem' )
+    ) {
+        return $rows;
+    }
+
+    global $wpdb;
+    if ( ! isset( $wpdb ) || ! is_object( $wpdb ) ) {
+        return $rows;
+    }
+
+    $pokemon_table       = pokehub_get_table( 'pokemon' );
+    $form_variants_table = pokehub_get_table( 'pokemon_form_variants' );
+    $generations_table   = pokehub_get_table( 'generations' );
+    if ( ! $pokemon_table || ! $form_variants_table ) {
+        return $rows;
+    }
+
+    $gen_sql    = poke_hub_collections_pool_generation_sql_parts();
+    $gen_join   = ( $generations_table !== '' && $generations_table )
+        ? $gen_sql['join_sql']
+        : '';
+    $gen_select = ( $generations_table !== '' && $generations_table )
+        ? $gen_sql['select_comma']
+        : ", p.generation_id, '' AS generation_name, 0 AS generation_number, p.origin_region_id, '' AS pokemon_region_name, 999 AS pokemon_region_sort, '' AS pokemon_region_slug, '' AS generation_region_fallback_name, 999 AS generation_region_fallback_sort, '' AS generation_region_fallback_slug, '' AS generation_group_slug";
+
+    /** @var array<string, true> */
+    $stems_needed = [];
+
+    foreach ( $rows as $r ) {
+        if ( ! is_array( $r ) ) {
+            continue;
+        }
+        $dex = (int) ( $r['dex_number'] ?? 0 );
+        if ( $dex <= 0 ) {
+            continue;
+        }
+        $slug = strtolower( trim( (string) ( $r['slug'] ?? '' ) ) );
+        if ( $slug === '' ) {
+            continue;
+        }
+        $stem = poke_hub_pokemon_slug_regional_multi_form_branch_stem( $slug );
+        if ( $stem === null ) {
+            continue;
+        }
+        $fam = $stem . '-family';
+        $pool_has_family = false;
+        foreach ( $rows as $r2 ) {
+            if ( ! is_array( $r2 ) ) {
+                continue;
+            }
+            if ( (int) ( $r2['dex_number'] ?? 0 ) !== $dex ) {
+                continue;
+            }
+            if ( strtolower( trim( (string) ( $r2['slug'] ?? '' ) ) ) === $fam ) {
+                $pool_has_family = true;
+                break;
+            }
+        }
+        if ( ! $pool_has_family ) {
+            $stems_needed[ $dex . '|' . $fam ] = true;
+        }
+    }
+
+    foreach ( array_keys( $stems_needed ) as $dk ) {
+        $parts = explode( '|', $dk, 2 );
+        $dex   = isset( $parts[0] ) ? (int) $parts[0] : 0;
+        $fam_slug = isset( $parts[1] ) ? (string) $parts[1] : '';
+        if ( $dex <= 0 || $fam_slug === '' ) {
+            continue;
+        }
+        $already = false;
+        foreach ( $rows as $r ) {
+            if ( ! is_array( $r ) ) {
+                continue;
+            }
+            if ( (int) ( $r['dex_number'] ?? 0 ) === $dex
+                && strtolower( trim( (string) ( $r['slug'] ?? '' ) ) ) === strtolower( $fam_slug )
+            ) {
+                $already = true;
+                break;
+            }
+        }
+        if ( $already ) {
+            continue;
+        }
+
+        $stem_plain = strtolower( preg_replace( '/-family$/', '', trim( $fam_slug ) ) );
+        $seed_pick  = null;
+        $seed_slug  = '';
+        foreach ( $rows as $r_seed ) {
+            if ( ! is_array( $r_seed ) ) {
+                continue;
+            }
+            if ( (int) ( $r_seed['dex_number'] ?? 0 ) !== $dex ) {
+                continue;
+            }
+            $s_seed = strtolower( trim( (string) ( $r_seed['slug'] ?? '' ) ) );
+            if ( $s_seed === '' || substr( $s_seed, -7 ) === '-family' ) {
+                continue;
+            }
+            $bs = poke_hub_pokemon_slug_regional_multi_form_branch_stem( $s_seed );
+            if ( $bs === null || strtolower( $bs ) !== $stem_plain ) {
+                continue;
+            }
+            if ( ! empty( $r_seed['synthetic_regional_branch_family'] ) ) {
+                continue;
+            }
+            $rid = (int) ( $r_seed['id'] ?? 0 );
+            if ( $rid > 0 && poke_hub_collections_regional_branch_family_is_synthetic_pokemon_id( $rid ) ) {
+                continue;
+            }
+            if ( $seed_pick === null || $s_seed < $seed_slug ) {
+                $seed_pick = $r_seed;
+                $seed_slug = $s_seed;
+            }
+        }
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT p.id, p.dex_number, p.name_fr, p.name_en, p.slug, p.form_variant_id, p.extra,
+                        '' AS gm_form_proto,
+                        COALESCE(fv.label, fv.form_slug, '') AS form_label,
+                        COALESCE(fv.form_slug, '') AS form_slug,
+                        COALESCE(fv.category, 'normal') AS form_category
+                        {$gen_select}
+                 FROM {$pokemon_table} p
+                 LEFT JOIN {$form_variants_table} fv ON p.form_variant_id = fv.id
+                 {$gen_join}
+                 WHERE p.dex_number = %d
+                   AND p.slug IS NOT NULL AND TRIM(p.slug) <> ''
+                   AND LOWER(TRIM(p.slug)) = %s
+                 LIMIT 1",
+                $dex,
+                strtolower( $fam_slug )
+            ),
+            ARRAY_A
+        );
+
+        $resolved = null;
+        if ( is_array( $row ) && ! empty( $row['id'] ) ) {
+            if ( $category === '' || poke_hub_collections_row_passes_pool_release_filter(
+                $row,
+                poke_hub_collections_pool_release_context_for_category( $category ),
+                $opts
+            ) ) {
+                $resolved = $row;
+            }
+        }
+        if ( $resolved === null && $seed_pick !== null ) {
+            $syn = poke_hub_collections_regional_branch_family_build_synthetic_row(
+                $seed_pick,
+                strtolower( $fam_slug ),
+                $category,
+                $opts
+            );
+            if ( is_array( $syn ) && ! empty( $syn['id'] ) ) {
+                $resolved = $syn;
+            }
+        }
+        if ( $resolved === null || empty( $resolved['id'] ) ) {
+            continue;
+        }
+
+        $row = $resolved;
+        unset( $row['extra'] );
+        if ( function_exists( 'poke_hub_pokemon_is_baby_from_row' ) ) {
+            $row['is_baby'] = poke_hub_pokemon_is_baby_from_row( $row + [ 'extra' => '' ] );
+        } else {
+            $row['is_baby'] = false;
+        }
+        if ( function_exists( 'poke_hub_pokemon_species_special_group_from_row' ) ) {
+            $row['species_special_group'] = poke_hub_pokemon_species_special_group_from_row( $row );
         } else {
             $row['species_special_group'] = '';
         }
@@ -5083,9 +5647,11 @@ function poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists(ar
  * rattacher explicitement cette ligne (le WHERE SQL peut tout exclure pour le dex).
  *
  * @param array<int, array<string, mixed>> $rows
+ * @param string                           $category Catégorie de liste (filtrage dates comme le pool principal).
+ * @param array<string, mixed>             $opts     Options pool (même tableau que {@see poke_hub_collections_get_pool()}).
  * @return array<int, array<string, mixed>>
  */
-function poke_hub_collections_append_switch_form_family_placeholder_one_per_species(array $rows): array {
+function poke_hub_collections_append_switch_form_family_placeholder_one_per_species(array $rows, string $category = '', array $opts = []): array {
     if (! function_exists('pokehub_get_table')) {
         return $rows;
     }
@@ -5213,6 +5779,14 @@ function poke_hub_collections_append_switch_form_family_placeholder_one_per_spec
             continue;
         }
 
+        if ($category !== '' && !poke_hub_collections_row_passes_pool_release_filter(
+            $db_row,
+            poke_hub_collections_pool_release_context_for_category($category),
+            $opts
+        )) {
+            continue;
+        }
+
         unset($db_row['extra']);
         if (function_exists('poke_hub_pokemon_is_baby_from_row')) {
             $db_row['is_baby'] = poke_hub_pokemon_is_baby_from_row($db_row + [ 'extra' => '' ]);
@@ -5242,9 +5816,11 @@ function poke_hub_collections_append_switch_form_family_placeholder_one_per_spec
  * fusion (Kyurem B/N, Necrozma, Calyrex…), dynamique par № Dex — pas en mode « toutes les formes ».
  *
  * @param array<int, array<string, mixed>> $rows
+ * @param string                           $category Catégorie de liste (filtrage dates comme le pool principal).
+ * @param array<string, mixed>             $opts     Options pool (même tableau que {@see poke_hub_collections_get_pool()}).
  * @return array<int, array<string, mixed>>
  */
-function poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool(array $rows): array {
+function poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool(array $rows, string $category = '', array $opts = []): array {
     if ($rows === [] || ! function_exists('pokehub_get_table')) {
         return poke_hub_collections_dedupe_bare_base_when_family_placeholder_exists($rows);
     }
@@ -5380,6 +5956,14 @@ function poke_hub_collections_collapse_fusion_to_family_for_one_per_species_pool
         );
 
         if (! is_array($db_row) || empty($db_row['id'])) {
+            continue;
+        }
+
+        if ($category !== '' && !poke_hub_collections_row_passes_pool_release_filter(
+            $db_row,
+            poke_hub_collections_pool_release_context_for_category($category),
+            $opts
+        )) {
             continue;
         }
 
@@ -5651,6 +6235,7 @@ function poke_hub_collections_create(int $user_id, array $data): array {
 
     $name     = isset($data['name']) ? sanitize_text_field($data['name']) : '';
     $category = isset($data['category']) ? sanitize_key($data['category']) : 'custom';
+    $category = poke_hub_collections_normalize_storage_category_slug($category);
     $slug     = sanitize_title($name ?: 'collection-' . $user_id . '-' . time());
     $options  = isset($data['options']) && is_array($data['options']) ? $data['options'] : [];
     $is_public = !empty($data['is_public']);
@@ -5728,6 +6313,7 @@ function poke_hub_collections_create_anonymous(array $data, string $ip): array {
 
     $name     = isset($data['name']) ? sanitize_text_field($data['name']) : '';
     $category = isset($data['category']) ? sanitize_key($data['category']) : 'custom';
+    $category = poke_hub_collections_normalize_storage_category_slug($category);
     $options  = isset($data['options']) && is_array($data['options']) ? $data['options'] : [];
 
     $categories = array_keys(poke_hub_collections_get_categories());
@@ -5819,6 +6405,7 @@ function poke_hub_collections_update(int $collection_id, int $user_id, array $da
     if ($current_category === '') {
         $current_category = 'custom';
     }
+    $current_category = poke_hub_collections_normalize_storage_category_slug($current_category);
 
     $updates = [];
     $formats = [];
@@ -5889,6 +6476,7 @@ function poke_hub_collections_get_by_user(int $user_id): array {
     }
 
     foreach ($rows as &$row) {
+        $row['category'] = poke_hub_collections_normalize_storage_category_slug((string) ($row['category'] ?? ''));
         if (!empty($row['options'])) {
             $row['options'] = json_decode($row['options'], true) ?: [];
         } else {
@@ -5937,7 +6525,9 @@ function poke_hub_collections_get_one(int $collection_id = 0, ?string $slug = nu
         return null;
     }
 
-    $row['options'] = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+    $row['category'] = poke_hub_collections_normalize_storage_category_slug((string) ($row['category'] ?? ''));
+    $row['options']  = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+
     return $row;
 }
 
@@ -5970,7 +6560,9 @@ function poke_hub_collections_get_by_share_token(string $token): ?array {
         return null;
     }
 
-    $row['options'] = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+    $row['category'] = poke_hub_collections_normalize_storage_category_slug((string) ($row['category'] ?? ''));
+    $row['options']  = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+
     return $row;
 }
 
@@ -6028,7 +6620,9 @@ function poke_hub_collections_get_public_by_slug(string $slug): ?array {
         return null;
     }
 
-    $row['options'] = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+    $row['category'] = poke_hub_collections_normalize_storage_category_slug((string) ($row['category'] ?? ''));
+    $row['options']  = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
+
     return $row;
 }
 
@@ -6113,6 +6707,7 @@ function poke_hub_collections_get_anonymous_by_ip(string $ip): array {
     }
 
     foreach ($rows as &$row) {
+        $row['category'] = poke_hub_collections_normalize_storage_category_slug((string) ($row['category'] ?? ''));
         $row['options'] = !empty($row['options']) ? (json_decode($row['options'], true) ?: []) : poke_hub_collections_default_options();
     }
     unset($row);

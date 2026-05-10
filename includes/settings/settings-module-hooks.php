@@ -326,6 +326,15 @@ add_action('admin_init', function () {
     if (!empty($modules_to_create) && function_exists('pokehub_install_tables_for_modules')) {
         pokehub_install_tables_for_modules($modules_to_create);
     }
+
+    // Colonnes `pokemon_regional_form_*` sur `regions` : la table existe souvent sans elles après mise à jour du plugin ;
+    // `pokehub_install_tables_for_modules` ne tourne alors pas → migration explicite à chaque admin (idempotent).
+    if ( in_array( 'pokemon', $active_modules, true ) && function_exists( 'pokehub_get_table' ) ) {
+        $regions_for_migrate = pokehub_get_table( 'regions' );
+        if ( $regions_for_migrate && $wpdb->get_var( "SHOW TABLES LIKE '{$regions_for_migrate}'" ) === $regions_for_migrate ) {
+            Pokehub_DB::getInstance()->migrateRegionsPokemonRegionalFormColumns( $regions_for_migrate );
+        }
+    }
     
     // Migration des colonnes recurring pour special_events (même si la table existe déjà)
     if (in_array('events', $active_modules, true)) {

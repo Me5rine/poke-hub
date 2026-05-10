@@ -18,7 +18,7 @@ function poke_hub_pokemon_get_section_label($section) {
         case 'generations':
             return __('Generations', 'poke-hub');
         case 'regions':
-            return __('Regions', 'poke-hub');
+            return __('Game regions', 'poke-hub');
         case 'types':
             return __('Types', 'poke-hub');
         case 'moves':
@@ -36,7 +36,7 @@ function poke_hub_pokemon_get_section_label($section) {
         case 'biomes':
             return __('Biomes', 'poke-hub');
         case 'regional_regions':
-            return __('Geographic Regions', 'poke-hub');
+            return __('Geographical areas', 'poke-hub');
         case 'overview':
         default:
             return __('Pokémon data', 'poke-hub');
@@ -57,7 +57,7 @@ require_once POKE_HUB_POKEMON_PATH . '/admin/sections/egg-types.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/items.php';
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/backgrounds.php'; // 🔹 NOUVEAU
 require_once POKE_HUB_POKEMON_PATH . '/admin/sections/biomes.php';
-require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regional-regions.php'; // Geographic Regions
+require_once POKE_HUB_POKEMON_PATH . '/admin/sections/regional-regions.php'; // GO spawn regions / countries
 
 /**
  * Screen options pour la page Pokémon (onglet "Pokémon" + "Attacks").
@@ -792,7 +792,7 @@ function poke_hub_pokemon_admin_ui() {
 
         case 'regional_regions':
             $add_button = [
-                'label' => __('Add Geographic Region', 'poke-hub'),
+                'label' => __('Add regional spawn region', 'poke-hub'),
                 'url'   => add_query_arg(
                     [
                         'page'       => 'poke-hub-pokemon',
@@ -814,7 +814,7 @@ function poke_hub_pokemon_admin_ui() {
         'overview'      => __('Overview', 'poke-hub'),
         'pokemon'       => __('Pokémon', 'poke-hub'),
         'generations'   => __('Generations', 'poke-hub'),
-        'regions'       => __('Regions', 'poke-hub'),
+        'regions'       => __('Game regions', 'poke-hub'),
         'types'         => __('Types', 'poke-hub'),
         'moves'         => __('Attacks', 'poke-hub'),
         'forms'         => __('Form variants', 'poke-hub'),
@@ -823,7 +823,7 @@ function poke_hub_pokemon_admin_ui() {
         'items'         => __('Items', 'poke-hub'),
         'backgrounds'   => __('Backgrounds', 'poke-hub'),
         'biomes'        => __('Biomes', 'poke-hub'),
-        'regional_regions' => __('Geographic Regions', 'poke-hub'),
+        'regional_regions' => __('Geographical areas', 'poke-hub'),
     ];
     ?>
     <div class="wrap">

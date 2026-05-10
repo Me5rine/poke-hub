@@ -33,7 +33,7 @@ add_action('rest_api_init', function () {
             'options'  => ['type' => 'string'], // JSON
         ],
         'callback'            => function (WP_REST_Request $request) use ($resolve_owner_key) {
-            $category = sanitize_key($request->get_param('category'));
+            $category = poke_hub_collections_normalize_storage_category_slug(sanitize_key((string) $request->get_param('category')));
             $options  = $request->get_param('options');
             $options  = is_string($options) ? json_decode($options, true) : [];
             if (!is_array($options)) {

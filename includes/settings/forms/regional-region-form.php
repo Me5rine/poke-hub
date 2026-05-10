@@ -62,7 +62,7 @@ function poke_hub_regional_region_edit_form($edit_data = null) {
     ?>
     <div class="wrap">
         <?php poke_hub_admin_back_to_list_bar($back_url, __('Back to Regions', 'poke-hub')); ?>
-        <h1><?php echo $is_edit ? esc_html__('Edit Geographic Region', 'poke-hub') : esc_html__('Add Geographic Region', 'poke-hub'); ?></h1>
+        <h1><?php echo $is_edit ? esc_html__('Edit regional spawn region', 'poke-hub') : esc_html__('Add regional spawn region', 'poke-hub'); ?></h1>
 
         <form method="post" action="">
             <?php wp_nonce_field('poke_hub_regional_mapping_settings', 'poke_hub_regional_mapping_nonce'); ?>
