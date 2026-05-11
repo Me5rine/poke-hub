@@ -4866,6 +4866,17 @@ function poke_hub_collections_collapse_exclusive_binary_sex_pair_rows(array $row
         if (count($items) !== 2) {
             continue;
         }
+        // Binômes *-family* / slug nu / *-male* / *-female* : {@see poke_hub_collections_normalize_slug_exclusive_binary_family_dimorphism_rows()}
+        // doit garder les deux lignes. Sinon cette étape (avant la normalisation) ne laisse qu’un mâle — cas Meowstic, Indeedee, etc.
+        $slug_pair = [
+            strtolower(trim((string) ($items[0]['row']['slug'] ?? ''))),
+            strtolower(trim((string) ($items[1]['row']['slug'] ?? ''))),
+        ];
+        if ($slug_pair[0] !== '' && $slug_pair[1] !== ''
+            && function_exists('poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs')
+            && poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($slug_pair)) {
+            continue;
+        }
         $axes = [];
         foreach ($items as $it) {
             $axis = poke_hub_collections_exclusive_binary_sex_axis_from_row($it['row']);
