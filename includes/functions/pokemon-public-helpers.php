@@ -850,6 +850,7 @@ function poke_hub_pokemon_get_assets_fallback_base_url() {
 
 /**
  * Construit la "clé" d'image à partir du slug + shiny + genre.
+ * Au plus un suffixe genre : jamais ...-male-male ni ...-female-male (un seul -male ou -female en fin, avant -shiny).
  */
 function poke_hub_pokemon_build_image_key_from_slug($slug, array $args = []) {
     $args = wp_parse_args($args, [
@@ -857,17 +858,20 @@ function poke_hub_pokemon_build_image_key_from_slug($slug, array $args = []) {
         'gender' => null,
     ]);
 
-    $slug = sanitize_title($slug);
-    $key  = $slug;
+    $key = sanitize_title($slug);
+    $g   = $args['gender'];
+    if ($g === '') {
+        $g = null;
+    }
 
-    // Genre
-    if ($args['gender'] === 'male') {
-        if (!preg_match('/-male(?:-|$)/', $key)) {
-            $key .= '-male';
-        }
-    } elseif ($args['gender'] === 'female') {
-        if (!preg_match('/-female(?:-|$)/', $key)) {
-            $key .= '-female';
+    if ($g === 'male' || $g === 'female') {
+        // Retirer toute suite finale -(male|female)(-(male|female))* puis ajouter exactement un suffixe.
+        $key = preg_replace('/(?:-(?:male|female))+$/u', '', (string) $key);
+        $key .= $g === 'male' ? '-male' : '-female';
+    } else {
+        // Pas de genre imposé ici : dédoublonner ...-male-male / ...-female-female sur la fin.
+        while (preg_match('/-(male|female)-\1$/u', $key)) {
+            $key = preg_replace('/-(male|female)-\1$/u', '-$1', $key);
         }
     }
 
