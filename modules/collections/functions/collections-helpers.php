@@ -1691,20 +1691,23 @@ function poke_hub_collections_pogo_strip_regional_collapsed(string $s): string {
  * @return string '' | 'alola' | 'galar' | 'paldea' | 'hisui'
  */
 function poke_hub_collections_pogo_regional_key_from_row( array $row ): string {
-    $slug = strtolower( trim( (string) ( $row['form_slug'] ?? '' ) . ' ' . (string) ( $row['slug'] ?? '' ) ) );
-    if ( $slug === '' ) {
+    $blob = strtolower( trim( (string) ( $row['form_slug'] ?? '' ) . ' ' . (string) ( $row['slug'] ?? '' ) ) );
+    if ( function_exists( 'poke_hub_pokemon_regional_form_group_key_from_slug_blob' ) ) {
+        return poke_hub_pokemon_regional_form_group_key_from_slug_blob( $blob );
+    }
+    if ( $blob === '' ) {
         return '';
     }
-    if ( false !== strpos( $slug, 'alola' ) || false !== strpos( $slug, 'alolan' ) ) {
+    if ( false !== strpos( $blob, 'alola' ) || false !== strpos( $blob, 'alolan' ) ) {
         return 'alola';
     }
-    if ( false !== strpos( $slug, 'galar' ) || false !== strpos( $slug, 'galarian' ) ) {
+    if ( false !== strpos( $blob, 'galar' ) || false !== strpos( $blob, 'galarian' ) ) {
         return 'galar';
     }
-    if ( false !== strpos( $slug, 'paldea' ) || false !== strpos( $slug, 'paldean' ) ) {
+    if ( false !== strpos( $blob, 'paldea' ) || false !== strpos( $blob, 'paldean' ) ) {
         return 'paldea';
     }
-    if ( false !== strpos( $slug, 'hisui' ) || false !== strpos( $slug, 'hisuian' ) ) {
+    if ( false !== strpos( $blob, 'hisui' ) || false !== strpos( $blob, 'hisuian' ) ) {
         return 'hisui';
     }
 
@@ -1911,13 +1914,33 @@ function poke_hub_collections_pool_rows_add_pogo_tokens(array &$rows): void {
             $row['pogo_group_prefix_en'] = $ven !== '' ? $ven : $vfr;
         }
         $row['pogo_regional_key'] = poke_hub_collections_pogo_regional_key_from_row( $row );
-        // Forme régionale : le jeton d’attente POGO est toujours alola& / galar& / paldea& / hisuian&, pas le libellé
-        // (ex. Tauros Paldea Aqua → éviter « paldeaaqua& » au lieu de « paldea& »).
+        // Forme régionale : préfixes recherche cumulatif POGO (admin : regions.pokemon_regional_form_pogo_slug_*).
         $reg = $row['pogo_regional_key'];
-        if ( $reg === 'alola' || $reg === 'galar' || $reg === 'paldea' || $reg === 'hisui' ) {
-            $canon = ( $reg === 'hisui' ) ? 'hisuian' : $reg;
-            $row['pogo_group_prefix_fr'] = $canon;
-            $row['pogo_group_prefix_en'] = $canon;
+        if ( $reg !== '' && function_exists( 'poke_hub_pokemon_regional_pogo_prefixes_for_group_key' ) ) {
+            $pair = poke_hub_pokemon_regional_pogo_prefixes_for_group_key( $reg );
+            if ( is_array( $pair ) ) {
+                $frP = isset( $pair['fr'] ) ? (string) $pair['fr'] : '';
+                $enP = isset( $pair['en'] ) ? (string) $pair['en'] : '';
+                if ( $frP === '' && $enP !== '' ) {
+                    $frP = $enP;
+                }
+                if ( $enP === '' && $frP !== '' ) {
+                    $enP = $frP;
+                }
+                if ( $frP !== '' ) {
+                    $row['pogo_group_prefix_fr'] = $frP;
+                }
+                if ( $enP !== '' ) {
+                    $row['pogo_group_prefix_en'] = $enP;
+                }
+            }
+            if ( $row['pogo_group_prefix_fr'] === '' && $row['pogo_group_prefix_en'] === '' ) {
+                $row['pogo_group_prefix_fr'] = $reg;
+                $row['pogo_group_prefix_en'] = $reg;
+            }
+        } elseif ( $reg !== '' ) {
+            $row['pogo_group_prefix_fr'] = $reg;
+            $row['pogo_group_prefix_en'] = $reg;
         }
     }
     unset($row);

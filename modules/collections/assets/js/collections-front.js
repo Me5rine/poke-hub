@@ -1845,11 +1845,32 @@
     function pogoSearchLangIsFr(tokenMode) {
         return tokenMode === 'name_fr';
     }
-    function pogoSexPrefix(tokenMode, female) {
-        if (female) {
-            return pogoSearchLangIsFr(tokenMode) ? 'femelle&' : 'female&';
+    function pogoSearchKeywordsMap() {
+        return (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.pogoSearchKeywords)
+            ? pokeHubCollections.pogoSearchKeywords
+            : {};
+    }
+    function pogoKwRaw(key, fallback) {
+        var map = pogoSearchKeywordsMap();
+        var v = map[key];
+        if (v !== undefined && v !== null) {
+            var t = String(v).trim();
+            if (t !== '') {
+                return t;
+            }
         }
-        return pogoSearchLangIsFr(tokenMode) ? 'mâle&' : 'male&';
+        return fallback !== undefined && fallback !== null ? String(fallback) : '';
+    }
+    function pogoKwAmp(key, fallback) {
+        var raw = pogoKwRaw(key, fallback);
+        return raw !== '' ? raw + '&' : '';
+    }
+    function pogoSexPrefix(tokenMode, female) {
+        var isFr = pogoSearchLangIsFr(tokenMode);
+        if (female) {
+            return pogoKwAmp(isFr ? 'female_fr' : 'female_en', isFr ? 'femelle' : 'female');
+        }
+        return pogoKwAmp(isFr ? 'male_fr' : 'male_en', isFr ? 'mâle' : 'male');
     }
     function pogoSexCompoundParentGkey(gkey) {
         var m = /^(shiny|shadow|purified|dynamax|costume|mega|gigamax|alola|galar|paldea|hisui)(Male|Female)$/.exec(String(gkey || ''));
@@ -1859,31 +1880,31 @@
         var k = tokenMode === 'name_en' ? 'pogo_group_prefix_en' : 'pogo_group_prefix_fr';
         var isFr = pogoSearchLangIsFr(tokenMode);
         if (gkey === 'shiny') {
-            return (isFr ? 'chromatique' : 'shiny') + '&';
+            return pogoKwAmp(isFr ? 'shiny_fr' : 'shiny_en', isFr ? 'chromatique' : 'shiny');
         }
         if (gkey === 'shadow') {
-            return (isFr ? 'obscur' : 'shadow') + '&';
+            return pogoKwAmp(isFr ? 'shadow_fr' : 'shadow_en', isFr ? 'obscur' : 'shadow');
         }
         if (gkey === 'purified') {
-            return (isFr ? 'purifié' : 'purified') + '&';
+            return pogoKwAmp(isFr ? 'purified_fr' : 'purified_en', isFr ? 'purifié' : 'purified');
         }
         if (gkey === 'fond_dynamax') {
-            return (isFr ? 'fond&dynamax&' : 'background&dynamax&');
+            return pogoKwRaw(isFr ? 'fond_dynamax_fr' : 'fond_dynamax_en', isFr ? 'fond&dynamax' : 'background&dynamax') + '&';
         }
         if (gkey === 'fond_gigamax') {
-            return (isFr ? 'fond&gigamax&' : 'background&gigantamax&');
+            return pogoKwRaw(isFr ? 'fond_gigamax_fr' : 'fond_gigamax_en', isFr ? 'fond&gigamax' : 'background&gigantamax') + '&';
         }
         if (gkey === 'fond') {
-            return (isFr ? 'fond' : 'background') + '&';
+            return pogoKwAmp(isFr ? 'fond_fr' : 'fond_en', isFr ? 'fond' : 'background');
         }
         if (gkey === 'fond_lieu') {
-            return (isFr ? 'fonddelieu' : 'locationbackground') + '&';
+            return pogoKwAmp(isFr ? 'fond_lieu_fr' : 'fond_lieu_en', isFr ? 'fonddelieu' : 'locationbackground');
         }
         if (gkey === 'fond_special') {
-            return (isFr ? 'fonspécial' : 'specialbackground') + '&';
+            return pogoKwAmp(isFr ? 'fond_special_fr' : 'fond_special_en', isFr ? 'fonspécial' : 'specialbackground');
         }
         if (gkey === 'gigamax') {
-            return (isFr ? 'gigamax' : 'gigantamax') + '&';
+            return pogoKwAmp(isFr ? 'gigamax_fr' : 'gigamax_en', isFr ? 'gigamax' : 'gigantamax');
         }
         var compoundParent = pogoSexCompoundParentGkey(gkey);
         if (compoundParent) {
@@ -1891,13 +1912,13 @@
             return pogoGroupPrefix(compoundParent, tokenMode, sampleRow) + sexBit;
         }
         if (gkey === 'dynamax') {
-            return 'dynamax&';
+            return pogoKwAmp(isFr ? 'dynamax_fr' : 'dynamax_en', 'dynamax');
         }
         if (gkey === 'mega') {
-            return (isFr ? 'méga' : 'mega') + '&';
+            return pogoKwAmp(isFr ? 'mega_fr' : 'mega_en', isFr ? 'méga' : 'mega');
         }
         if (gkey === 'costume') {
-            return (isFr ? 'événement' : 'event') + '&';
+            return pogoKwAmp(isFr ? 'costume_fr' : 'costume_en', isFr ? 'événement' : 'event');
         }
         /* Mâle / femelle : préfixe langue ; pas le préfixe variante (pogo_group_prefix_*) de la ligne d’exemple. */
         if (gkey === 'male' || gkey === 'female') {
@@ -1920,13 +1941,13 @@
         var isFr = pogoSearchLangIsFr(tokenMode);
         try {
             if (wrap && wrap.getAttribute && wrap.getAttribute('data-collection-category') === 'lucky') {
-                parts.push(isFr ? 'chanceux' : 'lucky');
+                parts.push(isFr ? pogoKwRaw('lucky_fr', 'chanceux') : pogoKwRaw('lucky_en', 'lucky'));
             }
             var jo = wrap && wrap.getAttribute ? wrap.getAttribute('data-edit-options') : '';
             if (jo) {
                 var o = JSON.parse(jo);
                 if (o && o.pool_show_only === 'baby') {
-                    parts.push(isFr ? 'oeufseulement' : 'eggsonly');
+                    parts.push(isFr ? pogoKwRaw('eggsonly_fr', 'oeufseulement') : pogoKwRaw('eggsonly_en', 'eggsonly'));
                 }
             }
         } catch (eScope) {}

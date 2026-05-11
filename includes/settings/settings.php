@@ -176,10 +176,15 @@ function poke_hub_settings_ui() {
 
     // Onglet Sources toujours visible (sources image et préfixe Pokémon disponibles à l'activation)
     $sources_enabled     = true;
+    // Onglet « Import exceptions » : cas particuliers paramétrables (ex. binary_sex_family).
+    $exceptions_enabled  = true;
     // Liste des onglets autorisés
     $allowed_tabs = ['general'];
     if ($sources_enabled) {
         $allowed_tabs[] = 'sources';
+    }
+    if ($exceptions_enabled) {
+        $allowed_tabs[] = 'exceptions';
     }
 
     // Si on demande un onglet non autorisé (ex: désactivation de pokemon
@@ -205,6 +210,12 @@ function poke_hub_settings_ui() {
                 . esc_html__('Sources', 'poke-hub') . '</a>';
     }
 
+    // Onglet Import exceptions (même slug URL `tab=exceptions` pour ne pas casser les favoris).
+    if ($exceptions_enabled) {
+        echo '<a href="?page=poke-hub-settings&tab=exceptions" class="nav-tab ' . ($active_tab === 'exceptions' ? 'nav-tab-active' : '') . '">'
+                . esc_html__('Import exceptions', 'poke-hub') . '</a>';
+    }
+
     echo '</nav>';
 
     // Inclusion des onglets
@@ -214,6 +225,8 @@ function poke_hub_settings_ui() {
         include $tabs_dir . 'settings-tab-general.php';
     } elseif ($active_tab === 'sources') {
         include $tabs_dir . 'settings-tab-sources.php';
+    } elseif ($active_tab === 'exceptions') {
+        include $tabs_dir . 'settings-tab-exceptions.php';
     }
 
     echo '</div>';

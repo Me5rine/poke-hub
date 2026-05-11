@@ -1225,6 +1225,33 @@ function poke_hub_pokemon_regional_game_form_slug_tokens_default(): array {
 }
 
 /**
+ * Déduit la clé de groupe recherche POGO (alola, galar, paldea, hisui) à partir d’un texte concaténé
+ * (slug forme, alias, slug région) — même logique que les lignes Pokémon (form_slug / slug).
+ *
+ * @return string ''|'alola'|'galar'|'paldea'|'hisui'
+ */
+function poke_hub_pokemon_regional_form_group_key_from_slug_blob( string $blob ): string {
+    $slug = strtolower( trim( preg_replace( '/\s+/u', ' ', $blob ) ) );
+    if ( $slug === '' ) {
+        return '';
+    }
+    if ( false !== strpos( $slug, 'alola' ) || false !== strpos( $slug, 'alolan' ) ) {
+        return 'alola';
+    }
+    if ( false !== strpos( $slug, 'galar' ) || false !== strpos( $slug, 'galarian' ) ) {
+        return 'galar';
+    }
+    if ( false !== strpos( $slug, 'paldea' ) || false !== strpos( $slug, 'paldean' ) ) {
+        return 'paldea';
+    }
+    if ( false !== strpos( $slug, 'hisui' ) || false !== strpos( $slug, 'hisuian' ) ) {
+        return 'hisui';
+    }
+
+    return '';
+}
+
+/**
  * Valide un jeton pour slug / REGEXP (lettres/chiffres + tirets).
  */
 function poke_hub_pokemon_regional_game_form_slug_sanitize_token( string $token ): string {
@@ -1335,6 +1362,169 @@ function poke_hub_pokemon_regional_game_form_slug_tokens(): array {
     wp_cache_set( $cache_key, $merged, 'poke_hub', HOUR_IN_SECONDS );
 
     return $merged;
+}
+
+/**
+ * Carte groupe régional jeu → préfixes recherche Pokémon GO par langue (jetons avant « & », sans accent forcé — cohérent avec les saisies admin).
+ *
+ * @return array<string, array{fr:string, en:string}> ex. ['hisui' => ['fr'=>'hisui','en'=>'hisuian'], …]
+ */
+function poke_hub_pokemon_regional_pogo_search_prefix_map(): array {
+    $cache_ver = (int) get_option( 'poke_hub_prf_slug_tokens_rev', 0 );
+    $cache_key = 'prf_pogo_prefix_map_' . $cache_ver;
+    $hit       = wp_cache_get( $cache_key, 'poke_hub' );
+    if ( is_array( $hit ) ) {
+        return $hit;
+    }
+
+    /** @var array<string, array{fr:string, en:string}> $map */
+    $map = [];
+
+    global $wpdb;
+    $table = function_exists( 'pokehub_get_table' ) ? pokehub_get_table( 'regions' ) : '';
+    if ( ! $table || ! isset( $wpdb ) || ! $wpdb instanceof \wpdb ) {
+        wp_cache_set( $cache_key, $map, 'poke_hub', MINUTE_IN_SECONDS * 15 );
+
+        return $map;
+    }
+
+    $db = $wpdb->dbname;
+    if ( $db === '' || $db === null ) {
+        wp_cache_set( $cache_key, $map, 'poke_hub', MINUTE_IN_SECONDS * 15 );
+
+        return $map;
+    }
+
+    $has_fr = ! empty(
+        $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s LIMIT 1',
+                $db,
+                $table,
+                'pokemon_regional_form_pogo_slug_fr'
+            )
+        )
+    );
+    $has_en = ! empty(
+        $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s LIMIT 1',
+                $db,
+                $table,
+                'pokemon_regional_form_pogo_slug_en'
+            )
+        )
+    );
+
+    $cols = 'slug, pokemon_regional_form_slug, pokemon_regional_form_slug_aliases, pokemon_regional_form_name_fr, pokemon_regional_form_name_en';
+    if ( $has_fr ) {
+        $cols .= ', pokemon_regional_form_pogo_slug_fr';
+    }
+    if ( $has_en ) {
+        $cols .= ', pokemon_regional_form_pogo_slug_en';
+    }
+
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- colonnes et table canalisées.
+    $rows = $wpdb->get_results( "SELECT {$cols} FROM `{$table}`", ARRAY_A );
+    if ( ! is_array( $rows ) ) {
+        wp_cache_set( $cache_key, $map, 'poke_hub', HOUR_IN_SECONDS );
+
+        return $map;
+    }
+
+    foreach ( $rows as $r ) {
+        if ( ! is_array( $r ) ) {
+            continue;
+        }
+
+        $parts = [];
+        $main = trim( (string) ( $r['pokemon_regional_form_slug'] ?? '' ) );
+        if ( $main !== '' ) {
+            $parts[] = $main;
+        }
+        $aliases_raw = isset( $r['pokemon_regional_form_slug_aliases'] ) ? (string) $r['pokemon_regional_form_slug_aliases'] : '';
+        $decoded     = json_decode( $aliases_raw, true );
+        if ( is_array( $decoded ) ) {
+            foreach ( $decoded as $a ) {
+                $as = trim( (string) $a );
+                if ( $as !== '' ) {
+                    $parts[] = $as;
+                }
+            }
+        }
+        $region_slug = trim( (string) ( $r['slug'] ?? '' ) );
+        if ( $region_slug !== '' ) {
+            $parts[] = $region_slug;
+        }
+        if ( $parts === [] ) {
+            continue;
+        }
+
+        $blob = strtolower( implode( ' ', $parts ) );
+        $key  = poke_hub_pokemon_regional_form_group_key_from_slug_blob( $blob );
+        if ( $key === '' ) {
+            continue;
+        }
+
+        $pogo_fr = $has_fr
+            ? poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) ( $r['pokemon_regional_form_pogo_slug_fr'] ?? '' ) )
+            : '';
+        $pogo_en = $has_en
+            ? poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) ( $r['pokemon_regional_form_pogo_slug_en'] ?? '' ) )
+            : '';
+
+        $main_san = poke_hub_pokemon_regional_game_form_slug_sanitize_token( $main );
+
+        $fr = $pogo_fr !== ''
+            ? $pogo_fr
+            : (
+                $main_san !== ''
+                    ? $main_san
+                    : poke_hub_pokemon_regional_game_form_slug_sanitize_token( sanitize_title( (string) ( $r['pokemon_regional_form_name_fr'] ?? '' ) ) )
+            );
+        $en = $pogo_en !== ''
+            ? $pogo_en
+            : (
+                $main_san !== ''
+                    ? $main_san
+                    : poke_hub_pokemon_regional_game_form_slug_sanitize_token( sanitize_title( (string) ( $r['pokemon_regional_form_name_en'] ?? '' ) ) )
+            );
+
+        if ( $fr === '' && $en !== '' ) {
+            $fr = $en;
+        }
+        if ( $en === '' && $fr !== '' ) {
+            $en = $fr;
+        }
+        if ( $fr === '' && $en === '' ) {
+            $fr = $key;
+            $en = $key;
+        }
+
+        $map[ $key ] = [
+            'fr' => $fr,
+            'en' => $en,
+        ];
+    }
+
+    wp_cache_set( $cache_key, $map, 'poke_hub', HOUR_IN_SECONDS );
+
+    return $map;
+}
+
+/**
+ * Préfixes GO pour une clé de groupe (voir {@see poke_hub_pokemon_regional_pogo_search_prefix_map()}).
+ *
+ * @return array{fr:string,en:string}|null
+ */
+function poke_hub_pokemon_regional_pogo_prefixes_for_group_key( string $group_key ): ?array {
+    $group_key = strtolower( trim( $group_key ) );
+    if ( $group_key === '' ) {
+        return null;
+    }
+    $map = poke_hub_pokemon_regional_pogo_search_prefix_map();
+
+    return isset( $map[ $group_key ] ) && is_array( $map[ $group_key ] ) ? $map[ $group_key ] : null;
 }
 
 /**
@@ -1469,9 +1659,23 @@ function poke_hub_regions_ensure_core_regional_game_regions(): void {
             'form_name_fr'  => 'Hisui',
             'form_slug'     => 'hisui',
             'aliases'       => [ 'hisuian' ],
+            /* Recherche Pokémon GO : FR / EN pilotables aussi via l’admin (`pokemon_regional_form_pogo_slug_*`). */
+            'pogo_slug_fr' => 'hisui',
+            'pogo_slug_en' => 'hisuian',
             'sort'          => 45,
         ],
     ];
+
+    $has_pogo_cols = ! empty(
+        $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s LIMIT 1',
+                $wpdb->dbname,
+                $table,
+                'pokemon_regional_form_pogo_slug_fr'
+            )
+        )
+    );
 
     $touched = false;
 
@@ -1487,21 +1691,29 @@ function poke_hub_regions_ensure_core_regional_game_regions(): void {
         $aliases_json = wp_json_encode( $cfg['aliases'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
         if ( $id <= 0 ) {
-            $ok = $wpdb->insert(
-                $table,
-                [
-                    'slug'                                => $slug,
-                    'name_en'                             => $cfg['name_en'],
-                    'name_fr'                             => $cfg['name_fr'],
-                    'sort_order'                          => (int) $cfg['sort'],
-                    'pokemon_regional_form_name_en'       => $cfg['form_name_en'],
-                    'pokemon_regional_form_name_fr'       => $cfg['form_name_fr'],
-                    'pokemon_regional_form_slug'          => $cfg['form_slug'],
-                    'pokemon_regional_form_slug_aliases'   => $aliases_json,
-                    'extra'                               => '',
-                ],
-                [ '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ]
-            );
+            $insert_data = [
+                'slug'                               => $slug,
+                'name_en'                            => $cfg['name_en'],
+                'name_fr'                            => $cfg['name_fr'],
+                'sort_order'                         => (int) $cfg['sort'],
+                'pokemon_regional_form_name_en'      => $cfg['form_name_en'],
+                'pokemon_regional_form_name_fr'      => $cfg['form_name_fr'],
+                'pokemon_regional_form_slug'         => $cfg['form_slug'],
+                'pokemon_regional_form_slug_aliases' => $aliases_json,
+                'extra'                              => '',
+            ];
+            $insert_fmt = [ '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ];
+            if ( $has_pogo_cols ) {
+                $insert_data['pokemon_regional_form_pogo_slug_fr'] = isset( $cfg['pogo_slug_fr'] )
+                    ? poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $cfg['pogo_slug_fr'] )
+                    : '';
+                $insert_data['pokemon_regional_form_pogo_slug_en'] = isset( $cfg['pogo_slug_en'] )
+                    ? poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $cfg['pogo_slug_en'] )
+                    : '';
+                $insert_fmt[] = '%s';
+                $insert_fmt[] = '%s';
+            }
+            $ok = $wpdb->insert( $table, $insert_data, $insert_fmt );
             if ( $ok ) {
                 $touched = true;
             }
@@ -1518,16 +1730,24 @@ function poke_hub_regions_ensure_core_regional_game_regions(): void {
             continue;
         }
 
+        $update_data = [
+            'pokemon_regional_form_name_en'      => $cfg['form_name_en'],
+            'pokemon_regional_form_name_fr'      => $cfg['form_name_fr'],
+            'pokemon_regional_form_slug'         => $cfg['form_slug'],
+            'pokemon_regional_form_slug_aliases' => $aliases_json,
+        ];
+        $update_fmt  = [ '%s', '%s', '%s', '%s' ];
+        if ( $has_pogo_cols && isset( $cfg['pogo_slug_fr'], $cfg['pogo_slug_en'] ) ) {
+            $update_data['pokemon_regional_form_pogo_slug_fr'] = poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $cfg['pogo_slug_fr'] );
+            $update_data['pokemon_regional_form_pogo_slug_en'] = poke_hub_pokemon_regional_game_form_slug_sanitize_token( (string) $cfg['pogo_slug_en'] );
+            $update_fmt[]                                      = '%s';
+            $update_fmt[]                                      = '%s';
+        }
         $wpdb->update(
             $table,
-            [
-                'pokemon_regional_form_name_en'      => $cfg['form_name_en'],
-                'pokemon_regional_form_name_fr'      => $cfg['form_name_fr'],
-                'pokemon_regional_form_slug'         => $cfg['form_slug'],
-                'pokemon_regional_form_slug_aliases' => $aliases_json,
-            ],
+            $update_data,
             [ 'id' => $id ],
-            [ '%s', '%s', '%s', '%s' ],
+            $update_fmt,
             [ '%d' ]
         );
         $touched = true;

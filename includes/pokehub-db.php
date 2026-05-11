@@ -74,6 +74,20 @@ class Pokehub_DB {
             $this->createCollectionsTables();
         }
 
+        if (in_array('collections', $active_modules, true) || in_array('go-search-filters', $active_modules, true)) {
+            $this->createGoSearchFiltersTable();
+        }
+
+        // Table « Exceptions » des settings : toujours créée (indépendante des modules).
+        // Stocke les listes paramétrables (binary_sex_family, etc.) qui remplacent les
+        // listes en dur ; les modules consommateurs lisent via le filtre WP dédié.
+        if (function_exists('pokehub_settings_exceptions_install_table')) {
+            pokehub_settings_exceptions_install_table();
+            if (function_exists('pokehub_settings_exceptions_seed_defaults')) {
+                pokehub_settings_exceptions_seed_defaults();
+            }
+        }
+
         // Plus de global_egg_pools : les œufs (y compris pools globaux) sont dans content_eggs.
         // if (in_array('eggs', $active_modules, true)) { $this->createEggsTables(); }
     }
@@ -222,6 +236,8 @@ class Pokehub_DB {
             pokemon_regional_form_name_fr VARCHAR(120) NOT NULL DEFAULT '',
             pokemon_regional_form_slug VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Jeton principal espèce-/form_slug (paldea)',
             pokemon_regional_form_slug_aliases LONGTEXT NULL COMMENT 'JSON list alternate tokens [alolan]',
+            pokemon_regional_form_pogo_slug_fr VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Jeton recherche Pokémon GO (langue jeu FR)',
+            pokemon_regional_form_pogo_slug_en VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Jeton recherche Pokémon GO (langue jeu EN)',
             extra LONGTEXT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY slug (slug)
@@ -754,6 +770,12 @@ class Pokehub_DB {
         }
         if ( $needs( 'pokemon_regional_form_slug_aliases' ) ) {
             $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_slug_aliases` LONGTEXT NULL COMMENT 'JSON alias tokens' AFTER `pokemon_regional_form_slug`" );
+        }
+        if ( $needs( 'pokemon_regional_form_pogo_slug_fr' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_pogo_slug_fr` VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'GO search FR' AFTER `pokemon_regional_form_slug_aliases`" );
+        }
+        if ( $needs( 'pokemon_regional_form_pogo_slug_en' ) ) {
+            $wpdb->query( "ALTER TABLE `{$regions_table}` ADD COLUMN `pokemon_regional_form_pogo_slug_en` VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'GO search EN' AFTER `pokemon_regional_form_pogo_slug_fr`" );
         }
     }
 
@@ -2744,6 +2766,42 @@ class Pokehub_DB {
 
         dbDelta($sql_collections);
         dbDelta($sql_items);
+    }
+
+    /**
+     * Catalogue des filtres de recherche Pokémon GO (Pokémon, amis, etc.) — partagé collections + module dédié.
+     */
+    private function createGoSearchFiltersTable(): void {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+        $table           = pokehub_get_table('go_search_filters');
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $sql = "CREATE TABLE {$table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            code VARCHAR(64) NOT NULL,
+            filter_fr VARCHAR(191) NOT NULL DEFAULT '',
+            filter_en VARCHAR(191) NOT NULL DEFAULT '',
+            description_fr TEXT NULL,
+            description_en TEXT NULL,
+            scope_pokemon TINYINT(1) NOT NULL DEFAULT 1,
+            scope_friends TINYINT(1) NOT NULL DEFAULT 0,
+            use_in_collections TINYINT(1) NOT NULL DEFAULT 0,
+            is_system TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order SMALLINT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY code (code),
+            KEY scope_pokemon (scope_pokemon),
+            KEY scope_friends (scope_friends),
+            KEY use_in_collections (use_in_collections),
+            KEY sort_order (sort_order)
+        ) {$charset_collate};";
+
+        dbDelta($sql);
     }
 
     /**

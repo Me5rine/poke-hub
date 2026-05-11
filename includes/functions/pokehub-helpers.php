@@ -488,6 +488,8 @@ function pokehub_get_table(string $key): string {
         // ==== Tables locales Collections Pokémon GO ====
         'collections'                   => ['scope' => 'local', 'suffix' => 'collections'],
         'collection_items'              => ['scope' => 'local', 'suffix' => 'collection_items'],
+        /* Catalogue filtres GO : même préfixe local que Collections (pas le préfixe distant Pokémon). */
+        'go_search_filters'             => ['scope' => 'local', 'suffix' => 'go_search_filters'],
 
         // ==== Module Eggs (pools globaux) ====
         'global_egg_pools'              => ['scope' => 'local', 'suffix' => 'global_egg_pools'],
@@ -527,6 +529,10 @@ function pokehub_get_table(string $key): string {
 
         // ==== Catalogue des types de bonus (source de vérité sur le site principal) ====
         'bonus_types'                       => ['scope' => 'local', 'suffix' => 'bonus_types'],
+
+        // ==== Settings « Exceptions » (cas particuliers paramétrables) ====
+        // Ex: liste binary_sex_family (Pokémon clonés à l'import GM faute d'entrée dédiée).
+        'pokehub_settings_exceptions'       => ['scope' => 'local', 'suffix' => 'settings_exceptions'],
 
         // ==== Tables globales partagées (ME5RINE_LAB_GLOBAL_PREFIX) ====
         'user_profiles'                    => ['scope' => 'global', 'suffix' => 'pokehub_user_profiles'],

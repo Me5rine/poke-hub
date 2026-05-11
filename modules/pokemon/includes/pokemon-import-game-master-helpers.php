@@ -2285,10 +2285,15 @@ function poke_hub_pokemon_gm_duplicate_pokemon_attack_links_clone( int $source_i
 }
 
 /**
- * Après import GM : pour certaines espèces (binôme sexe GO sans lignes dédiées dans le GM),
- * assure *-family*, la fiche « nue » (♂) et *-female* avec les **mêmes stats / types / attaques** qu’un modèle choisi parmi lignes déjà présentes.
+ * Après import GM : pour certaines espèces rares où le GM n’expose toujours pas la
+ * structure *-family* / fiche nue / *-female* attendue par les collections, clone
+ * une fiche existante (mêmes stats / types / attaques).
  *
- * Cas initial : Hippopotas / Hippowdon — collections attendent la même structure que les autres familles sexuées.
+ * En pratique le GM fournit déjà NORMAL / FEMALE (ou MALE / FEMALE) pour la plupart
+ * des espèces dimorphiques (Frillish, Pyroar, Meowstic, Indeedee, Oinkologne…).
+ * Cette passe ne doit cibler que les vrais trous GM (ex. Hippopotas, Hippowdon,
+ * Unfezant), listés dans Réglages → Exceptions ; si une autre espèce manque,
+ * corriger l’import plutôt que d’étendre la liste.
  *
  * @param array<string, string> $tables
  * @param array<string, mixed>  $stats
@@ -2302,10 +2307,17 @@ function poke_hub_pokemon_gm_import_binary_sex_family_clone_pass( array $tables,
         return $stats;
     }
 
-    /** @var list<string> $protos */
+    /**
+     * Liste paramétrable (Réglages → Exceptions → binary_sex_family). Par défaut
+     * vide ici : la liste effective vient du filtre
+     * {@see pokehub_settings_exceptions_filter_binary_sex_family_clone_protos()}
+     * (table pré-remplie : Hippopotas, Hippowdon, Unfezant uniquement).
+     *
+     * @var list<string> $protos
+     */
     $protos = apply_filters(
         'poke_hub_pokemon_gm_binary_sex_family_clone_protos',
-        [ 'HIPPOPOTAS', 'HIPPOWDON' ]
+        []
     );
     if ( ! is_array( $protos ) || $protos === [] ) {
         return $stats;

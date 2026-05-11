@@ -7,21 +7,6 @@
     box-sizing: border-box;
 }
 
-.pokehub-collections-form.me5rine-lab-form-block > fieldset.me5rine-lab-form-block {
-    margin: 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    min-width: 0;
-}
-
-.pokehub-collections-form.me5rine-lab-form-block > fieldset.me5rine-lab-form-block:not(:first-of-type) {
-    border-top: 1px solid rgba(148, 163, 184, 0.45);
-    padding-top: 1rem;
-    margin-top: 1rem;
-}
-
 .pokehub-share-popover {
     position: fixed;
     inset: 0;

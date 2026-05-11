@@ -398,6 +398,15 @@ function poke_hub_pokemon_handle_regions_form() {
         ? wp_json_encode(array_values($alias_list), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
         : '';
 
+    $pogo_slug_fr_raw = isset($_POST['pokemon_regional_form_pogo_slug_fr']) ? (string) wp_unslash($_POST['pokemon_regional_form_pogo_slug_fr']) : '';
+    $pogo_slug_en_raw = isset($_POST['pokemon_regional_form_pogo_slug_en']) ? (string) wp_unslash($_POST['pokemon_regional_form_pogo_slug_en']) : '';
+    $pr_pogo_slug_fr  = function_exists('poke_hub_pokemon_regional_game_form_slug_sanitize_token')
+        ? poke_hub_pokemon_regional_game_form_slug_sanitize_token($pogo_slug_fr_raw)
+        : sanitize_title($pogo_slug_fr_raw);
+    $pr_pogo_slug_en = function_exists('poke_hub_pokemon_regional_game_form_slug_sanitize_token')
+        ? poke_hub_pokemon_regional_game_form_slug_sanitize_token($pogo_slug_en_raw)
+        : sanitize_title($pogo_slug_en_raw);
+
     // Au moins un nom requis
     if ($name_en === '' && $name_fr === '') {
         wp_redirect(add_query_arg('ph_msg', 'missing_name', $redirect_base));
@@ -413,16 +422,18 @@ function poke_hub_pokemon_handle_regions_form() {
     $slug = pokehub_unique_slug_for_table($table, $slug, $action === 'add_region' ? 0 : $id, 'slug', 'id', 'region');
 
     $data = [
-        'name_en'                             => $name_en,
-        'name_fr'                             => $name_fr,
-        'slug'                                => $slug,
-        'sort_order'                          => $sort_order,
-        'pokemon_regional_form_name_en'       => $pr_form_name_en,
-        'pokemon_regional_form_name_fr'       => $pr_form_name_fr,
-        'pokemon_regional_form_slug'          => $pr_form_slug,
-        'pokemon_regional_form_slug_aliases' => $aliases_json,
+        'name_en'                               => $name_en,
+        'name_fr'                               => $name_fr,
+        'slug'                                  => $slug,
+        'sort_order'                            => $sort_order,
+        'pokemon_regional_form_name_en'         => $pr_form_name_en,
+        'pokemon_regional_form_name_fr'         => $pr_form_name_fr,
+        'pokemon_regional_form_slug'            => $pr_form_slug,
+        'pokemon_regional_form_slug_aliases'     => $aliases_json,
+        'pokemon_regional_form_pogo_slug_fr'    => $pr_pogo_slug_fr,
+        'pokemon_regional_form_pogo_slug_en'    => $pr_pogo_slug_en,
     ];
-    $format = ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s'];
+    $format = ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s'];
 
     if ($action === 'add_region') {
         $wpdb->insert($table, $data, $format);

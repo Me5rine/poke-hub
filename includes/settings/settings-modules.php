@@ -25,7 +25,8 @@ function poke_hub_get_modules_config(): array {
         'games'         => ['path' => 'games/games.php',          'label' => 'Games'],
         'eggs'          => ['path' => 'eggs/eggs.php',            'label' => 'Eggs'],
         'blocks'        => ['path' => 'blocks/blocks.php',        'label' => 'Blocks'],
-        'collections'   => ['path' => 'collections/collections.php', 'label' => 'Pokémon GO Collections'],
+        'collections'         => ['path' => 'collections/collections.php', 'label' => 'Pokémon GO Collections'],
+        'go-search-filters'    => ['path' => 'go-search-filters/go-search-filters.php', 'label' => 'GO search filters catalogue'],
         'shop-items'      => ['path' => 'shop-items/shop-items.php', 'label' => 'Avatar shop items'],
     ];
 }

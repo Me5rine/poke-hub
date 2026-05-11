@@ -21,6 +21,7 @@ define('POKE_HUB_COLLECTIONS_PATH', __DIR__);
 define('POKE_HUB_COLLECTIONS_URL', POKE_HUB_URL . 'modules/collections/');
 
 require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-helpers.php';
+require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-pogo-keywords.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-pages.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-routing.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-shortcode.php';
@@ -43,6 +44,10 @@ function poke_hub_collections_enqueue_front_assets() {
     }
     do_action('poke_hub_collections_enqueue_assets');
 
+    if (function_exists('poke_hub_go_search_filters_ensure_table')) {
+        poke_hub_go_search_filters_ensure_table();
+    }
+
     /* Même variables que les notices (notice-sucess, notice-warning) → global-colors.css en dépendance */
     poke_hub_enqueue_bundled_front_style('poke-hub-global-colors', 'global-colors.css', []);
     poke_hub_enqueue_bundled_front_style('poke-hub-collections-front', 'poke-hub-collections-front.css', [
@@ -62,7 +67,8 @@ function poke_hub_collections_enqueue_front_assets() {
         : '';
 
     wp_localize_script('poke-hub-collections-front', 'pokeHubCollections', [
-        'ajaxUrl'    => admin_url('admin-ajax.php'),
+        'pogoSearchKeywords' => poke_hub_collections_get_pogo_search_keywords(),
+        'ajaxUrl'            => admin_url('admin-ajax.php'),
         'restUrl'    => rest_url('poke-hub/v1/'),
         'nonce'      => wp_create_nonce('wp_rest'),
         'isLoggedIn' => is_user_logged_in(),

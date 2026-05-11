@@ -3,7 +3,7 @@
 Plugin Name: Poké HUB
 Plugin URI: https://poke-hub.fr
 Description: Plugin modulaire pour le site Poké HUB (Pokémon GO, Pokédex, événements, actualités, outils...).
-Version: 2.6.9
+Version: 2.7.0
 Author: Me5rine
 Author URI: https://me5rine.com
 Text Domain: poke-hub
@@ -45,9 +45,11 @@ require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-encryption.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-modules.php';
 require_once POKE_HUB_INCLUDES_DIR . 'settings/settings-module-hooks.php';
+require_once POKE_HUB_INCLUDES_DIR . 'settings/pokehub-settings-exceptions.php';
 require_once POKE_HUB_INCLUDES_DIR . 'admin-ui.php';
 require_once POKE_HUB_INCLUDES_DIR . 'admin/event-picker.php';
 require_once POKE_HUB_INCLUDES_DIR . 'pokehub-db.php';
+require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-go-search-filters.php';
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-backgrounds-helpers.php';
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-form-variant-helpers.php';
 require_once POKE_HUB_INCLUDES_DIR . 'functions/pokehub-events-public-helpers.php';
@@ -298,6 +300,7 @@ function poke_hub_admin_pages() {
         'poke-hub-pokemon',
         'poke-hub-events',
         'poke-hub-collections',
+        'poke-hub-go-tools',
         'poke-hub-user-profiles',
         'poke-hub-games',
         'poke-hub-bonus-types',
@@ -314,10 +317,7 @@ function poke_hub_admin_pages() {
  * Groupes de sous-menus (si tu ajoutes des écrans enfants plus tard)
  */
 function poke_hub_submenu_groups() {
-    return [
-        // exemple plus tard si tu as plusieurs écrans pour un même item
-        // 'poke-hub-pokemon' => ['poke-hub-pokemon', 'poke-hub-pokemon-edit'],
-    ];
+    return [];
 }
 
 // Screen options pour la page Pokémon (hook "load-<screen_id>")
@@ -479,6 +479,8 @@ function poke_hub_enqueue_admin_unified_styles($hook) {
         'poke-hub-settings',
         'poke-hub-pokemon',
         'poke-hub-events',
+        'poke-hub-collections',
+        'poke-hub-go-tools',
         'poke-hub-user-profiles',
         'poke-hub-games',
         'poke-hub-bonus-types',

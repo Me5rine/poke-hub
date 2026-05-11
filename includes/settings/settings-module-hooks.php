@@ -127,6 +127,18 @@ add_action('poke_hub_shop-items_module_activated', static function (): void {
     }
 }, 5);
 
+add_action('poke_hub_collections_module_activated', static function (): void {
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['collections']);
+    }
+}, 5);
+
+add_action('poke_hub_go-search-filters_module_activated', static function (): void {
+    if (function_exists('pokehub_install_tables_for_modules')) {
+        pokehub_install_tables_for_modules(['go-search-filters']);
+    }
+}, 5);
+
 /**
  * Vérification / création des tables pour les modules qui en ont besoin.
  * Même méthode que Me5rine LAB :
@@ -266,6 +278,11 @@ add_action('admin_init', function () {
         'collections' => [
             pokehub_get_table('collections'),
             pokehub_get_table('collection_items'),
+            pokehub_get_table('go_search_filters'),
+        ],
+
+        'go-search-filters' => [
+            pokehub_get_table('go_search_filters'),
         ],
 
         'bonus' => [
