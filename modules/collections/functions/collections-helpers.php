@@ -1441,7 +1441,7 @@ function poke_hub_collections_row_passes_pool_release_filter(array $row, string 
         if ($release_context === 'normal' && $is_forces_var) {
             return (bool) apply_filters(
                 'poke_hub_collections_forces_dual_passes_release_empty_extra',
-                true,
+                false,
                 $row,
                 $release_context,
                 $opts
@@ -1503,7 +1503,7 @@ function poke_hub_collections_row_passes_pool_release_filter(array $row, string 
 
         return (bool) apply_filters(
             'poke_hub_collections_forces_dual_passes_release_fallback',
-            true,
+            false,
             $row,
             $release_context,
             $opts,
@@ -6083,7 +6083,9 @@ function poke_hub_collections_apply_sex_collector_pool(array $rows, array $opts)
             $out[] = $row;
             continue;
         }
-        $use_gender_asset = !$is_gigamax_row && !empty($profile['has_gender_dimorphism']);
+        // Si l'utilisateur demande explicitement « mâle et femelle (GO) », on veut différencier les assets ♂/♀.
+        // Le profil Pokémon peut ne pas déclarer `has_gender_dimorphism` mais on génère quand même les deux lignes synthétiques.
+        $use_gender_asset = !$is_gigamax_row && (!empty($profile['has_gender_dimorphism']) || !empty($opts['include_both_sexes_collector']));
         $m = poke_hub_collections_sex_synthetic_row_from_base($row, 'male', $base_id, $use_gender_asset);
         $f = poke_hub_collections_sex_synthetic_row_from_base($row, 'female', $base_id, $use_gender_asset);
         if ($m !== null) {
