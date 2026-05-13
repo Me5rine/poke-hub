@@ -68,10 +68,10 @@
         return out;
     }
 
-    function pokehubCollectionsI18n(key, fallback) {
+    function pokehubCollectionsI18n(key) {
         var pack = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
         var v = pack[key];
-        return (typeof v === 'string' && v !== '') ? v : (fallback || '');
+        return (typeof v === 'string' && v !== '') ? v : '';
     }
 
     function pokehubCloseSharePopover(pop) {
@@ -87,14 +87,14 @@
         if (url) {
             var img = document.createElement('img');
             img.src = url;
-            img.alt = pokehubCollectionsI18n('shareCoverAlt', 'Collection cover image');
+            img.alt = pokehubCollectionsI18n('shareCoverAlt');
             img.className = 'pokehub-share-popover__cover-img';
             img.referrerPolicy = 'no-referrer';
             mount.appendChild(img);
         } else {
             var pEl = document.createElement('p');
             pEl.className = 'me5rine-lab-form-hint pokehub-share-popover__cover-empty';
-            pEl.textContent = pokehubCollectionsI18n('shareCoverEmpty', '');
+            pEl.textContent = pokehubCollectionsI18n('shareCoverEmpty');
             mount.appendChild(pEl);
         }
     }
@@ -111,6 +111,69 @@
         try {
             localStorage.setItem(offlineItemsStorageKey, JSON.stringify(map || {}));
         } catch (e) {}
+    }
+
+    /** Collections créées sans compte (REST, même IP) + éventuelles entrées purement localStorage. */
+    var guestAnonymousByIpList = [];
+    var guestAnonymousByIpFetched = false;
+    var guestAnonymousByIpFetchPromise = null;
+
+    function pokehubGuestLocalStorageCollections() {
+        try {
+            var raw = localStorage.getItem(storageKey);
+            var arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e2) {
+            return [];
+        }
+    }
+
+    function pokehubGuestLocalStorageCollectionsCount() {
+        var arr = pokehubGuestLocalStorageCollections();
+        var n = 0;
+        for (var i = 0; i < arr.length; i++) {
+            var c = arr[i];
+            if (!c || c.id === undefined || c.id === null) {
+                continue;
+            }
+            if (String(c.id).replace(/\s/g, '') === '') {
+                continue;
+            }
+            n++;
+        }
+        return n;
+    }
+
+    function pokehubEnsureGuestAnonymousByIpFetched() {
+        if (typeof pokeHubCollections === 'undefined' || pokeHubCollections.isLoggedIn) {
+            guestAnonymousByIpFetched = true;
+            return Promise.resolve(guestAnonymousByIpList);
+        }
+        if (guestAnonymousByIpFetched) {
+            return Promise.resolve(guestAnonymousByIpList);
+        }
+        if (!guestAnonymousByIpFetchPromise) {
+            guestAnonymousByIpFetchPromise = fetch(pokeHubCollections.restUrl + 'collections/anonymous-by-ip', {
+                headers: pokeHubCollections.nonce ? { 'X-WP-Nonce': pokeHubCollections.nonce } : {},
+                credentials: 'same-origin',
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (list) {
+                    guestAnonymousByIpList = Array.isArray(list) ? list : [];
+                    guestAnonymousByIpFetched = true;
+                    return guestAnonymousByIpList;
+                })
+                .catch(function () {
+                    guestAnonymousByIpList = [];
+                    guestAnonymousByIpFetched = true;
+                    return guestAnonymousByIpList;
+                });
+        }
+        return guestAnonymousByIpFetchPromise;
+    }
+
+    function pokehubGuestHasAnyCollectionWithoutAccount() {
+        return guestAnonymousByIpList.length > 0 || pokehubGuestLocalStorageCollectionsCount() > 0;
     }
 
     /**
@@ -703,7 +766,43 @@
     }
 
     if (btnCreate) {
-        btnCreate.addEventListener('click', openCreateDrawer);
+        btnCreate.addEventListener('click', function (ev) {
+            if (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.isLoggedIn) {
+                openCreateDrawer();
+                return;
+            }
+            ev.preventDefault();
+            pokehubEnsureGuestAnonymousByIpFetched().then(function () {
+                if (pokehubGuestHasAnyCollectionWithoutAccount()) {
+                    var blocked = document.getElementById('pokehub-collections-guest-create-blocked');
+                    if (blocked) {
+                        blocked.hidden = false;
+                        try {
+                            blocked.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        } catch (eScroll) {
+                            blocked.scrollIntoView(true);
+                        }
+                    } else {
+                        window.alert(
+                            pokehubCollectionsI18n('guestSecondCollectionTitle')
+                                + '\n\n'
+                                + pokehubCollectionsI18n('guestSecondCollectionBody')
+                        );
+                    }
+                    return;
+                }
+                openCreateDrawer();
+            });
+        });
+    }
+    var guestCreateBlockedDismiss = document.querySelector('.pokehub-collections-guest-create-blocked-dismiss');
+    if (guestCreateBlockedDismiss) {
+        guestCreateBlockedDismiss.addEventListener('click', function () {
+            var blocked = document.getElementById('pokehub-collections-guest-create-blocked');
+            if (blocked) {
+                blocked.hidden = true;
+            }
+        });
     }
     if (btnCancel) {
         btnCancel.addEventListener('click', closeCreateDrawer);
@@ -732,6 +831,75 @@
     var POKEHUB_COLLECTIONS_CAT_ALL_POKEMON = 'all_pokemon';
     var POKEHUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE = 'pogo_geo_exclusive';
     var POKEHUB_COLLECTIONS_CAT_BABIES_ONLY = 'babies_only';
+
+    function pokehubResolveCreateCollectionDisplayName(form) {
+        var nm = form && typeof form.name === 'string' ? form.name.trim() : '';
+        if (nm !== '') {
+            return nm;
+        }
+        var cat = form && form.category ? form.category : '';
+        var i18n = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.i18n) ? pokeHubCollections.i18n : {};
+        if (cat === 'shiny') {
+            return i18n.collectionDefaultNameShiny || 'My Shinies';
+        }
+        if (cat === POKEHUB_COLLECTIONS_CAT_ALL_POKEMON) {
+            return i18n.collectionDefaultNameAllPokemon || 'My full collection';
+        }
+        if (cat === POKEHUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE) {
+            return i18n.collectionDefaultNameGoRegional || 'Pokémon GO regionals';
+        }
+        if (cat === POKEHUB_COLLECTIONS_CAT_BABIES_ONLY) {
+            return i18n.collectionDefaultNameBabies || 'Baby Pokémon';
+        }
+        if (cat === 'lucky') {
+            return i18n.collectionDefaultNameLucky || 'Lucky Pokémon';
+        }
+        if (cat === 'mega') {
+            return i18n.collectionDefaultNameMega || 'Mega & Primal';
+        }
+        if (cat === 'legendary_mythical_ultra') {
+            return i18n.collectionDefaultNameLegendaryMythicalUltra || 'Legendary, Mythical & Ultra Beasts';
+        }
+        if (cat === 'lucky_dex') {
+            return i18n.collectionDefaultNameLuckyDex || 'Lucky National Dex';
+        }
+        return i18n.collectionDefaultNameFallback || 'My collection';
+    }
+
+    /**
+     * Invité hors ligne : enregistre la liste dans localStorage et ouvre la vue locale.
+     * @param {{ name: string, category: string, options: object }} form
+     */
+    function pokehubGuestOfflineCreatePersistAndRedirect(form) {
+        var name = pokehubResolveCreateCollectionDisplayName(form);
+        var rid = 'local-' + String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
+        var rec = {
+            id: rid,
+            name: name,
+            category: (form && form.category) ? form.category : 'custom',
+            options: form && form.options && typeof form.options === 'object' ? form.options : {},
+            items: {},
+        };
+        try {
+            var raw = localStorage.getItem(storageKey);
+            var arr = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(arr)) {
+                arr = [];
+            }
+            arr.push(rec);
+            localStorage.setItem(storageKey, JSON.stringify(arr));
+        } catch (e) {
+            window.alert(pokehubCollectionsI18n('offlineLocalSaveFailed'));
+            return;
+        }
+        closeCreateDrawer();
+        var baseRaw = (typeof pokeHubCollections !== 'undefined' && pokeHubCollections.collectionsBaseUrl) ? pokeHubCollections.collectionsBaseUrl : '';
+        var base = String(baseRaw).replace(/\/$/, '');
+        if (!base) {
+            base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+        }
+        window.location.href = base + '?local=1&collection=' + encodeURIComponent(rid);
+    }
 
     function pokehubSyncCollectionCreateWizard() {
         var presetEl = document.getElementById('pokehub-collection-preset');
@@ -930,11 +1098,18 @@
         btnCreateSubmit.addEventListener('click', function () {
             var presetEl = document.getElementById('pokehub-collection-preset');
             if (presetEl && !presetEl.value) {
-                window.alert(pokehubCollectionsI18n('selectListPresetRequired', 'Please select a list preset.'));
+                window.alert(pokehubCollectionsI18n('selectListPresetRequired'));
                 return;
             }
             var form = getCreateFormData();
             var isLoggedIn = typeof pokeHubCollections !== 'undefined' && pokeHubCollections.isLoggedIn;
+            var resolvedName = pokehubResolveCreateCollectionDisplayName(form);
+
+            // Hors ligne détecté : pas d’appel réseau pour un invité (création locale uniquement).
+            if (!isLoggedIn && typeof navigator !== 'undefined' && navigator.onLine === false) {
+                pokehubGuestOfflineCreatePersistAndRedirect(form);
+                return;
+            }
 
             // Création via API (connecté ou anonyme) : même URL avec token
             var headers = { 'Content-Type': 'application/json' };
@@ -945,35 +1120,7 @@
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({
-                    name: form.name || (function () {
-                        var cat = form.category;
-                        var i18n = pokeHubCollections && pokeHubCollections.i18n ? pokeHubCollections.i18n : {};
-                        if (cat === 'shiny') {
-                            return i18n.collectionDefaultNameShiny || 'My Shinies';
-                        }
-                        if (cat === POKEHUB_COLLECTIONS_CAT_ALL_POKEMON) {
-                            return i18n.collectionDefaultNameAllPokemon || 'My full collection';
-                        }
-                        if (cat === POKEHUB_COLLECTIONS_CAT_POGO_GEO_EXCLUSIVE) {
-                            return i18n.collectionDefaultNameGoRegional || 'Pokémon GO regionals';
-                        }
-                        if (cat === POKEHUB_COLLECTIONS_CAT_BABIES_ONLY) {
-                            return i18n.collectionDefaultNameBabies || 'Baby Pokémon';
-                        }
-                        if (cat === 'lucky') {
-                            return i18n.collectionDefaultNameLucky || 'Lucky Pokémon';
-                        }
-                        if (cat === 'mega') {
-                            return i18n.collectionDefaultNameMega || 'Mega & Primal';
-                        }
-                        if (cat === 'legendary_mythical_ultra') {
-                            return i18n.collectionDefaultNameLegendaryMythicalUltra || 'Legendary, Mythical & Ultra Beasts';
-                        }
-                        if (cat === 'lucky_dex') {
-                            return i18n.collectionDefaultNameLuckyDex || 'Lucky National Dex';
-                        }
-                        return i18n.collectionDefaultNameFallback || 'My collection';
-                    }()),
+                    name: resolvedName,
                     category: form.category,
                     options: form.options,
                     is_public: isLoggedIn ? form.is_public : false,
@@ -997,11 +1144,15 @@
                         closeCreateDrawer();
                         window.location.reload();
                     } else {
-                        window.alert(data.message || pokehubCollectionsI18n('genericError', 'Something went wrong.'));
+                        window.alert(data.message || pokehubCollectionsI18n('genericError'));
                     }
                 })
                 .catch(function () {
-                    window.alert(pokehubCollectionsI18n('networkError', 'Network error. Try again.'));
+                    if (!isLoggedIn) {
+                        pokehubGuestOfflineCreatePersistAndRedirect(form);
+                        return;
+                    }
+                    window.alert(pokehubCollectionsI18n('networkError'));
                 });
         });
     }
@@ -1265,12 +1416,12 @@
                 .catch(function () {
                     var tilesEl = localWrap.querySelector('.pokehub-collection-tiles-local');
                     if (tilesEl) {
-                        tilesEl.innerHTML = '<p class="pokehub-collections-not-found">' + pokehubCollectionsI18n('loadPoolFailed', 'Could not load the Pokémon list.') + '</p>';
+                        tilesEl.innerHTML = '<p class="pokehub-collections-not-found">' + pokehubCollectionsI18n('loadPoolFailed') + '</p>';
                     }
                 });
         } else {
-            localWrap.querySelector('.pokehub-collection-local-title').textContent = pokehubCollectionsI18n('collectionNotFoundTitle', 'Collection not found');
-            localWrap.querySelector('.pokehub-collection-tiles-local').innerHTML = '<p class="pokehub-collections-not-found">' + pokehubCollectionsI18n('localCollectionMissing', 'This local collection could not be found.') + '</p>';
+            localWrap.querySelector('.pokehub-collection-local-title').textContent = pokehubCollectionsI18n('collectionNotFoundTitle');
+            localWrap.querySelector('.pokehub-collection-tiles-local').innerHTML = '<p class="pokehub-collections-not-found">' + pokehubCollectionsI18n('localCollectionMissing') + '</p>';
         }
     }
 
@@ -1315,12 +1466,12 @@
                     var shareUrl = collectionVw.getAttribute('data-share-url') || window.location.href;
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(shareUrl).then(function () {
-                            window.alert(pokehubCollectionsI18n('linkCopied', 'Link copied to clipboard.'));
+                            window.alert(pokehubCollectionsI18n('linkCopied'));
                         }).catch(function () {
-                            window.prompt(pokehubCollectionsI18n('copyLinkManually', 'Copy this link:'), shareUrl);
+                            window.prompt(pokehubCollectionsI18n('copyLinkManually'), shareUrl);
                         });
                     } else {
-                        window.prompt(pokehubCollectionsI18n('copyLinkManually', 'Copy this link:'), shareUrl);
+                        window.prompt(pokehubCollectionsI18n('copyLinkManually'), shareUrl);
                     }
                 }
             });
@@ -1474,11 +1625,11 @@
                         closeDrawer();
                         window.location.reload();
                     } else {
-                        window.alert(data.message || pokehubCollectionsI18n('genericError', 'Something went wrong.'));
+                        window.alert(data.message || pokehubCollectionsI18n('genericError'));
                     }
                 })
                 .catch(function () {
-                    window.alert(pokehubCollectionsI18n('networkError', 'Network error. Try again.'));
+                    window.alert(pokehubCollectionsI18n('networkError'));
                 });
         });
     }
@@ -1502,11 +1653,11 @@
                             if (data.success) {
                                 window.location.reload();
                             } else {
-                                window.alert(data.message || pokehubCollectionsI18n('genericError', 'Something went wrong.'));
+                                window.alert(data.message || pokehubCollectionsI18n('genericError'));
                             }
                         })
                         .catch(function () {
-                            window.alert(pokehubCollectionsI18n('networkError', 'Network error. Try again.'));
+                            window.alert(pokehubCollectionsI18n('networkError'));
                         });
                 });
             });
@@ -1521,7 +1672,7 @@
             || viewWrap.querySelector('.pokehub-collection-view-title');
         var viewCollectionName = viewWrap.getAttribute('data-edit-name') || (viewTitleEl ? viewTitleEl.textContent : '') || '';
         btnDeleteCollection.addEventListener('click', function () {
-            var delMsg = pokehubCollectionsI18n('deleteCollectionConfirm', 'Delete this collection? This cannot be undone.').replace('%s', viewCollectionName);
+            var delMsg = pokehubCollectionsI18n('deleteCollectionConfirm').replace('%s', viewCollectionName);
             if (!viewCollectionId || !window.confirm(delMsg)) {
                 return;
             }
@@ -1536,11 +1687,11 @@
                         var path = window.location.pathname.replace(/\/[^/]+$/, '') || '/';
                         window.location.href = window.location.origin + path;
                     } else {
-                        window.alert(data.message || pokehubCollectionsI18n('genericError', 'Something went wrong.'));
+                        window.alert(data.message || pokehubCollectionsI18n('genericError'));
                     }
                 })
                 .catch(function () {
-                    window.alert(pokehubCollectionsI18n('networkError', 'Network error. Try again.'));
+                    window.alert(pokehubCollectionsI18n('networkError'));
                 });
         });
     }
@@ -1554,7 +1705,7 @@
             e.preventDefault();
             var id = btn.getAttribute('data-collection-id');
             var name = btn.getAttribute('data-collection-name') || '';
-            var delConfirm = pokehubCollectionsI18n('deleteCollectionConfirm', 'Delete this collection? This cannot be undone.').replace('%s', name);
+            var delConfirm = pokehubCollectionsI18n('deleteCollectionConfirm').replace('%s', name);
             if (!id || !window.confirm(delConfirm)) {
                 return;
             }
@@ -1570,13 +1721,95 @@
                     if (data.success) {
                         window.location.reload();
                     } else {
-                        window.alert(data.message || pokehubCollectionsI18n('genericError', 'Something went wrong.'));
+                        window.alert(data.message || pokehubCollectionsI18n('genericError'));
                     }
                 })
                 .catch(function () {
-                    window.alert(pokehubCollectionsI18n('networkError', 'Network error. Try again.'));
+                    window.alert(pokehubCollectionsI18n('networkError'));
                 });
         });
+    }
+
+    // Tableau invité : listes sans compte (même IP serveur + éventuel localStorage)
+    if (listWrap && typeof pokeHubCollections !== 'undefined' && listWrap.getAttribute('data-logged-in') === '0') {
+        function pokehubCategoryLabelGuest(cat) {
+            var labels = pokeHubCollections.categoryLabels || {};
+            var k = cat != null ? String(cat) : '';
+            if (labels[k] !== undefined && labels[k] !== null && String(labels[k]) !== '') {
+                return String(labels[k]);
+            }
+            return k;
+        }
+        function pokehubRenderGuestCollectionsDashboard() {
+            var grid = document.getElementById('pokehub-collections-guest-grid');
+            var loading = document.getElementById('pokehub-collections-guest-loading');
+            var emptyAll = document.getElementById('pokehub-collections-guest-empty-all');
+            if (!grid) {
+                return;
+            }
+            var baseRaw = pokeHubCollections.collectionsBaseUrl || '';
+            var base = baseRaw.replace(/\/$/, '');
+            if (!base) {
+                base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+            }
+            grid.innerHTML = '';
+            guestAnonymousByIpList.forEach(function (c) {
+                var tok = (c.share_token && String(c.share_token).replace(/[^a-zA-Z0-9]/g, '')) || '';
+                if (!tok) {
+                    return;
+                }
+                var viewUrl = base + '/' + tok;
+                var li = document.createElement('li');
+                li.className = 'me5rine-lab-card pokehub-collections-guest-card';
+                var a = document.createElement('a');
+                a.href = viewUrl;
+                a.className = 'pokehub-collections-card-link';
+                var spName = document.createElement('span');
+                spName.className = 'me5rine-lab-card-name';
+                spName.textContent = c.name || pokehubCollectionsI18n('unnamedCollection');
+                var spMeta = document.createElement('span');
+                spMeta.className = 'me5rine-lab-card-meta';
+                spMeta.textContent = pokehubCategoryLabelGuest(c.category);
+                a.appendChild(spName);
+                a.appendChild(spMeta);
+                li.appendChild(a);
+                grid.appendChild(li);
+            });
+            pokehubGuestLocalStorageCollections().forEach(function (c) {
+                if (!c || c.id === undefined || c.id === null) {
+                    return;
+                }
+                var id = String(c.id);
+                if (!id) {
+                    return;
+                }
+                var viewUrl = base + '?local=1&collection=' + encodeURIComponent(id);
+                var li = document.createElement('li');
+                li.className = 'me5rine-lab-card pokehub-collections-guest-card pokehub-collections-guest-card--local';
+                var a = document.createElement('a');
+                a.href = viewUrl;
+                a.className = 'pokehub-collections-card-link';
+                var spName = document.createElement('span');
+                spName.className = 'me5rine-lab-card-name';
+                spName.textContent = (c.name && String(c.name)) || pokehubCollectionsI18n('unnamedCollection');
+                var spMeta = document.createElement('span');
+                spMeta.className = 'me5rine-lab-card-meta';
+                spMeta.textContent = pokehubCollectionsI18n('guestLocalBadge');
+                a.appendChild(spName);
+                a.appendChild(spMeta);
+                li.appendChild(a);
+                grid.appendChild(li);
+            });
+            var n = grid.children.length;
+            if (loading) {
+                loading.hidden = true;
+            }
+            if (emptyAll) {
+                emptyAll.hidden = n > 0;
+            }
+            grid.hidden = n === 0;
+        }
+        pokehubEnsureGuestAnonymousByIpFetched().then(pokehubRenderGuestCollectionsDashboard);
     }
 
     // Select2 : manquants → possédé ou à échanger (mode liste + select)
@@ -1660,7 +1893,7 @@
                 })
                     .then(function () { done++; next(); })
                     .catch(function () {
-                        window.alert(pokehubCollectionsI18n('batchAddError', 'Could not add Pokémon. Try again.'));
+                        window.alert(pokehubCollectionsI18n('batchAddError'));
                         if (triggerBtn) triggerBtn.disabled = false;
                     });
             }
@@ -1696,21 +1929,15 @@
             var n = list.length;
             var msg;
             if (n === 1) {
-                msg = pokehubCollectionsI18n(
-                    'anonymousBannerOne',
-                    'A collection was created from this connection (this device). Do you want to add it to your account?'
-                );
+                msg = pokehubCollectionsI18n('anonymousBannerOne');
             } else {
-                msg = pokehubCollectionsI18n(
-                    'anonymousBannerMany',
-                    '%d collections were created from this connection. Do you want to add them to your account?'
-                ).replace('%d', String(n));
+                msg = pokehubCollectionsI18n('anonymousBannerMany').replace('%d', String(n));
             }
             bannerText.textContent = msg;
             bannerList.innerHTML = '';
             list.forEach(function (c) {
                 var li = document.createElement('li');
-                li.textContent = c.name || pokehubCollectionsI18n('unnamedCollection', 'Untitled collection');
+                li.textContent = c.name || pokehubCollectionsI18n('unnamedCollection');
                 bannerList.appendChild(li);
             });
             banner.classList.remove('is-hidden');

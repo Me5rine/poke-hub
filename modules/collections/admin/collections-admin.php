@@ -185,7 +185,7 @@ class Poke_Hub_Collections_Admin_List_Table extends WP_List_Table {
         return sprintf(
             '<span class="poke-hub-col-owner poke-hub-col-owner--anon"><strong>%s</strong>%s%s</span>',
             esc_html__('Anonymous', 'poke-hub'),
-            $ip !== '' ? '<br><span class="description">IP&nbsp;: ' . esc_html($ip) . '</span>' : '',
+            $ip !== '' ? '<br><span class="description">' . esc_html__('IP:', 'poke-hub') . ' ' . esc_html($ip) . '</span>' : '',
             $hint
         );
     }

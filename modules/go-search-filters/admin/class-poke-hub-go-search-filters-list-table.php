@@ -130,7 +130,7 @@ class Poke_Hub_Go_Search_Filters_List_Table extends WP_List_Table {
             $scopes[] = __('Friends', 'poke-hub');
         }
 
-        return esc_html(implode(', ', $scopes !== [] ? $scopes : ['—']));
+        return esc_html(implode(', ', $scopes !== [] ? $scopes : [__('—', 'poke-hub')]));
     }
 
     public function column_use_in_collections(array $item): string {

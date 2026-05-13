@@ -1327,6 +1327,49 @@ function poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs(array $slu
 }
 
 /**
+ * Portée de l’aperçu admin des sprites pour une famille sexe binaire (même n° Pokédex).
+ *
+ * - quad : fiche *-family* → montrer ♂/♀ × normal/shiny.
+ * - male|female : fiche *-male*, *-female*, ou slug « nu » jumelé → une seule paire normal/shiny pour ce sexe.
+ *
+ * @param list<string> $slugs_lc Slugs distincts du n° (voir {@see poke_hub_pokemon_binary_sex_family_slugs_for_dex()}).
+ * @return ''|'quad'|'male'|'female'
+ */
+function poke_hub_pokemon_binary_sex_family_admin_sprite_preview_scope(string $slug_lc, array $slugs_lc): string {
+    $slug_lc = strtolower(trim($slug_lc));
+    if ($slug_lc === '' || !poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($slugs_lc)) {
+        return '';
+    }
+    if (preg_match('/-family$/', $slug_lc)) {
+        return 'quad';
+    }
+    if (preg_match('/-female$/', $slug_lc)) {
+        return 'female';
+    }
+    if (preg_match('/-male$/', $slug_lc)) {
+        return 'male';
+    }
+    $stem = poke_hub_pokemon_binary_sex_family_stem_from_slug_lc($slug_lc);
+    if ($stem === null || $stem === '') {
+        return '';
+    }
+    if ($slug_lc !== $stem) {
+        return '';
+    }
+    $has_b = in_array($stem, $slugs_lc, true);
+    $has_f = in_array($stem . '-female', $slugs_lc, true);
+    $has_m = in_array($stem . '-male', $slugs_lc, true);
+    if ($has_b && $has_f && !$has_m) {
+        return 'male';
+    }
+    if ($has_b && $has_m && !$has_f) {
+        return 'female';
+    }
+
+    return '';
+}
+
+/**
  * Slug à utiliser dans la construction de clé de fichier pour une colonne d’aperçu admin ♂/♀ (familles sexe).
  *
  * @param list<string> $slugs_lc

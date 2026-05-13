@@ -776,8 +776,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                 <?php foreach ($form_variant_labels as $variant_id => $data) : ?>
                                     <option value="<?php echo (int) $variant_id; ?>" <?php selected($form_variant_id, (int) $variant_id); ?>>
                                         <?php
-                                        $slug = isset($data['form_slug']) ? (string) $data['form_slug'] : '';
-                                        echo esc_html($slug !== '' ? $data['label'] . ' — ' . $slug : $data['label']);
+                                        $variant_opt_slug = isset($data['form_slug']) ? (string) $data['form_slug'] : '';
+                                        echo esc_html($variant_opt_slug !== '' ? $data['label'] . ' — ' . $variant_opt_slug : $data['label']);
                                         ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -824,6 +824,9 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
         $show_binary_sex_family_sprite_preview = $dex_for_bin_preview > 0
             && function_exists('poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs')
             && poke_hub_pokemon_binary_sex_family_pattern_present_for_slugs($bin_slugs_preview);
+        $bin_sprite_preview_scope = ($show_binary_sex_family_sprite_preview && function_exists('poke_hub_pokemon_binary_sex_family_admin_sprite_preview_scope'))
+            ? poke_hub_pokemon_binary_sex_family_admin_sprite_preview_scope(strtolower(trim((string) $slug)), $bin_slugs_preview)
+            : '';
 
         if ($show_sprite_preview) :
             $preview_pokemon = (object) [
@@ -837,8 +840,12 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
             <h2><?php esc_html_e('Sprite preview', 'poke-hub'); ?></h2>
             <p class="description">
                 <?php
-                if ($show_binary_sex_family_sprite_preview && !$has_gender_dimorphism) {
-                    esc_html_e('Même règle que le front pour les familles à sexes : un slug sans −male/−female peut cibler les fichiers −male ou −female selon les autres fiches du même n° national.', 'poke-hub');
+                if ($has_gender_dimorphism) {
+                    esc_html_e('Preview of sprites from your configured Pokémon asset base URL: normal and shiny. If gender dimorphism is enabled, male and female variants are shown.', 'poke-hub');
+                } elseif ($show_binary_sex_family_sprite_preview && $bin_sprite_preview_scope === 'quad') {
+                    esc_html_e('Binary sex family (placeholder row): preview shows all four sprites (male and female, normal and shiny). Individual forms only show their own sex below.', 'poke-hub');
+                } elseif ($show_binary_sex_family_sprite_preview && ($bin_sprite_preview_scope === 'male' || $bin_sprite_preview_scope === 'female')) {
+                    esc_html_e('This entry represents one sex of a binary family: preview shows normal and shiny for that sex only (see the family placeholder for both).', 'poke-hub');
                 } else {
                     esc_html_e('Preview of sprites from your configured Pokémon asset base URL: normal and shiny. If gender dimorphism is enabled, male and female variants are shown.', 'poke-hub');
                 }
@@ -848,7 +855,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                 <?php
                 $preview_cells = [];
 
-                $show_quad_sprites = $has_gender_dimorphism || $show_binary_sex_family_sprite_preview;
+                $show_quad_sprites = $has_gender_dimorphism
+                    || ($show_binary_sex_family_sprite_preview && $bin_sprite_preview_scope === 'quad');
 
                 if ($show_quad_sprites) {
                     $pv_male_obj = $preview_pokemon;
@@ -902,6 +910,35 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         'label' => __('Shiny (female)', 'poke-hub'),
                         'src'   => $src_shiny_female['src'],
                         'fallback' => $src_shiny_female['fallback'],
+                    ];
+                } elseif ($show_binary_sex_family_sprite_preview && ($bin_sprite_preview_scope === 'male' || $bin_sprite_preview_scope === 'female')) {
+                    $stem_pv = strtolower(trim((string) $slug));
+                    if (function_exists('poke_hub_pokemon_binary_sex_family_stem_from_slug_lc')) {
+                        $st = poke_hub_pokemon_binary_sex_family_stem_from_slug_lc($stem_pv);
+                        if ($st !== null && $st !== '') {
+                            $stem_pv = $st;
+                        }
+                    }
+                    $asset_slug_bin = function_exists('poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column')
+                        ? poke_hub_pokemon_binary_sex_family_asset_slug_for_preview_column($stem_pv, $bin_sprite_preview_scope, $bin_slugs_preview)
+                        : $stem_pv;
+                    $pv_bin_one = (object) [
+                        'id'         => ($is_edit && isset($edit_row->id)) ? (int) $edit_row->id : 0,
+                        'slug'       => $asset_slug_bin,
+                        'dex_number' => $dex_for_bin_preview,
+                    ];
+                    $bin_sprite_args = ['skip_gender_resolution' => true];
+                    $src_normal_one = poke_hub_pokemon_get_sprite_display_sources($pv_bin_one, array_merge($bin_sprite_args, ['shiny' => false]));
+                    $preview_cells[] = [
+                        'label' => __('Normal', 'poke-hub'),
+                        'src'   => $src_normal_one['src'],
+                        'fallback' => $src_normal_one['fallback'],
+                    ];
+                    $src_shiny_one = poke_hub_pokemon_get_sprite_display_sources($pv_bin_one, array_merge($bin_sprite_args, ['shiny' => true]));
+                    $preview_cells[] = [
+                        'label' => __('Shiny', 'poke-hub'),
+                        'src'   => $src_shiny_one['src'],
+                        'fallback' => $src_shiny_one['fallback'],
                     ];
                 } else {
                     $src_normal = poke_hub_pokemon_get_sprite_display_sources($preview_pokemon, ['shiny' => false]);

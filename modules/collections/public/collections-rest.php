@@ -163,17 +163,35 @@ add_action('rest_api_init', function () {
             $id  = (int) $request['id'];
             $col = poke_hub_collections_get_one($id);
             if (!$col) {
-                return new WP_REST_Response(['error' => 'Not found'], 404);
+                return new WP_REST_Response(
+                    [
+                        'error'   => 'not_found',
+                        'message' => __('Collection not found.', 'poke-hub'),
+                    ],
+                    404
+                );
             }
             $user_id = get_current_user_id();
             if ((int) $col['user_id'] === 0) {
                 $ip = poke_hub_collections_get_client_ip();
                 $owner_key = $resolve_owner_key($request, $col);
                 if (!poke_hub_collections_can_edit_anonymous($id, $ip, $owner_key)) {
-                    return new WP_REST_Response(['error' => 'Forbidden'], 403);
+                    return new WP_REST_Response(
+                        [
+                            'error'   => 'forbidden',
+                            'message' => __('You cannot access this collection.', 'poke-hub'),
+                        ],
+                        403
+                    );
                 }
             } elseif (!poke_hub_collections_row_is_public($col) && (int) $col['user_id'] !== $user_id) {
-                return new WP_REST_Response(['error' => 'Forbidden'], 403);
+                return new WP_REST_Response(
+                    [
+                        'error'   => 'forbidden',
+                        'message' => __('You cannot access this collection.', 'poke-hub'),
+                    ],
+                    403
+                );
             }
             unset($col['anonymous_ip']);
             $col['items'] = poke_hub_collections_get_items($id);
@@ -251,7 +269,13 @@ add_action('rest_api_init', function () {
             $user_id       = get_current_user_id();
             $items         = $request->get_param('items');
             if (!is_array($items)) {
-                return new WP_REST_Response(['success' => false, 'message' => 'Invalid items'], 400);
+                return new WP_REST_Response(
+                    [
+                        'success' => false,
+                        'message' => __('Invalid items payload.', 'poke-hub'),
+                    ],
+                    400
+                );
             }
             $ok = poke_hub_collections_set_items($collection_id, $items, $user_id);
             return new WP_REST_Response(['success' => $ok], 200);
@@ -306,9 +330,7 @@ add_action('rest_api_init', function () {
 
     register_rest_route('poke-hub/v1', '/collections/anonymous-by-ip', [
         'methods'             => 'GET',
-        'permission_callback' => function () {
-            return is_user_logged_in();
-        },
+        'permission_callback' => '__return_true',
         'callback'            => function (WP_REST_Request $request) {
             $ip   = poke_hub_collections_get_client_ip();
             $list = poke_hub_collections_get_anonymous_by_ip($ip);

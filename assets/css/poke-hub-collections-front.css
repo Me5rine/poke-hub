@@ -118,3 +118,11 @@
     margin: 0.75rem 1rem;
     text-align: center;
 }
+
+/* Invité — états chargement / vide / grille / blocage 2e liste ([hidden] + .is-hidden selon thème) */
+#pokehub-collections-guest-create-blocked[hidden],
+#pokehub-collections-guest-loading[hidden],
+#pokehub-collections-guest-empty-all[hidden],
+#pokehub-collections-guest-grid[hidden] {
+    display: none !important;
+}

@@ -210,7 +210,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_pokemon_edit_form')) {
                     poke_hub_pokemon_pokemon_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_pokemon_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_pokemon_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -247,7 +253,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_regions_edit_form')) {
                     poke_hub_pokemon_regions_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_regions_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_regions_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -417,7 +429,13 @@ function poke_hub_pokemon_admin_ui() {
                         $current_offensive_no_effect_ids
                     );
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_types_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_types_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -459,7 +477,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_attacks_edit_form')) {
                     poke_hub_pokemon_attacks_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_attacks_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_attacks_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
 
                 return;
@@ -488,7 +512,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_forms_edit_form')) {
                     poke_hub_pokemon_forms_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_forms_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_forms_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -507,7 +537,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_weathers_edit_form')) {
                     poke_hub_pokemon_weathers_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_weathers_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_weathers_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -524,7 +560,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_egg_types_edit_form')) {
                     poke_hub_pokemon_egg_types_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_egg_types_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_egg_types_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -545,7 +587,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_items_edit_form')) {
                     poke_hub_pokemon_items_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_items_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_items_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -566,7 +614,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_backgrounds_edit_form')) {
                     poke_hub_pokemon_backgrounds_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_backgrounds_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_backgrounds_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -587,7 +641,13 @@ function poke_hub_pokemon_admin_ui() {
                 if (function_exists('poke_hub_pokemon_biomes_edit_form')) {
                     poke_hub_pokemon_biomes_edit_form($edit_row);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_pokemon_biomes_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_pokemon_biomes_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
 
@@ -621,7 +681,13 @@ function poke_hub_pokemon_admin_ui() {
                     
                     poke_hub_regional_region_edit_form($edit_data);
                 } else {
-                    echo '<div class="wrap"><h1>Missing function: poke_hub_regional_region_edit_form()</h1></div>';
+                    echo '<div class="wrap"><h1>' . esc_html(
+                        sprintf(
+                            /* translators: %s: Expected PHP function name. */
+                            __('Missing admin component (%s)', 'poke-hub'),
+                            'poke_hub_regional_region_edit_form()'
+                        )
+                    ) . '</h1></div>';
                 }
                 break;
         }
@@ -880,7 +946,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_pokemon_screen')) {
                         poke_hub_pokemon_admin_pokemon_screen();
                     } else {
-                        echo '<p>Pokemon screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Pokémon list screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -888,7 +954,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_generations_screen')) {
                         poke_hub_pokemon_admin_generations_screen();
                     } else {
-                        echo '<p>Generations screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Generations screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -896,7 +962,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_regions_screen')) {
                         poke_hub_pokemon_admin_regions_screen();
                     } else {
-                        echo '<p>Regions screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Regions screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -904,7 +970,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_types_screen')) {
                         poke_hub_pokemon_admin_types_screen();
                     } else {
-                        echo '<p>Types screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Types screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -912,7 +978,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_attacks_screen')) {
                         poke_hub_pokemon_admin_attacks_screen();
                     } else {
-                        echo '<p>Attacks screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Attacks screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -920,7 +986,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_forms_screen')) {
                         poke_hub_pokemon_admin_forms_screen();
                     } else {
-                        echo '<p>Form variants screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Form variants screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -928,7 +994,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_weathers_screen')) {
                         poke_hub_pokemon_admin_weathers_screen();
                     } else {
-                        echo '<p>Weathers screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Weather screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -936,7 +1002,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_egg_types_screen')) {
                         poke_hub_pokemon_admin_egg_types_screen();
                     } else {
-                        echo '<p>Egg types screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Egg types screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -944,7 +1010,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_items_screen')) {
                         poke_hub_pokemon_admin_items_screen();
                     } else {
-                        echo '<p>Items screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Items screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -952,7 +1018,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_backgrounds_screen')) {
                         poke_hub_pokemon_admin_backgrounds_screen();
                     } else {
-                        echo '<p>Backgrounds screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Backgrounds screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -960,7 +1026,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_biomes_screen')) {
                         poke_hub_pokemon_admin_biomes_screen();
                     } else {
-                        echo '<p>Biomes screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Biomes screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 
@@ -968,7 +1034,7 @@ function poke_hub_pokemon_admin_ui() {
                     if (function_exists('poke_hub_pokemon_admin_regional_regions_screen')) {
                         poke_hub_pokemon_admin_regional_regions_screen();
                     } else {
-                        echo '<p>Regional regions screen not implemented yet.</p>';
+                        echo '<p>' . esc_html__('The Regional regions screen could not be loaded.', 'poke-hub') . '</p>';
                     }
                     break;
 

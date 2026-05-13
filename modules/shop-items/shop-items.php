@@ -62,7 +62,13 @@ function poke_hub_shop_items_admin_render_list_frame_start(string $active_tab, ?
     $section_label = poke_hub_shop_items_get_tab_section_label($active_tab);
 
     echo '<div class="wrap">';
-    echo '<h1 class="wp-heading-inline">' . esc_html($section_label . ' – Poké HUB') . '</h1>';
+    echo '<h1 class="wp-heading-inline">' . esc_html(
+        sprintf(
+            /* translators: %s: section label (e.g. Avatar shop). */
+            __('%s – Poké HUB', 'poke-hub'),
+            $section_label
+        )
+    ) . '</h1>';
 
     if (is_array($add_button) && !empty($add_button['url']) && !empty($add_button['label'])) {
         echo '<a href="' . esc_url((string) $add_button['url']) . '" class="page-title-action">' . esc_html((string) $add_button['label']) . '</a>';

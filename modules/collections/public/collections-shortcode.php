@@ -239,12 +239,13 @@ add_shortcode('poke_hub_collections', function ($atts) {
         <?php endif; ?>
 
         <div class="pokehub-collections-list">
-            <?php if (empty($collections)) : ?>
-                <p class="pokehub-collections-empty me5rine-lab-state-message" role="status">
-                    <?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?>
-                </p>
-            <?php else : ?>
-                <ul class="pokehub-collections-grid">
+            <?php if ($is_logged_in) : ?>
+                <?php if (empty($collections)) : ?>
+                    <p class="pokehub-collections-empty me5rine-lab-state-message" role="status">
+                        <?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?>
+                    </p>
+                <?php else : ?>
+                    <ul class="pokehub-collections-grid">
                     <?php
                     $collections_base_url = rtrim(get_permalink(), '/');
                     foreach ($collections as $col) :
@@ -288,8 +289,27 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         </li>
                     <?php endforeach; ?>
                 </ul>
+                <?php endif; ?>
+            <?php else : ?>
+                <p id="pokehub-collections-guest-loading" class="pokehub-collections-guest-loading me5rine-lab-state-message" role="status"><?php esc_html_e('Loading your lists…', 'poke-hub'); ?></p>
+                <ul id="pokehub-collections-guest-grid" class="pokehub-collections-grid" hidden aria-live="polite"></ul>
+                <p id="pokehub-collections-guest-empty-all" class="pokehub-collections-empty me5rine-lab-state-message" hidden role="status"><?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?></p>
             <?php endif; ?>
         </div>
+
+        <?php if (!$is_logged_in) : ?>
+        <div id="pokehub-collections-guest-create-blocked" class="pokehub-collections-guest-create-blocked me5rine-lab-form-message me5rine-lab-form-message-warning" hidden role="alert" aria-live="polite">
+            <p class="pokehub-collections-guest-create-blocked-intro"><strong><?php esc_html_e('Create an account for another list', 'poke-hub'); ?></strong></p>
+            <p class="pokehub-collections-guest-create-blocked-body"><?php esc_html_e('You already have a collection without an account. Log in or register to create additional lists and keep them if you change device.', 'poke-hub'); ?></p>
+            <p class="pokehub-collections-guest-create-blocked-actions">
+                <?php if (get_option('users_can_register')) : ?>
+                    <a class="me5rine-lab-form-button button button-primary" href="<?php echo esc_url(wp_registration_url()); ?>"><?php esc_html_e('Create an account', 'poke-hub'); ?></a>
+                <?php endif; ?>
+                <a class="me5rine-lab-form-button me5rine-lab-form-button-secondary button" href="<?php echo esc_url(wp_login_url(get_permalink())); ?>"><?php esc_html_e('Log in', 'poke-hub'); ?></a>
+                <button type="button" class="pokehub-collections-guest-create-blocked-dismiss me5rine-lab-form-button me5rine-lab-form-button-secondary button"><?php esc_html_e('Close', 'poke-hub'); ?></button>
+            </p>
+        </div>
+        <?php endif; ?>
 
         <!-- Drawer création (panneau latéral, comme l’édition) -->
         <div class="pokehub-collections-drawer pokehub-collections-drawer-create pokehub-collections-drawer--menu-like" id="pokehub-collections-drawer-create" role="dialog" aria-label="<?php esc_attr_e('New collection', 'poke-hub'); ?>" aria-hidden="true">
@@ -405,8 +425,8 @@ add_shortcode('poke_hub_collections', function ($atts) {
                         ?>
                     <?php if (!$is_logged_in) : ?>
                         <p class="pokehub-collections-warning me5rine-lab-form-message me5rine-lab-form-message-warning" role="alert">
-                            <?php esc_html_e('You are not logged in. This collection will be stored locally on this device.', 'poke-hub'); ?>
-                            <?php esc_html_e('Create an account to save your collections.', 'poke-hub'); ?>
+                            <?php esc_html_e('You are not logged in. Your list is saved for this browser and connection; keep the link to open it again.', 'poke-hub'); ?>
+                            <?php esc_html_e('Create an account to manage several collections and sync them everywhere.', 'poke-hub'); ?>
                         </p>
                     <?php endif; ?>
                 </div>

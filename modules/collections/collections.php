@@ -66,12 +66,19 @@ function poke_hub_collections_enqueue_front_assets() {
         ? poke_hub_pokemon_get_assets_base_url()
         : '';
 
+    $collections_page_url = rtrim((string) get_permalink(), '/');
+    $register_url           = get_option('users_can_register') ? (string) wp_registration_url() : '';
+
     wp_localize_script('poke-hub-collections-front', 'pokeHubCollections', [
         'pogoSearchKeywords' => poke_hub_collections_get_pogo_search_keywords(),
         'ajaxUrl'            => admin_url('admin-ajax.php'),
         'restUrl'    => rest_url('poke-hub/v1/'),
         'nonce'      => wp_create_nonce('wp_rest'),
         'isLoggedIn' => is_user_logged_in(),
+        'collectionsBaseUrl' => $collections_page_url,
+        'registerUrl'        => $register_url,
+        'loginUrl'           => (string) wp_login_url($collections_page_url ?: home_url('/')),
+        'categoryLabels'     => poke_hub_collections_get_categories(),
         /* Catégorie => clés data-collections-control masquées (création + défauts sauvegarde édition). Voir docs/COLLECTIONS_MODULE.md. */
         'settingsHiddenByCategory' => function_exists('poke_hub_collections_settings_hidden_control_keys_map_for_ui')
             ? poke_hub_collections_settings_hidden_control_keys_map_for_ui()
@@ -96,8 +103,11 @@ function poke_hub_collections_enqueue_front_assets() {
             'includeRegionalForms' => __('Include regional forms (Alola, Galar, Paldea, Hisui)', 'poke-hub'),
             'includeCostumes' => __('Include costumed Pokémon', 'poke-hub'),
             'includeSpecialAttacks' => __('Include special attacks', 'poke-hub'),
-            'notLoggedInWarning' => __('You are not logged in. This collection will be stored locally on this device.', 'poke-hub'),
-            'createAccountHint' => __('Create an account to save your collections.', 'poke-hub'),
+            'notLoggedInWarning' => __('You are not logged in. Your list is saved for this browser and connection; keep the link to open it again.', 'poke-hub'),
+            'createAccountHint' => __('Create an account to manage several collections and sync them everywhere.', 'poke-hub'),
+            'guestSecondCollectionTitle' => __('Create an account for another list', 'poke-hub'),
+            'guestSecondCollectionBody' => __('You already have a collection without an account. Log in or register to create additional lists and keep them if you change device.', 'poke-hub'),
+            'guestLocalBadge' => __('On this device only', 'poke-hub'),
             'cancel'          => __('Cancel', 'poke-hub'),
             'save'            => __('Create collection', 'poke-hub'),
             'collectionDefaultNameLuckyDex' => __( 'Lucky National Dex', 'poke-hub' ),
@@ -187,6 +197,7 @@ function poke_hub_collections_enqueue_front_assets() {
             'deleteCollectionConfirm'                 => __('Delete the collection "%s"? This cannot be undone.', 'poke-hub'),
             'loadPoolFailed'                          => __('Could not load the Pokémon list.', 'poke-hub'),
             'localCollectionMissing'                  => __('This local collection could not be found.', 'poke-hub'),
+            'offlineLocalSaveFailed'                  => __('Could not save this list on your device. Check storage space and private mode.', 'poke-hub'),
             'collectionNotFoundTitle'                 => __('Collection not found', 'poke-hub'),
             'batchAddError'                           => __('Could not add Pokémon. Try again.', 'poke-hub'),
             'shareDialogTitle'                       => __('Share collection', 'poke-hub'),
