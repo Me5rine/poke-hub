@@ -1312,38 +1312,8 @@ function poke_hub_pokemon_clone_link_rows(int $source_id, int $new_id): bool {
         }
     }
 
-    // Évolutions dont ce Pokémon était la BASE (même familles vers les mêmes cibles ; à ajuster en admin si besoin)
-    $evo = pokehub_get_table('pokemon_evolutions');
-    if ($evo) {
-        $wpdb->query(
-            "
-            INSERT INTO `{$evo}` (
-                base_pokemon_id, target_pokemon_id,
-                base_form_variant_id, target_form_variant_id,
-                candy_cost, candy_cost_purified,
-                is_trade_evolution, no_candy_cost_via_trade, is_random_evolution,
-                method, item_requirement_slug, item_requirement_cost, item_id,
-                lure_item_slug, lure_item_id,
-                weather_requirement_slug, gender_requirement, time_of_day,
-                priority, quest_template_id, extra
-            )
-            SELECT
-                {$new_id}, target_pokemon_id,
-                base_form_variant_id, target_form_variant_id,
-                candy_cost, candy_cost_purified,
-                is_trade_evolution, no_candy_cost_via_trade, is_random_evolution,
-                method, item_requirement_slug, item_requirement_cost, item_id,
-                lure_item_slug, lure_item_id,
-                weather_requirement_slug, gender_requirement, time_of_day,
-                priority, quest_template_id, extra
-            FROM `{$evo}`
-            WHERE base_pokemon_id = {$source_id}
-            "
-        );
-        if ($wpdb->last_error) {
-            return false;
-        }
-    }
+    // Les évolutions ne sont pas copiées : elles dépendent de la forme / du costume et
+    // une copie aveugle crée des liens vers les mauvaises cibles (ex. Herbizarre costume → Florizarre normal).
 
     // Liens événements (costume etc.)
     $ppe = pokehub_get_table('pokemon_pokemon_events');
@@ -1604,10 +1574,55 @@ function poke_hub_pokemon_prepare_evolutions_from_request(array $raw): array {
 }
 
 /**
+ * Supprime les arêtes d'évolution dont base_form_variant_id ou target_form_variant_id
+ * ne correspondent plus à la fiche Pokémon liée (lignées fantômes après clone / import).
+ *
+ * @return int Nombre de lignes supprimées.
+ */
+function poke_hub_pokemon_purge_evolution_form_variant_mismatches(?int $limit_to_pokemon_id = null): int {
+    if (!function_exists('pokehub_get_table')) {
+        return 0;
+    }
+
+    global $wpdb;
+
+    $evo_table     = pokehub_get_table('pokemon_evolutions');
+    $pokemon_table = pokehub_get_table('pokemon');
+    if (!$evo_table || !$pokemon_table) {
+        return 0;
+    }
+
+    $scope_sql = '';
+    $scope_args  = [];
+    if ($limit_to_pokemon_id !== null && $limit_to_pokemon_id > 0) {
+        $scope_sql  = ' AND (e.base_pokemon_id = %d OR e.target_pokemon_id = %d)';
+        $scope_args = [$limit_to_pokemon_id, $limit_to_pokemon_id];
+    }
+
+    $sql = "
+        DELETE e FROM {$evo_table} e
+        LEFT JOIN {$pokemon_table} b ON b.id = e.base_pokemon_id
+        LEFT JOIN {$pokemon_table} t ON t.id = e.target_pokemon_id
+        WHERE (
+            (e.base_pokemon_id > 0 AND (b.id IS NULL OR COALESCE(e.base_form_variant_id, 0) <> COALESCE(b.form_variant_id, 0)))
+            OR (e.target_pokemon_id > 0 AND (t.id IS NULL OR COALESCE(e.target_form_variant_id, 0) <> COALESCE(t.form_variant_id, 0)))
+        ){$scope_sql}
+    ";
+
+    if ($scope_args !== []) {
+        $wpdb->query($wpdb->prepare($sql, ...$scope_args));
+    } else {
+        $wpdb->query($sql);
+    }
+
+    return (int) $wpdb->rows_affected;
+}
+
+/**
  * Synchronise les évolutions d'un Pokémon dans la table pokemon_evolutions.
  *
- * Stratégie : on SUPPRIME toutes les lignes existantes pour (base_pokemon_id, base_form_variant_id)
- * puis on INSERT les nouvelles.
+ * Stratégie : on SUPPRIME toutes les lignes existantes pour base_pokemon_id (toutes variantes
+ * de base_form_variant_id, y compris 0 / obsolètes) puis on INSERT les nouvelles.
  *
  * Deux modes :
  * - mode 'import' : données venant d'un import / normalisation (proto IDs, items, extra JSON, resolver, etc.)
@@ -1670,19 +1685,15 @@ function poke_hub_pokemon_sync_pokemon_evolutions(
     }
 
     // -------------------------------------------------
-    // 2) Suppression des lignes existantes
+    // 2) Suppression des lignes existantes (toute la base, pas seulement une variante)
     // -------------------------------------------------
     $wpdb->delete(
         $evo_table,
-        [
-            'base_pokemon_id'      => $base_pokemon_id,
-            'base_form_variant_id' => $base_form_variant_id,
-        ],
-        ['%d', '%d']
+        ['base_pokemon_id' => $base_pokemon_id],
+        ['%d']
     );
 
     if (empty($rows)) {
-        // Rien à insérer
         return;
     }
 
@@ -2603,6 +2614,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
         }
 
     // Sync évolutions si helper dispo
+    if ($pokemon_id > 0 && function_exists('poke_hub_pokemon_purge_evolution_form_variant_mismatches')) {
+        poke_hub_pokemon_purge_evolution_form_variant_mismatches($pokemon_id);
+    }
     if ($pokemon_id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_evolutions')) {
         $evo_rows = poke_hub_pokemon_prepare_evolutions_from_request((array) $evolutions_raw);
 
@@ -2695,6 +2709,9 @@ function poke_hub_pokemon_handle_pokemon_form() {
     }
 
     // Sync évolutions si helper dispo
+    if ($id > 0 && function_exists('poke_hub_pokemon_purge_evolution_form_variant_mismatches')) {
+        poke_hub_pokemon_purge_evolution_form_variant_mismatches((int) $id);
+    }
     if ($id > 0 && function_exists('poke_hub_pokemon_sync_pokemon_evolutions')) {
         $evo_rows = poke_hub_pokemon_prepare_evolutions_from_request((array) $evolutions_raw);
 
@@ -2770,7 +2787,7 @@ function poke_hub_pokemon_admin_pokemon_screen() {
         } elseif ($msg === 'deleted') {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon deleted.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'cloned') {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon cloned. Adjust the slug and name, then save.', 'poke-hub') . '</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Pokémon cloned. Adjust the slug and name, set evolutions, then save.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'clone_failed') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Unable to duplicate this Pokémon.', 'poke-hub') . '</p></div>';
         } elseif ($msg === 'invalid_id') {
@@ -2797,3 +2814,19 @@ function poke_hub_pokemon_admin_pokemon_screen() {
     </form>
     <?php
 }
+
+/**
+ * Nettoyage unique des arêtes d'évolution incohérentes (base_form_variant_id / target_form_variant_id).
+ */
+function poke_hub_pokemon_maybe_purge_evolution_mismatches_once(): void {
+    if (!is_admin() || get_option('poke_hub_evo_form_variant_mismatch_purge_v1') === '1') {
+        return;
+    }
+    if (!function_exists('poke_hub_pokemon_purge_evolution_form_variant_mismatches')) {
+        return;
+    }
+
+    poke_hub_pokemon_purge_evolution_form_variant_mismatches();
+    update_option('poke_hub_evo_form_variant_mismatch_purge_v1', '1', false);
+}
+add_action('admin_init', 'poke_hub_pokemon_maybe_purge_evolution_mismatches_once', 20);

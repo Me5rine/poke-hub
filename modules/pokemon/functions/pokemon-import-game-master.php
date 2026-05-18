@@ -2551,7 +2551,11 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
             }
 
             // Resolver proto → (pokemon_id, form_variant_id), sans placeholders *-family*
-            $resolver = static function( string $target_id_proto, string $target_form_proto ) use ( $pokemon_index ): array {
+            $resolver = static function( string $target_id_proto, string $target_form_proto ) use (
+                $pokemon_index,
+                $base_proto,
+                $base_form_key
+            ): array {
                 if ( $target_id_proto === '' ) {
                     return [ 0, 0 ];
                 }
@@ -2562,18 +2566,18 @@ function poke_hub_pokemon_import_game_master( $source, array $options = [] ) {
                 $target_bucket = $pokemon_index[ $target_id_proto ];
                 $form_key      = $target_form_proto !== '' ? $target_form_proto : '';
 
-                $info = $target_bucket[ $form_key ] ?? null;
-                if ( ! $info && isset( $target_bucket[''] ) ) {
-                    $info = $target_bucket[''];
+                if ( function_exists( 'poke_hub_pokemon_gm_derive_evolution_target_form_key' ) ) {
+                    $form_key = poke_hub_pokemon_gm_derive_evolution_target_form_key(
+                        $base_form_key,
+                        $base_proto,
+                        $target_id_proto,
+                        $form_key
+                    );
                 }
 
-                if ( ! $info ) {
-                    return [ 0, 0 ];
-                }
-
-                if ( function_exists( 'poke_hub_pokemon_gm_resolve_index_row_for_evolution_links' ) ) {
-                    $info = poke_hub_pokemon_gm_resolve_index_row_for_evolution_links( $target_bucket, $info, $target_id_proto );
-                }
+                $info = function_exists( 'poke_hub_pokemon_gm_pick_evolution_target_index_row' )
+                    ? poke_hub_pokemon_gm_pick_evolution_target_index_row( $target_bucket, $target_id_proto, $form_key )
+                    : null;
 
                 if ( ! $info ) {
                     return [ 0, 0 ];

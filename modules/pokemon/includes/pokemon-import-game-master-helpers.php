@@ -1621,6 +1621,118 @@ function poke_hub_pokemon_import_gm_slug_is_family_placeholder( string $slug ): 
 }
 
 /**
+ * Déduit la clé de forme cible (index GM) à partir de la forme de base et de la branche d'évolution.
+ * Évite qu'un Herbizarre costumé avec une branche « VENUSAUR_NORMAL » ne pointe vers le Florizarre standard.
+ *
+ * @param string               $base_form_key     Clé forme du parent dans pokemon_index (ex. IVYSAUR_PARTY_HAT).
+ * @param string               $base_proto        pokemonId du parent (ex. IVYSAUR).
+ * @param string               $target_proto      pokemonId de la cible (ex. VENUSAUR).
+ * @param string               $branch_form_proto Forme indiquée sur evolutionBranch (ex. VENUSAUR_NORMAL).
+ * @return string Clé à tester dans le bucket cible (peut être vide = forme par défaut).
+ */
+function poke_hub_pokemon_gm_derive_evolution_target_form_key(
+    string $base_form_key,
+    string $base_proto,
+    string $target_proto,
+    string $branch_form_proto
+): string {
+    $base_key_u   = strtoupper( trim( $base_form_key ) );
+    $base_proto_u = strtoupper( trim( $base_proto ) );
+    $target_u     = strtoupper( trim( $target_proto ) );
+    $branch_u     = strtoupper( trim( $branch_form_proto ) );
+
+    $suffix_from_base = static function ( string $form_key, string $species_proto ) use ( $base_proto_u ): string {
+        if ( $form_key === '' || $species_proto === '' ) {
+            return '';
+        }
+        $prefix = $species_proto . '_';
+        if ( strpos( $form_key, $prefix ) === 0 ) {
+            return substr( $form_key, strlen( $prefix ) );
+        }
+
+        return $form_key;
+    };
+
+    $build_target_key = static function ( string $suffix ) use ( $target_u ): string {
+        $suffix = trim( $suffix );
+        if ( $suffix === '' || strtolower( $suffix ) === 'normal' || strtolower( $suffix ) === 'unset' ) {
+            return '';
+        }
+
+        return $target_u . '_' . $suffix;
+    };
+
+    $base_suffix = $suffix_from_base( $base_key_u, $base_proto_u );
+    $base_is_variant = ( $base_key_u !== '' && $base_suffix !== '' && strtolower( $base_suffix ) !== 'normal' );
+
+    if ( $branch_u !== '' ) {
+        $branch_suffix = $suffix_from_base( $branch_u, $target_u );
+        $branch_is_generic_normal = (
+            $branch_u === $target_u . '_NORMAL'
+            || $branch_u === 'NORMAL'
+            || strtolower( $branch_suffix ) === 'normal'
+        );
+
+        if ( $base_is_variant && $branch_is_generic_normal ) {
+            return $build_target_key( $base_suffix );
+        }
+
+        return $branch_u;
+    }
+
+    if ( $base_is_variant ) {
+        return $build_target_key( $base_suffix );
+    }
+
+    return '';
+}
+
+/**
+ * Choisit une entrée du bucket index pour la cible d'une évolution (import GM).
+ *
+ * @param array<string, array> $target_bucket pokemon_index[target_proto].
+ * @return array|null
+ */
+function poke_hub_pokemon_gm_pick_evolution_target_index_row(
+    array $target_bucket,
+    string $target_proto,
+    string $form_key
+): ?array {
+    $form_key = trim( $form_key );
+    $candidates = [];
+
+    if ( $form_key !== '' && isset( $target_bucket[ $form_key ] ) ) {
+        $candidates[] = $target_bucket[ $form_key ];
+    }
+    if ( isset( $target_bucket[''] ) ) {
+        $candidates[] = $target_bucket[''];
+    }
+    if ( $candidates === [] ) {
+        foreach ( $target_bucket as $row ) {
+            if ( is_array( $row ) && ! empty( $row['pokemon_id'] ) ) {
+                $candidates[] = $row;
+            }
+        }
+    }
+
+    foreach ( $candidates as $info ) {
+        if ( ! is_array( $info ) || empty( $info['pokemon_id'] ) ) {
+            continue;
+        }
+        if ( function_exists( 'poke_hub_pokemon_gm_resolve_index_row_for_evolution_links' ) ) {
+            $resolved = poke_hub_pokemon_gm_resolve_index_row_for_evolution_links( $target_bucket, $info, $target_proto );
+            if ( $resolved ) {
+                return $resolved;
+            }
+        } else {
+            return $info;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Normalise le bloc evolutionBranch[] d'un pokemonSettings
  * dans un format générique utilisable pour la BDD.
  *
