@@ -31,13 +31,10 @@ jQuery(function($) {
         } else if (method === 'stats') {
             $row.find('.pokehub-evo-method-stats').css('display', 'block');
         }
-        
-        // Time of day : s'affiche si une valeur est sélectionnée
-        var timeOfDaySelect = $row.find('select[name*="[time_of_day]"]');
-        if (timeOfDaySelect.length && timeOfDaySelect.val()) {
+
+        // Time of day : condition supplémentaire pour level up (comme la météo)
+        if (method === '' || method === 'levelup') {
             $row.find('.pokehub-evo-method-time').css('display', 'block');
-        } else {
-            $row.find('.pokehub-evo-method-time').css('display', 'none');
         }
     }
     
@@ -47,19 +44,6 @@ jQuery(function($) {
     // Écouter les changements sur les selects de méthode
     $(document).on('change', '.pokehub-evolution-method', function() {
         toggleEvolutionFields(this);
-    });
-    
-    // Gérer l'affichage du time_of_day quand il change
-    $(document).on('change', 'select[name*="[time_of_day]"]', function() {
-        var $row = $(this).closest('tr');
-        if (!$row.length) {
-            $row = $(this).closest('td');
-        }
-        if ($(this).val()) {
-            $row.find('.pokehub-evo-method-time').css('display', 'block');
-        } else {
-            $row.find('.pokehub-evo-method-time').css('display', 'none');
-        }
     });
     
     // Initialiser au chargement pour tous les selects existants

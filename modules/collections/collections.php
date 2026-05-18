@@ -24,6 +24,7 @@ require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-helpers.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-pogo-keywords.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/functions/collections-pages.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-routing.php';
+require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-list-render.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-shortcode.php';
 require_once POKE_HUB_COLLECTIONS_PATH . '/public/collections-rest.php';
 if ( is_admin() ) {

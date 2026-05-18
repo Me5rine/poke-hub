@@ -2219,8 +2219,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                         <br /><br />
                     </div>
                     
-                    <!-- Time of day (condition supplémentaire) -->
-                    <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: none;">
+                    <!-- Time of day (condition supplémentaire, level up) -->
+                    <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: block;">
                         <label class="pokehub-evolution-label">
                             <?php esc_html_e('Time of day', 'poke-hub'); ?>
                         </label>
@@ -2674,8 +2674,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                             <br /><br />
                                         </div>
                                         
-                                        <!-- Time of day (condition supplémentaire) -->
-                                        <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: <?php echo (!empty($row->time_of_day)) ? 'block' : 'none'; ?>;">
+                                        <!-- Time of day (condition supplémentaire, level up) -->
+                                        <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: <?php echo (in_array($current_method, ['', 'levelup'], true) || !empty($row->time_of_day)) ? 'block' : 'none'; ?>;">
                                             <label class="pokehub-evolution-label">
                                                 <?php esc_html_e('Time of day', 'poke-hub'); ?>
                                             </label>
@@ -2901,8 +2901,8 @@ function poke_hub_pokemon_pokemon_edit_form($edit_row = null) {
                                         <br /><br />
                                     </div>
                                     
-                                    <!-- Time of day (condition supplémentaire) -->
-                                    <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: none;">
+                                    <!-- Time of day (condition supplémentaire, level up) -->
+                                    <div class="pokehub-evolution-conditional pokehub-evo-method-time" style="display: block;">
                                         <label class="pokehub-evolution-label">
                                             <?php esc_html_e('Time of day', 'poke-hub'); ?>
                                         </label>

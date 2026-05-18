@@ -315,5 +315,12 @@ $profile['reasons'] = array_map('strval', $profile['reasons']);
             <?php endif; ?>
         </div>
     <?php endif; ?>
+
+    <?php
+    if (poke_hub_is_module_active('collections') && poke_hub_is_module_active('pokemon') && function_exists('poke_hub_collections_render_profile_section')) {
+        $profile_collections_owner = is_user_logged_in() && (get_current_user_id() === (int) $user_id || current_user_can('manage_options'));
+        poke_hub_collections_render_profile_section((int) $user_id, $profile_collections_owner);
+    }
+    ?>
 </div>
 

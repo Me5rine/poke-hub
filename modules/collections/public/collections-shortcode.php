@@ -211,12 +211,23 @@ add_shortcode('poke_hub_collections', function ($atts) {
     $user_id      = $is_logged_in ? get_current_user_id() : 0;
     $collections  = $user_id > 0 ? poke_hub_collections_get_by_user($user_id) : [];
     $categories   = poke_hub_collections_get_categories();
+    $has_mine     = $is_logged_in ? ($collections !== []) : false;
+    if (!$is_logged_in && function_exists('poke_hub_collections_get_anonymous_by_ip') && function_exists('poke_hub_collections_get_client_ip')) {
+        $guest_ip = poke_hub_collections_get_client_ip();
+        if ($guest_ip !== '') {
+            $has_mine = poke_hub_collections_get_anonymous_by_ip($guest_ip) !== [];
+        }
+    }
+    $collections_base_url = rtrim((string) get_permalink(), '/');
+    $dashboard_url        = function_exists('poke_hub_collections_get_dashboard_page_url')
+        ? poke_hub_collections_get_dashboard_page_url()
+        : $collections_base_url;
 
     ob_start();
     ?>
     <div class="pokehub-collections-wrap collections-dashboard me5rine-lab-dashboard" data-logged-in="<?php echo $is_logged_in ? '1' : '0'; ?>">
         <div class="pokehub-collections-home-header me5rine-lab-form-block">
-            <h2 class="me5rine-lab-title-large"><?php esc_html_e('My collections', 'poke-hub'); ?></h2>
+            <h2 class="me5rine-lab-title-large"><?php esc_html_e('Collections', 'poke-hub'); ?></h2>
             <div class="me5rine-lab-dashboard-header">
                 <p class="me5rine-lab-subtitle"><?php esc_html_e('Create fully customizable collections (shiny, costumed Pokemon, 100%, and more), build as many as you want, and manage them your way: share, export, or print them whenever you need.', 'poke-hub'); ?></p>
                 <div class="me5rine-lab-dashboard-header-actions">
@@ -238,64 +249,36 @@ add_shortcode('poke_hub_collections', function ($atts) {
         </div>
         <?php endif; ?>
 
-        <div class="pokehub-collections-list">
+        <section
+            id="pokehub-collections-mine-section"
+            class="pokehub-collections-section pokehub-collections-section--mine me5rine-lab-form-block"
+            aria-labelledby="pokehub-collections-mine-heading"
+            <?php echo $has_mine ? '' : ' hidden'; ?>
+        >
+            <h3 id="pokehub-collections-mine-heading" class="me5rine-lab-title-medium"><?php esc_html_e('My collections', 'poke-hub'); ?></h3>
+            <div class="pokehub-collections-list">
             <?php if ($is_logged_in) : ?>
-                <?php if (empty($collections)) : ?>
-                    <p class="pokehub-collections-empty me5rine-lab-state-message" role="status">
-                        <?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?>
-                    </p>
-                <?php else : ?>
-                    <ul class="pokehub-collections-grid">
+                    <ul class="pokehub-collections-grid pokehub-collections-grid--mine">
                     <?php
-                    $collections_base_url = rtrim(get_permalink(), '/');
-                    foreach ($collections as $col) :
-                        $col_token = $col['share_token'] ?? '';
-                        $col_view_url = $col_token !== '' ? $collections_base_url . '/' . $col_token : add_query_arg(['id' => $col['id'], 'view' => '1'], get_permalink());
-                        $col_edit_url = $col_token !== '' ? $collections_base_url . '/' . $col_token . '?edit=1' : add_query_arg(['id' => $col['id'], 'view' => '1', 'edit' => '1'], get_permalink());
-                        $card_bg_image = poke_hub_collections_get_card_background_image_url($col);
-                        $card_bg_style = $card_bg_image !== '' ? ' style="background-image: url(' . esc_url($card_bg_image) . '); background-size: cover; background-position: center top;"' : '';
-                        $col_opts = is_array($col['options'] ?? null) ? $col['options'] : [];
-                        $col_opts = array_merge(poke_hub_collections_default_options(), $col_opts);
-                        $col_pool = poke_hub_collections_get_pool((string) ($col['category'] ?? 'custom'), $col_opts);
-                        $col_items = poke_hub_collections_get_items((int) ($col['id'] ?? 0));
-                        $col_items_resolved = function_exists('poke_hub_collections_resolved_items_map')
-                            ? poke_hub_collections_resolved_items_map($col_items, is_array($col_pool) ? $col_pool : [])
-                            : $col_items;
-                        $col_for_trade_as_owned = function_exists('poke_hub_collections_for_trade_counts_as_owned_from_options')
-                            ? poke_hub_collections_for_trade_counts_as_owned_from_options($col_opts)
-                            : true;
-                        $col_owned = is_array($col_items_resolved)
-                            ? count(array_filter($col_items_resolved, function ($s) use ($col_for_trade_as_owned) { return $s === 'owned' || ($col_for_trade_as_owned && $s === 'for_trade'); }))
-                            : 0;
-                        $col_total = is_array($col_pool) ? count($col_pool) : 0;
-                        $col_pct = ($col_total > 0) ? (int) min(100, round(($col_owned / $col_total) * 100)) : 0;
+                    foreach ($collections as $col) {
+                        if (function_exists('poke_hub_collections_render_grid_card')) {
+                            poke_hub_collections_render_grid_card($col, [
+                                'show_owner'    => false,
+                                'show_actions'  => true,
+                                'categories'    => $categories,
+                                'view_base_url' => $dashboard_url,
+                            ]);
+                        }
+                    }
                     ?>
-                        <li class="me5rine-lab-card" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" data-category="<?php echo esc_attr($col['category']); ?>">
-                            <a href="<?php echo esc_url($col_view_url); ?>" class="pokehub-collections-card-link">
-                                <span class="pokehub-collections-card-bg"<?php echo $card_bg_style; ?>></span>
-                                <span class="me5rine-lab-card-name"><?php echo esc_html($col['name']); ?></span>
-                                <span class="me5rine-lab-card-meta"><?php echo esc_html($categories[$col['category']] ?? $col['category']); ?></span>
-                                <span class="pokehub-collections-card-progress" aria-hidden="true">
-                                    <span class="pokehub-collections-card-progress-stats"><?php echo (int) $col_owned; ?> / <?php echo (int) $col_total; ?></span>
-                                    <span class="pokehub-collections-card-progress-bar">
-                                        <span class="pokehub-collections-card-progress-fill" style="width: <?php echo (int) $col_pct; ?>%;"></span>
-                                    </span>
-                                </span>
-                            </a>
-                            <div class="me5rine-lab-card-actions">
-                                <a href="<?php echo esc_url($col_edit_url); ?>" class="pokehub-collections-card-btn pokehub-collections-card-btn-settings me5rine-lab-form-button me5rine-lab-form-button-secondary" title="<?php esc_attr_e('Settings', 'poke-hub'); ?>"><span class="me5rine-lab-sr-only"><?php esc_html_e('Settings', 'poke-hub'); ?></span></a>
-                                <button type="button" class="pokehub-collections-card-btn pokehub-collections-card-btn-delete pokehub-collections-btn-delete-list me5rine-lab-form-button-remove" data-collection-id="<?php echo (int) $col['id']; ?>" data-collection-name="<?php echo esc_attr($col['name']); ?>" title="<?php esc_attr_e('Delete', 'poke-hub'); ?>"><span class="me5rine-lab-sr-only"><?php esc_html_e('Delete', 'poke-hub'); ?></span></button>
-                            </div>
-                        </li>
-                    <?php endforeach; ?>
                 </ul>
-                <?php endif; ?>
             <?php else : ?>
                 <p id="pokehub-collections-guest-loading" class="pokehub-collections-guest-loading me5rine-lab-state-message" role="status"><?php esc_html_e('Loading your lists…', 'poke-hub'); ?></p>
-                <ul id="pokehub-collections-guest-grid" class="pokehub-collections-grid" hidden aria-live="polite"></ul>
+                <ul id="pokehub-collections-guest-grid" class="pokehub-collections-grid pokehub-collections-grid--mine" hidden aria-live="polite"></ul>
                 <p id="pokehub-collections-guest-empty-all" class="pokehub-collections-empty me5rine-lab-state-message" hidden role="status"><?php esc_html_e('You don\'t have any collection yet. Create one to track your 100%, shiny, costumed, etc.', 'poke-hub'); ?></p>
             <?php endif; ?>
-        </div>
+            </div>
+        </section>
 
         <?php if (!$is_logged_in) : ?>
         <div id="pokehub-collections-guest-create-blocked" class="pokehub-collections-guest-create-blocked me5rine-lab-form-message me5rine-lab-form-message-warning" hidden role="alert" aria-live="polite">
@@ -436,6 +419,12 @@ add_shortcode('poke_hub_collections', function ($atts) {
                 </div>
             </div>
         </div>
+
+        <?php
+        if (function_exists('poke_hub_collections_render_public_browse_section')) {
+            poke_hub_collections_render_public_browse_section();
+        }
+        ?>
     </div>
     <?php
     return ob_get_clean();

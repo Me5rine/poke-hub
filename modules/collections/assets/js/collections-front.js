@@ -1808,6 +1808,14 @@
                 emptyAll.hidden = n > 0;
             }
             grid.hidden = n === 0;
+            var mineSection = document.getElementById('pokehub-collections-mine-section');
+            if (mineSection) {
+                if (n > 0) {
+                    mineSection.removeAttribute('hidden');
+                } else {
+                    mineSection.setAttribute('hidden', '');
+                }
+            }
         }
         pokehubEnsureGuestAnonymousByIpFetched().then(pokehubRenderGuestCollectionsDashboard);
     }
